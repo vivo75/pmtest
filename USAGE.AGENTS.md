@@ -20,7 +20,9 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
    `l3-source-parity.sh`). Variante VM (serve `vm/work/golden.qcow2`,
    vedi `differential-test-bed/vm/README.md`):
    `differential-test-bed/run/l0-resolver-vm.sh [atomlist]`
-   (report `l0-vm-*`, mai `l0-*`).
+   (report `l0-vm-*`, mai `l0-*`),
+   `differential-test-bed/run/l1-merge-from-binpkg-vm.sh [atomlist]`
+   (report `l1-vm-*`, pkgcache `_l1-pkgcache-vm`).
 3. `python3 bench/run_benchmark.py --ops 200000 --repeat 5 --json out.json`
    — benchmark harness batch (default: `--dataset snapshot`, seed 0;
    riporta il migliore di 5).
