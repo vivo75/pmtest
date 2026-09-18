@@ -1,11 +1,13 @@
 {
+  "pm": "portuale",
+  "pm_version": "7f6fd57",
   "dataset": "snapshot",
   "ops": 200000,
   "seed": 0,
   "repeat": 5,
-  "python_seconds": 1.061202178010717,
-  "rust_seconds": 0.1733002089895308,
-  "python_ops_per_sec": 188465.50086705553,
-  "rust_ops_per_sec": 1154066.698281259,
-  "speedup": 6.123490468928546
+  "python_seconds": 1.0869163470342755,
+  "rust_seconds": 0.18177224602550268,
+  "python_ops_per_sec": 184006.8010254087,
+  "rust_ops_per_sec": 1100277.9817769318,
+  "speedup": 5.97955062337614
 }
