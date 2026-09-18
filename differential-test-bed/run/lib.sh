@@ -34,7 +34,11 @@ pm_env_load() {
     echo "!!! cannot resolve the PM under test (PMTEST_PM=${PMTEST_PM:-portuale})" >&2
     exit 2
   }
+  # Exported (not just set): children such as pm_stamp's python read
+  # PM_* from the environment.
+  set -a
   eval "$out"
+  set +a
   pm_mounts
 }
 

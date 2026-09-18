@@ -68,7 +68,7 @@ vm_ssh() {  # <ip> <cmd...> -- run a command in the guest, code passthrough
 
 vm_define() {  # <name> <disk.qcow2> [seed.iso] -- (re)define a UEFI domain
   local name=$1 disk=$2 seed=${3:-}
-  $VM_VIRSH undefine "$name" --nvram 2>/dev/null || true
+  $VM_VIRSH undefine "$name" --nvram > /dev/null 2>&1 || true
   local seed_arg=()
   [ -n "$seed" ] && seed_arg=(--disk "$seed,device=cdrom")
   virt-install --connect qemu:///system --name "$name" \
@@ -94,9 +94,16 @@ vm_claim() {  # <file...> -- take back ownership libvirt gave to qemu:qemu
   sudo chown "$(id -un):$(id -gn)" "$@" 2>/dev/null || true
 }
 
-nbd_dev() {  # echo a free /dev/nbdN (loads nbd module); caller disconnects
+nbd_dev() {  # [already-taken...] -> echo a free /dev/nbdN
+  # Stateless w.r.t. the kernel (pid file), but NOT across two calls in
+  # one script: pass earlier results so two devices never alias.
   sudo modprobe nbd 2>/dev/null || true
   for n in $(seq 0 15); do
+    taken=0
+    for x in "$@"; do
+      [ "/dev/nbd$n" = "$x" ] && taken=1
+    done
+    [ $taken = 1 ] && continue
     [ -e "/sys/block/nbd$n/pid" ] && continue
     echo "/dev/nbd$n"
     return 0

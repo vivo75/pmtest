@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Structured filesystem + VDB diff of two normalised L1/L2 snapshots.
 
-    diff.py [--layer l0|l1|l2|...] [--tolerate-payload] \
+    diff.py [--layer l0|l1|l2|...] [--tolerate-payload] [--fs NAME] \
         <prefix-a> <prefix-b> [known-divergences.yaml]
 
 `prefix-a` is the reference (Portage), `prefix-b` the candidate
@@ -197,10 +197,18 @@ def glob_match(pat: str, s: str) -> bool:
     return re.fullmatch(re.escape(pat).replace(r"\*", ".*"), s) is not None
 
 
-def explained(f: dict, allow: list[dict], layer: str) -> str | None:
+def explained(f: dict, allow: list[dict], layer: str,
+              run_fs: str | None = None) -> str | None:
     for e in allow:
         if e.get("layer") not in (None, layer):
             continue
+        fs = e.get("fs")
+        if fs is not None:
+            fs = [fs] if isinstance(fs, str) else list(fs)
+            # fs-qualified entries only explain runs on those
+            # filesystems (VM bed matrix); unqualified match all.
+            if run_fs not in fs:
+                continue
         cats = e.get("categories") or ([e["category"]] if "category" in e else [])
         if cats and f["category"] not in cats:
             continue
@@ -220,6 +228,7 @@ def explained(f: dict, allow: list[dict], layer: str) -> str | None:
 def main(argv: list[str]) -> int:
     layer = "l1"
     tolerate_payload = False
+    run_fs: str | None = None
     pos: list[str] = []
     i = 0
     while i < len(argv):
@@ -231,6 +240,12 @@ def main(argv: list[str]) -> int:
             layer = argv[i]
         elif argv[i] == "--tolerate-payload":
             tolerate_payload = True
+        elif argv[i] == "--fs":
+            i += 1
+            if i >= len(argv):
+                print(__doc__)
+                return 2
+            run_fs = argv[i]
         elif argv[i] in ("-h", "--help"):
             print(__doc__)
             return 0
@@ -257,7 +272,7 @@ def main(argv: list[str]) -> int:
             continue
         if f["category"] not in HARD:
             continue
-        eid = explained(f, allow, layer)
+        eid = explained(f, allow, layer, run_fs)
         if eid:
             f["explained_by"] = eid
             explained_hits.append((f, eid))
