@@ -240,7 +240,7 @@ def test_match_matches_between_implementations(
 
 
 # extract_affecting_use: real portage's own test corpus
-# (lib/portage/pytests-contract-suite/dep/test_extract_affecting_use.py) -- 23 well-formed
+# (lib/portage/tests/dep/test_extract_affecting_use.py) -- 23 well-formed
 # + 15 malformed, plus the docstring example -- run through both harnesses
 # (Python = real portage's function; Rust = portage_dep's port).
 AFFECTING_CASES = [

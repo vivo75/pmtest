@@ -1954,11 +1954,11 @@ def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
 
 
 # Portage's own committed GnuPG test keyring
-# (`3rdparty/portage/lib/portage/pytests-contract-suite/.gnupg` -- the same keys real's
+# (`3rdparty/portage/lib/portage/tests/.gnupg` -- the same keys real's
 # own `test_gpkg_gpg.py` signs with): trusted `0x5D90EA06352177F6`,
 # untrusted `0x8812797DDF1DD192`, both with passphrase `GentooTest`.
 _GNUPG_FIXTURE_HOME = (
-    Path(FIXTURES_ROOT).parent / "3rdparty/portage/lib/portage/pytests-contract-suite/.gnupg"
+    Path(FIXTURES_ROOT).parent / "3rdparty/portage/lib/portage/tests/.gnupg"
 )
 _GPG_TRUSTED_KEY = "0x5D90EA06352177F6"
 

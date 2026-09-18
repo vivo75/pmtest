@@ -20,6 +20,7 @@ Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
 | `scripts/` | `portuale/scripts/` | primitive-tree-differential, repin-review, md5-cache-audit, upstream-resolver-translate |
 | `python-harness/` | `portuale/python/` | harness Python lato riferimento (`versions`/`atom`/`use_reduce`/`required_use`) |
 | `managers/` | nuovo | registry + adapter per ogni PM sotto test (vedi `managers/README.md`) |
+| `3rdparty` | symlink → `../portuale/3rdparty` | checkout pinned upstream (portage per gli harness/reference, chiavi gpg di test); materiale del PM, mai committato dentro pmtest — il symlink sì. Richiede `../portuale` con `3rdparty/` popolato (vedi `setup.sh` lì). |
 
 Esclusi dalla copia (rigenerabili / scratch host-specifico): `differential-test-bed/logs/`,
 `differential-test-bed/WORKDIR/`, `differential-test-bed/repos/`, `differential-test-bed/stage3-*.tar.xz`,

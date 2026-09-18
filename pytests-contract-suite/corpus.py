@@ -150,8 +150,16 @@ blessed: dict[str, dict] = {}
 blessed_expanded: dict[str, dict] = {}
 
 
+def _nodekey(nodeid: str) -> str:
+    """Corpus keys embed the suite dir name (`tests/` at harvest time,
+    `pytests-contract-suite/` now): the first path segment is checkout
+    layout, not case identity, so it is ignored when matching. This keeps
+    a harvested corpus valid across renames and re-syncs from portuale."""
+    return nodeid.split("/", 1)[1] if "/" in nodeid else nodeid
+
+
 def contract_key(nodeid: str, ordinal: int) -> str:
-    return f"{nodeid}#{ordinal}"
+    return f"{_nodekey(nodeid)}#{ordinal}"
 
 
 def _contract() -> dict[str, dict]:
@@ -169,7 +177,7 @@ def _by_nodeid() -> dict[str, list[tuple[str, dict]]]:
     if _nodeid_index is None:
         _nodeid_index = {}
         for k, c in sorted(_contract().items()):
-            _nodeid_index.setdefault(k.rsplit("#", 1)[0], []).append((k, c))
+            _nodeid_index.setdefault(_nodekey(k.rsplit("#", 1)[0]), []).append((k, c))
     return _nodeid_index
 
 
@@ -219,7 +227,7 @@ def check_contract_call(args, env, result) -> tuple[str | None, str | None]:
         # The harvest paired calls by args+env, so a test that runs the same
         # command twice may have its entry under the other ordinal.
         key, stored = next(
-            ((k, c) for k, c in _by_nodeid().get(nodeid, [])
+            ((k, c) for k, c in _by_nodeid().get(_nodekey(nodeid), [])
              if c["args"] == ident["args"] and c["env"] == ident["env"]),
             (None, None),
         )

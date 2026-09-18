@@ -5,7 +5,7 @@ and asserts their outputs are byte-for-byte the same. Neither harness's
 internals are imported directly -- this is deliberately implementation-
 agnostic, per the "black-box via CLI/API" decision in docs/agent-context.md.
 
-Test vectors are mirrored from lib/portage/pytests-contract-suite/versions/test_vercmp.py so
+Test vectors are mirrored from lib/portage/tests/versions/test_vercmp.py so
 portuale is graded against the same cases the Python implementation is
 already known to satisfy.
 """
@@ -14,7 +14,7 @@ import subprocess
 
 import pytest
 
-# Mirrors testVerCmpGreater in lib/portage/pytests-contract-suite/versions/test_vercmp.py:
+# Mirrors testVerCmpGreater in lib/portage/tests/versions/test_vercmp.py:
 # ver1 > ver2 for every pair below.
 VERCMP_GREATER_CASES = [
     ("6.0", "5.0"),
