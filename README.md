@@ -3,9 +3,12 @@
 Repository dedicato a **testare e confrontare tra loro varie versioni e
 tipologie di package manager** (portuale, portage reale, altri PM).
 
-Contenuto attuale: **duplicazione dell'infrastruttura di test costruita
-per portuale** (estratta da `../portuale`, commit
-`f8c2142508cf1ec942d0902c6689d6fc0cfeec5e`).
+Contenuto attuale: **l'infrastruttura di test costruita per portuale**
+(estratta da `../portuale`, commit
+`f8c2142508cf1ec942d0902c6689d6fc0cfeec5e`), che da
+`portuale@f982876` vive **solo qui**: l'albero del PM ha cancellato le
+proprie copie di `tests/`, `TEST/`, `bench/` e `python/` (tiene
+`fixtures/`, che serve anche ai test unitari Rust, e `scripts/`).
 Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
 (`../2p` era solo un clone temporaneo di lavoro, non è più sorgente.)
 
@@ -74,27 +77,23 @@ userpriv-container e committa l'immagine `localhost/test-portuale:latest`
 con entrypoint `/init`. Verifica con `podman images` e, se serve,
 con i comandi commentati in fondo allo script.
 
-## Provenienza / sync
+## Provenienza
 
-Duplicazione pura da `PORTUALE/portuale` al commit sopra indicato.
-Per re-sincronizzare (la sorgente è `../portuale`, mai `../2p`):
+Estratto da `PORTUALE/portuale` al commit sopra indicato. Non c'è più
+un sync da rifare: da `portuale@f982876` quelle directory non esistono
+più nell'albero del PM, e pmtest è l'unica copia. Le aggiunte e le
+correzioni all'infrastruttura si fanno **qui**.
 
-```sh
-SRC=../portuale
-for pair in "tests:pytests-contract-suite" "fixtures:fixtures" \
-    "TEST:differential-test-bed" "bench:bench" "scripts:scripts" \
-    "python:python-harness"; do
-  src=${pair%%:*}; dst=${pair##*:}
-  rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' \
-    --exclude '.pytest_cache/' --exclude 'logs/' --exclude 'WORKDIR/' \
-    --exclude 'repos/' --exclude 'stage3-*.tar.xz' --exclude 'var/cache/' \
-    "$SRC/$src/" "$dst/"
-done
-```
-I nomi locali restano (`pytests-contract-suite`, `differential-test-bed`,
-`python-harness`): dopo il sync riesegui la ridenominazione solo se la
-sorgente ha aggiunto file con riferimenti ai vecchi nomi.
+Quello che pmtest continua a leggere dall'albero del PM, e che quindi
+deve esistere accanto a lui:
 
-Non si modifica l'infrastruttura qui per far passare un PM:
-i bug vanno fissati nel PM, le divergenze attese in
+- la voce di registry del PM (`managers/managers.yaml`) — sorgente e
+  binari, ricostruiti a ogni run;
+- `3rdparty/` (symlink a `../portuale/3rdparty`) — il checkout di
+  portage al pin, riferimento degli harness Python e portatore del
+  keyring gpg di test. Se manca, gli harness si rifiutano di partire
+  invece di ricadere sul portage installato sull'host.
+
+Non si modifica l'infrastruttura per far passare un PM: i bug vanno
+fissati nel PM, le divergenze attese in
 `differential-test-bed/compare/known-divergences.yaml`.

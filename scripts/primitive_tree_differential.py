@@ -32,13 +32,16 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RUST = REPO / "rust"
+sys.path.insert(0, str(REPO / "managers"))
+import registry  # noqa: E402  (pmtest root is not a package)
+
 REGRESSIONS = REPO / "pytests-contract-suite" / "primitive_regressions"
 DEP_KEYS = ("DEPEND", "RDEPEND", "BDEPEND", "PDEPEND", "IDEPEND")
+# <registry harness key>: the Python harness wrapping real Portage.
 HARNESSES = {
-    "atom": ("atom-harness", "atom_harness.py"),
-    "use_reduce": ("use-reduce-harness", "use_reduce_harness.py"),
-    "required_use": ("required-use-harness", "required_use_harness.py"),
+    "atom": "atom_harness.py",
+    "use_reduce": "use_reduce_harness.py",
+    "required_use": "required_use_harness.py",
 }
 
 
@@ -120,15 +123,18 @@ def main() -> int:
     if not (opts.repo / "metadata" / "md5-cache").is_dir():
         sys.exit(f"{opts.repo}: no metadata/md5-cache")
 
-    subprocess.run(["cargo", "build", "--release", "--quiet",
-                    *[a for rust, _ in HARNESSES.values() for a in ("-p", rust)]],
-                   cwd=RUST, check=True)
+    # The PM under test, its build included, comes from the registry
+    # (managers/managers.yaml, $PMTEST_PM) -- never a hardcoded path.
+    try:
+        rust_harness = {name: registry.harness(name) for name in HARNESSES}
+    except registry.RegistryError as exc:
+        sys.exit(f"!!! {exc}")
     batches = build_batches(opts.repo, opts.limit)
     REGRESSIONS.mkdir(parents=True, exist_ok=True)
     total = 0
-    for name, (rust_bin, py_script) in HARNESSES.items():
+    for name, py_script in HARNESSES.items():
         lines = batches[name]
-        rust = run_batch([str(RUST / "target" / "release" / rust_bin)], lines)
+        rust = run_batch([str(rust_harness[name])], lines)
         real = run_batch([sys.executable, str(REPO / "python-harness" / py_script)], lines)
         mismatches = [line for line, r, p in zip(lines, rust, real) if r != p]
         print(f"{name}: {len(lines)} inputs, {len(mismatches)} mismatches")

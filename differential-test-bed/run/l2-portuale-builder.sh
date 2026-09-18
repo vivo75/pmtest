@@ -46,7 +46,7 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT" "$PKG_PORTAGE" "$PKG_PORTUALE" "$DISTFILES"
 ln -sfn "$RUN" "$LOGS_DIR/l2-latest"
 
-ensure_portuale_built
+ensure_pm_built
 ensure_image
 
 [ "${L2_REBUILD:-0}" = 1 ] && { echo ">>> L2_REBUILD: wiping the pkgcaches"; rm -rf "${PKG_PORTAGE:?}"/* "${PKG_PORTUALE:?}"/*; }
@@ -117,7 +117,7 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     /TEST/layers/l2/build-portage.sh "$REL_ATOMLIST" 2>&1 | tee "$OUT/build-portage.log"
 
   echo ">>> building the set with portuale (archive-only) -> $PKG_PORTUALE"
-  podman_run_portuale "porttest-l2-build-portuale-$$" \
+  podman_run_pm "porttest-l2-build-portuale-$$" \
     -v "$PKG_PORTAGE:/ref-pkgs:ro" -v "$PKG_PORTUALE:/pkgs" -v "$DISTFILES:/distfiles" \
     "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs -e DISTDIR=/distfiles \
@@ -175,7 +175,7 @@ done < "$ATOMLIST"
 consume() {  # <label> <pkgdir> <portage|portuale>
   local label=$1 pkgdir=$2 pm=$3
   echo ">>> cross-install $label: $pm merges $(basename "$pkgdir")"
-  podman_run_portuale "porttest-l2-$label-$$" \
+  podman_run_pm "porttest-l2-$label-$$" \
     -v "$pkgdir:/pkgs:ro" \
     -e PKGDIR=/pkgs \
     -e "L1_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \

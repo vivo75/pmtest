@@ -43,11 +43,15 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
   creano symlink `emerge`/`ebuild`/`mrg` verso quel path ed esercitano
   lo stesso percorso di un'installazione reale. I path relativi si
   risolvono contro la root di pmtest.
-- Risoluzione (a parità di voce): path esplicito se esiste → altrimenti
-  `cargo build --release` del `package` da `rust_dir` (solo se la voce
-  ha `repo`/`rust_dir`) → altrimenti skip con messaggio esplicito. Un PM
-  senza `repo` (come `portage`) non ha harness neutrali: gli harness
-  contract per lui fanno skip, i contract via `emerge` girano normali.
+- Risoluzione (a parità di voce): se la voce ha `repo`/`rust_dir` si
+  esegue **sempre** `cargo build --release` del `package` (cargo è il
+  proprio controllo di aggiornamento: no-op se nulla è cambiato, ma
+  nessun run può graduare un binario stale dopo una modifica al
+  sorgente; `PMTEST_NO_BUILD=1` disattiva la build dove il binario è
+  volutamente prebuilt) → poi si usa il path dichiarato, e se manca è
+  errore. Un PM senza `repo` (come `portage`) usa il path esplicito e
+  non ha harness neutrali: gli harness contract per lui fanno skip, i
+  contract via `emerge` girano normali.
 - `version` — solo documentazione: serve a risalire a *quale* build del
   PM un report si riferisce. Tenetela aggiornata a ogni cambio di PM.
 
@@ -70,11 +74,11 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
    PMTEST_PM=portuale-dev python3 -m pytest pytests-contract-suite/test_portuale.py -q
    ```
 
-3. Per il differential su albero reale (`differential-test-bed/run/l*.sh`), la voce
-   `portuale` deve puntare alla build release corrente: gli orchestrator
-   montano `rust/target/release` nel container (cfr. `differential-test-bed/run/lib.sh`
-   `podman_run_portuale`), quindi rieseguite la build del PM prima del
-   run.
+3. Per il differential su albero reale (`differential-test-bed/run/l*.sh`)
+   la voce deve dichiarare `repo`: gli orchestrator ricostruiscono il PM
+   da lì e montano nel container la sua build dir e il suo checkout
+   (cfr. `differential-test-bed/run/lib.sh`, `ensure_pm_built` /
+   `podman_run_pm`).
 
 ## Come modificare una voce esistente
 
@@ -87,15 +91,30 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
 - **Rinominare una voce**: è solo una chiave YAML, ma aggiornate anche
   gli eventuali `PMTEST_PM=...` negli script che la usano.
 
-## Nota sullo stato
+## Chi risolve cosa: `managers/registry.py`
 
-`pytests-contract-suite/conftest.py` è cablato sul registry: `PMTEST_PM` seleziona la
-voce, i path espliciti vincono se esistono sul disco, altrimenti la
-voce viene costruita con `cargo build --release` da `<repo>/rust`
-(solo se la voce dichiara `repo` e `cargo` è disponibile), altrimenti
-il test fa skip con un messaggio che dice cosa manca. Un `PMTEST_PM`
-sconosciuto fallisce subito elencando le voci disponibili.
+La risoluzione vive in un solo posto, `managers/registry.py`, e tutto il
+resto la usa — niente path di PM cablati altrove:
 
-Ancora hardcoded fuori dalla suite pytest: `bench/run_benchmark.py`
-(coppia Rust-vs-Python) e `differential-test-bed/run/lib.sh` (`ensure_portuale_built`)
-— prossimi candidati allo stesso trattamento.
+| Consumatore | Come |
+|---|---|
+| `pytests-contract-suite/conftest.py` | `registry.applet/harness/product_binary` (un `NotProvided` diventa `skip`, ogni altro errore `fail`) |
+| `differential-test-bed/run/lib.sh` | `registry.py --sh` → `PM_NAME PM_PACKAGE PM_VERSION PM_EMERGE PM_BIN_DIR PM_REPO PM_RUST_DIR`; `--no-build` risolve senza costruire |
+| `bench/run_benchmark.py` | `registry.harness("versions")` |
+| `scripts/primitive_tree_differential.py` | `registry.harness(...)` per i tre harness |
+| `scripts/portage_repin_review.py` | `registry.rust_dir(...)` (le citazioni da rivedere sono nei sorgenti del PM) |
+| `scripts/real_world_spotcheck.sh`, `differential-test-bed/scripts/mo-trace/ptl-trace.sh` | `registry.py --sh` |
+
+Due cose che il registry impone, e che valgono per ogni PM:
+
+- **Il bed differenziale gira solo su PM costruiti da sorgente.** Monta
+  la build dir del PM come `/usr/local/bin` *e* il suo checkout al
+  proprio path host, perché un binario può risolvere i propri dati di
+  runtime (portuale: `bin/`, `3rdparty/portage`) da un path inciso a
+  compile-time, che esiste solo dentro il suo albero. Una voce senza
+  `repo` viene rifiutata con quel messaggio: il portage reale con cui si
+  confronta è già dentro il container.
+- **Diagnostica:** `python3 managers/registry.py` stampa la voce attiva
+  e dove risolve i tre applet, senza costruire nulla.
+
+Un `PMTEST_PM` sconosciuto fallisce subito elencando le voci disponibili.

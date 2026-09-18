@@ -32,25 +32,26 @@
 # dependency-recursion cascade this pilot's own lack of binhost support can
 # trigger on a system that tracks one -- see the README).
 #
-# Requires real emerge on PATH (a real Gentoo system) and a built pilot
-# binary (built automatically below if missing).
+# Requires real emerge on PATH (a real Gentoo system); the PM under test
+# is resolved (and rebuilt) through managers/managers.yaml.
 
 set -uo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
-RUST_DIR="${REPO_DIR}/rust"
-PILOT_BIN="${RUST_DIR}/target/release/portuale"
+# The PM under test comes from the registry (managers/managers.yaml,
+# selected by $PMTEST_PM), which also rebuilds it from its own checkout.
+PM_ENV="$(python3 "${REPO_DIR}/managers/registry.py" --sh)" || {
+    echo "real_world_spotcheck: cannot resolve the PM under test (PMTEST_PM=${PMTEST_PM:-portuale})" >&2
+    exit 1
+}
+eval "${PM_ENV}"
+PILOT_BIN="${PM_EMERGE}"
 
 REAL_EMERGE="$(command -v emerge || true)"
 if [ -z "${REAL_EMERGE}" ]; then
     echo "real_world_spotcheck: no real 'emerge' found on PATH -- this script needs an actual Gentoo system" >&2
     exit 1
-fi
-
-if [ ! -x "${PILOT_BIN}" ]; then
-    echo "Building pilot binary (cargo build --release)..."
-    (cd "${RUST_DIR}" && cargo build --release) || exit 1
 fi
 
 SYMLINK_DIR="$(mktemp -d)"

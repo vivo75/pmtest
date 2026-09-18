@@ -28,11 +28,11 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
 ln -sfn "$RUN" "$LOGS_DIR/l0-latest"
 
-ensure_portuale_built
+ensure_pm_built
 ensure_image
 
 echo ">>> running L0 probes in $IMAGE  (out: $OUT)"
-podman_run_portuale "porttest-l0-$$" \
+podman_run_pm "porttest-l0-$$" \
   -e "L0_SKIP_PORTAGE_UPGRADE=${L0_SKIP_PORTAGE_UPGRADE:-0}" \
   -e "L0_SKIP_MULTI=${L0_SKIP_MULTI:-0}" \
   -e "L0_SKIP_INVARIANTS=${L0_SKIP_INVARIANTS:-0}" \

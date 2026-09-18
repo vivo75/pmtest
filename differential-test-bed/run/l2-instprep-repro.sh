@@ -16,12 +16,12 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 RUN="l2-instprep-$(timestamp)"
 OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
-ensure_portuale_built
+ensure_pm_built
 ensure_image
 
 for pm in portage portuale; do
   echo ">>> $pm"
-  podman_run_portuale "porttest-instprep-$pm-$$" \
+  podman_run_pm "porttest-instprep-$pm-$$" \
     -v "$TEST_DIR/images/overlay/porttest:/porttest-overlay:ro" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
     --entrypoint /bin/bash "$IMAGE" \

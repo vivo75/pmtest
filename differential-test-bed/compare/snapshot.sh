@@ -62,7 +62,7 @@ PRUNE=(
 )
 # Extra root-relative paths to prune, `:`-separated (`SNAPSHOT_PRUNE`),
 # for a mount the caller knows about but this script cannot (the L3
-# orchestrator prunes the repo bind mount that `podman_run_portuale`
+# orchestrator prunes the repo bind mount that `podman_run_pm`
 # places at its host path). Empty is the common case.
 if [ -n "${SNAPSHOT_PRUNE:-}" ]; then
   IFS=: read -r -a extra <<< "${SNAPSHOT_PRUNE}"

@@ -1,6 +1,4 @@
 import os
-import shutil
-import subprocess
 import sys
 from pathlib import Path
 
@@ -8,17 +6,13 @@ import pytest
 
 import corpus
 
-try:
-    import yaml
-except ImportError:  # pragma: no cover - PyYAML is a documented host prereq
-    yaml = None
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
-# PM registry: which package manager is under test is decided here, not
+# PM registry: which package manager is under test is decided there, not
 # by hardcoded paths. The active entry is selected via PMTEST_PM
 # (default: "portuale"); see managers/README.md.
-MANAGERS_YAML = REPO_ROOT / "managers" / "managers.yaml"
-DEFAULT_PM = "portuale"
+sys.path.insert(0, str(REPO_ROOT / "managers"))
+import registry  # noqa: E402  (pmtest root is not a package)
+
 VERSIONS_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "versions_harness.py"
 ATOM_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "atom_harness.py"
 USE_REDUCE_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "use_reduce_harness.py"
@@ -54,114 +48,30 @@ def _isolate_config_env():
     yield
 
 
-_registry_cache = None
+def _resolved(what, kind):
+    """`registry.<what>(kind)`, with registry errors in pytest's idiom.
 
-
-def _registry():
-    """The `pms:` mapping from managers/managers.yaml, loaded once."""
-    global _registry_cache
-    if _registry_cache is None:
-        if yaml is None:
-            pytest.fail("PyYAML is required to read managers/managers.yaml")
-        try:
-            data = yaml.safe_load(MANAGERS_YAML.read_text())
-        except FileNotFoundError:
-            pytest.fail(f"PM registry not found: {MANAGERS_YAML}")
-        _registry_cache = (data or {}).get("pms") or {}
-    return _registry_cache
-
-
-def _active_pm():
-    """(name, entry) of the PM selected via PMTEST_PM."""
-    name = os.environ.get("PMTEST_PM", DEFAULT_PM)
-    reg = _registry()
-    if name not in reg:
-        pytest.fail(
-            f"PMTEST_PM={name!r} is not in managers/managers.yaml "
-            f"(available: {', '.join(sorted(reg)) or 'none'})"
-        )
-    return name, reg[name] or {}
-
-
-def _resolve_registry_path(raw):
-    """A registry path: absolute stays, relative resolves against pmtest root."""
-    p = Path(os.path.expandvars(os.path.expanduser(str(raw))))
-    return p if p.is_absolute() else REPO_ROOT / p
-
-
-def _pm_rust_dir(pm):
-    """Cargo workspace dir for entries built from source (None if prebuilt)."""
-    if pm.get("rust_dir"):
-        return _resolve_registry_path(pm["rust_dir"])
-    if pm.get("repo"):
-        return _resolve_registry_path(pm["repo"]) / "rust"
-    return None
-
-
-def _cargo_build(rust_dir, package):
-    subprocess.run(
-        ["cargo", "build", "--release", "--package", package],
-        cwd=rust_dir,
-        check=True,
-    )
-    return rust_dir / "target" / "release" / package
-
-
-def _ensure_built(name, pm, package, binary):
-    """Return `binary`, building `package` first if needed."""
-    if binary.exists():
-        return binary
-    rust_dir = _pm_rust_dir(pm)
-    if rust_dir is None:
-        pytest.skip(
-            f"PM {name!r}: {binary} not found and the registry entry "
-            "has no repo to build it from"
-        )
-    if shutil.which("cargo") is None:
-        pytest.skip(f"PM {name!r}: {binary} not built and cargo not available")
-    _cargo_build(rust_dir, package)
-    if not binary.exists():
-        pytest.fail(f"PM {name!r}: cargo build of {package} produced no {binary}")
-    return binary
-
-
-_HARNESS_PACKAGES = {
-    "versions": "versions-harness",
-    "atom": "atom-harness",
-    "use_reduce": "use-reduce-harness",
-    "required_use": "required-use-harness",
-}
+    A `NotProvided` is the entry saying it cannot offer this binary at
+    all (a prebuilt reference PM has no neutral harness): that is a skip,
+    with the reason the registry gave. Anything else is a real
+    misconfiguration and fails the run.
+    """
+    try:
+        return getattr(registry, what)(kind) if kind else getattr(registry, what)()
+    except registry.NotProvided as exc:
+        pytest.skip(str(exc))
+    except registry.RegistryError as exc:
+        pytest.fail(str(exc))
 
 
 def _pm_harness(harness):
     """Neutral CLI harness binary of the active PM (skips if it ships none)."""
-    name, pm = _active_pm()
-    package = _HARNESS_PACKAGES[harness]
-    if pm.get(f"{harness}_harness"):
-        binary = _resolve_registry_path(pm[f"{harness}_harness"])
-    else:
-        rust_dir = _pm_rust_dir(pm)
-        if rust_dir is None:
-            pytest.skip(
-                f"PM {name!r} ships no {package} harness "
-                "(no repo in registry) -- harness contract not applicable"
-            )
-        binary = rust_dir / "target" / "release" / package
-    return _ensure_built(name, pm, package, binary)
+    return _resolved("harness", harness)
 
 
 def _pm_applet(kind):
     """emerge/ebuild/mrg entry point of the active PM."""
-    name, pm = _active_pm()
-    package = pm.get("package", "portuale")
-    if pm.get(kind):
-        binary = _resolve_registry_path(pm[kind])
-    else:
-        rust_dir = _pm_rust_dir(pm)
-        if rust_dir is None:
-            pytest.skip(f"PM {name!r}: no {kind} path and no repo in registry")
-        binary = rust_dir / "target" / "release" / package
-    return _ensure_built(name, pm, package, binary)
+    return _resolved("applet", kind)
 
 
 def _applet_symlink(kind, tmp_path_factory):
@@ -221,12 +131,7 @@ def portuale_binary() -> Path:
     Historically the portuale multicall binary; now resolved through the
     registry: an explicit `binary` key wins, else the `emerge` applet
     path (the same binary for multicall PMs), else a cargo build."""
-    _, pm = _active_pm()
-    if pm.get("binary"):
-        binary = _resolve_registry_path(pm["binary"])
-        if binary.exists():
-            return binary
-    return _pm_applet("emerge")
+    return _resolved("product_binary", None)
 
 
 @pytest.fixture(scope="session")

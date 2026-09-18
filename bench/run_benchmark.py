@@ -26,8 +26,9 @@ import time
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RUST_DIR = REPO_ROOT / "rust"
-RUST_BIN = RUST_DIR / "target" / "release" / "versions-harness"
+sys.path.insert(0, str(REPO_ROOT / "managers"))
+import registry  # noqa: E402  (pmtest root is not a package)
+
 PYTHON_HARNESS = [
     sys.executable,
     str(REPO_ROOT / "python-harness" / "versions_harness.py"),
@@ -42,12 +43,14 @@ from dataset import (
 )
 
 
-def build_rust_binary() -> None:
-    subprocess.run(
-        ["cargo", "build", "--release", "--package", "versions-harness"],
-        cwd=RUST_DIR,
-        check=True,
-    )
+def rust_harness(build: bool) -> Path:
+    """The PM's versions harness, from the registry (`$PMTEST_PM`).
+
+    Which PM a published number belongs to is part of the number, so the
+    binary is resolved -- and rebuilt -- through managers/managers.yaml
+    exactly like the contract suite's, never from a path built into this
+    script."""
+    return registry.harness("versions", build=build)
 
 
 def time_batch(cmd: list[str], stdin_data: str, repeat: int) -> tuple[float, str]:
@@ -114,11 +117,10 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not args.skip_build:
-        build_rust_binary()
-
-    if not RUST_BIN.exists():
-        print(f"error: rust binary not found at {RUST_BIN}", file=sys.stderr)
+    try:
+        rust_bin = rust_harness(build=not args.skip_build)
+    except registry.RegistryError as exc:
+        print(f"error: {exc}", file=sys.stderr)
         return 1
 
     if args.dataset == "snapshot":
@@ -135,7 +137,7 @@ def main() -> int:
     stdin_data = "\n".join(lines) + "\n"
 
     python_time, python_output = time_batch(PYTHON_HARNESS, stdin_data, args.repeat)
-    rust_time, rust_output = time_batch([str(RUST_BIN)], stdin_data, args.repeat)
+    rust_time, rust_output = time_batch([str(rust_bin)], stdin_data, args.repeat)
 
     if python_output != rust_output:
         print(

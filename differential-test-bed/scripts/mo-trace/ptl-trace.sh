@@ -10,8 +10,9 @@
 #   OUT-PREFIX.portuale.err   stderr (includes the MO_SEL lines)
 #   OUT-PREFIX.portuale.trace just the MO_SEL lines (align-traces input)
 #
-# Env: PORTUALE_BIN overrides the binary (default: the repo's release
-# multicall `emerge` symlink). PORTUALE_MO_SEL is forced on.
+# Env: PORTUALE_BIN overrides the binary (default: the `emerge` applet of
+# the PM selected by $PMTEST_PM in managers/managers.yaml). PORTUALE_MO_SEL
+# is forced on.
 
 set -euo pipefail
 
@@ -26,10 +27,19 @@ shift
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 REPO_ROOT=$(cd "$HERE/../../.." && pwd)
-BIN=${PORTUALE_BIN:-"$REPO_ROOT/rust/target/release/emerge"}
+if [ -n "${PORTUALE_BIN:-}" ]; then
+    BIN=$PORTUALE_BIN
+else
+    pm_env=$(python3 "$REPO_ROOT/managers/registry.py" --sh --no-build) || {
+        echo "ptl-trace: cannot resolve the PM under test (PMTEST_PM=${PMTEST_PM:-portuale})" >&2
+        exit 2
+    }
+    eval "$pm_env"
+    BIN="$PM_BIN_DIR/emerge"
+fi
 
 if [ ! -x "$BIN" ]; then
-    echo "ptl-trace: no executable at $BIN (build with cargo build --release -p portuale)" >&2
+    echo "ptl-trace: no executable at $BIN (run a differential-test-bed/run/l*.sh once, or build the PM)" >&2
     exit 2
 fi
 

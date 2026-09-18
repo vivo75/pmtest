@@ -40,26 +40,24 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT" "$DISTFILES"
 ln -sfn "$RUN" "$LOGS_DIR/l3-latest"
 
-ensure_portuale_built
+ensure_pm_built
 ensure_image
 
 run_pm() {  # <label> <portage|portuale>
   local label=$1 pm=$2
   echo ">>> L3 build+merge: $label ($pm)"
   set +e
-  # `timeout` cannot run a shell function, so this mirrors
-  # `podman_run_portuale`'s own `podman run` arguments inline (the
-  # portuale binaries and the repo at its build-time path, /TEST, the
-  # shared logs + distfiles).
+  # `timeout` cannot run a shell function, so this reuses
+  # `podman_run_pm`'s own mounts (`$PM_MOUNTS`: the PM binaries, its
+  # checkout at its build-time path, /TEST, the shared logs) and adds
+  # the distfiles cache.
   timeout "$TIMEOUT" "$PODMAN" run --rm --name "porttest-l3-$label-$$" \
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private \
     --hostname porttest-l3 \
-    -v "$REPO_ROOT/rust/target/release:/usr/local/bin:ro" \
-    -v "$REPO_ROOT:$REPO_ROOT:ro" \
-    -v "$TEST_DIR:/TEST:ro" -v "$LOGS_DIR:/TEST/logs" \
+    "${PM_MOUNTS[@]}" \
     -v "$DISTFILES:/distfiles" \
     -e DISTDIR=/distfiles \
-    -e "SNAPSHOT_PRUNE=$REPO_ROOT" \
+    -e "SNAPSHOT_PRUNE=$PM_REPO" \
     -e "L3_SKIP_PORTAGE_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L3_BUILD_ARGS=${L3_BUILD_ARGS:---emptytree --oneshot --usepkg=n --color=n}" \
     --entrypoint /bin/bash "$IMAGE" \

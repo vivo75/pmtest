@@ -29,7 +29,12 @@ from collections import defaultdict
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-RUST = REPO / "rust"
+sys.path.insert(0, str(REPO / "managers"))
+import registry  # noqa: E402  (pmtest root is not a package)
+
+# The citations being reviewed live in the PM's own sources, so the tree
+# to scan comes from the registry (managers/managers.yaml, $PMTEST_PM).
+RUST = registry.rust_dir(registry.active_pm()[1])
 SCOPES = ("lib/_emerge", "lib/portage")
 CITATION = re.compile(r"([A-Za-z_][\w/]*\.py):(\d+)(?:-(\d+))?")
 

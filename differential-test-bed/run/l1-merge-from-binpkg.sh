@@ -32,7 +32,7 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT" "$PKGCACHE"
 ln -sfn "$RUN" "$LOGS_DIR/l1-latest"
 
-ensure_portuale_built
+ensure_pm_built
 ensure_image
 
 [ "${L1_REBUILD:-0}" = 1 ] && { echo ">>> L1_REBUILD: wiping $PKGCACHE"; rm -rf "${PKGCACHE:?}"/*; }
@@ -63,7 +63,7 @@ fi
 consume() {  # pm
   local pm=$1
   echo ">>> merging with $pm"
-  podman_run_portuale "porttest-l1-$pm-$$" \
+  podman_run_pm "porttest-l1-$pm-$$" \
     -v "$PKGCACHE:/pkgs:ro" "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs \
     -e "L1_SKIP_PORTAGE_UPGRADE=${L1_SKIP_PORTAGE_UPGRADE:-0}" \

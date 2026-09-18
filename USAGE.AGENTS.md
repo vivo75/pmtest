@@ -22,7 +22,11 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
    — benchmark harness batch (default: `--dataset snapshot`, seed 0;
    riporta il migliore di 5).
 4. Gate in CI: `PORTUALE_RUN_BENCHMARK=1 python3 -m pytest pytests-contract-suite -q`.
-5. Re-sync infrastruttura solo da `../portuale` (comando in `README.md`).
+5. Nessun sync da rifare: l'infrastruttura vive solo qui (`README.md`,
+   "Provenienza"). Il PM sotto test viene **ricostruito a ogni run** dal
+   suo `repo` di registry, quindi non si testa mai un binario stale;
+   `python3 managers/registry.py` dice quale voce è attiva e dove
+   risolve.
 
 ## Ammesso
 
