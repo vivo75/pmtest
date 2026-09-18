@@ -54,6 +54,59 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
   `bench/gentoo_snapshot.json`, stesso seed e stessi `--ops`/`--repeat`.
 - F5. `--dataset synthetic` per i numeri ufficiali: solo `snapshot`.
 
+## Spazio /tmp
+
+La suite ha ripetutamente riempito `/tmp` (inode, non solo byte: è tmpfs,
+RAM-backed, con un tetto FISSO indipendente dalla RAM effettiva). Due
+cause distinte, entrambe indipendenti da chi lancia la suite:
+
+- un test di merge chown-a a `root` i path che installa (simula proprietà
+  reale; questo container ha sudo passwordless), e la pulizia di pytest
+  gira senza privilegi: non può rimuoverli, li rinomina `garbage-<uuid>`
+  e li lascia lì per sempre;
+- **ogni** invocazione di `emerge`/`ebuild` che esegue fasi reali crea un
+  suo overlay `$TMPDIR/portuale-bin.<pid>` (`ebuild_phases.rs::bin_dir()`)
+  e non lo rimuove mai — un leak nel PM stesso, non nell'harness; su
+  `/tmp` restava invisibile nel rumore generale.
+
+Difese, automatiche, in ordine di quanto costano:
+
+1. **Bonifica a inizio sessione.** `pytests-contract-suite/conftest.py`
+   (`pytest_configure`) e `differential-test-bed/run/lib.sh` ripuliscono
+   quanto lasciato dalla sessione precedente prima di partire — via
+   `sudo -n` per i residui root-owned (silenzioso e mai bloccante se
+   sudo non c'è: si limita a non risolvere quel residuo), senza sudo per
+   gli overlay `portuale-bin.*`. Verificato: due run pieni consecutivi
+   restano piatti (stesso numero di overlay dopo il secondo run di dopo
+   il primo, mai la somma).
+2. **Preflight spazio/inode.** Prima di collezionare, `pytest_configure`
+   legge `statvfs` sulla base tmp: sotto una soglia bassa fallisce con un
+   messaggio chiaro invece di una cascata di `OSError` a metà run; sotto
+   una soglia più alta avverte soltanto. Soglie in env, non hardcoded:
+   `PMTEST_MIN_FREE_INODES`/`_WARN`, `PMTEST_MIN_FREE_BYTES`/`_WARN`.
+3. **Disco reale, non tmpfs.** Default `/var/tmp/pmtest` (non `/tmp`):
+   disco vero, non RAM, inode non capati indipendentemente dallo spazio.
+   Un solo path fisso riusato a ogni run (niente `pytest-N` numerati:
+   niente famiglia di `garbage-*` da inseguire). Override: `PMTEST_TMPDIR`
+   (vince anche su un `TMPDIR` ambientale); un `--basetemp` esplicito
+   sulla riga di comando resta sempre rispettato senza interferenze.
+
+**Non basta impostare `$TMPDIR`** per il punto 3: il capture manager di
+pytest crea i propri file per catturare l'IMPORT di `conftest.py` stesso
+(così un print/errore durante il caricamento viene catturato anch'esso),
+e per farlo chiama `tempfile.gettempdir()` — che mette in cache il
+vecchio valore — **prima** che il codice del modulo giri. L'unico aggancio
+affidabile è `config.option.basetemp`, letto direttamente da
+`TempPathFactory` bypassando `tempfile`. Trappola gemella: `import corpus`
+deve avvenire **dopo** aver impostato `TMPDIR`, perché `corpus.py`
+fotografa l'ambiente al proprio import (`_HOST_ENV`, per distinguere "solo
+ereditato dall'host" da "specifico di questa chiamata") — importarlo
+prima rompe ogni confronto col corpus che passa da `fixture_env()`.
+
+L'overlay `portuale-bin.<pid>` resta un bug del PM, non dell'harness: F1
+si applica anche qui, non lo si nasconde ripuntando `/tmp` altrove senza
+dirlo.
+
 ## Valuta l'efficienza così
 
 1. Esegui il comando del punto 3 sopra e leggi `out.json`:

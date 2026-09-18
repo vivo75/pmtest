@@ -8,6 +8,17 @@ REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 TEST_DIR="$REPO_ROOT/differential-test-bed"
 LOGS_DIR="$TEST_DIR/logs"
 
+# Host-side scratch (mktemp -d in abort-capture.sh, etc.) defaults off
+# tmpfs /tmp onto real disk: /tmp is RAM-backed with a FIXED inode count
+# independent of disk size, and a merge test's own root-owned residue
+# already erodes it faster than volume alone would (see
+# pytests-contract-suite/conftest.py's own tmp-hygiene block, and
+# USAGE.AGENTS.md "Spazio /tmp", for the full story). `: "${TMPDIR:=...}"`
+# is a no-op for anyone who already set TMPDIR themselves.
+: "${TMPDIR:=/var/tmp/pmtest}"
+export TMPDIR
+mkdir -p "$TMPDIR"
+
 # Which package manager is under test comes from the registry
 # (`managers/managers.yaml`, selected by $PMTEST_PM), exactly as in the
 # pytest contract suite -- no PM path is hardcoded here. `--sh` prints
