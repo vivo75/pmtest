@@ -144,7 +144,6 @@ def save(path: Path, cases: dict[str, dict]) -> None:
 # Drift checking (after deletion).
 
 _contract_cases: dict[str, dict] | None = None
-_rust_ordinals: dict[str, int] = {}
 drifted: list[str] = []
 blessed: dict[str, dict] = {}
 blessed_expanded: dict[str, dict] = {}
@@ -158,10 +157,6 @@ def _nodekey(nodeid: str) -> str:
     return nodeid.split("/", 1)[1] if "/" in nodeid else nodeid
 
 
-def contract_key(nodeid: str, ordinal: int) -> str:
-    return f"{_nodekey(nodeid)}#{ordinal}"
-
-
 def _contract() -> dict[str, dict]:
     global _contract_cases
     if _contract_cases is None:
@@ -173,10 +168,20 @@ _nodeid_index: dict[str, list[tuple[str, dict]]] | None = None
 
 
 def _by_nodeid() -> dict[str, list[tuple[str, dict]]]:
+    """Every stored case for a nodeid, in harvest (ordinal) order.
+
+    Sorted numerically by ordinal, not lexicographically by key text --
+    `#10` must not sort before `#2`. Two calls in the same test that
+    share args+env (a genuine but rare pattern -- see
+    `check_contract_call`) rely on this order to tell their two stored
+    entries apart."""
     global _nodeid_index
     if _nodeid_index is None:
         _nodeid_index = {}
-        for k, c in sorted(_contract().items()):
+        for k, c in sorted(
+            _contract().items(),
+            key=lambda kc: (_nodekey(kc[0].rsplit("#", 1)[0]), int(kc[0].rsplit("#", 1)[1])),
+        ):
             _nodeid_index.setdefault(_nodekey(k.rsplit("#", 1)[0]), []).append((k, c))
     return _nodeid_index
 
@@ -210,29 +215,55 @@ def flag(key: str, message: str, stored: dict, args, env, result, sink: dict) ->
     warnings.warn(message, CorpusDrift, stacklevel=3)
 
 
+# (nodeid, ident-json) -> how many calls with that exact args+env this
+# session has already resolved. Keyed on identity rather than absolute
+# call position: most tests give every call distinct args/env (one
+# candidate, occurrence 0 always picks it -- unchanged from before), so
+# this only engages its disambiguation for the rare test that repeats
+# the same args+env, and is immune to unrelated calls elsewhere in the
+# test shifting a global ordinal out of alignment with the harvest.
+_ident_occurrence: dict[tuple[str, str], int] = {}
+
+
 def check_contract_call(args, env, result) -> tuple[str | None, str | None]:
     """Called for every Rust `_run` in the contract suite. Returns the
     corpus key (None when this call has no harvested entry, or its args or
-    env changed since) and the drift message (None when it still matches)."""
+    env changed since) and the drift message (None when it still matches).
+
+    The original design keyed each call by its position among the whole
+    test's calls (nodeid + a running ordinal) and stripped the nodeid's
+    checkout-relative prefix to build that key -- but a stored key keeps
+    the harvest-time `tests/` prefix verbatim, so the direct lookup could
+    never hit, and every call fell through to an args+env-only fallback.
+    That fallback returns the *first* stored entry whose args+env match:
+    fine when a test's calls all have distinct args/env (the common
+    case), wrong when two calls legitimately share them -- both then
+    resolved to the same entry, so blessing one drift silently overwrote
+    it with the *other* call's output instead of accepting a real change.
+    Matching among only the candidates that share this exact args+env,
+    keyed by how many of them this session has already claimed, gives
+    same-args/env calls their own entry each while leaving every other
+    test's resolution untouched.
+    """
     nodeid = current_nodeid.get()
     if nodeid is None:
         return None, None
-    with _lock:
-        n = _rust_ordinals.get(nodeid, 0)
-        _rust_ordinals[nodeid] = n + 1
-    key = contract_key(nodeid, n)
-    stored = _contract().get(key)
     ident = case_identity(list(args), env)
-    if stored is None or ident["args"] != stored["args"] or ident["env"] != stored["env"]:
-        # The harvest paired calls by args+env, so a test that runs the same
-        # command twice may have its entry under the other ordinal.
-        key, stored = next(
-            ((k, c) for k, c in _by_nodeid().get(_nodekey(nodeid), [])
-             if c["args"] == ident["args"] and c["env"] == ident["env"]),
-            (None, None),
-        )
-        if stored is None:
-            return None, None
+    ident_key = (nodeid, json.dumps(ident, sort_keys=True))
+    with _lock:
+        occurrence = _ident_occurrence.get(ident_key, 0)
+        _ident_occurrence[ident_key] = occurrence + 1
+    candidates = [
+        (k, c) for k, c in _by_nodeid().get(_nodekey(nodeid), [])
+        if c["args"] == ident["args"] and c["env"] == ident["env"]
+    ]
+    if not candidates:
+        return None, None
+    # A call beyond how many times this exact args+env was harvested (a
+    # test issuing more repeats today than it did at harvest time) keeps
+    # resolving to the last candidate, matching the pre-fix behaviour of
+    # always finding *some* entry rather than going unmatched.
+    key, stored = candidates[min(occurrence, len(candidates) - 1)]
     message = compare(key, stored, args, env, result)
     if message:
         flag(key, message, stored, args, env, result, blessed)
