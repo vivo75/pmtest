@@ -16,7 +16,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 RUN="l2-instprep-$(timestamp)"
 OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
-ensure_pm_built
+ensure_pm_built "$OUT"
 ensure_image
 
 for pm in portage portuale; do

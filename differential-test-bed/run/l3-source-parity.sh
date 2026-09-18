@@ -40,7 +40,7 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT" "$DISTFILES"
 ln -sfn "$RUN" "$LOGS_DIR/l3-latest"
 
-ensure_pm_built
+ensure_pm_built "$OUT"
 ensure_image
 
 run_pm() {  # <label> <portage|portuale>

@@ -17,7 +17,7 @@ Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
 | Dir | Origine | Cosa contiene |
 |---|---|---|
 | `pytests-contract-suite/` | `portuale/tests/` | contract suite pytest (black-box via CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark-gate, musl-smoke |
-| `fixtures/` | `portuale/fixtures/` | alberi sintetici (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) contro cui gira la suite |
+| `fixtures/` | `portuale/fixtures/` | alberi sintetici (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) contro cui gira la suite. **Copia unica**: dal 2026-09-18 l'albero del PM non ne ha una sua, `portuale/fixtures` è un symlink a questa (`portuale@335543e`), quindi la leggono sia la contract suite sia i test Rust `#[cfg(test)]`. Ogni aggiunta o correzione si fa qui. |
 | `differential-test-bed/` | `portuale/TEST/` | differential test bed su container (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source parity) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
 | `bench/` | `portuale/bench/` | benchmark harness (batch-mode) + snapshot reale Gentoo (`gentoo_snapshot.json`) |
 | `scripts/` | `portuale/scripts/` | primitive-tree-differential, repin-review, md5-cache-audit, upstream-resolver-translate |

@@ -52,8 +52,15 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
   errore. Un PM senza `repo` (come `portage`) usa il path esplicito e
   non ha harness neutrali: gli harness contract per lui fanno skip, i
   contract via `emerge` girano normali.
-- `version` — solo documentazione: serve a risalire a *quale* build del
-  PM un report si riferisce. Tenetela aggiornata a ogni cambio di PM.
+- `version` — **risolta a run time, non scritta a mano**: `git` = commit
+  corto di `<repo>` più `-dirty` se quel checkout ha modifiche non
+  committate (un numero misurato su un albero sporco non è
+  riproducibile dal commit, e non deve fingere di esserlo); `latest` =
+  la prima riga che il binario stampa con `--version`. Qualunque altro
+  valore viene usato alla lettera. È il dato che identifica la build a
+  cui un report si riferisce, e i run lo scrivono da soli: `pm.json`
+  nella dir di ogni run del bed, `pm`/`pm_version` nel JSON del
+  benchmark.
 
 ## Come aggiungere un PM
 
@@ -99,13 +106,13 @@ resto la usa — niente path di PM cablati altrove:
 | Consumatore | Come |
 |---|---|
 | `pytests-contract-suite/conftest.py` | `registry.applet/harness/product_binary` (un `NotProvided` diventa `skip`, ogni altro errore `fail`) |
-| `differential-test-bed/run/lib.sh` | `registry.py --sh` → `PM_NAME PM_PACKAGE PM_VERSION PM_EMERGE PM_BIN_DIR PM_REPO PM_RUST_DIR`; `--no-build` risolve senza costruire |
+| `differential-test-bed/run/lib.sh` | `registry.py --sh` → `PM_NAME PM_PACKAGE PM_VERSION PM_EMERGE PM_BIN_DIR PM_REPO PM_RUST_DIR`; `--no-build` risolve senza costruire; `ensure_pm_built "$OUT"` scrive `pm.json` nella dir del run |
 | `bench/run_benchmark.py` | `registry.harness("versions")` |
 | `scripts/primitive_tree_differential.py` | `registry.harness(...)` per i tre harness |
 | `scripts/portage_repin_review.py` | `registry.rust_dir(...)` (le citazioni da rivedere sono nei sorgenti del PM) |
 | `scripts/real_world_spotcheck.sh`, `differential-test-bed/scripts/mo-trace/ptl-trace.sh` | `registry.py --sh` |
 
-Due cose che il registry impone, e che valgono per ogni PM:
+Tre cose che il registry impone, e che valgono per ogni PM:
 
 - **Il bed differenziale gira solo su PM costruiti da sorgente.** Monta
   la build dir del PM come `/usr/local/bin` *e* il suo checkout al
@@ -114,7 +121,14 @@ Due cose che il registry impone, e che valgono per ogni PM:
   compile-time, che esiste solo dentro il suo albero. Una voce senza
   `repo` viene rifiutata con quel messaggio: il portage reale con cui si
   confronta è già dentro il container.
-- **Diagnostica:** `python3 managers/registry.py` stampa la voce attiva
-  e dove risolve i tre applet, senza costruire nulla.
+- **I path dei binari non vengono canonicalizzati.** `/usr/sbin/emerge`
+  è un symlink verso un wrapper e la dispatch dei multicall guarda il
+  basename di `argv[0]`: risolvere il symlink cambierebbe quale applet
+  parte. Vengono canonicalizzate solo le *directory* (`repo`,
+  `rust_dir`), perché sono mount point del container e prefissi da
+  potare dagli snapshot, e devono combaciare con il path che il binario
+  calcola per sé.
+- **Diagnostica:** `python3 managers/registry.py` stampa la voce attiva,
+  dove risolve i tre applet e a che versione, senza costruire nulla.
 
 Un `PMTEST_PM` sconosciuto fallisce subito elencando le voci disponibili.

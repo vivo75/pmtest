@@ -42,6 +42,13 @@ DEFAULT_PM = "portuale"
 
 APPLETS = ("emerge", "ebuild", "mrg")
 
+# `version:` values that are resolved at run time instead of being a
+# literal label. A hand-written version string goes stale the moment the
+# PM is rebuilt, and every published number has to say which build it
+# measured -- so the registry works it out and the run logs record it.
+VERSION_GIT = "git"        # short commit of the entry's `repo` (+ -dirty)
+VERSION_LATEST = "latest"  # what the binary itself answers to --version
+
 # Neutral CLI harnesses: the cargo package each one is built from.
 HARNESS_PACKAGES = {
     "versions": "versions-harness",
@@ -88,16 +95,22 @@ def active_pm(name=None):
     return name, reg[name] or {}
 
 
-def resolve_path(raw):
-    """A registry path, made absolute and canonical.
+def resolve_path(raw, canonical=False):
+    """A registry path, made absolute. Relative entries resolve against
+    the pmtest root; `a/../b` is normalised either way.
 
-    Relative entries resolve against the pmtest root. The result is
-    canonicalised because it is used as a container mount point and as a
-    prefix to prune from filesystem snapshots, where `a/../b` and `b`
-    would be two different paths.
+    `canonical` additionally resolves symlinks, and is for *directories*
+    only: a checkout's path is a container mount point and a prefix to
+    prune from filesystem snapshots, and it has to match what the PM
+    binary computes for itself (portuale canonicalises its own
+    `repo_root()`). Never canonicalise a binary: `/usr/sbin/emerge` is a
+    symlink into a wrapper, and an applet path is dispatched by its own
+    basename -- resolving it would change which applet runs, or run a
+    wrapper that refuses to be called directly.
     """
     p = Path(os.path.expandvars(os.path.expanduser(str(raw))))
-    return (p if p.is_absolute() else PMTEST_ROOT / p).resolve()
+    p = p if p.is_absolute() else PMTEST_ROOT / p
+    return p.resolve() if canonical else Path(os.path.abspath(p))
 
 
 def repo_dir(pm):
@@ -108,16 +121,71 @@ def repo_dir(pm):
     data (portuale: `bin/`, `3rdparty/portage`) through a path baked in at
     compile time, which only exists inside its own checkout.
     """
-    return resolve_path(pm["repo"]) if pm.get("repo") else None
+    return resolve_path(pm["repo"], canonical=True) if pm.get("repo") else None
 
 
 def rust_dir(pm):
     """Cargo workspace of an entry built from source (None if prebuilt)."""
     if pm.get("rust_dir"):
-        return resolve_path(pm["rust_dir"])
+        return resolve_path(pm["rust_dir"], canonical=True)
     if pm.get("repo"):
-        return resolve_path(pm["repo"]) / "rust"
+        return resolve_path(pm["repo"], canonical=True) / "rust"
     return None
+
+
+_version_cache = {}
+
+
+def _git(repo, *args):
+    out = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True, text=True, check=False,
+    )
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip()
+
+
+def pm_version(name=None):
+    """The version string a report must cite for the active PM.
+
+    `git` resolves to the short commit of the entry's `repo`, with a
+    `-dirty` suffix when that checkout has uncommitted changes -- a
+    number measured on a dirty tree is not reproducible from the commit
+    alone and must not claim to be. `latest` asks the binary itself.
+    Anything else is a literal label, used as written.
+    """
+    name, pm = active_pm(name)
+    raw = str(pm.get("version", "") or "")
+    if raw not in (VERSION_GIT, VERSION_LATEST):
+        return raw
+    if name in _version_cache:
+        return _version_cache[name]
+    if raw == VERSION_GIT:
+        repo = repo_dir(pm) or rust_dir(pm)
+        if repo is None:
+            raise RegistryError(
+                f"PM {name!r}: version `git` needs a `repo` in managers/managers.yaml"
+            )
+        commit = _git(repo, "rev-parse", "--short", "HEAD")
+        if commit is None:
+            raise RegistryError(f"PM {name!r}: {repo} is not a git checkout")
+        dirty = _git(repo, "status", "--porcelain")
+        resolved = f"{commit}-dirty" if dirty else commit
+    else:
+        binary = declared_applet("emerge", name=name)
+        out = subprocess.run(
+            [str(binary), "--version"], capture_output=True, text=True, check=False,
+        )
+        resolved = (out.stdout or out.stderr).strip().splitlines()
+        resolved = resolved[0].strip() if resolved else ""
+        if not any(c.isdigit() for c in resolved):
+            raise RegistryError(
+                f"PM {name!r}: `--version` answered {resolved!r}, which is not a "
+                "version -- use `git` or a literal string in managers/managers.yaml"
+            )
+    _version_cache[name] = resolved
+    return resolved
 
 
 def _build_disabled():
@@ -248,7 +316,7 @@ def _sh(argv):
     out = {
         "PM_NAME": name,
         "PM_PACKAGE": pm.get("package", "portuale"),
-        "PM_VERSION": str(pm.get("version", "")),
+        "PM_VERSION": pm_version(name),
         "PM_EMERGE": str(emerge),
         "PM_BIN_DIR": str(emerge.parent),
         "PM_REPO": str(repo) if repo else "",
@@ -263,7 +331,7 @@ def main(argv):
         _sh(argv)
         return 0
     name, pm = active_pm()
-    print(f"{name} ({pm.get('type', 'unknown')}, version {pm.get('version', '?')})")
+    print(f"{name} ({pm.get('type', 'unknown')}, version {pm_version(name)})")
     for kind in APPLETS:
         try:
             print(f"  {kind}: {declared_applet(kind, name=name)}")

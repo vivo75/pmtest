@@ -40,6 +40,35 @@ _ENV_CONFIG_VARS = (
 )
 
 
+# Markers, not a full inventory: enough to catch a tree that is there
+# but is not the fixture tree (an empty clone, a half-finished checkout).
+_FIXTURE_MARKERS = (
+    "repo/profiles/make.defaults",
+    "repo/metadata/md5-cache",
+    "etc/portage/make.conf",
+    "var/db/pkg",
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _require_fixture_tree():
+    """Fail the session, once and with the reason, on a missing or wrong
+    fixture tree.
+
+    Every case in this suite reads `fixtures/`; without this the whole
+    run turns into a pile of unrelated file-not-found failures. The same
+    tree is what the PM's own Rust tests read, through a `fixtures`
+    symlink in its checkout."""
+    if not FIXTURES_ROOT.is_dir():
+        pytest.fail(f"fixture tree missing: {FIXTURES_ROOT}")
+    missing = [m for m in _FIXTURE_MARKERS if not (FIXTURES_ROOT / m).exists()]
+    if missing:
+        pytest.fail(
+            f"fixture tree at {FIXTURES_ROOT} is missing {', '.join(missing)}: "
+            "it exists, but it is not the fixture tree this suite grades against"
+        )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _isolate_config_env():
     """Strip any inherited make.conf-style config vars for the session."""

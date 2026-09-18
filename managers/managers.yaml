@@ -3,6 +3,11 @@
 # (PMTEST_PM=<name>, default: portuale) instead of a hardcoded
 # `cargo build -p portuale` -- see pytests-contract-suite/conftest.py and managers/README.md.
 # Relative paths resolve against the pmtest root.
+#
+# `version:` is what a published report cites, so it is not written by
+# hand: `git` = short commit of <repo> (+ `-dirty` when that checkout has
+# uncommitted changes), `latest` = what the binary answers to
+# `--version`. Any other value is used verbatim.
 pms:
   portuale:
     type: portage-compatible
@@ -11,9 +16,11 @@ pms:
     emerge: ../portuale/rust/target/release/portuale  # argv[0]-dispatched multicall
     ebuild: ../portuale/rust/target/release/portuale
     mrg: ../portuale/rust/target/release/portuale
-    version: f8c2142  # commit di portuale da cui l'infrastruttura è stata duplicata
+    version: git
   portage:
     type: reference
     emerge: /usr/sbin/emerge
     ebuild: /usr/bin/ebuild
-    version: 3.0.82.2  # pin di riferimento L0/L1 (cfr. differential-test-bed/run/lib.sh L0_PORTAGE_PIN)
+    version: latest
+    # The portage the container upgrades to for L0/L1 is a separate pin:
+    # L0_PORTAGE_PIN in differential-test-bed/run/lib.sh's callers.

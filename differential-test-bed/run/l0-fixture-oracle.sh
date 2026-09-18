@@ -28,7 +28,7 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
 ln -sfn "$RUN" "$LOGS_DIR/l0-fixture-oracle-latest"
 
-ensure_pm_built
+ensure_pm_built "$OUT"
 ensure_image
 
 echo ">>> running fixture-oracle cases in $IMAGE  (out: $OUT)"

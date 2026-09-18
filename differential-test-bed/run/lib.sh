@@ -63,7 +63,31 @@ podman_run_pm() {
     "$@"
 }
 
-ensure_pm_built() {
+# Which build produced a run's numbers is part of the numbers, so every
+# run dir carries it: `pm.json` next to the logs, written before the
+# first container starts. `$PM_VERSION` is what the registry resolved
+# (for a source-built PM, the commit, `-dirty` when the checkout had
+# uncommitted changes) -- not a label somebody remembered to update.
+pm_stamp() {  # <run-dir>
+  [ -d "$1" ] || return 0
+  PM_STAMP_DIR="$1" python3 - <<'PY'
+import json, os, datetime
+out = {
+    "pm": os.environ["PM_NAME"],
+    "version": os.environ["PM_VERSION"],
+    "binary": os.environ["PM_EMERGE"],
+    "repo": os.environ["PM_REPO"],
+    "stamped_at": datetime.datetime.now(datetime.timezone.utc)
+        .strftime("%Y-%m-%dT%H:%M:%SZ"),
+}
+with open(os.path.join(os.environ["PM_STAMP_DIR"], "pm.json"), "w") as fh:
+    json.dump(out, fh, indent=2)
+    fh.write("\n")
+PY
+  echo ">>> PM under test: $PM_NAME $PM_VERSION  (stamped in $1/pm.json)"
+}
+
+ensure_pm_built() {  # [run-dir]
   echo ">>> building $PM_NAME (release, registry version $PM_VERSION)"
   # The registry owns the build: it runs `cargo build --release` in the
   # PM's own workspace, so a source change can never be graded through a
@@ -72,6 +96,8 @@ ensure_pm_built() {
   for l in emerge ebuild mrg; do
     [ -e "$PM_BIN_DIR/$l" ] || ln -s "$(basename "$PM_EMERGE")" "$PM_BIN_DIR/$l"
   done
+  [ $# -ge 1 ] && pm_stamp "$1"
+  return 0
 }
 
 ensure_image() {

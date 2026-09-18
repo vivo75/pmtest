@@ -23,14 +23,19 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
    riporta il migliore di 5).
 4. Gate in CI: `PORTUALE_RUN_BENCHMARK=1 python3 -m pytest pytests-contract-suite -q`.
 5. Nessun sync da rifare: l'infrastruttura vive solo qui (`README.md`,
-   "Provenienza"). Il PM sotto test viene **ricostruito a ogni run** dal
-   suo `repo` di registry, quindi non si testa mai un binario stale;
-   `python3 managers/registry.py` dice quale voce è attiva e dove
-   risolve.
+   "Provenienza"), **`fixtures/` compresa** — l'albero del PM ci punta
+   con un symlink, quindi ogni fixture nuova o corretta si aggiunge qui.
+   Il PM sotto test viene **ricostruito a ogni run** dal suo `repo` di
+   registry, quindi non si testa mai un binario stale; `python3
+   managers/registry.py` dice quale voce è attiva, dove risolve e a che
+   versione.
 
 ## Ammesso
 
-- A1. Aggiungere voci in `managers/managers.yaml`. Aggiorna sempre `version`.
+- A1. Aggiungere voci in `managers/managers.yaml`. `version` non si scrive a
+  mano: `git` (commit corto di `<repo>`, `-dirty` se il checkout ha
+  modifiche non committate) o `latest` (quello che risponde il binario a
+  `--version`).
 - A2. Registrare divergenze attese in `differential-test-bed/compare/known-divergences.yaml`
   (e `known-divergences-fixture-oracle.yaml`).
 - A3. Run in sola lettura: pytest, `differential-test-bed/run/l*.sh`, benchmark.
@@ -62,7 +67,8 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
    `l1-report.json` (0 hard finding attesi). Misurano comportamento,
    non velocità: pubblicali accanto ai secondi, mai al posto dei secondi.
 4. Ogni numero pubblicato riporta tutti e sei questi dati, altrimenti
-   si scarta:
-   - voce registry + `version`
+   si scarta (i primi due te li scrivono i run: `pm`/`pm_version` in
+   `out.json`, `pm.json` nella dir di ogni run del bed):
+   - voce registry + `version` risolta
    - `ops`, `seed`, `repeat`, `dataset`
    - macchina (CPU, RAM, host OS)

@@ -46,7 +46,7 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT" "$PKG_PORTAGE" "$PKG_PORTUALE" "$DISTFILES"
 ln -sfn "$RUN" "$LOGS_DIR/l2-latest"
 
-ensure_pm_built
+ensure_pm_built "$OUT"
 ensure_image
 
 [ "${L2_REBUILD:-0}" = 1 ] && { echo ">>> L2_REBUILD: wiping the pkgcaches"; rm -rf "${PKG_PORTAGE:?}"/* "${PKG_PORTUALE:?}"/*; }

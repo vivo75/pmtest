@@ -149,7 +149,13 @@ def main() -> int:
         return 1
 
     speedup = python_time / rust_time
+    # A number without the build that produced it is not publishable
+    # (USAGE.AGENTS.md "Valuta l'efficienza cosi", point 4), so the JSON
+    # carries the registry entry and the version it resolved to.
+    pm_name, _ = registry.active_pm()
     result = {
+        "pm": pm_name,
+        "pm_version": registry.pm_version(pm_name),
         "dataset": args.dataset,
         "ops": args.ops,
         "seed": args.seed,
@@ -166,7 +172,8 @@ def main() -> int:
     print(f"{'rust':<12} {rust_time:>10.4f} {args.ops / rust_time:>14,.0f}")
     print(
         f"\nrust is {speedup:.2f}x faster than python "
-        f"(best of {args.repeat} runs, {args.ops} ops, seed {args.seed})"
+        f"(best of {args.repeat} runs, {args.ops} ops, seed {args.seed}; "
+        f"PM {result['pm']} {result['pm_version']})"
     )
 
     if args.json:
