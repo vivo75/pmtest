@@ -13,23 +13,23 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 
 ## Usa così
 
-1. `PMTEST_PM=<nome> python3 -m pytest tests -q` — suite fixture-based.
-2. `TEST/run/l0-resolver.sh` e `TEST/run/l1-merge-from-binpkg.sh` —
+1. `PMTEST_PM=<nome> python3 -m pytest pytests-contract-suite -q` — suite fixture-based.
+2. `differential-test-bed/run/l0-resolver.sh` e `differential-test-bed/run/l1-merge-from-binpkg.sh` —
    differential su albero reale (serve `localhost/test-portuale:latest`;
    poi `l0-fixture-oracle.sh`, `l2-portuale-builder.sh`,
    `l3-source-parity.sh`).
 3. `python3 bench/run_benchmark.py --ops 200000 --repeat 5 --json out.json`
    — benchmark harness batch (default: `--dataset snapshot`, seed 0;
    riporta il migliore di 5).
-4. Gate in CI: `PORTUALE_RUN_BENCHMARK=1 python3 -m pytest tests -q`.
+4. Gate in CI: `PORTUALE_RUN_BENCHMARK=1 python3 -m pytest pytests-contract-suite -q`.
 5. Re-sync infrastruttura solo da `../portuale` (comando in `README.md`).
 
 ## Ammesso
 
 - A1. Aggiungere voci in `managers/managers.yaml`. Aggiorna sempre `version`.
-- A2. Registrare divergenze attese in `TEST/compare/known-divergences.yaml`
+- A2. Registrare divergenze attese in `differential-test-bed/compare/known-divergences.yaml`
   (e `known-divergences-fixture-oracle.yaml`).
-- A3. Run in sola lettura: pytest, `TEST/run/l*.sh`, benchmark.
+- A3. Run in sola lettura: pytest, `differential-test-bed/run/l*.sh`, benchmark.
   I run non modificano mai il PM sotto test.
 - A4. Fix all'harness in commit separato dal report dei risultati.
 
@@ -37,8 +37,8 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 
 - F1. Modificare test, fixture, oracoli o soglie per far passare un PM.
   Un rosso si fissa nel PM, non qui.
-- F2. Committare output di run: `TEST/logs/`, `fixtures/var/cache/`,
-  `__pycache__/`, tarball stage3, `TEST/WORKDIR/`, `TEST/repos/`.
+- F2. Committare output di run: `differential-test-bed/logs/`, `fixtures/var/cache/`,
+  `__pycache__/`, tarball stage3, `differential-test-bed/WORKDIR/`, `differential-test-bed/repos/`.
 - F3. Testare un PM non dichiarato nel registry (niente path hardcoded,
   niente binari copiati a mano nel repo).
 - F4. Confrontare PM su condizioni diverse: stessi `fixtures/`, stesso
@@ -54,7 +54,7 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 2. Regressioni: `python3 bench/run_benchmark.py --check-baseline`
    (fallisce sotto il 90% di `bench/baseline.json`).
    `--update-baseline` solo in commit dedicato, mai con un cambio di PM.
-3. Scala reale: `TEST/logs/l0-report.json` (parità resolver) e
+3. Scala reale: `differential-test-bed/logs/l0-report.json` (parità resolver) e
    `l1-report.json` (0 hard finding attesi). Misurano comportamento,
    non velocità: pubblicali accanto ai secondi, mai al posto dei secondi.
 4. Ogni numero pubblicato riporta tutti e sei questi dati, altrimenti

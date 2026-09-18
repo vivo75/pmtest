@@ -28,7 +28,7 @@ Usage:
     scripts/upstream_resolver_translate.py --file 3rdparty/.../test_x.py --json /tmp/x.json
 
 Determinism: `PYTHONHASHSEED=0` and `CLEAN_DELAY=0` are pinned for the
-run (the same pins `TEST/layers/l0/in-container.sh` uses).
+run (the same pins `differential-test-bed/layers/l0/in-container.sh` uses).
 """
 
 from __future__ import annotations

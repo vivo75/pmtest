@@ -35,7 +35,7 @@ DEFAULT_REPOS = {
         "layoutmasteroverlay",
         "repnamerepo",
     ),
-    "TEST/images/overlay": ("porttest",),
+    "differential-test-bed/images/overlay": ("porttest",),
 }
 
 

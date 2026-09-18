@@ -30,7 +30,7 @@ RUST_DIR = REPO_ROOT / "rust"
 RUST_BIN = RUST_DIR / "target" / "release" / "versions-harness"
 PYTHON_HARNESS = [
     sys.executable,
-    str(REPO_ROOT / "python" / "versions_harness.py"),
+    str(REPO_ROOT / "python-harness" / "versions_harness.py"),
 ]
 BASELINE_PATH = Path(__file__).resolve().parent / "baseline.json"
 
@@ -140,7 +140,7 @@ def main() -> int:
     if python_output != rust_output:
         print(
             "error: harness outputs differ -- refusing to report a benchmark for "
-            "implementations that disagree; run the contract suite (tests) "
+            "implementations that disagree; run the contract suite (pytests-contract-suite) "
             "to find the mismatch first",
             file=sys.stderr,
         )

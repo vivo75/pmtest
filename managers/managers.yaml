@@ -1,7 +1,7 @@
 # pmtest registry: every package manager under test gets one entry here.
 # Tests resolve `emerge`/`ebuild`/`mrg` through the active entry
 # (PMTEST_PM=<name>, default: portuale) instead of a hardcoded
-# `cargo build -p portuale` -- see tests/conftest.py and managers/README.md.
+# `cargo build -p portuale` -- see pytests-contract-suite/conftest.py and managers/README.md.
 # Relative paths resolve against the pmtest root.
 pms:
   portuale:
@@ -16,4 +16,4 @@ pms:
     type: reference
     emerge: /usr/sbin/emerge
     ebuild: /usr/bin/ebuild
-    version: 3.0.82.2  # pin di riferimento L0/L1 (cfr. TEST/run/lib.sh L0_PORTAGE_PIN)
+    version: 3.0.82.2  # pin di riferimento L0/L1 (cfr. differential-test-bed/run/lib.sh L0_PORTAGE_PIN)

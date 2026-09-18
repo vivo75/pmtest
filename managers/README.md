@@ -2,12 +2,12 @@
 
 Questo è il punto in cui si dichiara **quale PM viene testato**.
 Nessun path di PM è hardcoded nell'infrastruttura: i run (pytest e
-`TEST/`) risolvono `emerge`/`ebuild`/`mrg` tramite la voce attiva del
+`differential-test-bed/`) risolvono `emerge`/`ebuild`/`mrg` tramite la voce attiva del
 registry, selezionata con la variabile d'ambiente `PMTEST_PM`.
 
 ```sh
-PMTEST_PM=portage python3 -m pytest tests -q   # testate il portage reale
-PMTEST_PM=portuale python3 -m pytest tests -q  # testate portuale (default)
+PMTEST_PM=portage python3 -m pytest pytests-contract-suite -q   # testate il portage reale
+PMTEST_PM=portuale python3 -m pytest pytests-contract-suite -q  # testate portuale (default)
 ```
 
 ## Formato di una voce (`managers.yaml`)
@@ -67,12 +67,12 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
 2. Verificate che i symlink risolvano:
 
    ```sh
-   PMTEST_PM=portuale-dev python3 -m pytest tests/test_portuale.py -q
+   PMTEST_PM=portuale-dev python3 -m pytest pytests-contract-suite/test_portuale.py -q
    ```
 
-3. Per il differential su albero reale (`TEST/run/l*.sh`), la voce
+3. Per il differential su albero reale (`differential-test-bed/run/l*.sh`), la voce
    `portuale` deve puntare alla build release corrente: gli orchestrator
-   montano `rust/target/release` nel container (cfr. `TEST/run/lib.sh`
+   montano `rust/target/release` nel container (cfr. `differential-test-bed/run/lib.sh`
    `podman_run_portuale`), quindi rieseguite la build del PM prima del
    run.
 
@@ -82,14 +82,14 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
   path, se la build vive altrove). Non toccate i test.
 - **Divergenza attesa e legittima** (es. un PM che dichiara una
   differenza voluta): non si allenta il test — si registra in
-  `TEST/compare/known-divergences.yaml` (L0/L1/L2) oppure si apre una
+  `differential-test-bed/compare/known-divergences.yaml` (L0/L1/L2) oppure si apre una
   voce di backlog. Il run è verde solo se ogni finding è spiegato lì.
 - **Rinominare una voce**: è solo una chiave YAML, ma aggiornate anche
   gli eventuali `PMTEST_PM=...` negli script che la usano.
 
 ## Nota sullo stato
 
-`tests/conftest.py` è cablato sul registry: `PMTEST_PM` seleziona la
+`pytests-contract-suite/conftest.py` è cablato sul registry: `PMTEST_PM` seleziona la
 voce, i path espliciti vincono se esistono sul disco, altrimenti la
 voce viene costruita con `cargo build --release` da `<repo>/rust`
 (solo se la voce dichiara `repo` e `cargo` è disponibile), altrimenti
@@ -97,5 +97,5 @@ il test fa skip con un messaggio che dice cosa manca. Un `PMTEST_PM`
 sconosciuto fallisce subito elencando le voci disponibili.
 
 Ancora hardcoded fuori dalla suite pytest: `bench/run_benchmark.py`
-(coppia Rust-vs-Python) e `TEST/run/lib.sh` (`ensure_portuale_built`)
+(coppia Rust-vs-Python) e `differential-test-bed/run/lib.sh` (`ensure_portuale_built`)
 — prossimi candidati allo stesso trattamento.

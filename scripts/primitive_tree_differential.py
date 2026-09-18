@@ -4,7 +4,7 @@
 
 Feeds every dependency atom, every dependency string and every
 REQUIRED_USE string of a whole `metadata/md5-cache` through the kept
-primitive harnesses -- `python/*_harness.py` wrap the real
+primitive harnesses -- `python-harness/*_harness.py` wrap the real
 `portage.dep`, `rust/*-harness` wrap portuale's crates -- and diffs the
 answers line by line:
 
@@ -15,8 +15,8 @@ answers line by line:
                     USE, the IUSE defaults (`+flag`), and every IUSE flag.
 
 A mismatch is appended (deduplicated) to
-`tests/primitive_regressions/<harness>.txt`, which
-`tests/test_primitive_regressions.py` replays on every test run. Re-run
+`pytests-contract-suite/primitive_regressions/<harness>.txt`, which
+`pytests-contract-suite/test_primitive_regressions.py` replays on every test run. Re-run
 this after every `3rdparty/portage` re-pin.
 
 Usage:
@@ -33,7 +33,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 RUST = REPO / "rust"
-REGRESSIONS = REPO / "tests" / "primitive_regressions"
+REGRESSIONS = REPO / "pytests-contract-suite" / "primitive_regressions"
 DEP_KEYS = ("DEPEND", "RDEPEND", "BDEPEND", "PDEPEND", "IDEPEND")
 HARNESSES = {
     "atom": ("atom-harness", "atom_harness.py"),
@@ -129,7 +129,7 @@ def main() -> int:
     for name, (rust_bin, py_script) in HARNESSES.items():
         lines = batches[name]
         rust = run_batch([str(RUST / "target" / "release" / rust_bin)], lines)
-        real = run_batch([sys.executable, str(REPO / "python" / py_script)], lines)
+        real = run_batch([sys.executable, str(REPO / "python-harness" / py_script)], lines)
         mismatches = [line for line, r, p in zip(lines, rust, real) if r != p]
         print(f"{name}: {len(lines)} inputs, {len(mismatches)} mismatches")
         for line in mismatches[:20]:
