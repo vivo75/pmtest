@@ -8,3 +8,6 @@
 # create-container.bash) -- typically symlinks to this host's own
 # already-synced /.gentoo/repos/{gentoo,buildovl}, never committed.
 /repos/
+
+# VM bed scratch: base/golden/run overlays, seeds, build logs (F2)
+/vm/work/
