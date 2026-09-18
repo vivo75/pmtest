@@ -4,51 +4,86 @@ Repository dedicato a **testare e confrontare tra loro varie versioni e
 tipologie di package manager** (portuale, portage reale, altri PM).
 
 Contenuto attuale: **duplicazione dell'infrastruttura di test costruita
-per portuale** (estratta da `../2p`, commit `c35b37dcd3b884cb6af333c47aca40713d41d5e7`).
+per portuale** (estratta da `../portuale`, commit
+`f8c2142508cf1ec942d0902c6689d6fc0cfeec5e`).
 Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
+(`../2p` era solo un clone temporaneo di lavoro, non è più sorgente.)
 
 ## Layout
 
 | Dir | Origine | Cosa contiene |
 |---|---|---|
-| `tests/` | `2p/tests/` | contract suite pytest (black-box via CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark-gate, musl-smoke |
-| `fixtures/` | `2p/fixtures/` | alberi sintetici (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) contro cui gira la suite |
-| `TEST/` | `2p/TEST/` | differential test bed su container (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source parity) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/` |
-| `bench/` | `2p/bench/` | benchmark harness (batch-mode) + snapshot reale Gentoo (`gentoo_snapshot.json`) |
-| `scripts/` | `2p/scripts/` | primitive-tree-differential, repin-review, md5-cache-audit, upstream-resolver-translate |
-| `python/` | `2p/python/` | harness Python lato riferimento (`versions`/`atom`/`use_reduce`/`required_use`) |
-| `managers/` | nuovo | registry + adapter per ogni PM sotto test (vedi `managers/managers.yaml`) |
+| `tests/` | `portuale/tests/` | contract suite pytest (black-box via CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark-gate, musl-smoke |
+| `fixtures/` | `portuale/fixtures/` | alberi sintetici (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) contro cui gira la suite |
+| `TEST/` | `portuale/TEST/` | differential test bed su container (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source parity) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
+| `bench/` | `portuale/bench/` | benchmark harness (batch-mode) + snapshot reale Gentoo (`gentoo_snapshot.json`) |
+| `scripts/` | `portuale/scripts/` | primitive-tree-differential, repin-review, md5-cache-audit, upstream-resolver-translate |
+| `python/` | `portuale/python/` | harness Python lato riferimento (`versions`/`atom`/`use_reduce`/`required_use`) |
+| `managers/` | nuovo | registry + adapter per ogni PM sotto test (vedi `managers/README.md`) |
 
-Esclusi dalla copia (rigenerabili): `TEST/logs/`, `__pycache__/`,
-`.pytest_cache/`, `rust/target/`.
+Esclusi dalla copia (rigenerabili / scratch host-specifico): `TEST/logs/`,
+`TEST/WORKDIR/`, `TEST/repos/`, `TEST/stage3-*.tar.xz`,
+`fixtures/var/cache/`, `__pycache__/`, `.pytest_cache/`, `rust/target/`.
 
 ## Uso
 
 ```sh
-# suite fixture-based contro un PM registrato
+# suite fixture-based contro il PM attivo (vedi managers/)
 python3 -m pytest tests -q
+PMTEST_PM=portage python3 -m pytest tests -q
 
-# differential su albero reale (serve podman + image localhost/test-portuale:latest)
+# differential su albero reale (serve l'immagine del § sotto)
 TEST/run/l0-resolver.sh
 TEST/run/l1-merge-from-binpkg.sh
 ```
 
 Quale binario viene testato è deciso dal **registry** (`managers/`),
 non da path hardcoded: i test puntano a symlink `emerge`/`ebuild`/`mrg`
-risolti dal PM attivo (`PMTEST_PM=portage-3.0.82.2 ...`).
-Oggi gli adapter contengono solo le due voci seed (`portuale`, `portage`);
-la generalizzazione di `tests/conftest.py` (oggi `cargo build -p portuale`
-hardcoded) a `managers/` è il prossimo passo.
+risolti dal PM attivo. Come aggiungere o modificare un PM è spiegato in
+[`managers/README.md`](managers/README.md).
+
+## Creare l'immagine container (`localhost/test-portuale:latest`)
+
+Tutto il codice necessario è già in `TEST/`: `create-container.bash`,
+`init.c` (il PID 1 che esegue `TEST/scripts/` in ordine lessicografico),
+`images/overlay/porttest/` (l'overlay sintetico per L1/L2) e `net/`.
+L'immagine non contiene i binari del PM: vengono montati a run-time da
+`TEST/run/lib.sh`. Da fornire sull'host (mai committati, cfr.
+`TEST/.gitignore`):
+
+- `podman` + `buildah`, `gcc`, `python3` + `PyYAML`;
+- i mirror git locali in `TEST/repos/{gentoo,buildovl}` — lo script li
+  usa come remote `file://` e fa `git fetch --shallow-since=<data>
+  <LAST_COMMIT>` ai pin dichiarati in testa allo script; in pratica
+  symlink ai checkout già sincronizzati dell'host;
+- lo stage3 (`stage3-amd64-systemd-<ts>.tar.xz`): se manca in `TEST/`,
+  lo script lo scarica da `distfiles.gentoo.org`.
+
+Comando (deve girare come root; dentro usa `sudo -su vivo` per
+podman/buildah, con subuid/subgid configurati):
+
+```sh
+sudo TEST/create-container.bash
+```
+
+Lo script: compila `init`, scompatta lo stage3 in `WORKDIR/`, clona i
+repo ai pin, copia l'overlay `porttest` (commit automatico), scrive
+`resolv.conf`/`make.conf`/`repos.conf`, rimappa gli uid per il
+userpriv-container e committa l'immagine `localhost/test-portuale:latest`
+con entrypoint `/init`. Verifica con `podman images` e, se serve,
+con i comandi commentati in fondo allo script.
 
 ## Provenienza / sync
 
-Duplicazione pura da `PORTUALE/2p` al commit sopra indicato.
-Per re-sincronizzare:
+Duplicazione pura da `PORTUALE/portuale` al commit sopra indicato.
+Per re-sincronizzare (la sorgente è `../portuale`, mai `../2p`):
 
 ```sh
-SRC=../2p; for d in tests fixtures TEST bench scripts python; do \
+SRC=../portuale; for d in tests fixtures TEST bench scripts python; do \
   rsync -a --delete --exclude '__pycache__/' --exclude '*.pyc' \
-    --exclude '.pytest_cache/' --exclude 'logs/' "$SRC/$d/" "$d/"; done
+    --exclude '.pytest_cache/' --exclude 'logs/' --exclude 'WORKDIR/' \
+    --exclude 'repos/' --exclude 'stage3-*.tar.xz' --exclude 'var/cache/' \
+    "$SRC/$d/" "$d/"; done
 ```
 
 Non si modifica l'infrastruttura qui per far passare un PM:
