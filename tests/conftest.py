@@ -8,8 +8,17 @@ import pytest
 
 import corpus
 
+try:
+    import yaml
+except ImportError:  # pragma: no cover - PyYAML is a documented host prereq
+    yaml = None
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RUST_DIR = REPO_ROOT / "rust"
+# PM registry: which package manager is under test is decided here, not
+# by hardcoded paths. The active entry is selected via PMTEST_PM
+# (default: "portuale"); see managers/README.md.
+MANAGERS_YAML = REPO_ROOT / "managers" / "managers.yaml"
+DEFAULT_PM = "portuale"
 VERSIONS_PYTHON_HARNESS = REPO_ROOT / "python" / "versions_harness.py"
 ATOM_PYTHON_HARNESS = REPO_ROOT / "python" / "atom_harness.py"
 USE_REDUCE_PYTHON_HARNESS = REPO_ROOT / "python" / "use_reduce_harness.py"
@@ -45,20 +54,129 @@ def _isolate_config_env():
     yield
 
 
-def _cargo_build(package: str) -> Path:
+_registry_cache = None
+
+
+def _registry():
+    """The `pms:` mapping from managers/managers.yaml, loaded once."""
+    global _registry_cache
+    if _registry_cache is None:
+        if yaml is None:
+            pytest.fail("PyYAML is required to read managers/managers.yaml")
+        try:
+            data = yaml.safe_load(MANAGERS_YAML.read_text())
+        except FileNotFoundError:
+            pytest.fail(f"PM registry not found: {MANAGERS_YAML}")
+        _registry_cache = (data or {}).get("pms") or {}
+    return _registry_cache
+
+
+def _active_pm():
+    """(name, entry) of the PM selected via PMTEST_PM."""
+    name = os.environ.get("PMTEST_PM", DEFAULT_PM)
+    reg = _registry()
+    if name not in reg:
+        pytest.fail(
+            f"PMTEST_PM={name!r} is not in managers/managers.yaml "
+            f"(available: {', '.join(sorted(reg)) or 'none'})"
+        )
+    return name, reg[name] or {}
+
+
+def _resolve_registry_path(raw):
+    """A registry path: absolute stays, relative resolves against pmtest root."""
+    p = Path(os.path.expandvars(os.path.expanduser(str(raw))))
+    return p if p.is_absolute() else REPO_ROOT / p
+
+
+def _pm_rust_dir(pm):
+    """Cargo workspace dir for entries built from source (None if prebuilt)."""
+    if pm.get("rust_dir"):
+        return _resolve_registry_path(pm["rust_dir"])
+    if pm.get("repo"):
+        return _resolve_registry_path(pm["repo"]) / "rust"
+    return None
+
+
+def _cargo_build(rust_dir, package):
     subprocess.run(
         ["cargo", "build", "--release", "--package", package],
-        cwd=RUST_DIR,
+        cwd=rust_dir,
         check=True,
     )
-    return RUST_DIR / "target" / "release" / package
+    return rust_dir / "target" / "release" / package
+
+
+def _ensure_built(name, pm, package, binary):
+    """Return `binary`, building `package` first if needed."""
+    if binary.exists():
+        return binary
+    rust_dir = _pm_rust_dir(pm)
+    if rust_dir is None:
+        pytest.skip(
+            f"PM {name!r}: {binary} not found and the registry entry "
+            "has no repo to build it from"
+        )
+    if shutil.which("cargo") is None:
+        pytest.skip(f"PM {name!r}: {binary} not built and cargo not available")
+    _cargo_build(rust_dir, package)
+    if not binary.exists():
+        pytest.fail(f"PM {name!r}: cargo build of {package} produced no {binary}")
+    return binary
+
+
+_HARNESS_PACKAGES = {
+    "versions": "versions-harness",
+    "atom": "atom-harness",
+    "use_reduce": "use-reduce-harness",
+    "required_use": "required-use-harness",
+}
+
+
+def _pm_harness(harness):
+    """Neutral CLI harness binary of the active PM (skips if it ships none)."""
+    name, pm = _active_pm()
+    package = _HARNESS_PACKAGES[harness]
+    if pm.get(f"{harness}_harness"):
+        binary = _resolve_registry_path(pm[f"{harness}_harness"])
+    else:
+        rust_dir = _pm_rust_dir(pm)
+        if rust_dir is None:
+            pytest.skip(
+                f"PM {name!r} ships no {package} harness "
+                "(no repo in registry) -- harness contract not applicable"
+            )
+        binary = rust_dir / "target" / "release" / package
+    return _ensure_built(name, pm, package, binary)
+
+
+def _pm_applet(kind):
+    """emerge/ebuild/mrg entry point of the active PM."""
+    name, pm = _active_pm()
+    package = pm.get("package", "portuale")
+    if pm.get(kind):
+        binary = _resolve_registry_path(pm[kind])
+    else:
+        rust_dir = _pm_rust_dir(pm)
+        if rust_dir is None:
+            pytest.skip(f"PM {name!r}: no {kind} path and no repo in registry")
+        binary = rust_dir / "target" / "release" / package
+    return _ensure_built(name, pm, package, binary)
+
+
+def _applet_symlink(kind, tmp_path_factory):
+    """A real `kind` symlink to the active PM's applet, so tests exercise
+    the same argv[0]-dispatch path a real installation would use."""
+    target = _pm_applet(kind)
+    link_dir = tmp_path_factory.mktemp(f"{kind}-symlink")
+    link = link_dir / kind
+    link.symlink_to(target)
+    return link
 
 
 @pytest.fixture(scope="session")
 def versions_harness_rust() -> Path:
-    if shutil.which("cargo") is None:
-        pytest.skip("cargo not available")
-    return _cargo_build("versions-harness")
+    return _pm_harness("versions")
 
 
 @pytest.fixture(scope="session")
@@ -68,9 +186,7 @@ def versions_harness_python() -> list[str]:
 
 @pytest.fixture(scope="session")
 def atom_harness_rust() -> Path:
-    if shutil.which("cargo") is None:
-        pytest.skip("cargo not available")
-    return _cargo_build("atom-harness")
+    return _pm_harness("atom")
 
 
 @pytest.fixture(scope="session")
@@ -80,9 +196,7 @@ def atom_harness_python() -> list[str]:
 
 @pytest.fixture(scope="session")
 def use_reduce_harness_rust() -> Path:
-    if shutil.which("cargo") is None:
-        pytest.skip("cargo not available")
-    return _cargo_build("use-reduce-harness")
+    return _pm_harness("use_reduce")
 
 
 @pytest.fixture(scope="session")
@@ -92,9 +206,7 @@ def use_reduce_harness_python() -> list[str]:
 
 @pytest.fixture(scope="session")
 def required_use_harness_rust() -> Path:
-    if shutil.which("cargo") is None:
-        pytest.skip("cargo not available")
-    return _cargo_build("required-use-harness")
+    return _pm_harness("required_use")
 
 
 @pytest.fixture(scope="session")
@@ -104,39 +216,32 @@ def required_use_harness_python() -> list[str]:
 
 @pytest.fixture(scope="session")
 def portuale_binary() -> Path:
-    if shutil.which("cargo") is None:
-        pytest.skip("cargo not available")
-    return _cargo_build("portuale")
+    """The active PM's own product binary (multicall dispatch target).
+
+    Historically the portuale multicall binary; now resolved through the
+    registry: an explicit `binary` key wins, else the `emerge` applet
+    path (the same binary for multicall PMs), else a cargo build."""
+    _, pm = _active_pm()
+    if pm.get("binary"):
+        binary = _resolve_registry_path(pm["binary"])
+        if binary.exists():
+            return binary
+    return _pm_applet("emerge")
 
 
 @pytest.fixture(scope="session")
-def emerge_binary(portuale_binary: Path, tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A real `emerge` symlink to the portuale binary, so tests exercise
-    the same argv[0]-dispatch path a real installation would use."""
-    link_dir = tmp_path_factory.mktemp("emerge-symlink")
-    link = link_dir / "emerge"
-    link.symlink_to(portuale_binary)
-    return link
+def emerge_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _applet_symlink("emerge", tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
-def ebuild_binary(portuale_binary: Path, tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A real `ebuild` symlink to the portuale binary, so tests exercise
-    the same argv[0]-dispatch path a real installation would use."""
-    link_dir = tmp_path_factory.mktemp("ebuild-symlink")
-    link = link_dir / "ebuild"
-    link.symlink_to(portuale_binary)
-    return link
+def ebuild_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _applet_symlink("ebuild", tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
-def mrg_binary(portuale_binary: Path, tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A real `mrg` symlink to the portuale binary, so tests exercise the
-    same argv[0]-dispatch path a real installation would use."""
-    link_dir = tmp_path_factory.mktemp("mrg-symlink")
-    link = link_dir / "mrg"
-    link.symlink_to(portuale_binary)
-    return link
+def mrg_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    return _applet_symlink("mrg", tmp_path_factory)
 
 
 @pytest.fixture(autouse=True)

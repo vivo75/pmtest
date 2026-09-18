@@ -1,13 +1,16 @@
-# pmtest registry: ogni package manager sotto test ha una voce qui.
-# I test risolvono `emerge`/`ebuild`/`mrg` tramite la voce attiva
-# (PMTEST_PM=<nome>) invece di un `cargo build -p portuale` hardcoded.
-# Stato: il cablaggio in tests/conftest.py è il prossimo passo;
-# questo file è già il riferimento per i run manuali e per TEST/.
+# pmtest registry: every package manager under test gets one entry here.
+# Tests resolve `emerge`/`ebuild`/`mrg` through the active entry
+# (PMTEST_PM=<name>, default: portuale) instead of a hardcoded
+# `cargo build -p portuale` -- see tests/conftest.py and managers/README.md.
+# Relative paths resolve against the pmtest root.
 pms:
   portuale:
     type: portage-compatible
-    emerge: /home/vivo/repo/PORTUALE/portuale/rust/target/release/portuale  # multicall argv[0]-dispatched
-    ebuild: /home/vivo/repo/PORTUALE/portuale/rust/target/release/portuale
+    repo: ../portuale  # source tree; cargo builds run in <repo>/rust
+    package: portuale  # cargo package for the emerge/ebuild/mrg multicall
+    emerge: ../portuale/rust/target/release/portuale  # argv[0]-dispatched multicall
+    ebuild: ../portuale/rust/target/release/portuale
+    mrg: ../portuale/rust/target/release/portuale
     version: f8c2142  # commit di portuale da cui l'infrastruttura è stata duplicata
   portage:
     type: reference

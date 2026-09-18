@@ -18,7 +18,19 @@ pms:
     type: portage-compatible   # oppure: reference
     emerge: /percorso/del/binario-emerge
     ebuild: /percorso/del/binario-ebuild
+    mrg: /percorso/del/binario-mrg
     version: stringa-libera    # commit, versione, o etichetta del PM
+```
+
+Campi opzionali per i PM costruiti da sorgente (come portuale):
+
+```yaml
+    repo: ../portuale          # albero sorgente; la build gira in <repo>/rust
+    rust_dir: ../portuale/rust # default: <repo>/rust (serve solo se diverso)
+    package: portuale          # package cargo del multicall (default: portuale)
+    binary: /path/esplicito    # vince su emerge per la fixture product-binary
+    versions_harness: /path    # override per-harness (default:
+    atom_harness: /path        #   <rust_dir>/target/release/<package-harness>)
 ```
 
 - `type: reference` — il PM oracolo (oggi il portage reale). Il suo
@@ -26,10 +38,16 @@ pms:
   farlo passare, si fissa il PM sotto test.
 - `type: portage-compatible` — un PM alternativo che deve replicare il
   comportamento del reference (oggi portuale).
-- `emerge` / `ebuild` — per i multicall (portuale) puntano entrambi allo
-  stesso binario: la dispatch avviene via `argv[0]`, quindi i test
+- `emerge` / `ebuild` / `mrg` — per i multicall (portuale) puntano tutti
+  allo stesso binario: la dispatch avviene via `argv[0]`, quindi i test
   creano symlink `emerge`/`ebuild`/`mrg` verso quel path ed esercitano
-  lo stesso percorso di un'installazione reale.
+  lo stesso percorso di un'installazione reale. I path relativi si
+  risolvono contro la root di pmtest.
+- Risoluzione (a parità di voce): path esplicito se esiste → altrimenti
+  `cargo build --release` del `package` da `rust_dir` (solo se la voce
+  ha `repo`/`rust_dir`) → altrimenti skip con messaggio esplicito. Un PM
+  senza `repo` (come `portage`) non ha harness neutrali: gli harness
+  contract per lui fanno skip, i contract via `emerge` girano normali.
 - `version` — solo documentazione: serve a risalire a *quale* build del
   PM un report si riferisce. Tenetela aggiornata a ogni cambio di PM.
 
@@ -71,8 +89,13 @@ pms:
 
 ## Nota sullo stato
 
-Oggi `tests/conftest.py` (copiato da portuale) costruisce ancora il
-binario con `cargo build -p portuale` hardcoded: leggere `managers.yaml`
-e onorare `PMTEST_PM` è il prossimo passo di cablaggio. Fino ad allora
-il registry è il riferimento per i run manuali/`TEST` e per la
-documentazione di quale PM ha prodotto un report.
+`tests/conftest.py` è cablato sul registry: `PMTEST_PM` seleziona la
+voce, i path espliciti vincono se esistono sul disco, altrimenti la
+voce viene costruita con `cargo build --release` da `<repo>/rust`
+(solo se la voce dichiara `repo` e `cargo` è disponibile), altrimenti
+il test fa skip con un messaggio che dice cosa manca. Un `PMTEST_PM`
+sconosciuto fallisce subito elencando le voci disponibili.
+
+Ancora hardcoded fuori dalla suite pytest: `bench/run_benchmark.py`
+(coppia Rust-vs-Python) e `TEST/run/lib.sh` (`ensure_portuale_built`)
+— prossimi candidati allo stesso trattamento.
