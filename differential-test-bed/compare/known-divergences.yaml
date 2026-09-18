@@ -107,3 +107,31 @@
   reason: "VDB CONTENTS sym-target residue of the same ungradable build-id link race."
   owner: portuale-bug
 
+- id: l2-vm-repo-revisions-vdb
+  layer: l2
+  category: VDB
+  path_glob: "*/REPO_REVISIONS"
+  match: "portuale='{}'"
+  reason: >
+    Portuale hardcodes PORTAGE_REPO_REVISIONS="{}" ("until portuale
+    tracks a repo revision", emerge_build.rs); real fills SHAs via git
+    retrieve_head whenever git exists. The VM golden has git (repo
+    clones need it) so real records SHAs; the container image has no
+    git so real writes {} there too. Same single cause as the archive
+    rows (l2-vm-repo-revisions* in the L2-VM classifier). Filed in
+    differential-test-bed/vm/FINDINGS.md; delete when portuale tracks
+    revisions.
+  owner: portuale-bug
+
+- id: l2-vm-repo-revisions-vdb-env
+  layer: l2
+  category: VDB
+  path_glob: "*/environment"
+  reason: >
+    The merged-VDB echo of the same gap: environment dumps differ only
+    in the PORTAGE_REPO_REVISIONS line (verified byte-level: 1 line in
+    1308). Masking tradeoff, stated plainly: this matches on the file
+    name, so a future unrelated env delta would hide here too --
+    re-tighten when the gap closes. Same filing as above.
+  owner: portuale-bug
+

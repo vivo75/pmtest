@@ -50,3 +50,19 @@ unilateral blessing); candidates:
   So portuale does not read `package.use/` directory fragments (or at
   least extensionless ones) — backend-independent bug class, exposed
   by VM stock content. For the owner; no blessing here.
+
+## L2 (slice 5)
+
+- Porttest track (`l1-porttest.txt`, strict): GREEN
+  (`logs/l2-vm-20260918T203434Z/`) after adjudicating one single-cause
+  class (below); cross-install + control clean.
+- `REPO_REVISIONS` (filed, suppressed in `l2-portuale-builder-vm.sh`
+  `KNOWN_FINDINGS` as `l2-vm-repo-revisions[-env]`, delete when fixed):
+  portuale hardcodes `PORTAGE_REPO_REVISIONS="{}"` ("until portuale
+  tracks a repo revision", `emerge_build.rs`); real fills SHAs via git
+  `retrieve_head` whenever git exists. The VM golden has git (repo
+  clones need it), the container image has none — so real writes `{}`
+  on containers (pair matches, bed green) and SHAs on VMs. The full
+  1308-line `environment.bz2` diff is that ONE line. Masking tradeoff:
+  the env entry matches on filename, so re-tighten it when the gap
+  closes.

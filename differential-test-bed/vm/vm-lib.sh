@@ -98,9 +98,13 @@ vm_share_pm() {  # <label> -- share the active PM's checkout via virtiofs
   # what the container bed bind-mounts ($PM_REPO:$PM_REPO:ro).
   # 9p cannot be hotplugged (libvirt: only virtiofs can), hence virtiofs
   # with a per-run daemon (domains already carry shared memory backing).
+  # Sockets live in VM_SOCK_DIR, NOT VM_WORK: unix socket paths die
+  # past SUN_LEN (108) and VM_WORK-based names overflow with long labels.
   local label=$1
-  local sock="$VM_WORK/$label-pm.sock"
+  local sockdir=${VM_SOCK_DIR:-/tmp/porttest-vm-socks}
+  local sock="$sockdir/$label-pm.sock"
   local pidf="$VM_WORK/$label-virtiofsd.pid"
+  mkdir -p "$sockdir"
   rm -f "$sock" "$pidf"
   setsid /usr/libexec/virtiofsd --shared-dir="$PM_REPO" --socket-path="$sock" \
     --cache=never --log-level=warn </dev/null >>"$VM_WORK/$label-virtiofsd.log" 2>&1 &
@@ -110,7 +114,11 @@ vm_share_pm() {  # <label> -- share the active PM's checkout via virtiofs
     [ -S "$sock" ] && break
     sleep 1
   done
-  [ -S "$sock" ] || { echo "!!! virtiofsd produced no socket for $label" >&2; return 2; }
+  [ -S "$sock" ] || {
+    echo "!!! virtiofsd produced no socket for $label (log follows)" >&2
+    tail -n 15 "$VM_WORK/$label-virtiofsd.log" >&2 || true
+    return 2
+  }
   chmod 777 "$sock"  # qemu connects as qemu:qemu (test-only NAT)
   local xml
   xml=$(mktemp)
@@ -127,11 +135,12 @@ EOF
 
 vm_unshare() {  # <label> -- stop the virtiofs daemon, drop the socket
   local label=$1
+  local sockdir=${VM_SOCK_DIR:-/tmp/porttest-vm-socks}
   local pidf="$VM_WORK/$label-virtiofsd.pid"
   [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null || true
   pkill -f "virtiofs[d].*$label-pm.sock" 2>/dev/null || true
   # virtiofsd also drops its own <socket>.pid next to the socket.
-  rm -f "$VM_WORK/$label-pm.sock" "$VM_WORK/$label-pm.sock.pid" \
+  rm -f "$sockdir/$label-pm.sock" "$sockdir/$label-pm.sock.pid" \
     "$pidf" "$VM_WORK/$label-virtiofsd.log"
 }
 

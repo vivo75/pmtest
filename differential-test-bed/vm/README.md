@@ -62,6 +62,27 @@ qcow2 is the base (and its gotchas), `../USAGE.AGENTS.md` for run rules.
 - Trap discipline: every run script traps teardown, and the trap
   handler must end `true` — a `[ -n ... ] && ...` guard ending false
   overrides a green exit code.
+
+## L2 on VMs (slice 5)
+
+- `run/l2-portuale-builder-vm.sh [atomlist]` — both PMs build from
+  source in their own guests (DISTFILES round-trips through the host
+  so the second builder reuses downloads), host-side gpkg-structure
+  + per-atom gpkg-diff + classification (same KNOWN entries), then
+  the ref/cand/ctrl cross-install triplet on fresh overlays, host
+  normalize + `diff.py --layer l2 --fs`. Backend-private pkgcaches
+  (`_l2-pkgcache-{portage,portuale}-vm`) AND distfiles
+  (`_l2-distfiles-vm` — the shared container path accumulates
+  root-owned files). Reports `l2-vm-*`.
+- PM checkout rides virtiofs hotplug at its build-time path on every
+  build/consume guest (uniform guests, fair runs); 9p cannot be
+  hotplugged. Sockets live in `VM_SOCK_DIR` (default
+  `/tmp/porttest-vm-socks`), never `VM_WORK` — unix paths die past
+  SUN_LEN (108) with long labels.
+- Porttest track GREEN (`logs/l2-vm-20260918T203434Z/`); the one
+  finding class (REPO_REVISIONS `{}` vs SHAs) is filed as
+  `l2-vm-repo-revisions*` (classifier) + yaml VDB entries, with the
+  masking tradeoff stated — delete when portuale tracks revisions.
 - Baseline rule: the VM guest is a NEWER installed set than the
   pinned container (weekly official image), so VM parity numbers are
   NOT comparable to container ones probe-for-probe — compare finding
