@@ -20,6 +20,8 @@ Two things live here:
 
 ### Prerequisites
 
+Check them all in one shot: `../scripts/check-prereqs.sh`.
+
 - `podman` + `buildah`; root containers are fine (and preferred where
   they give a cleaner test — see the doc §1.10).
 - The `localhost/test-portuale:latest` image:
