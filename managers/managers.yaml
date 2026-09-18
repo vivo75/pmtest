@@ -1,0 +1,15 @@
+# pmtest registry: every package manager under test gets one entry here.
+# Tests resolve `emerge`/`ebuild`/`mrg` through the active entry
+# (PMTEST_PM=<name>) instead of a hardcoded `cargo build -p portuale`.
+# Next step: teach tests/conftest.py to read this file.
+pms:
+  portuale:
+    type: portage-compatible
+    emerge: /home/vivo/repo/PORTUALE/2p/rust/target/release/portuale  # argv[0]-dispatched multicall
+    ebuild: /home/vivo/repo/PORTUALE/2p/rust/target/release/portuale
+    version: c35b37d  # 2p commit the test infra was duplicated from
+  portage:
+    type: reference
+    emerge: /usr/sbin/emerge
+    ebuild: /usr/bin/ebuild
+    version: 3.0.82.2  # L0/L1 reference pin (see TEST/run/lib.sh L0_PORTAGE_PIN)
