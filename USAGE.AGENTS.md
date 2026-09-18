@@ -17,7 +17,10 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 2. `differential-test-bed/run/l0-resolver.sh` e `differential-test-bed/run/l1-merge-from-binpkg.sh` —
    differential su albero reale (serve `localhost/test-portuale:latest`;
    poi `l0-fixture-oracle.sh`, `l2-portuale-builder.sh`,
-   `l3-source-parity.sh`).
+   `l3-source-parity.sh`). Variante VM (serve `vm/work/golden.qcow2`,
+   vedi `differential-test-bed/vm/README.md`):
+   `differential-test-bed/run/l0-resolver-vm.sh [atomlist]`
+   (report `l0-vm-*`, mai `l0-*`).
 3. `python3 bench/run_benchmark.py --ops 200000 --repeat 5 --json out.json`
    — benchmark harness batch (default: `--dataset snapshot`, seed 0;
    riporta il migliore di 5).

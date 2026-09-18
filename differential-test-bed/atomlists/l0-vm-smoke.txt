@@ -1,0 +1,5 @@
+## L0-on-VM smoke list: a leaf, a mid-size closure, a set.
+## Full list: atomlists/l0-resolve.txt (used by run/l0-resolver-vm.sh default).
+app-misc/tmux
+dev-libs/libffi
+@system

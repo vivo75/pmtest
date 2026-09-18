@@ -31,6 +31,23 @@ qcow2 is the base (and its gotchas), `../USAGE.AGENTS.md` for run rules.
   build logs). Run everything as a NORMAL user (sudo is used inside
   only for nbd/mount); whole-script sudo breaks SSH auth.
 
+## Runs (slice 2)
+
+- `vm-lib.sh` — per-run lifecycle, sourced after `run/lib.sh`:
+  `vm_run_boot` (fresh overlay → seed → boot → IP), `vm_push_pm`
+  (single `$PM_EMERGE` binary + applet symlinks — never the whole
+  build dir), `vm_push_test` (`layers/` + `atomlists/` → `/TEST`),
+  `vm_pull` (guest `/TEST/logs/$RUN` → host `$OUT`), `vm_teardown`.
+- `run/l0-resolver-vm.sh [atomlist]` — same probes/env/grading as
+  `run/l0-resolver.sh`; reports are `l0-vm-*` (container `l0-*`
+  untouched). Smoke list: `atomlists/l0-vm-smoke.txt`
+  (`L0_SKIP_MULTI=1 L0_SKIP_INVARIANTS=1` for iteration).
+- Baseline rule: the VM guest is a NEWER installed set than the
+  pinned container (weekly official image), so VM parity numbers are
+  NOT comparable to container ones probe-for-probe — compare finding
+  *sets* per backend, adjudicate separately. See `vm/FINDINGS.md`
+  (slice-2 baseline: expat/python installed-reuse class).
+
 ## Rebuild
 
 ```sh
