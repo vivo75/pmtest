@@ -72,6 +72,6 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 4. Ogni numero pubblicato riporta tutti e sei questi dati, altrimenti
    si scarta (i primi due te li scrivono i run: `pm`/`pm_version` in
    `out.json`, `pm.json` nella dir di ogni run del bed):
-   - voce registry + `version` risolta
-   - `ops`, `seed`, `repeat`, `dataset`
-   - macchina (CPU, RAM, host OS)
+    - voce registry + `version` risolta
+    - `ops`, `seed`, `repeat`, `dataset`
+    - macchina (CPU, RAM, host OS) + per i run VM: guest fs (`VM_FS`)
