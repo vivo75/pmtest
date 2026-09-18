@@ -357,10 +357,19 @@ def glob_match(pat: str, s: str) -> bool:
     return re.fullmatch(re.escape(pat).replace(r"\*", ".*"), s) is not None
 
 
-def explained(finding: dict, slug: str, kind: str, allow: list[dict]) -> dict | None:
+def explained(finding: dict, slug: str, kind: str, allow: list[dict],
+              run_fs: str | None = None) -> dict | None:
     for e in allow:
         if e.get("layer", "l0") != "l0":
             continue
+        fs = e.get("fs")
+        if fs is not None:
+            fs = [fs] if isinstance(fs, str) else list(fs)
+            # An fs-qualified entry only explains runs on those
+            # filesystems (VM bed matrix); unqualified entries match all.
+            # A run without --fs is explained by nothing fs-qualified.
+            if run_fs not in fs:
+                continue
         cats = e.get("categories") or ([e["category"]] if "category" in e else [])
         if cats and finding["category"] not in cats:
             continue
@@ -378,12 +387,25 @@ def explained(finding: dict, slug: str, kind: str, allow: list[dict]) -> dict | 
 
 # --------------------------------------------------------------------------
 def main(argv: list[str]) -> int:
-    if not 1 <= len(argv) <= 2:
+    run_fs: str | None = None
+    pos: list[str] = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--fs":
+            i += 1
+            if i >= len(argv):
+                print(__doc__)
+                return 2
+            run_fs = argv[i]
+        else:
+            pos.append(argv[i])
+        i += 1
+    if not 1 <= len(pos) <= 2:
         print(__doc__)
         return 2
-    d = Path(argv[0])
+    d = Path(pos[0])
     allow = load_allowlist(
-        Path(argv[1]) if len(argv) == 2 else Path(__file__).with_name("known-divergences.yaml")
+        Path(pos[1]) if len(pos) == 2 else Path(__file__).with_name("known-divergences.yaml")
     )
     meta = d / "meta.tsv"
     if not meta.exists():
@@ -403,7 +425,7 @@ def main(argv: list[str]) -> int:
     explained_hits: list[tuple[str, dict, str]] = []
     for pr in probes:
         for f in pr.findings:
-            e = explained(f, pr.slug, pr.kind, allow)
+            e = explained(f, pr.slug, pr.kind, allow, run_fs)
             if e:
                 f["explained_by"] = e.get("id", "<unnamed>")
                 explained_hits.append((pr.slug, f, e.get("id", "<unnamed>")))
@@ -458,6 +480,10 @@ def main(argv: list[str]) -> int:
         e.get("id", "<unnamed>")
         for e in allow
         if e.get("layer", "l0") == "l0"
+        # An fs-qualified entry for another fs is out of scope here,
+        # not a removal candidate.
+        and (e.get("fs") is None or run_fs in (
+            [e["fs"]] if isinstance(e["fs"], str) else list(e["fs"])))
         and not any(eid == e.get("id", "<unnamed>") for _, _, eid in explained_hits)
     ]
     if unused:
@@ -475,6 +501,7 @@ def main(argv: list[str]) -> int:
                     "explained": len(explained_hits),
                     "unexplained": len(unexplained),
                     "by_category": by_cat,
+                    "fs": run_fs,
                 },
                 "probes": [asdict(p) for p in probes],
             },

@@ -21,6 +21,10 @@
 #   slugs:      list of probe-slug globs (e.g. "app-editors_vim",
 #               "MULTI_*"); '*' is the only wildcard
 #   match:      substring that must appear in the finding detail
+#   fs:         filesystem(s) this entry applies to, string or list
+#               (e.g. `xfs` or `[ext4, btrfs]`) -- VM bed matrix only.
+#               Absent = every filesystem. A run graded with `--fs NAME`
+#               is explained by nothing qualified for another fs.
 #   reason:     why this is not a Portuale bug   (required in spirit)
 #   ticket:     upstream/issue reference, if any
 #   owner:      who adjudicated it

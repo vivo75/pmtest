@@ -12,14 +12,27 @@
 # The guest never sees host paths; the host never trusts guest state
 # except through the pulled $OUT (graded by the same compare scripts).
 
-vm_overlay() {  # <label> -> path (fresh overlay on the golden image)
-  local label=$1 path="$VM_WORK/$label.qcow2"
-  [ -f "$VM_IMAGE" ] || {
-    echo "!!! no golden image: $VM_IMAGE (build it: vm/make-image.sh)" >&2
+# Filesystem matrix (slice 3): VM_FS selects the golden backing.
+# Default xfs = golden.qcow2 (continuity with the slice-2 baseline);
+# VM_FS=ext4|btrfs selects golden-<fs>.qcow2 (built by make-fs-image.sh).
+vm_golden() {
+  local fs=${VM_FS:-xfs}
+  case $fs in
+    xfs) echo "$VM_WORK/golden.qcow2" ;;
+    ext4|btrfs) echo "$VM_WORK/golden-$fs.qcow2" ;;
+    *) echo "!!! VM_FS must be xfs|ext4|btrfs (got $fs)" >&2; exit 2 ;;
+  esac
+}
+
+vm_overlay() {  # <label> -> path (fresh overlay on the selected golden)
+  local label=$1 path="$VM_WORK/$label.qcow2" golden
+  golden=$(vm_golden)
+  [ -f "$golden" ] || {
+    echo "!!! no golden image: $golden (build it: vm/make-image.sh, vm/make-fs-image.sh)" >&2
     exit 2
   }
   rm -f "$path"
-  qemu-img create -F qcow2 -b "$VM_IMAGE" -f qcow2 "$path" > /dev/null
+  qemu-img create -F qcow2 -b "$golden" -f qcow2 "$path" > /dev/null
   echo "$path"
 }
 

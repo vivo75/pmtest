@@ -48,6 +48,30 @@ qcow2 is the base (and its gotchas), `../USAGE.AGENTS.md` for run rules.
   *sets* per backend, adjudicate separately. See `vm/FINDINGS.md`
   (slice-2 baseline: expat/python installed-reuse class).
 
+## Filesystem matrix (slice 3)
+
+- Goldens: `vm/work/golden.qcow2` (xfs, the official layout),
+  `golden-ext4.qcow2`, `golden-btrfs.qcow2` — same bytes, fresh fs.
+  Built by `vm/make-fs-image.sh ext4|btrfs`: fresh GPT, ESP dd-copied
+  (kernel+initramfs live there, GRUB never reads root), root mkfs with
+  the SAME UUID (grub.cfg untouched) + `cp -a`, only fstab's fstype
+  changes. Same-UUID twins must never share a guest (never happens)
+  and are mounted only by explicit /dev paths.
+- `VM_FS=xfs|ext4|btrfs` (default xfs) selects the backing in
+  `vm_golden()`; `run/l0-resolver-vm.sh` validates it, prints it,
+  and grades with `resolve-compare.py --fs`.
+- `fs:` allowlist qualifier (string or list; absent = all fs) in
+  `compare/known-divergences.yaml`, honored by `resolve-compare.py`
+  and `diff.py` (`--fs NAME`); self-test `compare/test-allowlist-fs.py`.
+  Runs without `--fs` match nothing fs-qualified.
+- Provenance: guest `fingerprint.tsv` carries an `fs` line
+  (`stat -f /`; ext4 shows as ext2/ext3), `l0-report.json` summary
+  carries `"fs"`.
+- Baseline (2026-09-18): smoke ×3 fs identical shape; full ext4 ==
+  full xfs finding multiset (76/120 clean) → L0 resolver is
+  fs-independent on this corpus. fs-specific findings, if any, will
+  surface on merge paths (L1-on-VM).
+
 ## Rebuild
 
 ```sh

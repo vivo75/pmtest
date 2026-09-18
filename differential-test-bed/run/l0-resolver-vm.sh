@@ -31,6 +31,13 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
 ln -sfn "$RUN" "$LOGS_DIR/l0-vm-latest"
 
+# Guest filesystem under test (slice 3 matrix): selects the golden
+# backing (vm_golden) and scopes fs-qualified allowlist entries.
+# The guest also records it in fingerprint.tsv (`fs` line).
+VM_FS=${VM_FS:-xfs}
+case $VM_FS in xfs|ext4|btrfs) ;; *) echo "VM_FS must be xfs|ext4|btrfs" >&2; exit 2 ;; esac
+echo ">>> guest filesystem: $VM_FS"
+
 ensure_pm_built
 
 LABEL="porttest-l0-vm-$$"
@@ -60,9 +67,9 @@ vm_ssh "$IP" \
 echo ">>> pulling $OUT"
 vm_pull "$IP" "/TEST/logs/$RUN" "$OUT"
 
-echo ">>> comparing"
+echo ">>> comparing (fs=$VM_FS)"
 set +e
-python3 "$TEST_DIR/compare/resolve-compare.py" "$OUT" "$TEST_DIR/compare/known-divergences.yaml"
+python3 "$TEST_DIR/compare/resolve-compare.py" --fs "$VM_FS" "$OUT" "$TEST_DIR/compare/known-divergences.yaml"
 rc=$?
 python3 "$TEST_DIR/compare/check-invariants.py" "$OUT" | tee "$OUT/invariants.txt"
 [ "${PIPESTATUS[0]}" = 0 ] || [ "$rc" != 0 ] || rc=1

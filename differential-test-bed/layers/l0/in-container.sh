@@ -60,6 +60,7 @@ log() { printf '%s\n' "$*" | tee -a "$OUTDIR/run.log" ; }
   done
   echo "profile	$(readlink -f /etc/portage/make.profile | sed 's#.*/profiles/##')"
   echo "python	$(python3 --version 2>&1)"
+  echo "fs	$(stat -f -c %T /)"
 } > "$OUTDIR/fingerprint.tsv"
 log "fingerprint:"; sed 's/^/  /' "$OUTDIR/fingerprint.tsv" | tee -a "$OUTDIR/run.log"
 
