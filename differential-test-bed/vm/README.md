@@ -36,12 +36,32 @@ qcow2 is the base (and its gotchas), `../USAGE.AGENTS.md` for run rules.
 - `vm-lib.sh` — per-run lifecycle, sourced after `run/lib.sh`:
   `vm_run_boot` (fresh overlay → seed → boot → IP), `vm_push_pm`
   (single `$PM_EMERGE` binary + applet symlinks — never the whole
-  build dir), `vm_push_test` (`layers/` + `atomlists/` → `/TEST`),
-  `vm_pull` (guest `/TEST/logs/$RUN` → host `$OUT`), `vm_teardown`.
+  build dir), `vm_push_test` (`layers/` + `atomlists/` + `compare/`
+  → `/TEST`), `vm_push`/`vm_pull`/`vm_pull_prefix` (consume.sh
+  writes `$OUT.*` prefixes, mirroring the container layout),
+  `vm_share_pm`/`vm_mount_pm`/`vm_unshare` (PM checkout via
+  virtiofs hotplug at its build-time path — 9p cannot be hotplugged;
+  domains carry shared-memory backing for it), `vm_teardown`
+  (also kills the per-run virtiofsd).
 - `run/l0-resolver-vm.sh [atomlist]` — same probes/env/grading as
   `run/l0-resolver.sh`; reports are `l0-vm-*` (container `l0-*`
   untouched). Smoke list: `atomlists/l0-vm-smoke.txt`
   (`L0_SKIP_MULTI=1 L0_SKIP_INVARIANTS=1` for iteration).
+
+## L1 on VMs (slice 4)
+
+- `run/l1-merge-from-binpkg-vm.sh [atomlist]` — build once with
+  Portage (binpkgs pulled to host `_l1-pkgcache-vm`, backend-private
+  for provenance), consume per PM on fresh overlays (pkgcache pushed
+  to guest `/pkgs`), host-side normalize + `diff.py --fs`.
+  `L1_REBUILD`/`L1_SKIP_BUILD`/`L1_JOBS` as the container script;
+  reports `l1-vm-*`. Smoke (`l1-smoke.txt`) and porttest set GREEN;
+  full set currently invalid by a genuine PM gap (see FINDINGS.md,
+  `package.use` fragments) — the bed's first bug found, not a
+  plumbing failure.
+- Trap discipline: every run script traps teardown, and the trap
+  handler must end `true` — a `[ -n ... ] && ...` guard ending false
+  overrides a green exit code.
 - Baseline rule: the VM guest is a NEWER installed set than the
   pinned container (weekly official image), so VM parity numbers are
   NOT comparable to container ones probe-for-probe — compare finding

@@ -73,11 +73,15 @@ vm_define() {  # <name> <disk.qcow2> [seed.iso] -- (re)define a UEFI domain
   [ -n "$seed" ] && seed_arg=(--disk "$seed,device=cdrom")
   virt-install --connect qemu:///system --name "$name" \
     --memory "$VM_MEMORY_MB" --vcpus "$VM_VCPUS" --cpu host-model \
+    --memorybacking source.type=memfd,access.mode=shared \
     --disk "$disk" "${seed_arg[@]}" \
     --os-variant gentoo \
     --boot loader=/usr/share/edk2/OvmfX64/OVMF_CODE_4M.qcow2,loader.readonly=yes,loader.type=pflash,nvram.template=/usr/share/edk2/OvmfX64/OVMF_VARS_4M.qcow2 \
     --network network="$VM_NET" --graphics none --noautoconsole --import \
     > /dev/null
+  # NOTE: shared memory backing is for virtiofs hotplug (vm_share_pm);
+  # 9p cannot be hotplugged at all, which is why the PM checkout rides
+  # virtiofs instead of 9p.
 }
 
 vm_down() {  # <name> [disk-to-delete] -- destroy, undefine, drop overlay

@@ -25,7 +25,12 @@ vm_golden() {
 }
 
 vm_overlay() {  # <label> -> path (fresh overlay on the selected golden)
-  local label=$1 path="$VM_WORK/$label.qcow2" golden
+  # NOTE: one `local` per line (see clone_pin lesson in
+  # firstboot-customize.sh): a forward reference works only by accident
+  # of the caller's dynamic scope.
+  local label=$1
+  local path="$VM_WORK/$label.qcow2"
+  local golden
   golden=$(vm_golden)
   [ -f "$golden" ] || {
     echo "!!! no golden image: $golden (build it: vm/make-image.sh, vm/make-fs-image.sh)" >&2
@@ -60,6 +65,16 @@ vm_push_test() {  # <ip> -- bed scripts the guest layer needs
   vm_ssh "$ip" "mkdir -p /TEST"
   scp $(ssh_opts) -r "$TEST_DIR/layers" "$TEST_DIR/atomlists" \
     "${VM_SSH_USER}@${ip}:/TEST/"
+  # compare/ runs inside the guest too (consume.sh -> snapshot.sh);
+  # ship it without caches.
+  tar -C "$TEST_DIR" -cf - --exclude='__pycache__' compare \
+    | ssh $(ssh_opts) "${VM_SSH_USER}@${ip}" 'tar -C /TEST -xf -'
+}
+
+vm_push() {  # <ip> <src> <dst-dir> -- scp -r host src into guest dir
+  local ip=$1 src=$2 dst=$3
+  vm_ssh "$ip" "mkdir -p $dst"
+  scp $(ssh_opts) -r "$src" "${VM_SSH_USER}@${ip}:${dst}/"
 }
 
 vm_pull() {  # <ip> <guest-path> <host-dest>
@@ -68,8 +83,67 @@ vm_pull() {  # <ip> <guest-path> <host-dest>
   scp $(ssh_opts) -r "${VM_SSH_USER}@${ip}:${src}/." "$dst/"
 }
 
-vm_teardown() {  # <label> -- destroy domain, drop overlay + seed
+vm_pull_prefix() {  # <ip> <guest-prefix> <host-dir> -- $prefix.* files
+  # consume.sh writes "$OUT.*" (prefix, not directory), mirroring the
+  # container layout ($OUT/<pm>.* directly under the run dir).
+  local ip=$1 pre=$2 dst=$3
+  mkdir -p "$dst"
+  scp $(ssh_opts) "${VM_SSH_USER}@${ip}:${pre}.*" "$dst/"
+}
+
+vm_share_pm() {  # <label> -- share the active PM's checkout via virtiofs
+  # The PM checkout must appear in the guest at its build-time path:
+  # portuale resolves repo_root() from compile-time CARGO_MANIFEST_DIR,
+  # and L1+ phase execution reads bin/ + 3rdparty through it -- exactly
+  # what the container bed bind-mounts ($PM_REPO:$PM_REPO:ro).
+  # 9p cannot be hotplugged (libvirt: only virtiofs can), hence virtiofs
+  # with a per-run daemon (domains already carry shared memory backing).
+  local label=$1
+  local sock="$VM_WORK/$label-pm.sock"
+  local pidf="$VM_WORK/$label-virtiofsd.pid"
+  rm -f "$sock" "$pidf"
+  setsid /usr/libexec/virtiofsd --shared-dir="$PM_REPO" --socket-path="$sock" \
+    --cache=never --log-level=warn </dev/null >>"$VM_WORK/$label-virtiofsd.log" 2>&1 &
+  echo $! > "$pidf"
+  local i
+  for i in $(seq 1 30); do
+    [ -S "$sock" ] && break
+    sleep 1
+  done
+  [ -S "$sock" ] || { echo "!!! virtiofsd produced no socket for $label" >&2; return 2; }
+  chmod 777 "$sock"  # qemu connects as qemu:qemu (test-only NAT)
+  local xml
+  xml=$(mktemp)
+  cat > "$xml" <<EOF
+<filesystem type='mount' accessmode='passthrough'>
+  <driver type='virtiofs' queue='1024'/>
+  <source socket='$sock'/>
+  <target dir='pmrepo'/>
+</filesystem>
+EOF
+  virsh --connect qemu:///system attach-device "$label" "$xml" --live
+  rm -f "$xml"
+}
+
+vm_unshare() {  # <label> -- stop the virtiofs daemon, drop the socket
+  local label=$1
+  local pidf="$VM_WORK/$label-virtiofsd.pid"
+  [ -f "$pidf" ] && kill "$(cat "$pidf")" 2>/dev/null || true
+  pkill -f "virtiofs[d].*$label-pm.sock" 2>/dev/null || true
+  # virtiofsd also drops its own <socket>.pid next to the socket.
+  rm -f "$VM_WORK/$label-pm.sock" "$VM_WORK/$label-pm.sock.pid" \
+    "$pidf" "$VM_WORK/$label-virtiofsd.log"
+}
+
+vm_mount_pm() {  # <ip> -- mount the shared PM checkout at $PM_REPO
+  local ip=$1
+  vm_ssh "$ip" "modprobe virtiofs 2>/dev/null; modprobe fuse 2>/dev/null; true"
+  vm_ssh "$ip" "mkdir -p '$PM_REPO' && mount -t virtiofs -o ro pmrepo '$PM_REPO' && test -f '$PM_REPO/bin/ebuild.sh'"
+}
+
+vm_teardown() {  # <label> -- destroy domain, drop overlay + seed + share
   local label=$1
   vm_down "$label" "$VM_WORK/$label.qcow2" 2>/dev/null || true
   rm -f "$VM_WORK/$label-seed.iso"
+  vm_unshare "$label"
 }

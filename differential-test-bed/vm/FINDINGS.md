@@ -30,3 +30,23 @@ unilateral blessing); candidates:
    vs portuale virtual/libc` at #8 — different @system input sets
    (nomultilib vs multilib); needs the full-list order verdict before
    calling it.
+
+## L1 (slice 4)
+
+- Smoke (`l1-smoke.txt`, 5 pkgs) and porttest set (10 pkgs, setuid /
+  hardlinks / symlinks / keepdir / dodoc / INSTALL_MASK / phases /
+  splitdebug / unicode): GREEN on VM, 0 hard findings.
+  Reports: `logs/l1-vm-20260918T193129Z/`, `logs/l1-vm-20260918T193316Z/`.
+- Full set (`l1-merge.txt`): INVALID run (`MERGE_RC=2` — portuale
+  built htop from source), root-caused to a genuine PM gap, not plumbing:
+  1. The stock cloud image ships
+     `/etc/portage/package.use/releng/no-filecaps` (`*/* -filecaps`,
+     "caps are not useful" on auto-login images).
+  2. Real honors it (htop binpkg built/merged with `-filecaps`);
+     portuale ignores the fragment (computes `filecaps` from IUSE
+     default) → binpkg USE mismatch → source rebuild.
+  3. Proof of causality: same probe in the container bed (no releng
+     fragment there) has both PMs agree on `filecaps` ON.
+  So portuale does not read `package.use/` directory fragments (or at
+  least extensionless ones) — backend-independent bug class, exposed
+  by VM stock content. For the owner; no blessing here.
