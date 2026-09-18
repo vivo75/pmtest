@@ -21,3 +21,7 @@ bench/__pycache__/
 .idea/
 *~
 .DS_Store/
+
+# VM spike scratch (large, host-local)
+*.qcow2
+seed.iso

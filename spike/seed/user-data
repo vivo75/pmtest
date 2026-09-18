@@ -1,0 +1,8 @@
+#cloud-config
+# NoCloud seed for the porttest-spike VM (spike only).
+users:
+  - name: root
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICz6I/xki07qzYlZKS3ApNT7BDQl928Lf2Wd9dJbhVYo F.R.@Monfi 2019-05-15
+hostname: porttest-spike
+manage_etc_hosts: true
