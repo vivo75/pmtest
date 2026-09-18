@@ -20,11 +20,10 @@ Usage:
 import os
 import sys
 
-sys.path.insert(0, os.path.join(
-    os.environ.get("PORTUALE_PORTAGE_CHECKOUT")
-    or os.path.join(os.path.dirname(__file__), "..", "3rdparty", "portage"),
-    "lib",
-))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from _pinned_portage import use_pinned_portage
+
+use_pinned_portage()
 
 from portage.versions import vercmp, ververify
 
