@@ -113,6 +113,24 @@
     visibility is fixed.
   owner: portuale-bug
 
+- id: l0-vm-system-virtual-order
+  layer: l0
+  backend: vm
+  categories: [order]
+  slugs: ["_system", "_world"]
+  match: "real virtual/editor vs portuale virtual/libc"
+  reason: >
+    Accepted variance per the virtual-resolution rules (owner decision
+    2026-09-19): nano-9.2 and glibc-2.43-r2 are installed, both PMs
+    keep them (identical R rows, no provider switch), @world pins
+    neither provider -- rules 1-3 hold identically on both sides and
+    only the order of two dependency-free rows differs (no edge either
+    way, verified RDEPENDs). Real is seed-stable (0/1/42) but its
+    traversal choice is arbitrary, and mimicking CPython traversal is
+    declared unportable (see gedit-nautilus-cluster-a-rewalk-abort).
+    Evidence: logs/l0-vm-20260918T183537Z.
+  owner: accepted-variance
+
 - id: l2-gpkg-dostrip-splitdebug
   layer: l2
   category: SYMLINK

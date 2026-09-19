@@ -1,5 +1,13 @@
 # VM findings (slice 2 baseline, 2026-09-18)
 
+## Open investigations (backlog)
+
+- **xtrans-early pattern** (filed 2026-09-19): in ~10 L0-VM order
+  findings portuale merges `x11-libs/xtrans` well before real does
+  (vs libpng, binutils-libs, xorg-proto, libidn, libatomic_ops, ...).
+  Open: systematic edge-violation or benign traversal difference?
+  Per-probe dependency-path analysis pending.
+
 L0-on-VM vs L0-on-container, same atom list, same pins, same PM build
 (portuale 84cefdf). Reports:
 `differential-test-bed/logs/l0-vm-20260918T173822Z/`,
@@ -25,7 +33,13 @@ unilateral blessing); candidates:
    `l0-vm-installed-python-slot` (backend: vm, this probe only;
    owner portuale-bug). Same installed-visibility root cause.
 3. **@system merge-order cluster** (`real virtual/editor vs portuale
-   virtual/libc`): OPEN, needs full-list order verdict.
+   virtual/libc`): ADJUDICATED 2026-09-19 as ACCEPTED VARIANCE
+   (`l0-vm-system-virtual-order`, slugs `_system`+`_world`, owner
+   accepted-variance). Procedure applied: no dependency edge either
+   way (verified RDEPENDs); nano-9.2 + glibc-2.43-r2 installed and
+   kept by both PMs (no provider switch); @world pins neither;
+   real seed-stable (0/1/42) yet traversal-arbitrary. No rule
+   contradiction → not a bug.
 
 ## L1 (slice 4)
 
