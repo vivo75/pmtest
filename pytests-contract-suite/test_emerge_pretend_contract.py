@@ -16736,7 +16736,7 @@ def test_oracle_bdeps_default_of_an_installed_parent_drives_dependency_updates(
 
     Oracle: container fixture-oracle capture 2026-09-16 (real 3.0.82.2,
     staged `/tmp/fx66` tree; the re-probe of the same rule on the host is
-    in `docs/evidence/2026-09-16-post63-probes/`), six cells:
+    in `docs/history/evidence/2026-09-16-post63-probes/`), six cells:
     default `-uDN`, `--with-bdeps=y --usepkg` -> `dep-2.0` merged;
     `--usepkg`, `--getbinpkg`, `--with-bdeps-auto=n`, `--with-bdeps=n`
     -> no merge list. Every cell MATCHES real, before any code change --

@@ -113,7 +113,7 @@ names only `othermod`.
 
 ## #54 S0 — oracle matrix: world state × case × complete-graph gate
 
-`docs/06.054-residual_conflict.opus.md` §S0's hypothesis H: the 511e659
+`docs/history/06.054-residual_conflict.opus.md` §S0's hypothesis H: the 511e659
 docstrings ("verified live") came from a probe where `keeper` was
 reachable from `@world`; both oracles are right under different world
 states, and the fix is to restrict the consumer scan to reachable
@@ -232,7 +232,7 @@ writeup above (no further code change).
 
 ## #57 S0 — oracle matrix: backtrack trace + argv order + solvable control
 
-`docs/06.057-directly_requested_hard_atom_conflict.opus.md` §S0. Same
+`docs/history/06.057-directly_requested_hard_atom_conflict.opus.md` §S0. Same
 fixture as #54 (`dev-libs/{needer,othermod,paired}`, `paired-1.0`
 installed), plus a new throwaway solvable-control fixture
 `dev-libs/plainuser-1.0` (`RDEPEND="dev-libs/paired"`, bare/unversioned)
@@ -313,7 +313,7 @@ md5-cache entry) + this section (no resolver code change).
 
 ## #57 S1 — installed-instance slot tracking
 
-`docs/06.057-directly_requested_hard_atom_conflict.opus.md` §S1, built on
+`docs/history/06.057-directly_requested_hard_atom_conflict.opus.md` §S1, built on
 the S0 verdict above (tracker collision + slot-conflict backtracking
 exhausted; no K4 trigger). The walker now indexes `AlreadyInstalled`
 graph nodes by `(cat, pkg, slot)` in a new `PassState::installed_slots`
@@ -424,7 +424,7 @@ Correct work, not overhead; flagged here for S2 to confirm against the
 
 ## #57 S2 — fixture oracle + full L0 verification
 
-`docs/06.057-directly_requested_hard_atom_conflict.opus.md` §S2, after
+`docs/history/06.057-directly_requested_hard_atom_conflict.opus.md` §S2, after
 S1 (`ec09c66`).
 
 **Fixture oracle** (`TEST/run/l0-fixture-oracle.sh`, run
