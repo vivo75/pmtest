@@ -146,6 +146,10 @@ vm_unshare() {  # <label> -- stop the virtiofs daemon, drop the socket
 
 vm_mount_pm() {  # <ip> -- mount the shared PM checkout at $PM_REPO
   local ip=$1
+  # A checkout without its gitignored 3rdparty/ breaks phase execution
+  # confusingly (empty PORTAGE_PYM_PATH); fail loud here instead.
+  [ -d "$PM_REPO/3rdparty/portage" ] \
+    || { echo "!!! $PM_REPO/3rdparty/portage missing (gitignored checkout content)" >&2; return 2; }
   vm_ssh "$ip" "modprobe virtiofs 2>/dev/null; modprobe fuse 2>/dev/null; true"
   vm_ssh "$ip" "mkdir -p '$PM_REPO' && mount -t virtiofs -o ro pmrepo '$PM_REPO' && test -f '$PM_REPO/bin/ebuild.sh'"
 }

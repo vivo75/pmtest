@@ -55,10 +55,14 @@ unilateral blessing); candidates:
   (`logs/l3-vm-20260918T225222Z/`): candidate 12 explained (VDB
   REPO_REVISIONS/env entries), 0 unexplained; control 0/0.
 - 6 systemd coredumps (`core.build-and-merge.*`) appeared in one
-  portuale guest run (merge rc=0 regardless). The PM binary under test is
-  a dirty-tree dev build — per owner decision (2026-09-19): retest on a
-  clean tree first (PENDING, see below), no filing yet. Not diff signal
-  either way (pruned).
+  portuale guest run (merge rc=0 regardless). CLOSED 2026-09-19 as
+  dirty-tree artifact: clean-tree retest (worktree at aeef59f,
+  `portuale-clean` registry entry, throwaway guest, tree+pv+dmidecode
+  source merges) completed rc=0 with ZERO cores. No filing. (Retest
+  also showed: a PM checkout shared without its gitignored 3rdparty
+  fails phases with empty PORTAGE_PYM_PATH — vm_mount_pm now fails
+  loud; and absolute symlinks escaping the virtiofs share do not
+  resolve in-guest, use bind-mount.)
 
 ## L2 (slice 5)
 
