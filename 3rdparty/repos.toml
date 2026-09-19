@@ -1,0 +1,65 @@
+# Third-party repositories portuale checks out (into 3rdparty/, gitignored)
+# or vendors (into the tree), and the exact ref/commit each is pinned to.
+#
+# One [table] per repository. Keys: url, kind, ref (branch/tag/commit in
+# use), commit (the ref's resolved SHA -- for an annotated tag this is
+# `git rev-parse <ref>^{commit}`, not the tag object), pinned_at
+# (YYYY-MM-DD this was last set/verified). `checkout_path` is where the
+# working tree lives (relative to repo root); `$PORTUALE_PORTAGE_CHECKOUT`
+# overrides the portage one at runtime.
+#
+# TOML: parse with any TOML library (Python stdlib `tomllib`, the `toml`
+# crate, `yq -p toml`, ...), or by eye -- every value is on its own line.
+#
+# Update this file in the same commit that changes a pin.
+
+[portage]
+description = "Upstream Gentoo Portage. portuale vendors the whole bash phase runtime into ./bin/ (see bin/README.md), but the .py helpers that `import portage` (doins.py, xpak-helper.py, ...), their lib/portage import path, and cnf/sets/portage.conf still come from this checkout. The primitive harnesses (python/*_harness.py) import the real portage.versions / portage.dep from here."
+url = "https://github.com/gentoo/portage"
+kind = "reference-checkout"
+checkout_path = "3rdparty/portage"
+# `commit` is the tag's underlying commit: `git rev-parse <ref>^{commit}`
+# (annotated tags -- plain `git rev-parse <ref>` gives the tag object).
+# Re-verify: `git -C 3rdparty/portage describe --tags` reads `<ref>`.
+ref = "portage-3.0.82.2"
+commit = "1d95fc2c552a2c7d347e54093fa0e5b172a57004"
+pinned_at = "2026-09-01"
+# Vendored into the tree (so `emerge` runs with no Portage installed):
+#   bin/  -- ebuild.sh + its whole source closure, every ebuild-helpers/
+#            script, estrip/ecompress, the *-qa-check.d/ sets, and the
+#            stdlib-only filter-bash-environment.py. Only bin/phase-functions.sh
+#            diverges (brush strategy #2 -- see its header). Re-sync on a
+#            `commit` bump by copying the upstream files over + re-applying
+#            that one change; `diff -r 3rdparty/portage/bin bin` should
+#            then be empty bar phase-functions.sh + bin/README.md.
+vendored_paths = ["bin/"]
+
+[brush]
+description = "Rust-native bash interpreter (brush-core + brush-builtins), embedded in portuale as the real ebuild phase execution backend (bin/*.sh phases run through it, not a shelled-out system bash)."
+url = "https://github.com/vivo75/brush"
+kind = "cargo-git-dependency"
+checkout_path = "3rdparty/brush"
+ref = "main"
+commit = "b9524ad51de5c8231eb5dcaf79ca982841117385"
+pinned_in = "rust/portuale/Cargo.toml"
+pinned_at = "2026-09-14"
+tracking_doc = "docs/brush-pin.md"
+# Thin fork (since 2026-09-05): vivo75/brush `main` = upstream
+# reubeno/brush `main` (25bffd54) + the five staged docs/brush-pr/
+# fixes, nothing else; exact-commit pinned (no released crates.io
+# version carries them, nor reubeno/brush#1274, which portuale's use of
+# bin/eapi.sh needs). Drop the fork once the PRs land. Cargo.toml
+# fetches this via git; the 3rdparty/brush checkout (origin = vivo75,
+# upstream = reubeno) holds the per-bug fix/* branches. Re-pin
+# periodically -- see docs/brush-pin.md's checklist.
+notes = "Back to vivo75/brush (a fork) Operator will manually follow upstream at reubeno/brush"
+
+[portage-cli]
+description = "Upstream Rust Portage CLI (lu-zero/portage-cli). Home of the portage-solver / portage-atom-pubgrub / portage-atom-resolvo crates analyzed in docs/solver-backends-analysis.md. Reference checkout only -- no Cargo dependency yet; a future solver bridge would fetch the crates via crates.io independently."
+url = "https://github.com/lu-zero/portage-cli"
+kind = "reference-checkout"
+checkout_path = "3rdparty/portage-cli"
+ref = "master"
+commit = "a0465cd9c34ee9ce6490f1ff09ac39597abc90ac"
+pinned_at = "2026-09-07"
+tracking_doc = "docs/solver-backends-analysis.md"
