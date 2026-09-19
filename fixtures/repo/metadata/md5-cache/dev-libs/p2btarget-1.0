@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #81 p2b replacement target, installed 1.0
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=fa2da9787cf59c7339f97cc4dc7172dd

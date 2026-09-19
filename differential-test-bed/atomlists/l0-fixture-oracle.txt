@@ -86,3 +86,11 @@ app-misc/mopodmanok
 # agree byte-for-byte here (host oracle 2026-09-18); this is the
 # standing default-bed coverage for the `kept_alt_for_display` path
 =dev-libs/rdisjtarget-2.0
+# #81 S2: the tree-only satisfied row -- the replacement upgrades over an
+# installed instance whose owner upgrades too, so flat mode's greedy pop
+# drains past it with no row, but tree mode's one-at-a-time selection
+# stalls and schedules the uninstall (`scheduled_uninstalls`), solving
+# and showing the row. Real and portuale agree on the row bytes, the
+# nesting and the -v counters (host oracle 2026-09-19); the surrounding
+# walk sequence stays portuale's own (documented residue).
+--tree --update dev-libs/p2btarget dev-libs/p2bowner dev-libs/newpkg

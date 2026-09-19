@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #81 p2b owner, installed 1.0 with a blocker on the replacement, staged 1.1 upgrade
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=59fc61cdaaec7119760440ca29c47be2
+RDEPEND=!<dev-libs/p2btarget-2.0

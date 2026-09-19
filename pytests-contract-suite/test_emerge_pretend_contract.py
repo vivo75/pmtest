@@ -1500,6 +1500,11 @@ CASES = [
         0,
     ),
     (
+        "blocker: a tree-only satisfied row from the stuck serializer (#81 S2)",
+        ["--pretend", "--tree", "--update", "dev-libs/p2btarget", "dev-libs/p2bowner", "dev-libs/newpkg"],
+        0,
+    ),
+    (
         "blocker: --tree hangs a merging owner's removal chain under the blocker (#75 C0 u1)",
         ["--pretend", "--tree", "dev-libs/blockerpkg"],
         0,
@@ -17383,6 +17388,81 @@ def test_oracle_76_wait_follows_the_selected_disjunctive_branch(emerge_binary, f
         "Total: 2 packages (2 upgrades), Size of downloads: 0 KiB",
         "Conflict: 1 block (all satisfied)",
     ], result.stdout
+
+
+def test_oracle_81_tree_only_satisfied_row_from_the_stuck_serializer(
+    emerge_binary, fixture_env
+):
+    """Backlog #81 S1/S2 (C0 p2b): the tree-only satisfied row.
+
+    `p2btarget-2.0` replaces installed `p2btarget-1.0` in-slot while the
+    blocker owner `p2bowner` upgrades 1.0 -> 1.1 itself. Flat mode's
+    greedy leaf pop drains past the shape with no row (both PMs agree);
+    tree mode disables the greedy pop, so selection stalls with the
+    blocker pending, schedules the replaced instance's uninstall
+    (`scheduled_uninstalls`), and appends the solved row -- which portuale
+    models with the shared scheduler loop plus the stuck branch
+    (`merge_order::tree_solved_replacements`), hanging the row under the
+    replacement exactly like an Inline row.
+
+    Host oracle, real 3.0.82.2, 2026-09-19: the `[blocks b]` bytes, the
+    nesting under the replacement, rc 0, and the `-v` counters
+    (`Conflict: 1 block (all satisfied)` in tree, absent in flat) all
+    match. The surrounding walk sequence stays portuale's own (real leads
+    with the merge owner and trails the nested new-slot occurrence;
+    portuale opens on the nomerge ancestor) -- documented residue on the
+    branch, same class as u6/multislotparent sibling order.
+    """
+    args = [
+        "--pretend",
+        "--tree",
+        "--update",
+        "dev-libs/p2btarget",
+        "dev-libs/p2bowner",
+        "dev-libs/newpkg",
+    ]
+    result = _run([str(emerge_binary)], args, fixture_env)
+    assert result.returncode == 0
+    lines = result.stdout.splitlines()
+    row = lines.index(
+        '[blocks b      ]  <dev-libs/p2btarget-2.0 ("<dev-libs/p2btarget-2.0" is '
+        "soft blocking dev-libs/p2bowner-1.1)"
+    )
+    # The row follows the owner's merge line with the replacement nested
+    # beneath it, like real. (Real additionally interleaves the newpkg
+    # merge, a nomerge-owner ancestor occurrence and a nested new-slot
+    # owner line around this core -- walk-sequence residue, same class as
+    # u6/multislotparent sibling order, documented on the branch.)
+    assert lines[row - 1] == "[ebuild     U  ] dev-libs/p2bowner-1.1 [1.0]"
+    assert lines[row + 1] == "[ebuild     U  ]   dev-libs/p2btarget-2.0 [1.0]"
+    # Flat mode shows no row for the same argv (both PMs agree).
+    flat = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "dev-libs/p2btarget", "dev-libs/p2bowner", "dev-libs/newpkg"],
+        fixture_env,
+    )
+    assert flat.returncode == 0
+    assert "[blocks" not in flat.stdout
+    assert flat.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/newpkg-1.0 ",
+        "[ebuild     U  ] dev-libs/p2btarget-2.0 [1.0]",
+        "[ebuild     U  ] dev-libs/p2bowner-1.1 [1.0]",
+    ]
+    # Counters: tree -v counts the solved row, flat -v does not.
+    verbose_tree = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--tree", "-v", "--update", "dev-libs/p2btarget", "dev-libs/p2bowner", "dev-libs/newpkg"],
+        fixture_env,
+    )
+    assert verbose_tree.returncode == 0
+    assert "Conflict: 1 block (all satisfied)" in verbose_tree.stdout
+    verbose_flat = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--update", "dev-libs/p2btarget", "dev-libs/p2bowner", "dev-libs/newpkg"],
+        fixture_env,
+    )
+    assert verbose_flat.returncode == 0
+    assert "Conflict:" not in verbose_flat.stdout
 
 
 def test_oracle_87_rdepend_disjunctive_wait_is_default_bed_covered(
