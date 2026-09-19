@@ -1,5 +1,10 @@
 # pmtest — confronto tra package manager
 
+> **Agenti LLM: leggete prima [`USAGE.AGENTS.md`](USAGE.AGENTS.md)** —
+> comandi, cosa è ammesso e cosa è vietato, come misurare l'efficienza
+> di un PM. Le sezioni di questo README restano il riferimento di
+> dettaglio (layout, immagini, provenienza).
+
 Repository dedicato a **testare e confrontare tra loro varie versioni e
 tipologie di package manager** (portuale, portage reale, altri PM).
 
