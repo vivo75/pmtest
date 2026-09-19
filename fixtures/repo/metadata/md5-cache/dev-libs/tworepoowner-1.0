@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: recorded-repo control owner, testrepo copy carries no blocker (#86 S0)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=a2a0d5020cc7a0972d8a978be6586efa

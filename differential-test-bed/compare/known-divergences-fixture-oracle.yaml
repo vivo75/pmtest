@@ -121,55 +121,21 @@
     #71's. See `differential-test-bed/findings/l0.md` "#71 S1".
   owner: portuale
 
-# -- #79 D1: the reverse-dependency pin fixture
+# -- #79 D1 (DONE 2026-09-18): the reverse-dependency pin fixture
 #    (FX_WORLD_EXTRA=dev-libs/rdctarget,
-#    differential-test-bed/atomlists/l0-fixture-oracle-rdcpin.txt). A filed portuale bug
-#    being suppressed so the layer stays green until D2 fixes it; the
-#    `owner: portuale-bug` entries are removed in D2.
+#    differential-test-bed/atomlists/l0-fixture-oracle-rdcpin.txt).
+#    Portuale no longer enforces the holdable plain pin, so the cell is
+#    green without suppression: both `portuale-bug` entries deleted.
 
-- id: d1-rdcpin-drops-the-blocker-merge
-  category: exit
-  slugs: ["--update_--deep_--newuse_--oneshot_dev-libs_rdcpuller"]
-  match: "real rc=1 portuale rc=0"
-  reason: >
-    Portuale's `reverse_dependency_constraints` scan enforces the
-    installed `dev-libs/rdctarget-1.0`'s recorded
-    `~dev-libs/rdcblocker-1.0` pin when `rdcblocker` is upgrading, so
-    `rdcblocker-2.0` is dropped and no block is reported (rc 0). Real
-    keeps the merge and reports `[blocks B] <dev-libs/rdctarget-2.0`
-    (the installed consumer is an @selected digraph node, so it cannot
-    be uninstalled), rc 1. Backlog #79; D2 removes this entry.
-  owner: portuale-bug
-
-- id: d1-rdcpin-suppressed-merge-list
-  category: exit
-  slugs: ["--update_--deep_--newuse_--oneshot_dev-libs_rdcpuller"]
-  match: "merge-list comparison suppressed"
-  reason: >
-    The comparator suppresses merge-list comparison on the rc mismatch
-    above; real's list is `rdcblocker-2.0` + `rdcpuller-2.0` + the
-    `[blocks B]` row, portuale's is `rdcpuller-2.0` alone. Backlog #79;
-    D2 removes this entry.
-  owner: portuale-bug
-
-# -- #85: two new slots of one cp, pulled by different parents, merge in
-#    the opposite order. Found while building #82's tree fixture; the
-#    tree edge set itself matches real after #82, only the sequence the
-#    reversed display list walks does not.
-
-- id: treeslot-new-slot-merge-order
-  category: order
-  slugs: ["-v_dev-libs_treeslotuser"]
-  match: "merge order diverges"
-  reason: >
-    Real merges `dev-libs/treeslotpkg-1.9` (SLOT 0, reached through
-    `treeslotuser`'s own `:0` atom) before `-1.10` (SLOT 1, reached
-    through `treeslotparent`); portuale's `build_digraph` discovery order
-    reaches the slot-1 node first and emits `1.10, 1.9`. Set, versions,
-    flags and `Total:` all match -- only the sequence differs, the
-    standing #17 merge-order class. It is what keeps the `--tree` cell
-    of the same shape from being byte-equal to real (the reversed
-    display list walks the merge order), so #82's tree fix cannot be
-    pinned end-to-end until this closes. Backlog #85; see
-    `differential-test-bed/findings/l0.md` "#82".
-  owner: portuale-bug
+# -- #85 (DONE 2026-09-18): two new slots of one cp, pulled by
+#    different parents, merged in the opposite order. S0 proved this
+#    was not the #17 frontier-drain wall: real's `--debug` digraph dump
+#    shows `treeslotuser` has NO edge to 1.10 at all -- real's
+#    `_minimize_children` (`depgraph.py:4751-4856`) eliminates the
+#    redundant 1.10 selection (`:0` matches only 1.9, the bare atom
+#    matches both), so the bias parent-count ties 1-1 and discovery
+#    order decides. Portuale's `select_dep_target` ranked the bare atom
+#    vercmp-highest independently, adding the extra `user → 1.10` edge
+#    that flipped the bias. Now ported in the shared helper (both
+#    `build_digraph` and `print_tree` through `resolved_dep_targets`),
+#    the bed cell is byte-equal, and the entry is deleted.

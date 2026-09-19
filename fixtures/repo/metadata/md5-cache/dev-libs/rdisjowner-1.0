@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: disjunctive wait-chain RDEPEND-control blocker owner (#87 S2), older version (#76 B0)
+EAPI=8
+RDEPEND=!<dev-libs/rdisjtarget-2.0
+KEYWORDS=amd64
+SLOT=0
+_md5_=ee34c097ff9b56bcb36bbc998430da42

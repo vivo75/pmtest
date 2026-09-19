@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: recorded-repo control owner, overlay copy carries the blocker (#86 S0)
+EAPI=8
+RDEPEND=!<dev-libs/tworepotarget-2.0
+KEYWORDS=amd64
+SLOT=0
+_md5_=1c3eb8dc1a634e6c53ab75083b855817

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: disjunctive wait-chain RDEPEND-control replacement (#87 S2, #76 B0 q3)
+EAPI=8
+RDEPEND=|| ( ~dev-libs/rdisjowner-1.1 dev-libs/absent )
+KEYWORDS=amd64
+SLOT=0
+_md5_=d3581f72c9c2b8ee7dc29ea7ed5bb8a8

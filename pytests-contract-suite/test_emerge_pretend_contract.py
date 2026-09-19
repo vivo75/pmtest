@@ -82,14 +82,14 @@ CASES = [
         0,
     ),
     (
-        "the needer/othermod triangle reports the installed-instance conflict (#57)",
+        "the needer/othermod triangle reports the installed-instance conflict (#57, #62: rc 1 like real)",
         ["--pretend", "dev-libs/needer", "dev-libs/othermod"],
-        0,
+        1,
     ),
     (
-        "the same triangle, argv reversed, reports the same conflict (#57)",
+        "the same triangle, argv reversed, reports the same conflict (#57, #62: rc 1 like real)",
         ["--pretend", "dev-libs/othermod", "dev-libs/needer"],
-        0,
+        1,
     ),
     (
         "a solvable installed-instance slot collision stays silent (#57 K2)",
@@ -404,7 +404,7 @@ CASES = [
     ("--json: upgrade includes from_version", ["--pretend", "--update", "--json", "dev-libs/upgradepkg"], 0),
     ("--json: blocker match (satisfied -> rc 0, real `b`)", ["--pretend", "--json", "dev-libs/blockerpkg"], 0),
     ("--json: solvable slot conflict reconciled", ["--pretend", "--json", "dev-libs/slotconflictparent"], 0),
-    ("--json: unsolvable slot conflict reported", ["--pretend", "--json", "dev-libs/slotconflictunsolvable"], 0),
+    ("--json: unsolvable slot conflict reported (#62: rc 1 like the text path)", ["--pretend", "--json", "dev-libs/slotconflictunsolvable"], 1),
     ("--json: combined with --deep", ["--pretend", "--update", "--deep", "--json", "dev-libs/deeppkg"], 0),
     (
         "--json: provenance records a mask cancelled by a matching unmask",
@@ -1485,8 +1485,18 @@ CASES = [
         0,
     ),
     (
+        "blocker: installed metadata comes from the vdb-recorded repo, not the priority winner (#86 S0)",
+        ["--pretend", "=dev-libs/tworepotarget-1.5"],
+        0,
+    ),
+    (
         "blocker: a satisfied replacement waits through the selected || branch (#76 B0 q1)",
         ["--pretend", "=dev-libs/disjtarget-2.0"],
+        0,
+    ),
+    (
+        "blocker: the same wait through an RDEPEND || branch, default-bed covered (#76 B0 q3, #87 S2)",
+        ["--pretend", "=dev-libs/rdisjtarget-2.0"],
         0,
     ),
     (
@@ -1522,19 +1532,19 @@ CASES = [
     ("repos.conf explicit masters=: inherits a non-main declared master's mask", ["--pretend", "dev-libs/independentmasteroverlaypkg"], 1),
     ("layout.conf masters= middle tier + repo-name= override", ["--pretend", "dev-libs/layoutmasterpkg"], 1),
     ("slot conflict: solvable, reconciled by backtracking", ["--pretend", "dev-libs/slotconflictparent"], 0),
-    ("slot conflict: --backtrack=0 disables reconciliation", ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"], 0),
+    ("slot conflict: --backtrack=0 disables reconciliation (#62: rc 1; real rc 0 silent here, backlog #90)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"], 1),
     ("slot conflict: --backtrack 1 still reconciles a one-step conflict", ["--pretend", "--backtrack", "1", "dev-libs/slotconflictparent"], 0),
-    ("slot conflict: unsolvable, survives backtracking and is reported", ["--pretend", "dev-libs/slotconflictunsolvable"], 0),
+    ("slot conflict: unsolvable, survives backtracking and is reported (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconflictunsolvable"], 1),
     ("slot conflict: unsolvable, resolved by masking a puller version", ["--pretend", "dev-libs/btparent"], 0),
-    ("slot conflict: --backtrack=0 also disables the runtime_pkg_mask trial", ["--pretend", "--backtrack=0", "dev-libs/btparent"], 0),
-    ("slot conflict: --backtrack=30 suppresses the try-a-larger-value hint", ["--pretend", "--backtrack=30", "dev-libs/slotconflictunsolvable"], 0),
-    ("slot conflict: pkg_use_display renders non-empty USE on instance + parent lines", ["--pretend", "dev-libs/scuseparent"], 0),
-    ("slot conflict: --json carries the per-instance / per-parent pkg_use_display", ["--pretend", "--json", "dev-libs/scuseparent"], 0),
-    ("slot conflict: three same-reason parents collapse to one + '(and N more)'", ["--pretend", "dev-libs/slotconfgroup"], 0),
-    ("slot conflict: --color=y colours violated spans, markers stay aligned", ["--pretend", "--color=y", "dev-libs/slotconfgroup"], 0),
-    ("slot conflict: USE reason keys, unconditional before violated", ["--pretend", "dev-libs/slotusegroup"], 0),
-    ("slot conflict: --verbose-conflicts shows every omitted parent", ["--pretend", "--verbose-conflicts", "dev-libs/slotconfgroup"], 0),
-    ("slot conflict: --verbose-conflicts=n is the default (collapsed)", ["--pretend", "--verbose-conflicts=n", "dev-libs/slotconfgroup"], 0),
+    ("slot conflict: --backtrack=0 also disables the runtime_pkg_mask trial (#62: rc 1 like real)", ["--pretend", "--backtrack=0", "dev-libs/btparent"], 1),
+    ("slot conflict: --backtrack=30 suppresses the try-a-larger-value hint (#62: rc 1 like real)", ["--pretend", "--backtrack=30", "dev-libs/slotconflictunsolvable"], 1),
+    ("slot conflict: pkg_use_display renders non-empty USE on instance + parent lines (#62: rc 1 like real)", ["--pretend", "dev-libs/scuseparent"], 1),
+    ("slot conflict: --json carries the per-instance / per-parent pkg_use_display (#62: rc 1 like the text path)", ["--pretend", "--json", "dev-libs/scuseparent"], 1),
+    ("slot conflict: three same-reason parents collapse to one + '(and N more)' (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: --color=y colours violated spans, markers stay aligned (#62: rc 1 like real)", ["--pretend", "--color=y", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: USE reason keys, unconditional before violated (#62: rc 1 like real)", ["--pretend", "dev-libs/slotusegroup"], 1),
+    ("slot conflict: --verbose-conflicts shows every omitted parent (#62: rc 1 like real)", ["--pretend", "--verbose-conflicts", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: --verbose-conflicts=n is the default (collapsed) (#62: rc 1; real rejects =n with rc 2, separate surface)", ["--pretend", "--verbose-conflicts=n", "dev-libs/slotconfgroup"], 1),
     ("slot conflict: different slots of the same package coexist", ["--pretend", "dev-libs/multislotparent"], 0),
     ("merge order: a slot-qualified dep does not edge to a sibling slot", ["--pretend", "dev-libs/slotorderroot"], 0),
     ("merge order: --json for the slot-qualified sibling-slot fixture", ["--pretend", "--json", "dev-libs/slotorderroot"], 0),
@@ -1544,7 +1554,7 @@ CASES = [
     ("multi-atom: literal duplicate atom dedupes silently", ["--pretend", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("multi-atom: dependency shared between two targets dedupes", ["--pretend", "dev-libs/shared-a", "dev-libs/shared-b"], 0),
     ("multi-atom: solvable slot conflict between two targets is reconciled", ["--pretend", "dev-libs/slotconflictnewconsumer", "dev-libs/slotconflictoldconsumer"], 0),
-    ("multi-atom: unsolvable slot conflict between two targets is reported", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 0),
+    ("multi-atom: unsolvable slot conflict between two targets is reported (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 1),
     ("multi-atom: all requested atoms already installed", ["--pretend", "dev-libs/samepkg", "dev-libs/samepkg"], 0),
     ("multi-atom: a nonexistent atom aborts the whole run, first-bad-wins", ["--pretend", "dev-libs/does-not-exist", "dev-libs/newpkg"], 1),
     ("multi-atom: a later nonexistent atom still aborts the whole run", ["--pretend", "dev-libs/newpkg", "dev-libs/does-not-exist"], 1),
@@ -1554,7 +1564,7 @@ CASES = [
     ("--debug: resolver trace on both streams", ["--pretend", "--debug", "dev-libs/newpkg"], 0),
     ("-d: --debug short alias, resolver trace", ["--pretend", "-d", "dev-libs/newpkg"], 0),
     ("-pd: --debug bundles with -p", ["-pd", "dev-libs/newpkg"], 0),
-    ("--debug + a slot conflict: resolver trace survives backtracking", ["--pretend", "--debug", "dev-libs/slotconfgroup"], 0),
+    ("--debug + a slot conflict: resolver trace survives backtracking (#62: rc 1 like real)", ["--pretend", "--debug", "dev-libs/slotconfgroup"], 1),
     ("--verbose is now implemented, not rejected", ["--pretend", "--verbose", "dev-libs/newpkg"], 0),
     ("-v short alias is now implemented, not rejected", ["--pretend", "-v", "dev-libs/newpkg"], 0),
     ("without --verbose, USE= is never shown even for a package with IUSE", ["--pretend", "dev-libs/useflagpkg"], 0),
@@ -2481,7 +2491,7 @@ def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
         ["--pretend", "--json", "dev-libs/needer", "dev-libs/othermod"],
         fixture_env,
     )
-    assert plain.returncode == 0
+    assert plain.returncode == 1  # #62: the triangle records a slot conflict
     data = json.loads(plain.stdout)
     assert data["backtrack"] == {"restarts": 2, "max": 10}
 
@@ -9339,7 +9349,7 @@ def test_backtrack_zero_disables_slot_conflict_reconciliation(emerge_binary, fix
         ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"],
         fixture_env,
     )
-    assert r0.returncode == 0
+    assert r0.returncode == 1
     assert r0.stdout.splitlines()[:4] == [
         '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 ',
@@ -9395,7 +9405,7 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         ["--pretend", "--backtrack=0", "dev-libs/btparent"],
         fixture_env,
     )
-    assert r0.returncode == 0
+    assert r0.returncode == 1
     assert r0.stdout.splitlines()[:4] == [
         '[ebuild  N     ] dev-libs/bttarget-2.0 ',
         '[ebuild  N     ] dev-libs/btconsumer-2.0 ',
@@ -9427,12 +9437,12 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
     slotconflictoldpin (RDEPEND "<dev-libs/slotconflicttarget-2.0"). No
     single version of slotconflicttarget satisfies both, so the
     backtracking solvability pre-check fails, the runtime_pkg_mask trial
-    is reverted, and the slot-collision block is reported -- purely
-    informational, exit code unchanged."""
+    is reverted, and the slot-collision block is reported -- and since
+    #62 the run exits 1, like real 3.0.82.2 (`action_build`)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/slotconflictunsolvable"], fixture_env
     )
-    assert result.returncode == 0
+    assert result.returncode == 1
     assert result.stdout.splitlines()[:4] == [
         '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 ',
@@ -9464,7 +9474,7 @@ def test_slot_conflict_notice_renders_pkg_use_display(emerge_binary, fixture_env
     `IUSE="+scupin"`, `dev-libs/scuseoldpin` none. The `^` marker line
     still spans the full (now longer) `cur_line`."""
     rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/scuseparent"], fixture_env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     assert (
         '  (dev-libs/scusetarget-2.0:0/0::testrepo, ebuild scheduled for merge) '
         'USE="scuon -scuoff" pulled in by\n'
@@ -9497,7 +9507,7 @@ def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
     collapsed = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/slotconfgroup"], fixture_env
     )
-    assert collapsed.returncode == 0
+    assert collapsed.returncode == 1
     out = collapsed.stdout
     # the >=2.0 parent of the 2.0 instance: carets under ">=" and "2.0"
     assert (
@@ -9519,7 +9529,7 @@ def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
         ["--pretend", "--verbose-conflicts", "dev-libs/slotconfgroup"],
         fixture_env,
     )
-    assert verbose.returncode == 0
+    assert verbose.returncode == 1
     vout = verbose.stdout
     for p in ("a", "b", "c"):
         assert (
@@ -9548,7 +9558,7 @@ def test_slot_conflict_color_y_colours_violated_spans_with_aligned_markers(
     R = "\x1b[39;49;00m"
     base = ["--pretend", "--color=y", "dev-libs/slotconfgroup"]
     rust = _run([str(emerge_binary)], base, fixture_env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     out = rust.stdout
     atom_line = (
         f"    {RED}>{R}{RED}={R}dev-libs/slotconflicttarget-"
@@ -9586,7 +9596,7 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     installed parent)."""
     args = ["--pretend", "dev-libs/slotusegroup"]
     rust = _run([str(emerge_binary)], args, fixture_env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     assert rust.stderr == ''
     out = rust.stdout
     assert out.splitlines()[:5] == [
@@ -9881,7 +9891,7 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
         ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"],
         fixture_env,
     )
-    assert result.returncode == 0
+    assert result.returncode == 1
     assert result.stdout.splitlines()[:3] == [
         '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 ',
@@ -13113,42 +13123,39 @@ def test_unreachable_installed_consumer_does_not_block_an_upgrade(
     ]
 
 
-def test_reachable_installed_consumer_version_bound_blocks_an_upgrade(
+def test_reachable_installed_consumer_holdable_pin_does_not_block_an_upgrade(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):
-    """Real depgraph._complete_graph reaching
-    _slot_operator_check_reverse_dependencies: an upgrade has to satisfy
-    every atom recorded against it, including one recorded by an
-    *installed* package that is nowhere in the requested atom's own
-    dependency tree -- as long as real's required-set walk reaches that
-    consumer (#54; see
-    `test_unreachable_installed_consumer_does_not_block_an_upgrade` for
-    the unreachable case, the checked-in fixture's actual default).
+    """Backlog #79: a *holdable* plain pin from a reachable installed
+    consumer is ignored, not enforced -- real only ever consults such
+    pins from the slot-operator update probe
+    (`_slot_operator_check_reverse_dependencies`,
+    `depgraph.py:2472-2538`), never as an upgrade veto.
 
-    Real reaches those atoms because complete mode -- auto-enabled by any
-    installed-package version/USE change (depgraph.py:8592-8648) --
-    re-seeds the walk from @world/@selected/@system and pulls the
-    *reachable* installed closure into the graph as nomerge nodes, each
-    contributing its recorded *DEPEND to _parent_atoms. portuale finds
-    the same atoms with a direct vdb reverse scan, gated the same way,
-    and feeds them into the backtrack loop's slot_constraints, which is
-    what parent atoms are.
+    dev-libs/revdeptarget is installed at 1.0 with 2.0 visible, and
+    dev-libs/revdepconsumer-1.0 (installed, made reachable here by
+    putting it directly in a copied `@world` -- K2/K3) records
+    RDEPEND="<dev-libs/revdeptarget-2.0". Before #79 portuale enforced
+    that pin and the upgrade settled as already-installed (empty merge
+    list); real 3.0.82.2 upgrades to 2.0 cleanly -- no block, no
+    residual row, rc 0 (host oracle, hermetic fixture root, 2026-09-18;
+    `--update --deep [--newuse]` agree). The pin is jointly satisfiable
+    with the bare `--update` pull (1.0 satisfies both), so it is
+    holdable -- and holdable plain pins are exactly what #79 stops
+    enforcing.
 
-    dev-libs/revdeptarget is installed at 1.0 with 2.0 visible, so a bare
-    --update would upgrade it -- except dev-libs/revdepconsumer-1.0
-    (installed, and not otherwise part of this resolve, made reachable
-    here by putting it directly in a copied `@world` -- K2/K3) records
-    RDEPEND="<dev-libs/revdeptarget-2.0". The upgrade is therefore
-    rejected and the entry settles as already-installed, exactly as real
-    leaves media-libs/libdisplay-info at 0.3.0 because of
-    dev-libs/weston's own <media-libs/libdisplay-info-0.4.0 bound (the
-    live divergence this was originally written for, memory
-    `complete-graph-reverse-dep-atoms`)."""
+    Contrast the keeper shape (`=paired-1.0` vs an explicit `=2.0`
+    argument): jointly *unsatisfiable*, so the pin is dropped for the
+    residual report instead -- upgrade plus `[blocks B]`, rc 1. And
+    contrast a *walked* consumer (a graph node with parents): that arm
+    is unchanged -- still `B`, rc 1 (the n6 control below
+    `test_oracle_77_nomerge_owner_removal_row`)."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/revdepconsumer")
     args = ["--pretend", "--update", "dev-libs/revdeptarget"]
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/revdeptarget-2.0 [1.0]",
     ]
 
 
@@ -13406,9 +13413,9 @@ def test_needer_othermod_triangle_reports_the_installed_instance_conflict(
     `AlreadyInstalled` early branch never consulted `resolved_slots`, so
     an installed instance was invisible to slot tracking from both sides
     (othermod's `<2.0` settling on installed 1.0 after needer graphed
-    2.0, and the mirror order). Exit stays 0 per #57 K1 (portuale's
-    standing "slot-conflict notice is informational" convention; backlog
-    #60 tracks revisiting it).
+    2.0, and the mirror order). Exit is 1 per #62 (matching real
+    3.0.82.2's `action_build`: a recorded slot conflict fails the run;
+    backlog #62 retired the #57 K1 informational convention).
 
     Instance *order* inside the block is portuale's own (the first
     instance graphed is listed first): real walks its dep stack LIFO and
@@ -13421,7 +13428,7 @@ def test_needer_othermod_triangle_reports_the_installed_instance_conflict(
     if reversed_argv:
         args = ["--pretend", "dev-libs/othermod", "dev-libs/needer"]
     rust = _run([str(emerge_binary)], args, fixture_env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     merges = [ln for ln in rust.stdout.splitlines() if ln.startswith("[ebuild")]
     assert merges[0] == "[ebuild     U  ] dev-libs/paired-2.0 [1.0]"
     assert sorted(merges[1:]) == [
@@ -13486,7 +13493,7 @@ def test_keeper_reachable_pin_breaks_an_explicit_upgrade_and_reports_it(
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/keeper")
     args = ["--pretend", "=dev-libs/paired-2.0"]
     rust = _run([str(emerge_binary)], args, env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     assert rust.stdout.splitlines()[:1] == [
         "[ebuild     U  ] dev-libs/paired-2.0 [1.0]",
     ]
@@ -13513,7 +13520,7 @@ def test_keeper_reachable_pin_breaks_a_hard_dependency_requirement_and_reports_i
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/keeper")
     args = ["--pretend", "dev-libs/needer"]
     rust = _run([str(emerge_binary)], args, env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     assert rust.stdout.splitlines()[:2] == [
         "[ebuild     U  ] dev-libs/paired-2.0 [1.0]",
         "[ebuild  N     ] dev-libs/needer-1.0 ",
@@ -13542,7 +13549,7 @@ def test_keeper_reachable_needer_triangle_reports_the_installed_instance_with_bo
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/keeper")
     args = ["--pretend", "dev-libs/needer", "dev-libs/othermod"]
     rust = _run([str(emerge_binary)], args, env)
-    assert rust.returncode == 0
+    assert rust.returncode == 1
     assert rust.stdout.splitlines()[:3] == [
         "[ebuild     U  ] dev-libs/paired-2.0 [1.0]",
         "[ebuild  N     ] dev-libs/needer-1.0 ",
@@ -14274,7 +14281,7 @@ def test_json_includes_slot_conflicts(emerge_binary, fixture_env):
         ["--pretend", "--json", "dev-libs/slotconflictunsolvable"],
         fixture_env,
     )
-    assert result.returncode == 0
+    assert result.returncode == 1  # #62: rc 1 like the text path
     payload = json.loads(result.stdout)
     assert len(payload["slot_conflicts"]) == 1
     conflict = payload["slot_conflicts"][0]
@@ -15584,7 +15591,9 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     NOTHING. Portuale's single bundled trial cannot explore that search:
     it upgrades `btra` + `btrc` and reports the residual slot conflict.
     Pinned to portuale's current output; the Phase C driver for the node
-    stack."""
+    stack. Since #62 the residual report exits 1 (real's rc-1 rule for a
+    recorded conflict, even though real records none here -- the rc is
+    part of the documented divergence, like the merge list itself)."""
     root = _b1_root(
         tmp_path,
         ["dev-libs/btrb", "dev-libs/btrc"],
@@ -15595,11 +15604,12 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
             ("dev-libs", "btrd", "1", "0", {"RDEPEND": "<dev-libs/btra-2"}),
         ],
     )
-    rust = _b1_run(
+    rust = _run(
+        [str(emerge_binary)],
         ["--pretend", "--backtrack", "6", "--deep", "--selective", "--update", "@world"],
         _b1_env(fixture_env, root),
-        emerge_binary,
     )
+    assert rust.returncode == 1
     merges = _b1_merges(rust.stdout)
     assert "[ebuild     U  ] dev-libs/btra-2 [1]" in merges
     assert "[ebuild     U  ] dev-libs/btrc-2 [1]" in merges
@@ -15817,10 +15827,13 @@ def test_oracle_missed_update_siblings_masked_together(
         "[ebuild  N     ] dev-libs/mgfb-1 ",
         "[ebuild  N     ] dev-libs/mgfa-1 ",
     ]
-    one = _b1_run(
+    # #62: portuale's low-budget conflict shape exits 1 like real
+    # (real aborts at this budget too -- different mechanism, same rc).
+    one = _run([str(emerge_binary)],
         ["--pretend", "--backtrack", "1", "dev-libs/mgfa"],
-        fixture_env, emerge_binary, 
+        fixture_env,
     )
+    assert one.returncode == 1
     assert _b1_merges(one.stdout) == [
         "[ebuild  N     ] dev-libs/mgfc-1 ",
         "[ebuild  N     ] dev-libs/mgfb-2 ",
@@ -16288,7 +16301,9 @@ def test_need_rebuild_trailer_fires_for_an_installed_parent(
     ):
         args = base[:5] + extra + base[5:]
         rust = _run([str(emerge_binary)], args, env)
-        assert rust.returncode == 0
+        # #62: the trailer fires on a recorded slot conflict, and a
+        # recorded slot conflict exits 1 like real.
+        assert rust.returncode == 1
         assert "!!! package(s) cannot be rebuilt for the reason(s) shown:" in rust.stdout
         assert (
             f"(kde-base/ark-4.10.0:0/0::testrepo, installed): {reason}" in rust.stdout
@@ -17225,6 +17240,101 @@ def test_oracle_77_nomerge_owner_removal_row(emerge_binary, fixture_env, tmp_pat
     assert "installed at the same time" in control.stderr
 
 
+def test_oracle_80_unresolved_scan_collected_row_has_a_trailing_home(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #80 (A0 controls n1b/n6b): an unresolved row of a
+    scan-collected blocker owner -- the owner is a world member (so it
+    is a digraph node with parents and real marks the block unresolved)
+    but never a graph argument, so the row has no entry to hang on.
+
+    Real 3.0.82.2 still reports it: `[blocks B]` in the trailing group,
+    `Conflict: 1 block (1 unsatisfied)`, rc 1 (host oracle, hermetic
+    fixture root with `dev-libs/nomowner` world-listed, 2026-09-18;
+    the same shape on a test-local root is byte-identical). Before the
+    fix portuale dropped the row in `file_blocker_conflicts` and
+    printed only the ebuild row, rc 0. The row rides out as an orphan
+    (no removal is fabricated -- the owner stays installed), and the
+    `* Error` block fires for it exactly like an entry-owned
+    unsolvable row.
+    """
+    n1b_tmp = tmp_path / "n1b"
+    n1b_tmp.mkdir()
+    root = _b1_root(
+        n1b_tmp,
+        ["dev-libs/nomtarget", "dev-libs/nomowner"],
+        [
+            ("dev-libs", "nomtarget", "1.0", "0", {}),
+            (
+                "dev-libs",
+                "nomowner",
+                "1.0",
+                "0",
+                {"RDEPEND": "!<dev-libs/nomtarget-2.0"},
+            ),
+        ],
+    )
+    env = _b1_env(fixture_env, root)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "=dev-libs/nomtarget-1.5"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/nomtarget-1.5 [1.0]",
+        '[blocks B      ] <dev-libs/nomtarget-2.0 ("<dev-libs/nomtarget-2.0" is '
+        "soft blocking dev-libs/nomowner-1.0)",
+    ], result.stdout
+    assert "installed at the same time" in result.stderr
+
+    verbose = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "=dev-libs/nomtarget-1.5"],
+        env,
+    )
+    assert verbose.returncode == 1
+    assert verbose.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/nomtarget-1.5::testrepo [1.0::testrepo]",
+        '[blocks B      ] <dev-libs/nomtarget-2.0 ("<dev-libs/nomtarget-2.0" is '
+        "soft blocking dev-libs/nomowner-1.0)",
+        "",
+        "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
+        "Conflict: 1 block (1 unsatisfied)",
+    ], verbose.stdout
+
+
+def test_oracle_86_installed_metadata_comes_from_the_recorded_repo(
+    emerge_binary, fixture_env
+):
+    """Backlog #86 S0/S1: the live ebuild metadata of an installed
+    package comes from its vdb-recorded `repository`, never from a
+    repo-priority search (real `FakeVartree._aux_get_wrapper`,
+    `FakeVartree.py:136`, `myrepo=pkg.repo`).
+
+    `tworepoowner-1.0` exists in both repos: the overlay copy (priority
+    10) carries `RDEPEND="!<dev-libs/tworepotarget-2.0"`, the testrepo
+    copy carries no blocker, and the installed instance records
+    `repository=testrepo`. Resolving `=dev-libs/tworepotarget-1.5`
+    (which replaces installed `tworepotarget-1.0` in-slot): real
+    3.0.82.2 reads the recorded repo's blocker-free view and prints
+    just the upgrade, rc 0 (host oracle, hermetic fixture root,
+    2026-09-18). Before the fix portuale searched the repos, read the
+    overlay copy, and printed a spurious `[uninstall]` +
+    `[blocks b]` pair for a blocker real never sees -- that output is
+    the regression this pin guards.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "=dev-libs/tworepotarget-1.5"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/tworepotarget-1.5 [1.0]",
+    ], result.stdout
+
+
 def test_oracle_76_wait_follows_the_selected_disjunctive_branch(emerge_binary, fixture_env):
     """Backlog #76 B0 q1/B2: a satisfied replacement's wait chain through
     a `|| ( … )` group follows the branch `dep_zapdeps` kept.
@@ -17275,7 +17385,53 @@ def test_oracle_76_wait_follows_the_selected_disjunctive_branch(emerge_binary, f
     ], result.stdout
 
 
-def test_oracle_75_tree_blocker_rows_match_real(emerge_binary, fixture_env):
+def test_oracle_87_rdepend_disjunctive_wait_is_default_bed_covered(
+    emerge_binary, fixture_env
+):
+    """Backlog #87 S2 / #76 B0 q3: the RDEPEND control of the q1
+    disjunctive-wait shape.
+
+    `rdisjtarget-2.0`'s `RDEPEND="|| ( ~dev-libs/rdisjowner-1.1
+    dev-libs/absent )"` collapses to the owner-merge branch like q1's
+    BDEPEND group, and `rdisjowner-1.1`'s own
+    `RDEPEND="!<dev-libs/rdisjtarget-2.0"` soft-blocks the installed
+    `rdisjtarget-1.0` -- real appends the solved blocker after the
+    replacement with `Conflict: 1 block (all satisfied)`, rc 0 (host
+    oracle, real 3.0.82.2, 2026-09-18: byte-identical to portuale's
+    output below). Unlike q1's BDEPEND, the RDEPEND group resolves
+    against the target root, so the shape survives the default bed's
+    `ROOT=$FX` split -- its permanent bed cell lives in the default
+    `differential-test-bed/atomlists/l0-fixture-oracle.txt`, and this pin
+    (not the host list) is its contract coverage.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "=dev-libs/rdisjtarget-2.0"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/rdisjowner-1.1 [1.0]",
+        "[ebuild     U  ] dev-libs/rdisjtarget-2.0 [1.0]",
+        '[blocks b      ] <dev-libs/rdisjtarget-2.0 ("<dev-libs/rdisjtarget-2.0" is '
+        "soft blocking dev-libs/rdisjowner-1.1)",
+    ], result.stdout
+
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "=dev-libs/rdisjtarget-2.0"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/rdisjowner-1.1::testrepo [1.0::testrepo]",
+        "[ebuild     U  ] dev-libs/rdisjtarget-2.0::testrepo [1.0::testrepo]",
+        '[blocks b      ] <dev-libs/rdisjtarget-2.0 ("<dev-libs/rdisjtarget-2.0" is '
+        "soft blocking dev-libs/rdisjowner-1.1)",
+        "",
+        "Total: 2 packages (2 upgrades), Size of downloads: 0 KiB",
+        "Conflict: 1 block (all satisfied)",
+    ], result.stdout
     """Backlog #75 C0/C1/C3: the two deterministic tree-mode blocker
     layouts.
 
@@ -17355,6 +17511,59 @@ def test_oracle_82_tree_edges_follow_the_resolved_dep_target(emerge_binary, fixt
         "[ebuild  N     ]  dev-libs/slotorderdual-2.0 ",
         "[ebuild  N     ]  dev-libs/slotordera-1.0 ",
     ], result.stdout
+
+
+def test_oracle_85_unqualified_atom_collapses_onto_the_slot_qualified_target(
+    emerge_binary, fixture_env
+):
+    """Backlog #85 (S1b, not the #17 wall): real's `_minimize_children`
+    (`depgraph.py:4751-4856`).
+
+    `dev-libs/treeslotuser` RDEPENDs `treeslotpkg:0` (selects 1.9),
+    `treeslotparent` (which pulls `:1`, i.e. 1.10) and the bare
+    `dev-libs/treeslotpkg` (which alone would select 1.10, the
+    vercmp-highest). Real eliminates the redundant 1.10 selection -- the
+    `:0` atom matches only 1.9 while the bare atom matches both -- so
+    the scheduler graph holds no `user → 1.10` edge (real's own
+    `--debug` digraph dump shows only the 1.9 and parent edges), the
+    bias parent-count ties 1-1, and the merge order is
+    `1.9, 1.10, treeslotparent, treeslotuser` by discovery order.
+    Portuale's per-atom vercmp-highest ranking added the extra edge,
+    doubling 1.10's parent count and flipping the pair to `1.10, 1.9`.
+
+    Host oracle, real 3.0.82.2, 2026-09-18: byte-identical apart from
+    real's `to <root>/` suffix and ` 0 KiB` per-row decorations (the
+    standing fixture cuts). The same shape in `--tree` nests
+    `treeslotparent → 1.10` with 1.9 as `treeslotuser`'s own child,
+    because the display list is the reversed merge order.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "dev-libs/treeslotuser"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/treeslotpkg-1.9::testrepo ",
+        "[ebuild  N     ] dev-libs/treeslotpkg-1.10:1::testrepo ",
+        "[ebuild  N     ] dev-libs/treeslotparent-1.0::testrepo ",
+        "[ebuild  N     ] dev-libs/treeslotuser-1.0::testrepo ",
+        "",
+        "Total: 4 packages (4 new), Size of downloads: 0 KiB",
+    ], result.stdout
+
+    tree = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--tree", "dev-libs/treeslotuser"],
+        fixture_env,
+    )
+    assert tree.returncode == 0
+    assert tree.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/treeslotuser-1.0 ",
+        "[ebuild  N     ]  dev-libs/treeslotparent-1.0 ",
+        "[ebuild  N     ]   dev-libs/treeslotpkg-1.10 ",
+        "[ebuild  N     ]  dev-libs/treeslotpkg-1.9 ",
+    ], tree.stdout
 
 
 _B0B_BPARENT_1_1 = """EAPI=8

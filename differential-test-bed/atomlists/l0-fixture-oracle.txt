@@ -79,3 +79,10 @@ app-misc/mopodmanok
 # slotorderroot's own dep, so the cp-keyed `required_by` fallback must
 # not nest it under slotorderb instead
 --tree dev-libs/slotorderroot
+# #87 S2: the #76 B0 q3 RDEPEND control -- the same satisfied-replacement
+# wait as q1's BDEPEND shape, but through an `RDEPEND="|| ( ... )"`
+# group, which (unlike a BDEPEND) resolves against the target root and
+# so survives the default bed's `ROOT=$FX` split. Real and portuale
+# agree byte-for-byte here (host oracle 2026-09-18); this is the
+# standing default-bed coverage for the `kept_alt_for_display` path
+=dev-libs/rdisjtarget-2.0

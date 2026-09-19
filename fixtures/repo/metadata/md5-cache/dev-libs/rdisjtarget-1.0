@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: disjunctive wait-chain RDEPEND-control blocked target, older version (#87 S2)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=7944d0afdf833367436043efc7067e2f

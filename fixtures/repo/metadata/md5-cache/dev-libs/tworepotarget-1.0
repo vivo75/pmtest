@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: recorded-repo control target 1.0, installed (#86 S0)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=abb4450c12bd296da597346e2240597e
