@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #91 blocker-carrying dependency, newer version
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=!<dev-libs/whtarget-2.0
+SLOT=0
+_md5_=a0c662a906fc8db3a353eac5a2f882a0

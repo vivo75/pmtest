@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #91 installed consumer with a runtime-key pin on whblocker-1.0
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=~dev-libs/whblocker-1.0
+SLOT=0
+_md5_=df5a5c12da6d13b7600d0d8adbde62f5

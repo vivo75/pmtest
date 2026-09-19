@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #91 installed updater pulling whblocker by a plain >= atom
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/whblocker-1
+SLOT=0
+_md5_=a16abeeea7b41cd6a2f9db771a56e59a

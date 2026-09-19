@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #91 arg pulling the blocker-carrying whblocker before the consumer
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/whblocker-1
+SLOT=0
+_md5_=71cac8c09da08f1cad8085a6f703b6c2

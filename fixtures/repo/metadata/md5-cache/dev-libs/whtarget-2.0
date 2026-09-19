@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #91 newer consumer pulling the blocker-carrying whblocker
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=~dev-libs/whblocker-2.0
+SLOT=0
+_md5_=93be9ce9c406d42aa1a66a6e276b4b6c
