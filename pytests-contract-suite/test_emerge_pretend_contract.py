@@ -1549,7 +1549,7 @@ CASES = [
     ("repos.conf explicit masters=: inherits a non-main declared master's mask", ["--pretend", "dev-libs/independentmasteroverlaypkg"], 1),
     ("layout.conf masters= middle tier + repo-name= override", ["--pretend", "dev-libs/layoutmasterpkg"], 1),
     ("slot conflict: solvable, reconciled by backtracking", ["--pretend", "dev-libs/slotconflictparent"], 0),
-    ("slot conflict: --backtrack=0 disables reconciliation (#62: rc 1; real rc 0 silent here, backlog #90)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"], 1),
+    ("slot conflict: --backtrack=0 reconciles the solvable shape silently like real (#90 S1: rc 0)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"], 0),
     ("slot conflict: --backtrack 1 still reconciles a one-step conflict", ["--pretend", "--backtrack", "1", "dev-libs/slotconflictparent"], 0),
     ("slot conflict: unsolvable, survives backtracking and is reported (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconflictunsolvable"], 1),
     ("slot conflict: unsolvable, resolved by masking a puller version", ["--pretend", "dev-libs/btparent"], 0),
@@ -5279,8 +5279,8 @@ def test_required_use_violations_are_collected_across_the_whole_walk_not_just_th
     dev-libs/requiredusebadpkg2's own "baz? ( qux )", unrelated to
     dev-libs/requiredusebadpkg's own "foo? ( bar )") would never even be
     attempted, let alone reported -- exactly the same failure mode real
-    portage doesn't have. Both violations now show up together, in
-    argument order."""
+    portage doesn't have. Both violations now show up together, in walk
+    order (last-declared-first per #90 S1, so badpkg2 leads)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "dev-libs/requiredusebadpkg", "dev-libs/requiredusebadpkg2"],
@@ -5289,17 +5289,17 @@ def test_required_use_violations_are_collected_across_the_whole_walk_not_just_th
     assert result.returncode == 1
     assert result.stdout == ""
     assert result.stderr.strip() == (
-        '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
-        "unmet requirements.\n"
-        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar"\n'
-        "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
-        "    foo? ( bar )\n"
-        "\n\n"
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg2" has '
         "unmet requirements.\n"
         '- dev-libs/requiredusebadpkg2-1.0::testrepo USE="baz -qux"\n'
         "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
-        "    baz? ( qux )"
+        "    baz? ( qux )\n"
+        "\n\n"
+        '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
+        "unmet requirements.\n"
+        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar"\n'
+        "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
+        "    foo? ( bar )"
     )
 
 
@@ -9352,9 +9352,12 @@ def test_solvable_slot_conflict_is_reconciled_by_backtracking(emerge_binary, fix
 
 def test_backtrack_zero_disables_slot_conflict_reconciliation(emerge_binary, fixture_env):
     """`--backtrack=0` (real: disable backtracking) turns the retry loop
-    off, so the otherwise-solvable dev-libs/slotconflictparent conflict is
-    reported instead of reconciled -- the pre-backtracking behavior, on
-    demand. `--backtrack=1` is enough to reconcile a one-step conflict."""
+    off. Backlog #90 (S1): the dev-libs/slotconflictparent conflict never
+    forms at any budget -- the walk resolves last-declared-first (real's
+    stack), so the old consumer graphs 1.0 first and the bare dep reuses
+    it (real `--debug` never prints `Slot conflict handler started.`
+    here, S0 matrix oracle) -- so bt0 settles silently on 1.0 with rc 0,
+    exactly like the default budget. `--backtrack=1` agrees."""
     reconciled = [
         '[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 ',
@@ -9366,24 +9369,8 @@ def test_backtrack_zero_disables_slot_conflict_reconciliation(emerge_binary, fix
         ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"],
         fixture_env,
     )
-    assert r0.returncode == 1
-    assert r0.stdout.splitlines()[:4] == [
-        '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
-        '[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 ',
-        '[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 ',
-        '[ebuild  N     ] dev-libs/slotconflictparent-1.0 ',
-    ]
-    _assert_slot_collision_block(
-        r0.stdout,
-        "dev-libs/slotconflicttarget:0",
-        [
-            (
-                "dev-libs/slotconflicttarget-1.0:0/0::testrepo",
-                [("dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo", "<dev-libs/slotconflicttarget-2.0")],
-            ),
-        ],
-        backtrack_hint=False,
-    )
+    assert r0.returncode == 0
+    assert r0.stdout.splitlines() == reconciled
 
     r1 = _run(
         [str(emerge_binary)],
@@ -9424,7 +9411,7 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
     )
     assert r0.returncode == 1
     assert r0.stdout.splitlines()[:4] == [
-        '[ebuild  N     ] dev-libs/bttarget-2.0 ',
+        '[ebuild  N     ] dev-libs/bttarget-1.0 ',
         '[ebuild  N     ] dev-libs/btconsumer-2.0 ',
         '[ebuild  N     ] dev-libs/btpin-1.0 ',
         '[ebuild  N     ] dev-libs/btparent-1.0 ',
@@ -9434,12 +9421,12 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         "dev-libs/bttarget:0",
         [
             (
-                "dev-libs/bttarget-2.0:0/0::testrepo",
-                [("dev-libs/btconsumer-2.0:0/0::testrepo", ">=dev-libs/bttarget-2.0")],
-            ),
-            (
                 "dev-libs/bttarget-1.0:0/0::testrepo",
                 [("dev-libs/btpin-1.0:0/0::testrepo", "<dev-libs/bttarget-2.0")],
+            ),
+            (
+                "dev-libs/bttarget-2.0:0/0::testrepo",
+                [("dev-libs/btconsumer-2.0:0/0::testrepo", ">=dev-libs/bttarget-2.0")],
             ),
         ],
         backtrack_hint=False,
@@ -9450,18 +9437,19 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
     emerge_binary, fixture_env
 ):
     """dev-libs/slotconflictunsolvable pulls in slotconflictnewpin (RDEPEND
-    ">=dev-libs/slotconflicttarget-2.0", resolves 2.0 first) and
-    slotconflictoldpin (RDEPEND "<dev-libs/slotconflicttarget-2.0"). No
-    single version of slotconflicttarget satisfies both, so the
-    backtracking solvability pre-check fails, the runtime_pkg_mask trial
-    is reverted, and the slot-collision block is reported -- and since
-    #62 the run exits 1, like real 3.0.82.2 (`action_build`)."""
+    ">=dev-libs/slotconflicttarget-2.0") and slotconflictoldpin (RDEPEND
+    "<dev-libs/slotconflicttarget-2.0"). No single version of
+    slotconflicttarget satisfies both, so the backtracking solvability
+    pre-check fails, the runtime_pkg_mask trial is reverted, and the
+    slot-collision block is reported -- and since #62 the run exits 1,
+    like real 3.0.82.2 (`action_build`). Backlog #90 (S1): instances file
+    oldpin's 1.0 first -- real's own notice order (staged oracle)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/slotconflictunsolvable"], fixture_env
     )
     assert result.returncode == 1
     assert result.stdout.splitlines()[:4] == [
-        '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
+        '[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictoldpin-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictunsolvable-1.0 ',
@@ -9471,12 +9459,12 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
         "dev-libs/slotconflicttarget:0",
         [
             (
-                "dev-libs/slotconflicttarget-2.0:0/0::testrepo",
-                [("dev-libs/slotconflictnewpin-1.0:0/0::testrepo", ">=dev-libs/slotconflicttarget-2.0")],
-            ),
-            (
                 "dev-libs/slotconflicttarget-1.0:0/0::testrepo",
                 [("dev-libs/slotconflictoldpin-1.0:0/0::testrepo", "<dev-libs/slotconflicttarget-2.0")],
+            ),
+            (
+                "dev-libs/slotconflicttarget-2.0:0/0::testrepo",
+                [("dev-libs/slotconflictnewpin-1.0:0/0::testrepo", ">=dev-libs/slotconflicttarget-2.0")],
             ),
         ],
     )
@@ -9513,13 +9501,15 @@ def test_slot_conflict_notice_renders_pkg_use_display(emerge_binary, fixture_env
 def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
     emerge_binary, fixture_env
 ):
-    """dev-libs/slotconfgroup pulls slotconfgroupnew (>=slotconflicttarget-2.0,
-    reached first -> slot 0 resolves to 2.0) plus slotconfgroupa/b/c (each
-    <slotconflicttarget-2.0). The 1.0 instance has three parents sharing
+    """dev-libs/slotconfgroup pulls slotconfgroupnew (>=slotconflicttarget-2.0)
+    plus slotconfgroupa/b/c (each <slotconflicttarget-2.0). The walk resolves
+    last-declared-first (real's stack, #90 S1), so c/b/a graph 1.0 before
+    new's >=2.0 graphs 2.0. The 1.0 instance has three parents sharing
     one collision reason ("version", "le"): real
     _prepare_conflict_msg_and_check_for_specificity keeps one
-    representative and appends "(and 2 more with the same problem)", then a
-    single "NOTE: Use the '--verbose-conflicts' option ..." footer.
+    representative -- the first-walked, i.e. c -- and appends "(and 2 more
+    with the same problem)" (staged oracle), then a single "NOTE: Use the
+    '--verbose-conflicts' option ..." footer.
     --verbose-conflicts shows all three and drops both trailers."""
     collapsed = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/slotconfgroup"], fixture_env
@@ -9534,7 +9524,7 @@ def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
     ) in out
     # exactly one of a/b/c is shown, then the omission tail + NOTE
     shown = [p for p in ("a", "b", "c") if f"slotconfgroup{p}-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\"" in out]
-    assert shown == ["a"]
+    assert shown == ["c"]
     assert "    (and 2 more with the same problem)\n" in out
     assert (
         "\nNOTE: Use the '--verbose-conflicts' option to display parents omitted above\n"
@@ -9601,23 +9591,27 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     emerge_binary, fixture_env
 ):
     """dev-libs/slotusegroup pulls slotuseplain (>=slotusetarget-2.0, no
-    USE-deps -- resolves 2.0 first) plus slotusex/slotusey, whose
-    `>=slotusetarget-1.0[x]` / `[y]` USE-deps 2.0 cannot satisfy (x is
-    default-off and masked there via profiles/package.use.mask, y is gone
-    from 2.0's IUSE). Real re-verifies USE-deps on slot reuse: both pull
-    1.0 as a second instance and the notice reports `("use", flag)`
-    parents -- the missing-IUSE (unconditional) `[y]` parent before the
-    violated `[x]` one, each with a `^` marker under its own token (no
-    colorization). A single conflict block (one handler per slot), no
-    autounmask block (nothing flippable), no need_rebuild trailer (no
-    installed parent)."""
+    USE-deps) plus slotusex/slotusey, whose `>=slotusetarget-1.0[x]` /
+    `[y]` USE-deps 2.0 cannot satisfy (x is default-off and masked there
+    via profiles/package.use.mask, y is gone from 2.0's IUSE). Real
+    re-verifies USE-deps on slot reuse: both pull 1.0 as a second
+    instance and the notice reports `("use", flag)` parents -- the
+    missing-IUSE (unconditional) `[y]` parent before the violated `[x]`
+    one, each with a `^` marker under its own token (no colorization).
+    A single conflict block (one handler per slot), no autounmask block
+    (nothing flippable), no need_rebuild trailer (no installed parent).
+    Backlog #90 (S1): the walk resolves last-declared-first, so the
+    1.0 instance files first -- real's own merge-list order (staged
+    oracle: 1.0 USE="x y" leads). The 2.0 merge row itself stays
+    absent -- one row per cp, the known dual-instance display gap
+    (same class as orbtblocked-bt0's missing row)."""
     args = ["--pretend", "dev-libs/slotusegroup"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stderr == ''
     out = rust.stdout
     assert out.splitlines()[:5] == [
-        '[ebuild  N     ] dev-libs/slotusetarget-2.0  USE="(-x)"',
+        '[ebuild  N     ] dev-libs/slotusetarget-1.0  USE="x y"',
         '[ebuild  N     ] dev-libs/slotuseplain-1.0 ',
         '[ebuild  N     ] dev-libs/slotusex-1.0 ',
         '[ebuild  N     ] dev-libs/slotusey-1.0 ',
@@ -9902,7 +9896,9 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
     """dev-libs/slotconflictnewpin (">=dev-libs/slotconflicttarget-2.0")
     and dev-libs/slotconflictoldpin ("<dev-libs/slotconflicttarget-2.0")
     as two top-level atoms: no common satisfying version, so backtracking
-    leaves the slot-collision block in place."""
+    leaves the slot-collision block in place. Backlog #90 (S1): the walk
+    resolves last-declared-first, so oldpin's 1.0 files first -- real's
+    own notice order (staged oracle)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"],
@@ -9910,7 +9906,7 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
     )
     assert result.returncode == 1
     assert result.stdout.splitlines()[:3] == [
-        '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
+        '[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictoldpin-1.0 ',
     ]
@@ -9919,12 +9915,12 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
         "dev-libs/slotconflicttarget:0",
         [
             (
-                "dev-libs/slotconflicttarget-2.0:0/0::testrepo",
-                [("dev-libs/slotconflictnewpin-1.0:0/0::testrepo", ">=dev-libs/slotconflicttarget-2.0")],
-            ),
-            (
                 "dev-libs/slotconflicttarget-1.0:0/0::testrepo",
                 [("dev-libs/slotconflictoldpin-1.0:0/0::testrepo", "<dev-libs/slotconflicttarget-2.0")],
+            ),
+            (
+                "dev-libs/slotconflicttarget-2.0:0/0::testrepo",
+                [("dev-libs/slotconflictnewpin-1.0:0/0::testrepo", ">=dev-libs/slotconflicttarget-2.0")],
             ),
         ],
     )
