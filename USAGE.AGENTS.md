@@ -63,6 +63,40 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
   `bench/gentoo_snapshot.json`, stesso seed e stessi `--ops`/`--repeat`.
 - F5. `--dataset synthetic` per i numeri ufficiali: solo `snapshot`.
 
+## Due repo, un progetto
+
+pmtest (`fixtures/`, suite, bed, corpus) e `../portuale` (codice
+prodotto, unit test, `docs/`) sono **un solo progetto in due repository**,
+affiancati. Le regole sopra che dicono "questo repo" valgono per la
+coppia, divise per contenuto, mai duplicate:
+
+- **I branch si aprono insieme, con lo stesso nome.** Prima di iniziare,
+  `git checkout -b <nome>` qui *e* in `../portuale` — anche se lo slice
+  sembra toccare un lato solo (le fixture aggiunte a metà slice sono la
+  norma, non l'eccezione). Un branch che esiste in un solo repo è già
+  divergente; se ne trovi uno, segnalalo invece di aggirarlo.
+- **I commit sono accoppiati.** Uno slice che tocca entrambi i lati
+  produce due commit, uno per repo, sullo stesso branch: prodotto in
+  portuale, fixture / celle del bed / pin / corpus bless qui (lo split
+  è in `../portuale/AGENTS.md` step 5). I due messaggi si citano a
+  vicenda così la coppia resta tracciabile senza altro legame: il commit
+  pmtest nomina branch e slice di portuale, quello portuale cita lo sha
+  corto pmtest (quindi prima pmtest). Un corpus bless
+  (`PORTUALE_CORPUS_BLESS=1`) viaggia sempre nel commit pmtest, drift
+  revisionato prima, mai in quello portuale.
+- **I commit standalone restano singoli.** Lavoro che tocca davvero un
+  solo repo (es. una correzione fixture solo-pmtest) si committa in quel
+  repo da solo, su `main` o su un suo branch, senza controparte — ma il
+  messaggio lo dice esplicitamente, così il prossimo agente non va a
+  caccia della metà mancante.
+- **I push vanno insieme.** La richiesta esplicita della regola 9 di
+  `../portuale/AGENTS.md` copre entrambi i repo insieme salvo indicazione
+  contraria; prima portuale, poi pmtest, riportando entrambi gli sha. Mai
+  pushare metà coppia lasciando l'altra in locale.
+- Resta F1: i pin qui si aggiornano solo contro un oracle reale, mai per
+  far passare un PM — la libertà di re-pinnare a costo zero non è una
+  licenza per il bless di massa senza verifica.
+
 ## Spazio /tmp
 
 La suite ha ripetutamente riempito `/tmp` (inode, non solo byte: è tmpfs,
