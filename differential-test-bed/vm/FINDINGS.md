@@ -51,6 +51,18 @@ unilateral blessing); candidates:
   least extensionless ones) — backend-independent bug class, exposed
   by VM stock content. For the owner; no blessing here.
 
+## L3 (slice 6, in progress)
+
+- Smoke (`l3-smoke.txt`): backend works end-to-end (both PMs
+  build+merge, snapshots pulled, report + metrics written). Bed-side
+  fixes: ssh env values need remote-shell single quotes (local double
+  quotes do not survive); `/var/lib/cloud` + `/var/lib/systemd/coredump`
+  pruned from snapshots (per-boot/per-crash scratch, never state).
+- 6 systemd coredumps (`core.build-and-merge.*`) appeared in the
+  portuale guest (merge rc=0 regardless). The PM binary under test is
+  a dirty-tree dev build — owner triage on a clean tree needed before
+  calling it a PM bug. Not diff signal either way (pruned).
+
 ## L2 (slice 5)
 
 - Porttest track (`l1-porttest.txt`, strict): GREEN

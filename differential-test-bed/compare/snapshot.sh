@@ -50,6 +50,9 @@ PRUNE=(
   "$ROOT/var/tmp" "$ROOT/var/cache" "$ROOT/var/log"
   "$ROOT/var/lib/portage/home" "$ROOT/var/db/repos" "$ROOT/usr/src"
   "$ROOT/root/.cache" "$ROOT/home"
+  # Crash dumps are runtime scratch like logs: a crashing-but-succeeding
+  # PM is owner-triage material (see vm/FINDINGS.md), never diff signal.
+  "$ROOT/var/lib/systemd/coredump" "$ROOT/var/lib/apport"
   # /var/db/pkg is compared via the vdb.tar (norm_vdb / diff_vdb), never
   # the files manifest -- otherwise every BUILD_TIME/COUNTER shows up
   # twice, once un-normalised as a CONTENT diff.
@@ -59,6 +62,11 @@ PRUNE=(
   # cache are inputs, never installed state. `--paths`-restricted walks
   # never reach them; the L3 full-tree walk does.
   "$ROOT/TEST" "$ROOT/distfiles"
+  # VM-bed only: cloud-init's per-instance state
+  # (/var/lib/cloud/instances/<seed>/...) is named after the seed
+  # (hence per-guest by construction) and regenerated every boot.
+  # No-op on the container bed (no such tree there).
+  "$ROOT/var/lib/cloud"
 )
 # Extra root-relative paths to prune, `:`-separated (`SNAPSHOT_PRUNE`),
 # for a mount the caller knows about but this script cannot (the L3

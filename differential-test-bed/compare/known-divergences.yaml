@@ -135,3 +135,26 @@
     re-tighten when the gap closes. Same filing as above.
   owner: portuale-bug
 
+- id: l3-vm-repo-revisions-vdb
+  layer: l3
+  category: VDB
+  path_glob: "*/REPO_REVISIONS"
+  match: "portuale='{}'"
+  reason: >
+    Same root cause as l2-vm-repo-revisions-vdb, on source-built
+    packages: portuale hardcodes PORTAGE_REPO_REVISIONS="{}", real
+    fills SHAs via git retrieve_head (VM golden has git). Filed in
+    differential-test-bed/vm/FINDINGS.md; delete when portuale tracks
+    revisions.
+  owner: portuale-bug
+
+- id: l3-vm-repo-revisions-vdb-env
+  layer: l3
+  category: VDB
+  path_glob: "*/environment"
+  reason: >
+    The merged-VDB echo of the same gap (dumps differ only in the
+    PORTAGE_REPO_REVISIONS line). Same masking tradeoff as its l2
+    sibling: re-tighten when the gap closes.
+  owner: portuale-bug
+

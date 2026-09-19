@@ -89,6 +89,23 @@ qcow2 is the base (and its gotchas), `../USAGE.AGENTS.md` for run rules.
   *sets* per backend, adjudicate separately. See `vm/FINDINGS.md`
   (slice-2 baseline: expat/python installed-reuse class).
 
+## L3 on VMs (slice 6)
+
+- `run/l3-source-parity-vm.sh [atomlist]` — both PMs (and optional
+  `L3_CONTROL=1` portage pair) build+merge from source in fresh
+  guests; DISTFILES round-trips through the host; `SNAPSHOT_PRUNE`
+  drops the virtiofs checkout from the full-tree walk; `timeout`
+  wraps ssh like the container script wraps podman; reports
+  `l3-vm-*` + `metrics/l3-vm-*.json`.
+- Smoke track GREEN incl. clean control pair
+  (`logs/l3-vm-20260918T225222Z/`).
+- Two bed lessons, both now in code/comments: ssh `env K=V` values
+  need REMOTE-shell single quotes (local double quotes do not survive
+  the trip — `L3_BUILD_ARGS` split into a bogus `--oneshot` command);
+  `snapshot.sh` also prunes `/var/lib/cloud` (per-instance seed state)
+  and `/var/lib/systemd/coredump` + apport (crash dumps are triage
+  material, never diff signal; container-no-op).
+
 ## Filesystem matrix (slice 3)
 
 - Goldens: `vm/work/golden.qcow2` (xfs, the official layout),

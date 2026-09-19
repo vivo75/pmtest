@@ -24,7 +24,9 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
    `differential-test-bed/run/l1-merge-from-binpkg-vm.sh [atomlist]`
    (report `l1-vm-*`, pkgcache `_l1-pkgcache-vm`),
    `differential-test-bed/run/l2-portuale-builder-vm.sh [atomlist]`
-   (report `l2-vm-*`, pkgcaches `_l2-pkgcache-*-vm`).
+   (report `l2-vm-*`, pkgcaches `_l2-pkgcache-*-vm`),
+   `differential-test-bed/run/l3-source-parity-vm.sh [atomlist]`
+   (report `l3-vm-*`, `L3_CONTROL=1` per il noise floor).
 3. `python3 bench/run_benchmark.py --ops 200000 --repeat 5 --json out.json`
    — benchmark harness batch (default: `--dataset snapshot`, seed 0;
    riporta il migliore di 5).
