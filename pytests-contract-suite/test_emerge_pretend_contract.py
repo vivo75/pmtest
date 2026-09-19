@@ -106,6 +106,18 @@ CASES = [
         ["--pretend", "--update", "dev-libs/paired"],
         0,
     ),
+    (
+        "an unreachable runtime-key pin merges with uninstall/b rows (#91 twin)",
+        [
+            "--pretend",
+            "--update",
+            "--deep",
+            "--newuse",
+            "--oneshot",
+            "dev-libs/whpuller",
+        ],
+        0,
+    ),
     ("already installed", ["--pretend", "dev-libs/samepkg"], 0),
     (
         "a New package shows its full USE=\"...\" list at plain -p (verbosity 2)",
@@ -18480,3 +18492,46 @@ def test_oracle_slotop_undo_cascade(
     assert "[ebuild  rR    ] app-misc/soccascb-0 [0]" in merges
     assert "[ebuild  rR    ] app-misc/soccascc-0 " in merges
     assert rust.stdout.count("causes rebuilds for:") == 2
+
+
+def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, fixture_env):
+    """Backlog #91 S3: the twin of the withhold cell -- the same
+    runtime-key `~whblocker-1.0` pin from installed `whtarget-1.0`,
+    but with the consumer unreachable (not in @world, not walked),
+    so the pin is invisible and the upgrade proceeds.
+
+    Real 3.0.82.2 on the staged hermetic tree (host oracle, same
+    staging as the S1 probes): `emerge -p --update --deep --newuse
+    --oneshot dev-libs/whpuller` merges `whblocker-2.0` + `whpuller-2.0`
+    with `[uninstall] whtarget-1.0` + satisfied `[blocks b]`, rc 0.
+    The withhold counterpart (consumer as a world member) is the
+    `l0-fixture-oracle-whpin.txt` bed cell -- it needs `FX_WORLD_EXTRA`
+    and so lives in the bed, like D1's `rdcpin` cell, not here.
+
+    The consumer's own removal row is what keeps the pin from firing:
+    the blocker phase appends the `Uninstall` entry before the
+    reverse-dependency scan runs, and the scan skips a removed consumer
+    (real `_in_blocker_conflict`, bug 612772) -- without that skip the
+    runtime pin would veto the very upgrade whose blocker removes its
+    owner.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--update",
+            "--deep",
+            "--newuse",
+            "--oneshot",
+            "dev-libs/whpuller",
+        ],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/whblocker-2.0 [1.0]",
+        "[ebuild     U  ] dev-libs/whpuller-2.0 [1.0]",
+        "[uninstall     ] dev-libs/whtarget-1.0 ",
+        '[blocks b      ] <dev-libs/whtarget-2.0 ("<dev-libs/whtarget-2.0" is '
+        "soft blocking dev-libs/whblocker-2.0)",
+    ], result.stdout
