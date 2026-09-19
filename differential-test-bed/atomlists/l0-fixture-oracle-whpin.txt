@@ -1,0 +1,13 @@
+# #91 S2 — the runtime-key reverse-dependency withhold, run with
+# `FX_WORLD_EXTRA=dev-libs/whtarget` (the installed consumer must be a
+# world member so the required-set closure reaches it without walking
+# its own upgrade -- the D1 `rdcpin` atomlist's mirror, opposite
+# expectation):
+#
+#   FX_WORLD_EXTRA=dev-libs/whtarget \
+#     differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-whpin.txt
+#
+# Real withholds `whblocker-2.0` (slot-conflict keep-installed over the
+# installed `whtarget-1.0`'s `RDEPEND="~dev-libs/whblocker-1.0"` pin)
+# and merges only `whpuller-2.0`, rc 0; portuale matches since #91 S1.
+--update --deep --newuse --oneshot dev-libs/whpuller
