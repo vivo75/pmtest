@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """L0 -- resolver parity comparison (host half).
 
+Usage: resolve-compare.py [--fs NAME] [--backend NAME] <dir> [allowlist]
+
 Reads a directory produced by ``differential-test-bed/layers/l0/in-container.sh``::
 
     <dir>/real/<slug>.txt        raw `emerge -pv` output, real portage
@@ -358,7 +360,8 @@ def glob_match(pat: str, s: str) -> bool:
 
 
 def explained(finding: dict, slug: str, kind: str, allow: list[dict],
-              run_fs: str | None = None) -> dict | None:
+              run_fs: str | None = None,
+              run_backend: str | None = None) -> dict | None:
     for e in allow:
         if e.get("layer", "l0") != "l0":
             continue
@@ -370,6 +373,10 @@ def explained(finding: dict, slug: str, kind: str, allow: list[dict],
             # A run without --fs is explained by nothing fs-qualified.
             if run_fs not in fs:
                 continue
+        if e.get("backend") is not None and run_backend != e["backend"]:
+            # Backend-qualified entries (VM-only guest-state findings)
+            # never explain container runs and vice versa.
+            continue
         cats = e.get("categories") or ([e["category"]] if "category" in e else [])
         if cats and finding["category"] not in cats:
             continue
@@ -388,6 +395,7 @@ def explained(finding: dict, slug: str, kind: str, allow: list[dict],
 # --------------------------------------------------------------------------
 def main(argv: list[str]) -> int:
     run_fs: str | None = None
+    run_backend: str | None = None
     pos: list[str] = []
     i = 0
     while i < len(argv):
@@ -397,6 +405,12 @@ def main(argv: list[str]) -> int:
                 print(__doc__)
                 return 2
             run_fs = argv[i]
+        elif argv[i] == "--backend":
+            i += 1
+            if i >= len(argv):
+                print(__doc__)
+                return 2
+            run_backend = argv[i]
         else:
             pos.append(argv[i])
         i += 1
@@ -425,7 +439,7 @@ def main(argv: list[str]) -> int:
     explained_hits: list[tuple[str, dict, str]] = []
     for pr in probes:
         for f in pr.findings:
-            e = explained(f, pr.slug, pr.kind, allow, run_fs)
+            e = explained(f, pr.slug, pr.kind, allow, run_fs, run_backend)
             if e:
                 f["explained_by"] = e.get("id", "<unnamed>")
                 explained_hits.append((pr.slug, f, e.get("id", "<unnamed>")))
@@ -484,6 +498,9 @@ def main(argv: list[str]) -> int:
         # not a removal candidate.
         and (e.get("fs") is None or run_fs in (
             [e["fs"]] if isinstance(e["fs"], str) else list(e["fs"])))
+        # Same for backend-qualified entries (VM-only findings never
+        # flag container runs and vice versa).
+        and (e.get("backend") is None or run_backend == e["backend"])
         and not any(eid == e.get("id", "<unnamed>") for _, _, eid in explained_hits)
     ]
     if unused:
@@ -502,6 +519,7 @@ def main(argv: list[str]) -> int:
                     "unexplained": len(unexplained),
                     "by_category": by_cat,
                     "fs": run_fs,
+                    "backend": run_backend,
                 },
                 "probes": [asdict(p) for p in probes],
             },

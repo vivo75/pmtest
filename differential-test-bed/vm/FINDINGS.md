@@ -18,18 +18,14 @@ see the same guest (fair); real adapts to the installed set where
 portuale does not. Adjudication belongs to the portuale owner (no
 unilateral blessing); candidates:
 
-1. **expat installed-version reuse** (systematic, ~30 probes):
-   `[extra] ebuild dev-libs/expat-2.8.3 present for portuale, absent
-   for real` — guest has 2.8.4 installed, real treats it as satisfied,
-   portuale plans 2.8.3. Absent on containers (2.8.3 installed there).
-2. **python:3.14 slot resolution against installed** (`dev-lang_python_3.14`):
-   real rc=0 (Total 1), portuale rc=1 `there are no ebuilds to satisfy
-   "dev-lang/python:3.14"` — same shape as (1): installed 3.14.7
-   invisible to portuale.
-3. **@system merge-order cluster** (smoke run): `real virtual/editor
-   vs portuale virtual/libc` at #8 — different @system input sets
-   (nomultilib vs multilib); needs the full-list order verdict before
-   calling it.
+1. **expat installed-version reuse** — FILED as
+   `l0-vm-installed-expat` (backend: vm, exact ebuild-row match;
+   owner portuale-bug). Single filing with (2).
+2. **python:3.14 slot resolution** — FILED as
+   `l0-vm-installed-python-slot` (backend: vm, this probe only;
+   owner portuale-bug). Same installed-visibility root cause.
+3. **@system merge-order cluster** (`real virtual/editor vs portuale
+   virtual/libc`): OPEN, needs full-list order verdict.
 
 ## L1 (slice 4)
 
@@ -47,9 +43,11 @@ unilateral blessing); candidates:
      default) → binpkg USE mismatch → source rebuild.
   3. Proof of causality: same probe in the container bed (no releng
      fragment there) has both PMs agree on `filecaps` ON.
-  So portuale does not read `package.use/` directory fragments (or at
-  least extensionless ones) — backend-independent bug class, exposed
-  by VM stock content. For the owner; no blessing here.
+   So portuale does not read `package.use/` directory fragments (or at
+   least extensionless ones) — backend-independent bug class, exposed
+   by VM stock content. Per owner decision (2026-09-19): known and
+   already in progress upstream — IGNORED, no new filing, no bed
+   workaround. L1/L2 full sets stay invalid/blocked pending the PM fix.
 
 ## L3 (slice 6)
 
@@ -58,21 +56,24 @@ unilateral blessing); candidates:
   REPO_REVISIONS/env entries), 0 unexplained; control 0/0.
 - 6 systemd coredumps (`core.build-and-merge.*`) appeared in one
   portuale guest run (merge rc=0 regardless). The PM binary under test is
-  a dirty-tree dev build — owner triage on a clean tree needed before
-  calling it a PM bug. Not diff signal either way (pruned).
+  a dirty-tree dev build — per owner decision (2026-09-19): retest on a
+  clean tree first (PENDING, see below), no filing yet. Not diff signal
+  either way (pruned).
 
 ## L2 (slice 5)
 
 - Porttest track (`l1-porttest.txt`, strict): GREEN
   (`logs/l2-vm-20260918T203434Z/`) after adjudicating one single-cause
   class (below); cross-install + control clean.
-- `REPO_REVISIONS` (filed, suppressed in `l2-portuale-builder-vm.sh`
-  `KNOWN_FINDINGS` as `l2-vm-repo-revisions[-env]`, delete when fixed):
-  portuale hardcodes `PORTAGE_REPO_REVISIONS="{}"` ("until portuale
-  tracks a repo revision", `emerge_build.rs`); real fills SHAs via git
-  `retrieve_head` whenever git exists. The VM golden has git (repo
-  clones need it), the container image has none — so real writes `{}`
-  on containers (pair matches, bed green) and SHAs on VMs. The full
-  1308-line `environment.bz2` diff is that ONE line. Masking tradeoff:
-  the env entry matches on filename, so re-tighten it when the gap
-  closes.
+- `REPO_REVISIONS` (filed, suppressed; suppression CONFIRMED per
+  owner decision 2026-09-19): portuale hardcodes
+  `PORTAGE_REPO_REVISIONS="{}"` ("until portuale tracks a repo
+  revision", `emerge_build.rs`); real fills SHAs via git
+  `retrieve_head` whenever git exists. Suppressed in
+  `l2-portuale-builder-vm.sh` `KNOWN_FINDINGS` as
+  `l2-vm-repo-revisions[-env]` plus yaml VDB entries
+  (`l2-vm-repo-revisions-vdb[-env]`, `l3-vm-repo-revisions-vdb[-env]`);
+  delete all when portuale tracks revisions. The VM golden has git
+  (repo clones need it), the container image has none — so real writes
+  `{}` on containers (pair matches, bed green) and SHAs on VMs. The
+  full 1308-line `environment.bz2` diff is that ONE line.

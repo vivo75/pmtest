@@ -69,7 +69,7 @@ vm_pull "$IP" "/TEST/logs/$RUN" "$OUT"
 
 echo ">>> comparing (fs=$VM_FS)"
 set +e
-python3 "$TEST_DIR/compare/resolve-compare.py" --fs "$VM_FS" "$OUT" "$TEST_DIR/compare/known-divergences.yaml"
+python3 "$TEST_DIR/compare/resolve-compare.py" --fs "$VM_FS" --backend vm "$OUT" "$TEST_DIR/compare/known-divergences.yaml"
 rc=$?
 python3 "$TEST_DIR/compare/check-invariants.py" "$OUT" | tee "$OUT/invariants.txt"
 [ "${PIPESTATUS[0]}" = 0 ] || [ "$rc" != 0 ] || rc=1

@@ -25,6 +25,10 @@
 #               (e.g. `xfs` or `[ext4, btrfs]`) -- VM bed matrix only.
 #               Absent = every filesystem. A run graded with `--fs NAME`
 #               is explained by nothing qualified for another fs.
+#   backend:    `vm` or `container` -- entries for guest-state findings
+#               that only occur on one backend (e.g. a newer installed
+#               set in the VM image). Absent = both backends. Grade with
+#               `--backend NAME`; unqualified runs match nothing qualified.
 #   reason:     why this is not a Portuale bug   (required in spirit)
 #   ticket:     upstream/issue reference, if any
 #   owner:      who adjudicated it
@@ -82,6 +86,32 @@
 # schema's rule applies: delete the entry the moment the gap is fixed);
 # they exist only so the L2 bed can gate everything else while the gap
 # is open.
+
+- id: l0-vm-installed-expat
+  layer: l0
+  backend: vm
+  categories: [extra]
+  match: "ebuild dev-libs/expat-2.8.3 present for portuale, absent for real"
+  reason: >
+    Installed-version visibility gap (single filing with
+    l0-vm-installed-python-slot): the VM golden ships expat-2.8.4
+    installed, real reuses it as satisfied, portuale plans 2.8.3 from
+    the repo. Absent on containers (2.8.3 installed there). Scoped to
+    this exact ebuild row, so any behavior change resurfaces.
+    Filed in differential-test-bed/vm/FINDINGS.md.
+  owner: portuale-bug
+
+- id: l0-vm-installed-python-slot
+  layer: l0
+  backend: vm
+  categories: [exit, error]
+  slugs: ["dev-lang_python_3.14"]
+  reason: >
+    Same filing as l0-vm-installed-expat: installed python 3.14.7 is
+    invisible to portuale (real rc=0, portuale rc=1 "no ebuilds to
+    satisfy"). Scoped to this one probe; delete when installed
+    visibility is fixed.
+  owner: portuale-bug
 
 - id: l2-gpkg-dostrip-splitdebug
   layer: l2

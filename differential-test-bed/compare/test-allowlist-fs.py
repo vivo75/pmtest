@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Self-test for the `fs:` allowlist qualifier (VM bed matrix).
+"""Self-test for the `fs:` and `backend:` allowlist qualifiers.
 
 Exercises explained() in resolve-compare.py (L0) and diff.py (L1+):
-unqualified entries match every run, fs-qualified entries only runs on
-those filesystems, and a run without --fs matches nothing qualified.
+unqualified entries match every run; fs-qualified entries only runs on
+those filesystems; backend-qualified entries only runs on that backend
+(VM-only guest-state findings never explain container runs). A run
+without the flag matches nothing qualified.
 
 Run: python3 differential-test-bed/compare/test-allowlist-fs.py
 """
@@ -76,6 +78,25 @@ def main() -> int:
                 ln_explained(f, qual_ln, "l1"), None)
     ok &= check("qualified matched on listed fs",
                 ln_explained(f, qual_ln, "l1", "btrfs"), "eb-pair")
+
+    print("backend qualifier:")
+    back = [{"id": "vm-only", "categories": ["order"],
+             "match": "diverges", "backend": "vm"}]
+    ok &= check("l0: backend entry skipped without --backend",
+                l0_explained(FINDING, "s", "atom", back), None)
+    ok &= check("l0: backend entry skipped on other backend",
+                l0_explained(FINDING, "s", "atom", back, None, "container"), None)
+    ok &= check("l0: backend entry matched on vm",
+                l0_explained(FINDING, "s", "atom", back, None, "vm")["id"], "vm-only")
+    ok &= check("diff: backend entry skipped without --backend",
+                ln_explained(
+                    {"category": "CONTENT", "path": "p", "detail": "diverges"},
+                    [{**back[0], "categories": ["CONTENT"]}], "l1"), None)
+    ok &= check("diff: backend entry matched on vm",
+                ln_explained(
+                    {"category": "CONTENT", "path": "p", "detail": "diverges"},
+                    [{**back[0], "categories": ["CONTENT"]}], "l1", None, "vm"),
+                "vm-only")
     print("ALL OK" if ok else "FAILURES")
     return 0 if ok else 1
 

@@ -220,14 +220,14 @@ TOL=()
 [ "$MODE" = payload-tolerant ] && TOL=(--tolerate-payload)
 echo ">>> diffing ref vs cand"
 set +e
-python3 "$TEST_DIR/compare/diff.py" --layer l2 --fs "$VM_FS" "${TOL[@]}" \
+python3 "$TEST_DIR/compare/diff.py" --layer l2 --backend vm --fs "$VM_FS" "${TOL[@]}" \
   "$OUT/ref" "$OUT/cand" "$TEST_DIR/compare/known-divergences.yaml" \
   | tee "$OUT/cross-install.txt"
 rc_diff=${PIPESTATUS[0]}
 set -e
 echo ">>> control diff (portuale consumes the portage-built set)"
 set +e
-python3 "$TEST_DIR/compare/diff.py" --layer l2 --fs "$VM_FS" "${TOL[@]}" \
+python3 "$TEST_DIR/compare/diff.py" --layer l2 --backend vm --fs "$VM_FS" "${TOL[@]}" \
   "$OUT/ref" "$OUT/ctrl" "$TEST_DIR/compare/known-divergences.yaml" \
   > "$OUT/control.txt" 2>&1
 rc_ctrl=$?

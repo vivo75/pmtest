@@ -109,7 +109,7 @@ CTRL_RC=0
 if [ -f "$OUT/portage.files.tsv" ] && [ -f "$OUT/portuale.files.tsv" ]; then
   echo ">>> diff portage vs portuale (--layer l3 --tolerate-payload --fs $VM_FS)"
   set +e
-  python3 "$TEST_DIR/compare/diff.py" --layer l3 --tolerate-payload --fs "$VM_FS" \
+  python3 "$TEST_DIR/compare/diff.py" --layer l3 --tolerate-payload --backend vm --fs "$VM_FS" \
     "$OUT/portage" "$OUT/portuale" "$TEST_DIR/compare/known-divergences.yaml" \
     | tee "$OUT/candidate.txt"
   DIFF_RC=${PIPESTATUS[0]}
@@ -118,7 +118,7 @@ fi
 if [ -f "$OUT/control-a.files.tsv" ] && [ -f "$OUT/control-b.files.tsv" ]; then
   echo ">>> diff control-a vs control-b (portage-vs-portage noise floor)"
   set +e
-  python3 "$TEST_DIR/compare/diff.py" --layer l3 --tolerate-payload --fs "$VM_FS" \
+  python3 "$TEST_DIR/compare/diff.py" --layer l3 --tolerate-payload --backend vm --fs "$VM_FS" \
     "$OUT/control-a" "$OUT/control-b" "$TEST_DIR/compare/known-divergences.yaml" \
     > "$OUT/control.txt" 2>&1
   CTRL_RC=$?

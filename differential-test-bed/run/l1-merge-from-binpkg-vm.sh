@@ -119,7 +119,7 @@ python3 "$TEST_DIR/compare/normalize.py" "$OUT/portuale"
 
 echo ">>> diffing"
 set +e
-python3 "$TEST_DIR/compare/diff.py" --fs "$VM_FS" \
+python3 "$TEST_DIR/compare/diff.py" --backend vm --fs "$VM_FS" \
   "$OUT/portage" "$OUT/portuale" \
   "$TEST_DIR/compare/known-divergences.yaml" | tee "$OUT/l1-report.txt"
 rc=${PIPESTATUS[0]}
