@@ -1,0 +1,6 @@
+DEFINED_PHASES=pretend
+DESCRIPTION=fixture package: package.env CC reaches the tc-getCC/tc-is-lto probe
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=c5929bf8945f5dd604cf48ee31662735

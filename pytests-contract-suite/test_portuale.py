@@ -27,6 +27,20 @@ import pytest
 
 FIXTURES_ROOT = str(Path(__file__).resolve().parents[1] / "fixtures")
 
+# The merged `usr/share/penvbuildpkg/flags` file's expected content: the
+# `penv-buildflags` env file's values (backlog #95 -- CC/CXX/AR/RUSTFLAGS
+# are real's toolchain selectors the old BUILD_VARS filter dropped,
+# ENV_UNSET is the incremental fold's observable value).
+PENVBUILDPKG_FLAGS = (
+    "CFLAGS=-Os -march=fixturepkgenv\n"
+    "MAKEOPTS=-j7\n"
+    "CC=fixture-cc\n"
+    "CXX=fixture-cxx\n"
+    "AR=fixture-ar\n"
+    "RUSTFLAGS=-C target-cpu=fixturepkg\n"
+    "ENV_UNSET=PENV_UNSET\n"
+)
+
 
 def _fixture_env():
     env = dict(os.environ)
@@ -3477,8 +3491,10 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     """The non-`USE` half of `package.env` (real `_grab_pkg_env` into
     `configdict["pkg"]`): `fixtures/etc/portage/package.env` maps
     `dev-libs/penvbuildpkg` to the env file `penv-buildflags`, which sets
-    `CFLAGS`/`MAKEOPTS`. Those override the run-wide (env-layer)
-    `CFLAGS`/`MAKEOPTS` in that package's build phase env only --
+    `CFLAGS`/`MAKEOPTS` plus real's toolchain selectors
+    (`CC`/`CXX`/`AR`/`RUSTFLAGS`) and the `ENV_UNSET` incremental
+    (backlog #95). All of them override the run-wide (env-layer) values
+    in that package's build phase env only --
     `MergeOptions::package_env_vars` ← `Config::package_env_vars`, layered
     by `emerge_build::entry_package_env_vars` after `build_config_env`."""
     root = tmp_path / "root"
@@ -3490,7 +3506,9 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     env["ROOT"] = str(root)
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
-    # The run-wide values -- package.env must win over these for this pkg.
+    # The run-wide values -- package.env must win over these for this pkg
+    # (portuale's current precedence; real's `env` layer outranks its
+    # `pkg` layer for a scalar set in the calling env too -- filed #101).
     env["CFLAGS"] = "-O2 -pipe"
     env["MAKEOPTS"] = "-j3"
 
@@ -3503,9 +3521,7 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     )
     assert result.returncode == 0, result.stderr
     assert ">>> dev-libs/penvbuildpkg-1.0 merged." in result.stdout
-    assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
-        "CFLAGS=-Os -march=fixturepkgenv\nMAKEOPTS=-j7\n"
-    )
+    assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
 
 
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
@@ -4525,9 +4541,7 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     assert (root / "usr/share/usebuildpkg/flags").read_text() == (
         "CFLAGS=-O2 -pipe\nMAKEOPTS=-j3\n"
     )
-    assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
-        "CFLAGS=-Os -march=fixturepkgenv\nMAKEOPTS=-j7\n"
-    )
+    assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
 
 
 def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
@@ -4902,11 +4916,13 @@ def test_standalone_ebuild_merge_applies_package_env_build_vars(emerge_binary, t
     the phase env -- no resolved graph entry needed, the entry is
     atom-matched against the ebuild's own md5-cache identity instead
     (the merge path matches the same string off its `GraphEntry`).
-    `dev-libs/penvbuildpkg` records its phase `CFLAGS`/`MAKEOPTS` into
-    the merged `/usr/share/${PN}/flags` file: with
+    `dev-libs/penvbuildpkg` records its phase flags into the merged
+    `/usr/share/${PN}/flags` file: with
     `package.env -> penv-buildflags` they come from the env file, not
-    make.conf. The `USE=` half needs no separate step (the standalone
-    USE display already folds `package_env_use` in)."""
+    make.conf -- `CFLAGS`/`MAKEOPTS` plus real's toolchain selectors
+    `CC`/`CXX`/`AR`/`RUSTFLAGS` and the `ENV_UNSET` incremental
+    (backlog #95). The `USE=` half needs no separate step (the
+    standalone USE display already folds `package_env_use` in)."""
     import shutil
 
     root = tmp_path / "root"
@@ -4928,8 +4944,63 @@ def test_standalone_ebuild_merge_applies_package_env_build_vars(emerge_binary, t
     )
     assert r.returncode == 0, r.stderr
     flags = (root / "usr/share/penvbuildpkg/flags").read_text()
-    assert "CFLAGS=-Os -march=fixturepkgenv" in flags, flags
-    assert "MAKEOPTS=-j7" in flags, flags
+    assert flags == PENVBUILDPKG_FLAGS, flags
+
+
+def test_standalone_ebuild_package_env_cc_reaches_the_tc_is_lto_probe(
+    emerge_binary, tmp_path
+):
+    """Backlog #95's live failure shape, hermetically: real
+    `_grab_pkg_env` accepts `CC` from a package.env env file, so
+    `toolchain-funcs.eclass`'s `tc-getCC` yields it and `tc-is-lto`'s
+    probe runs it (host capture: `ebuild ... setup` with the host
+    `llvm-lto`-shaped env file exports `CC=clang`; pmtest
+    `findings/l2.md` "#95 S0"). The old BUILD_VARS filter dropped `CC`,
+    `tc-getCC` fell back to gcc, and the probe died on `-flto=thin`
+    (`mail-client/thunderbird`). `dev-libs/penvccpkg`'s `pkg_pretend`
+    is that probe: it runs `${CC:-gcc}` with `-flto=thin`, dies on
+    failure, and records the compiler it used in `${T}/cc`. The env
+    file points `CC` at a stub that only accepts that probe shape, so
+    rc 0 plus `CC=<stub>` proves the package.env value reached the
+    phase."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    stub = tmp_path / "stub-cc"
+    stub.write_text(
+        "#!/bin/sh\n"
+        "# fixture stub compiler: accepts only the tc-is-lto probe shape.\n"
+        '[ "$1" = "-flto=thin" ] || exit 1\n'
+    )
+    stub.chmod(0o755)
+    (cfg / "etc" / "portage" / "env" / "penv-cc").write_text(f'CC="{stub}"\n')
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/penvccpkg penv-cc\n")
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    portage_tmpdir = tmp_path / "pt"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(portage_tmpdir)
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r = subprocess.run(
+        [
+            str(ebuild_link),
+            str(cfg / "repo/dev-libs/penvccpkg/penvccpkg-1.0.ebuild"),
+            "pretend",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    recorded = (
+        portage_tmpdir / "portage" / "dev-libs" / "penvccpkg-1.0" / "temp" / "cc"
+    ).read_text()
+    assert recorded == f"CC={stub}\n", recorded
 
 
 def test_emerge_unmerge_processes_prerm_postrm_elog(emerge_binary, tmp_path):
