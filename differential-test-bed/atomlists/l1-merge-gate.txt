@@ -1,0 +1,16 @@
+# Merge-path safety gate (portuale AGENTS.md step 8 / agent-context.md
+# "Merge-path safety gate"): a successful test merge of the two packages
+# whose running files every process on the system maps.
+#
+#   differential-test-bed/run/l1-merge-from-binpkg.sh differential-test-bed/atomlists/l1-merge-gate.txt
+#
+# Portage builds both from source into the shared $PKGDIR once, then real
+# Portage and portuale each merge the identical binpkg set into a fresh
+# container. Portuale's own shell children run from the very /bin/bash it
+# is replacing and every process in the container maps the libc being
+# replaced, so this cell fails loudly (or takes the container down) for
+# any merge write that touches a live inode instead of renaming over it
+# (backlog #96: an in-place `libreadline.so.8.3` write segfaulted every
+# running bash on the host; the same on glibc is system-wide).
+sys-libs/glibc
+app-shells/bash

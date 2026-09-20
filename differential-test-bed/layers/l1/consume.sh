@@ -90,6 +90,14 @@ done < "$ATOMLIST"
 installed_cpvs > "$OUT.installed-before.txt"
 log "merging ${#atoms[@]} atoms (+deps) from \$PKGDIR with $($EM --version 2>/dev/null | head -1 || echo "$PM")"
 
+# `L1_CONSUME_REINSTALL=1` (the merge-path safety gate atomlist): the set
+# is already installed at the built versions, so a plain `-k` leaves it
+# alone. `--reinstall-atoms` (implemented by both PMs; plain `--reinstall`
+# is a recognized no-op in portuale) forces the re-merge over the running
+# system -- the shape that matters for glibc/bash.
+reinstall_opts=()
+[ "${L1_CONSUME_REINSTALL:-0}" = 1 ] && reinstall_opts=(--reinstall-atoms "${atoms[*]}")
+
 # `-k --getbinpkg`: prefer a $PKGDIR binpkg, fall back to an ebuild (so
 # an installed dep with no binpkg is just satisfied). Both PMs run the
 # identical command. Notes (differential-test-bed/findings/l1.md):
@@ -101,7 +109,7 @@ log "merging ${#atoms[@]} atoms (+deps) from \$PKGDIR with $($EM --version 2>/de
 # The builder built the whole closure, so nothing is built here -- a
 # `>>> Emerging (` line in the log breaks that invariant (asserted below).
 set -o pipefail
-if ! $EM -k --getbinpkg --oneshot --verbose --color=n "${atoms[@]}" 2>&1 | tee "$OUT.merge.log"; then
+if ! $EM -k --getbinpkg --oneshot --verbose --color=n "${reinstall_opts[@]}" "${atoms[@]}" 2>&1 | tee "$OUT.merge.log"; then
   log "!!! merge failed -- see $OUT.merge.log"
   MERGE_RC=1
 else
@@ -115,7 +123,18 @@ if grep -qE '^>>> Emerging \(' "$OUT.merge.log"; then
 fi
 
 installed_cpvs > "$OUT.installed-after.txt"
-comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.merged-cpvs.txt"
+if [ "${L1_CONSUME_REINSTALL:-0}" = 1 ]; then
+  # A reinstall keeps the same cpv, so the before/after diff sees nothing;
+  # record every installed cpv whose cat/pkg matches an atom instead.
+  : > "$OUT.merged-cpvs.txt"
+  for atom in "${atoms[@]}"; do
+    catpkg=${atom#[=<>~]}; catpkg=${catpkg%%[<>=~]*}; catpkg=${catpkg%%:*}
+    grep -E "^${catpkg}-[0-9]" "$OUT.installed-after.txt" >> "$OUT.merged-cpvs.txt" || true
+  done
+  LC_ALL=C sort -u -o "$OUT.merged-cpvs.txt" "$OUT.merged-cpvs.txt"
+else
+  comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.merged-cpvs.txt"
+fi
 log "merged $(wc -l < "$OUT.merged-cpvs.txt") packages"
 
 # --- build the path list the snapshot restricts to -------------------
