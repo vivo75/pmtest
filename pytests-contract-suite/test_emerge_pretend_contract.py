@@ -15158,6 +15158,36 @@ def test_info_atom_prints_the_installed_package_block(
     )
 
 
+def test_info_atom_reads_multiline_vdb_fields_normalised(
+    emerge_binary, fixture_env
+):
+    """#109 S1: `read_vdb_string` normalises every field like real
+    `_aux_get` (`" ".join(myd.split())`, `vartree.py:1044-1046`) on the
+    individual-file path too, not only in the consolidated snapshot.
+    `dev-libs/multilinevdb` is the committed fixture for that: its
+    `IUSE`, `DEFINED_PHASES` and `RDEPEND` files all carry embedded
+    newlines (and the RDEPEND leading/trailing whitespace), so `--info`
+    reads the fallback path over values a raw read would hand over
+    unnormalised. Expected block verified against real Portage
+    3.0.82.2's own `emerge --info dev-libs/multilinevdb` on this same
+    fixture tree (the volatile `KiB Mem:` line aside), byte-identical
+    before and after the slice; the normalisation itself is pinned by
+    the Rust unit tests on `read_vdb_string`, including one over this
+    exact fixture."""
+    rust = _run(
+        [str(emerge_binary)], ["--info", "dev-libs/multilinevdb"], fixture_env
+    )
+    assert rust.returncode == 0
+    assert rust.stdout.endswith(
+        "dev-libs/multilinevdb-1.0::testrepo was built with the following:\n"
+        'USE="alpha -beta"\n'
+        "Unset: CHOST, CFLAGS, CXXFLAGS, FEATURES, LDFLAGS\n"
+        "\n"
+        "\n"
+        ">>> Attempting to run pkg_info() for 'dev-libs/multilinevdb-1.0'\n"
+    )
+
+
 def test_info_installed_block_reads_mydesiredvars_from_environment_bz2(
     emerge_binary, fixture_env
 ):
