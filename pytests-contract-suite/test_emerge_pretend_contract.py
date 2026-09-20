@@ -1571,6 +1571,7 @@ CASES = [
     ("multi-atom: literal duplicate atom dedupes silently", ["--pretend", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("multi-atom: dependency shared between two targets dedupes", ["--pretend", "dev-libs/shared-a", "dev-libs/shared-b"], 0),
     ("multi-atom: solvable slot conflict between two targets is reconciled", ["--pretend", "dev-libs/slotconflictnewconsumer", "dev-libs/slotconflictoldconsumer"], 0),
+    ("multi-atom: reversed two-target order withholds with a skip notice at --backtrack=0 (#90 S2: rc 0 like real)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictoldconsumer", "dev-libs/slotconflictnewconsumer"], 0),
     ("multi-atom: unsolvable slot conflict between two targets is reported (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 1),
     ("multi-atom: all requested atoms already installed", ["--pretend", "dev-libs/samepkg", "dev-libs/samepkg"], 0),
     ("multi-atom: a nonexistent atom aborts the whole run, first-bad-wins", ["--pretend", "dev-libs/does-not-exist", "dev-libs/newpkg"], 1),
@@ -18531,3 +18532,49 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
         '[blocks b      ] <dev-libs/whtarget-2.0 ("<dev-libs/whtarget-2.0" is '
         "soft blocking dev-libs/whblocker-2.0)",
     ], result.stdout
+
+
+def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
+    emerge_binary, fixture_env
+):
+    """Backlog #90 S2/S3: argv `oldconsumer newconsumer` (reversed
+    declaration) forms a genuine slot conflict where the forward order
+    silently reuses: the bare dep graphs 2.0 first, `<2.0` graphs 1.0,
+    and the direct solve removes 2.0 (`or_tuple` satisfied through the
+    already-forced 1.0) with real's skip-conflict `WARNING`, rc 0.
+
+    Real 3.0.82.2 on the staged hermetic tree (host oracle, S0 matrix:
+    `--backtrack=0` and default agree byte-for-byte modulo the
+    `ROOT=$FX` root suffixes and the profile-default `ELIBC="glibc"`
+    both omitted by portuale's display cuts): merge rows
+    `[1.0, oldconsumer, newconsumer]`, then the `WARNING` block naming
+    the scheduled-for-merge 2.0 against oldconsumer's `<2.0` pin with
+    the operator + version `^` spans. The forward order stays silent
+    (S1 reuse, pinned by the CASES entry above); the unsolvable twin
+    keeps its block + rc 1.
+    """
+    for extra in ([], ["--backtrack=0"]):
+        result = _run(
+            [str(emerge_binary)],
+            [
+                "--pretend",
+                *extra,
+                "dev-libs/slotconflictoldconsumer",
+                "dev-libs/slotconflictnewconsumer",
+            ],
+            fixture_env,
+        )
+        assert result.returncode == 0, (extra, result.stdout, result.stderr)
+        assert result.stdout.splitlines() == [
+            "[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ",
+            "[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 ",
+            "[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 ",
+            "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+            "",
+            "dev-libs/slotconflicttarget:0",
+            "",
+            "  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
+            "    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\"",
+            "    ^                            ^^^",
+            "",
+        ], (extra, result.stdout)
