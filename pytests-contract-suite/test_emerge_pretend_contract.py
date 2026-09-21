@@ -15188,6 +15188,34 @@ def test_info_atom_reads_multiline_vdb_fields_normalised(
     )
 
 
+def test_info_atom_ignores_a_stale_vdb_snapshot(emerge_binary, fixture_env):
+    """#109 S3: a consolidated `metadata` snapshot is served only when
+    `#format=` is the known version **and** `#dir_mtime=` equals the
+    package dir's own `st_mtime_ns` (real `_read_metadata_file`,
+    `vartree.py:115-187`). A committed fixture's stamp can never match
+    after `git checkout` sets the directory mtime, so
+    `dev-libs/stalesnapshot-1.0` is the negative-path pin: its snapshot
+    deliberately claims `USE=wrongflag` / `SLOT=99` / `IUSE=wrongflag`,
+    and the reader must reject it and serve the individual files
+    (`USE="alpha -beta"`). A reader that trusted the stale snapshot would
+    print `wrongflag` here. Expected block verified against real Portage
+    3.0.82.2 on this same fixture tree (it rejects the stale stamp the
+    same way)."""
+    rust = _run(
+        [str(emerge_binary)], ["--info", "dev-libs/stalesnapshot"], fixture_env
+    )
+    assert rust.returncode == 0
+    assert rust.stdout.endswith(
+        "dev-libs/stalesnapshot-1.0::testrepo was built with the following:\n"
+        'USE="alpha -beta"\n'
+        "Unset: CHOST, CFLAGS, CXXFLAGS, FEATURES, LDFLAGS\n"
+        "\n"
+        "\n"
+        ">>> Attempting to run pkg_info() for 'dev-libs/stalesnapshot-1.0'\n"
+    )
+    assert "wrongflag" not in rust.stdout
+
+
 def test_info_installed_block_reads_mydesiredvars_from_environment_bz2(
     emerge_binary, fixture_env
 ):
