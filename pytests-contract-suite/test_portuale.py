@@ -3493,10 +3493,16 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     `dev-libs/penvbuildpkg` to the env file `penv-buildflags`, which sets
     `CFLAGS`/`MAKEOPTS` plus real's toolchain selectors
     (`CC`/`CXX`/`AR`/`RUSTFLAGS`) and the `ENV_UNSET` incremental
-    (backlog #95). All of them override the run-wide (env-layer) values
-    in that package's build phase env only --
+    (backlog #95). Real's `USE_ORDER` (`config.py:1031-1035`) puts the
+    calling-environment `env` layer above the `pkg` layer, so a scalar
+    the process carries wins over the env file (backlog #101, S0 cell
+    A): with `CFLAGS`/`MAKEOPTS` in the process env the phase sees the
+    process values, while the keys only the env file sets (`CC`/`CXX`/
+    `AR`/`RUSTFLAGS`/`ENV_UNSET`) still arrive from it --
     `MergeOptions::package_env_vars` ← `Config::package_env_vars`, layered
-    by `emerge_build::entry_package_env_vars` after `build_config_env`."""
+    by `emerge_build::entry_package_env_vars` with the calling-env
+    scalar drop. (The name keeps the pre-#101 wording; the corpus entry
+    is nodeid-keyed.)"""
     root = tmp_path / "root"
     import shutil
 
@@ -3506,11 +3512,56 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     env["ROOT"] = str(root)
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
-    # The run-wide values -- package.env must win over these for this pkg
-    # (portuale's current precedence; real's `env` layer outranks its
-    # `pkg` layer for a scalar set in the calling env too -- filed #101).
+    # The run-wide values -- the calling env wins over package.env for
+    # these two keys (real's `env`-over-`pkg` layer order, #101 S0 A).
     env["CFLAGS"] = "-O2 -pipe"
     env["MAKEOPTS"] = "-j3"
+    # Isolation: no other env-file key may leak in from the ambient
+    # environment (this host itself carries a toolchain-env for #95's
+    # live failure), or the per-key winner is not what the pin asserts.
+    for key in ("CC", "CXX", "AR", "RUSTFLAGS", "ENV_UNSET"):
+        env.pop(key, None)
+
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/penvbuildpkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/penvbuildpkg-1.0 merged." in result.stdout
+    assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
+        "CFLAGS=-O2 -pipe\n"
+        "MAKEOPTS=-j3\n"
+        "CC=fixture-cc\n"
+        "CXX=fixture-cxx\n"
+        "AR=fixture-ar\n"
+        "RUSTFLAGS=-C target-cpu=fixturepkg\n"
+        "ENV_UNSET=PENV_UNSET\n"
+    )
+
+
+def test_emerge_atom_source_build_package_env_applies_when_the_process_is_silent(
+    emerge_binary, tmp_path
+):
+    """The negative twin of the #101 pin above: with the process carrying
+    none of the env file's keys, the whole `penv-buildflags` set reaches
+    the phase (`PENVBUILDPKG_FLAGS` verbatim). Together the two pins show
+    the winner is per-key -- the calling env where set, the env file
+    where it is not -- which is real's `env`-over-`pkg` layer order, not
+    a run-wide clobber in either direction."""
+    root = tmp_path / "root"
+    import shutil
+
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    for key in ("CFLAGS", "MAKEOPTS", "CC", "CXX", "AR", "RUSTFLAGS", "ENV_UNSET"):
+        env.pop(key, None)
 
     result = subprocess.run(
         [str(emerge_binary), "dev-libs/penvbuildpkg"],
@@ -3522,6 +3573,303 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     assert result.returncode == 0, result.stderr
     assert ">>> dev-libs/penvbuildpkg-1.0 merged." in result.stdout
     assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
+
+
+def test_standalone_ebuild_setup_sees_the_full_resolved_config_env(
+    ebuild_binary, tmp_path
+):
+    """Backlog #100 (S0 cell F): a standalone `ebuild <file> setup`
+    exports real's full resolved config env (`config.environ()`), not
+    the old narrow `BUILD_VARS` base. Hermetically: copy the configroot,
+    put `CC="makeconf-cc"` in the copy's `make.conf` (no package.env
+    entry), and the `dev-libs/envdumppkg` `pkg_setup` dump shows
+    `CC=makeconf-cc`. Pre-#100 the phase saw `CC=`."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write('\nCC="makeconf-cc"\n')
+
+    portage_tmpdir = tmp_path / "portage-tmpdir"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(portage_tmpdir)
+    env.pop("CC", None)
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+            "setup",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    # Phase output lands on stderr (the phase runner's own stream).
+    assert "CC=makeconf-cc" in result.stderr
+
+
+def _cfg_with_envdump_tmpdir(tmp_path, probe):
+    """Hermetic configroot copy mapping `dev-libs/envdumppkg` to an env
+    file setting `PORTAGE_TMPDIR` to `probe` (backlog #99 S0 cell D/E
+    vehicle). The caller creates `probe` (cell D) or not (cell E)."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-tmpdir").write_text(
+        f'PORTAGE_TMPDIR="{probe}"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/envdumppkg penv-tmpdir\n")
+    return cfg
+
+
+def test_standalone_ebuild_setup_sees_the_per_package_tmpdir(
+    ebuild_binary, tmp_path
+):
+    """Backlog #99 (S0 cell D, standalone): an env file
+    `PORTAGE_TMPDIR="<tmp>/probe-tmp"` (directory created) makes the
+    phase report that `PORTAGE_TMPDIR` and a `PORTAGE_BUILDDIR` under
+    it. The calling env carries no `PORTAGE_TMPDIR` here, so the `pkg`
+    layer decides; with one set, the process value wins (#101
+    precedence, asserted by the second leg)."""
+    probe = tmp_path / "probe-tmp"
+    probe.mkdir()
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+
+    def run(extra_env):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = str(cfg)
+        env["ROOT"] = str(tmp_path / "root")
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env.pop("PORTAGE_TMPDIR", None)
+        env.update(extra_env)
+        return subprocess.run(
+            [
+                str(ebuild_binary),
+                str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+                "setup",
+            ],
+            capture_output=True, text=True, check=False, env=env,
+        )
+
+    r = run({})
+    assert r.returncode == 0, r.stderr
+    assert f"PORTAGE_TMPDIR={probe}" in r.stderr
+    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in r.stderr
+
+    # Precedence leg: a process PORTAGE_TMPDIR beats the env file's.
+    other = tmp_path / "process-tmp"
+    other.mkdir()
+    r = run({"PORTAGE_TMPDIR": str(other)})
+    assert r.returncode == 0, r.stderr
+    assert f"PORTAGE_TMPDIR={other}" in r.stderr
+    assert f"PORTAGE_BUILDDIR={other}/portage/dev-libs/envdumppkg-1.0" in r.stderr
+
+
+def test_standalone_ebuild_setup_fails_for_a_missing_per_package_tmpdir(
+    ebuild_binary, tmp_path
+):
+    """Backlog #99 (S0 cell E, standalone): the env file names a
+    `PORTAGE_TMPDIR` that does not exist -- real fails with its exact
+    `_check_temp_dir` text and exit 1, and so does portuale."""
+    probe = tmp_path / "probe-tmp"  # deliberately not created
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+    r = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+            "setup",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert (
+        f"The directory specified in your PORTAGE_TMPDIR variable, '{probe}',\n"
+        "does not exist." in r.stderr
+    )
+
+
+def test_emerge_atom_source_build_sees_the_per_package_tmpdir(
+    emerge_binary, tmp_path
+):
+    """Backlog #99 (S0 cell D, merge scheduler): the same env file under
+    `emerge dev-libs/envdumppkg` puts the build under the per-package
+    tmpdir -- the pre-clean, the phase chain and the merge share one
+    resolved root. The calling env carries no `PORTAGE_TMPDIR`."""
+    import shutil
+
+    probe = tmp_path / "probe-tmp"
+    probe.mkdir()
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/envdumppkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/envdumppkg-1.0 merged." in result.stdout
+    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in result.stderr
+
+
+def test_emerge_atom_source_build_fails_for_a_missing_per_package_tmpdir(
+    emerge_binary, tmp_path
+):
+    """Backlog #99 (S0 cell E, merge scheduler): the missing directory
+    aborts the entry before anything runs, with real's text and exit 1."""
+    import shutil
+
+    probe = tmp_path / "probe-tmp"  # deliberately not created
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/envdumppkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "does not exist." in result.stdout + result.stderr
+
+
+def _cfg_with_splitdebug_env(tmp_path, process_features):
+    """Hermetic configroot copy mapping only `dev-libs/splitdbgpkg` to an
+    env file with `FEATURES="splitdebug"` (backlog #98). The neighbour
+    `dev-libs/splitdbgnbrpkg` has no entry. `process_features` is the
+    calling env's `FEATURES` (`None` = unset)."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-splitdebug").write_text(
+        'FEATURES="splitdebug"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/splitdbgpkg penv-splitdebug\n")
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env.pop("FEATURES", None)
+    if process_features is not None:
+        env["FEATURES"] = process_features
+    return cfg, root, env
+
+
+def _debug_trees(root):
+    """Merged `.debug` files per probe binary (empty when estrip did not
+    split). Layout-tolerant: real nests them under `usr/lib/debug/` with
+    `.build-id` links beside them."""
+    probe = sorted(
+        str(p.relative_to(root))
+        for p in (root / "usr/lib/debug").rglob("splitdbg-hello.debug")
+    )
+    neighbour = sorted(
+        str(p.relative_to(root))
+        for p in (root / "usr/lib/debug").rglob("splitnbr-hello.debug")
+    )
+    return probe, neighbour
+
+
+def test_emerge_per_package_features_splitdebug_is_per_entry(
+    emerge_binary, tmp_path
+):
+    """Backlog #98 (S0 cell C shape): a `FEATURES="splitdebug"` env file
+    for `dev-libs/splitdbgpkg` splits *its* binary into a `.debug` tree
+    while the neighbour built in the same run keeps an unsplit binary --
+    the value is per-entry, not a run-wide clobber. Both binaries built
+    with `-g`, so estrip has info to split in both cases."""
+    cfg, root, env = _cfg_with_splitdebug_env(tmp_path, None)
+    assert cfg is not None  # the configroot copy carries the mapping
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/splitdbgpkg", "dev-libs/splitdbgnbrpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/splitdbgpkg-1.0 merged." in result.stdout
+    assert ">>> dev-libs/splitdbgnbrpkg-1.0 merged." in result.stdout
+    # Both binaries merged (both builds ran).
+    assert (root / "usr/bin/splitdbg-hello").is_file()
+    assert (root / "usr/bin/splitnbr-hello").is_file()
+    probe, neighbour = _debug_trees(root)
+    assert len(probe) == 1, probe
+    assert neighbour == [], neighbour
+
+
+def test_emerge_calling_env_prunes_a_per_package_features_token(
+    emerge_binary, tmp_path
+):
+    """Backlog #98 (S0 cell B shape): the calling env's `-splitdebug`
+    prunes the env file's `splitdebug` token, so no `.debug` tree is
+    produced for either package."""
+    _, root, env = _cfg_with_splitdebug_env(tmp_path, "-splitdebug")
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/splitdbgpkg", "dev-libs/splitdbgnbrpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (root / "usr/bin/splitdbg-hello").is_file()
+    probe, neighbour = _debug_trees(root)
+    assert probe == [], probe
+    assert neighbour == [], neighbour
+
+
+def test_standalone_ebuild_setup_sees_the_per_package_features(
+    ebuild_binary, tmp_path
+):
+    """Backlog #98 (standalone): the env file's `FEATURES` folds onto
+    the run-wide list in the standalone phase env too -- the resolved
+    base value must survive `phase_env_vars`' own `FEATURES` literal
+    (which only covers the no-config fallback)."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-standalone-features").write_text(
+        'FEATURES="standalone-probe"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/envdumppkg penv-standalone-features\n")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env.pop("FEATURES", None)
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+            "setup",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "standalone-probe" in result.stderr
 
 
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
@@ -4503,15 +4851,17 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
 def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_path):
     """`emerge --resume` replays real builds, so resumed entries need the
     same phase env as a fresh `emerge <atom>` build: the run-wide
-    compiler/make flags (`MergeOptions::build_env` <- `build_config_env`)
-    and the per-package `package.env` overrides
+    compiler/make flags (`MergeOptions::build_env` <-
+    `run_wide_phase_env`) and the per-package `package.env` overrides
     (`MergeOptions::package_env_vars`). Before this the resume path set
     neither, so a resumed `src_install` saw `CFLAGS=""` (the per-entry
     resolved `USE` already flowed via `candidate_use_flags_display`).
     `dev-libs/schedbad` fails first so a resume list exists;
     `--resume --skipfirst` then merges `dev-libs/usebuildpkg` (records
     the run-wide flags) and `dev-libs/penvbuildpkg` (records its
-    `package.env` override of those same flags)."""
+    `package.env` values for the keys the process does not carry, and
+    the process values where it does -- real's `env`-over-`pkg` layer
+    order, backlog #101)."""
     import shutil
 
     root = tmp_path / "root"
@@ -4523,6 +4873,10 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
     env["CFLAGS"] = "-O2 -pipe"
     env["MAKEOPTS"] = "-j3"
+    # Isolation: no other env-file key may leak in from the ambient
+    # environment, or the per-key winner is not what the pin asserts.
+    for key in ("CC", "CXX", "AR", "RUSTFLAGS", "ENV_UNSET"):
+        env.pop(key, None)
 
     r = subprocess.run(
         [str(emerge_binary), "dev-libs/schedbad", "dev-libs/usebuildpkg", "dev-libs/penvbuildpkg"],
@@ -4541,7 +4895,15 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     assert (root / "usr/share/usebuildpkg/flags").read_text() == (
         "CFLAGS=-O2 -pipe\nMAKEOPTS=-j3\n"
     )
-    assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
+    assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
+        "CFLAGS=-O2 -pipe\n"
+        "MAKEOPTS=-j3\n"
+        "CC=fixture-cc\n"
+        "CXX=fixture-cxx\n"
+        "AR=fixture-ar\n"
+        "RUSTFLAGS=-C target-cpu=fixturepkg\n"
+        "ENV_UNSET=PENV_UNSET\n"
+    )
 
 
 def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
@@ -6044,7 +6406,12 @@ def test_ebuild_shell_bash_and_brush_compile_a_quoted_heredoc_ebuild(
     environment, the ebuild's own `src_compile` was replaced by `default`
     (a no-op), and `install` still exited 0 -- with an empty image. Both
     backends must compile the fixture and produce an identical `image/`
-    file set, not merely matching exit codes."""
+    file set, not merely matching exit codes. Hermetic configroot: the
+    host profile enables `splitdebug`, which splits debug info with
+    tmpdir-dependent build-id paths, so no two tmpdirs -- real's
+    included -- can produce identical file sets; the backend parity
+    this pins does not depend on it (the fixture config resolves no
+    `splitdebug`)."""
     if shutil.which("gcc") is None:
         pytest.skip("no gcc: the quoted-heredoc compile fixture cannot build")
 
@@ -6058,6 +6425,9 @@ def test_ebuild_shell_bash_and_brush_compile_a_quoted_heredoc_ebuild(
         env = dict(os.environ)
         portage_tmpdir = tmp_path / subdir
         env["PORTAGE_TMPDIR"] = str(portage_tmpdir)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(tmp_path / "root")
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
 
         result = subprocess.run(
             [str(ebuild_binary), "--shell", shell, ebuild_path, "install"],

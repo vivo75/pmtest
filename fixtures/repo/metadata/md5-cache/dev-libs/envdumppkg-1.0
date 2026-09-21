@@ -1,0 +1,6 @@
+DEFINED_PHASES=setup
+DESCRIPTION=fixture package: dumps the phase environment for package.env layer-oracle captures
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=02f5506bc8f4dd15fb71104d46139309
