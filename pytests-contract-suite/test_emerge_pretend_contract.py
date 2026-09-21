@@ -601,6 +601,11 @@ CASES = [
         1,
     ),
     (
+        "an installed parent's unresolvable deep dep aborts even with no use-deps involved (#132 libcnoisepkg)",
+        ["--pretend", "--update", "--deep", "dev-libs/libcnoisepkg"],
+        1,
+    ),
+    (
         "recursion: [use]-dep unsat with the flag absent from IUSE -- real's Missing IUSE reason (backlog #20)",
         ["--pretend", "--autounmask-use=n", "dev-libs/unsatuseiuse"],
         1,
