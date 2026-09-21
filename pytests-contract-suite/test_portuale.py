@@ -3614,6 +3614,145 @@ def test_standalone_ebuild_setup_sees_the_full_resolved_config_env(
     assert "CC=makeconf-cc" in result.stderr
 
 
+def _cfg_with_envdump_tmpdir(tmp_path, probe):
+    """Hermetic configroot copy mapping `dev-libs/envdumppkg` to an env
+    file setting `PORTAGE_TMPDIR` to `probe` (backlog #99 S0 cell D/E
+    vehicle). The caller creates `probe` (cell D) or not (cell E)."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-tmpdir").write_text(
+        f'PORTAGE_TMPDIR="{probe}"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/envdumppkg penv-tmpdir\n")
+    return cfg
+
+
+def test_standalone_ebuild_setup_sees_the_per_package_tmpdir(
+    ebuild_binary, tmp_path
+):
+    """Backlog #99 (S0 cell D, standalone): an env file
+    `PORTAGE_TMPDIR="<tmp>/probe-tmp"` (directory created) makes the
+    phase report that `PORTAGE_TMPDIR` and a `PORTAGE_BUILDDIR` under
+    it. The calling env carries no `PORTAGE_TMPDIR` here, so the `pkg`
+    layer decides; with one set, the process value wins (#101
+    precedence, asserted by the second leg)."""
+    probe = tmp_path / "probe-tmp"
+    probe.mkdir()
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+
+    def run(extra_env):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = str(cfg)
+        env["ROOT"] = str(tmp_path / "root")
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env.pop("PORTAGE_TMPDIR", None)
+        env.update(extra_env)
+        return subprocess.run(
+            [
+                str(ebuild_binary),
+                str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+                "setup",
+            ],
+            capture_output=True, text=True, check=False, env=env,
+        )
+
+    r = run({})
+    assert r.returncode == 0, r.stderr
+    assert f"PORTAGE_TMPDIR={probe}" in r.stderr
+    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in r.stderr
+
+    # Precedence leg: a process PORTAGE_TMPDIR beats the env file's.
+    other = tmp_path / "process-tmp"
+    other.mkdir()
+    r = run({"PORTAGE_TMPDIR": str(other)})
+    assert r.returncode == 0, r.stderr
+    assert f"PORTAGE_TMPDIR={other}" in r.stderr
+    assert f"PORTAGE_BUILDDIR={other}/portage/dev-libs/envdumppkg-1.0" in r.stderr
+
+
+def test_standalone_ebuild_setup_fails_for_a_missing_per_package_tmpdir(
+    ebuild_binary, tmp_path
+):
+    """Backlog #99 (S0 cell E, standalone): the env file names a
+    `PORTAGE_TMPDIR` that does not exist -- real fails with its exact
+    `_check_temp_dir` text and exit 1, and so does portuale."""
+    probe = tmp_path / "probe-tmp"  # deliberately not created
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+    r = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+            "setup",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert (
+        f"The directory specified in your PORTAGE_TMPDIR variable, '{probe}',\n"
+        "does not exist." in r.stderr
+    )
+
+
+def test_emerge_atom_source_build_sees_the_per_package_tmpdir(
+    emerge_binary, tmp_path
+):
+    """Backlog #99 (S0 cell D, merge scheduler): the same env file under
+    `emerge dev-libs/envdumppkg` puts the build under the per-package
+    tmpdir -- the pre-clean, the phase chain and the merge share one
+    resolved root. The calling env carries no `PORTAGE_TMPDIR`."""
+    import shutil
+
+    probe = tmp_path / "probe-tmp"
+    probe.mkdir()
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/envdumppkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/envdumppkg-1.0 merged." in result.stdout
+    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in result.stderr
+
+
+def test_emerge_atom_source_build_fails_for_a_missing_per_package_tmpdir(
+    emerge_binary, tmp_path
+):
+    """Backlog #99 (S0 cell E, merge scheduler): the missing directory
+    aborts the entry before anything runs, with real's text and exit 1."""
+    import shutil
+
+    probe = tmp_path / "probe-tmp"  # deliberately not created
+    cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/envdumppkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "does not exist." in result.stdout + result.stderr
+
+
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     emerge_binary, tmp_path
 ):
