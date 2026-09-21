@@ -198,6 +198,21 @@ CASES = [
     ("--deep: walks the whole already-installed chain", ["--pretend", "--deep", "dev-libs/deeppkg"], 0),
     ("-D short alias for --deep", ["--pretend", "-D", "dev-libs/deeppkg"], 0),
     ("--deep walk of an installed pkg evaluates flag?() deps against its vdb USE, not effective USE", ["--pretend", "-D", "dev-libs/deepvdbuseconsumer"], 0),
+    (
+        "an installed parent's [flag=] dep is evaluated against its vdb USE and cannot be satisfied (#132 A)",
+        ["--pretend", "-D", "dev-libs/deepusedepconsumer"],
+        1,
+    ),
+    (
+        "the same shape resolves by rebuilding the child with the flag off (#132 B)",
+        ["--pretend", "-D", "dev-libs/deepusedepbconsumer"],
+        0,
+    ),
+    (
+        "a parent built with the flag on evaluates the same atom to [flip], already satisfied (#132 C)",
+        ["--pretend", "-D", "dev-libs/deepusedepokconsumer"],
+        0,
+    ),
     ("--deep=N inline form", ["--pretend", "--deep=2", "dev-libs/deeppkg"], 0),
     ("--deep=0 matches not passing --deep at all", ["--pretend", "--deep=0", "dev-libs/deeppkg"], 0),
     ("--deep=-1 is a real, immediate parse error", ["--pretend", "--deep=-1", "dev-libs/deeppkg"], 2),
@@ -13744,6 +13759,76 @@ def test_deep_walk_evaluates_flag_deps_against_the_installed_vdb_use(
         "[ebuild  N     ] dev-libs/deepvdbuseconsumer-1.0 ",
     ]
     assert "deepvdbusetarget" not in rust.stdout
+
+
+def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
+    emerge_binary, fixture_env
+):
+    """Real evaluates every dependency token's conditional use-deps in
+    `use_reduce(..., token_class=Atom)` against
+    `_pkg_use_enabled(pkg)`, which for a built package is its vdb
+    `USE`. dev-libs/deepusedepparent is installed with vdb USE=""
+    (built -flip) and RDEPENDs `~dev-libs/deepusedepchild-1.0[flip=]`,
+    which therefore evaluates to `[-flip]`; the installed child is
+    +flip and the profile enables flip, so no pool satisfies it and
+    real aborts (#111 S0's live qtbase shape, shrunk). Portuale used to
+    queue the atom unevaluated, where a conditional form imposes no
+    state constraint at all, and resolved rc 0.
+
+    Residue note: real's bed capture qualifies the chain
+    (`# required by dev-libs/deepusedepparent-1.0::testrepo`); portuale's
+    autounmask block renders the installed owner short
+    (`# required by dev-libs/deepusedepparent`). Display-only, out of
+    #132's scope — filed at S7.
+    """
+    base = ["--pretend", "-D", "dev-libs/deepusedepconsumer"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        '[ebuild   R    ] dev-libs/deepusedepchild-1.0  USE="-flip*"',
+        "[ebuild  N     ] dev-libs/deepusedepconsumer-1.0 ",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/deepusedepparent\n"
+        ">=dev-libs/deepusedepchild-1.0 -flip\n" + BACKTRACK_TERMINATED_EARLY
+    )
+
+
+def test_an_evaluated_conditional_use_dep_reaches_candidate_selection(
+    emerge_binary, fixture_env
+):
+    """Arm B: the same parent shape with an unpinned child. The
+    evaluated `[-flip]` must reach candidate *selection*, not just the
+    failure display -- real rebuilds dev-libs/deepusedepbchild with flip
+    off rather than aborting. A fix that only hardened the unsatisfied
+    path would pass arm A and fail here.
+    """
+    base = ["--pretend", "-D", "dev-libs/deepusedepbconsumer"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        '[ebuild   R    ] dev-libs/deepusedepbchild-1.0  USE="-flip*"',
+        "[ebuild  N     ] dev-libs/deepusedepbconsumer-1.0 ",
+    ]
+
+
+def test_an_evaluated_conditional_use_dep_that_is_already_satisfied_moves_nothing(
+    emerge_binary, fixture_env
+):
+    """Arm C: dev-libs/deepusedepokparent is installed +flip, so the
+    same `[flip=]` atom evaluates to `[flip]`, which the installed
+    +flip dev-libs/deepusedepbchild satisfies. The guard against an
+    over-broad fix that rejects an installed candidate whenever a
+    conditional use-dep is present.
+    """
+    base = ["--pretend", "-D", "dev-libs/deepusedepokconsumer"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/deepusedepokconsumer-1.0 ",
+    ]
 
 
 def test_complete_graph_does_not_merge_a_missing_deep_dep_of_an_installed_pkg(
