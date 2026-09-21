@@ -3493,10 +3493,16 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     `dev-libs/penvbuildpkg` to the env file `penv-buildflags`, which sets
     `CFLAGS`/`MAKEOPTS` plus real's toolchain selectors
     (`CC`/`CXX`/`AR`/`RUSTFLAGS`) and the `ENV_UNSET` incremental
-    (backlog #95). All of them override the run-wide (env-layer) values
-    in that package's build phase env only --
+    (backlog #95). Real's `USE_ORDER` (`config.py:1031-1035`) puts the
+    calling-environment `env` layer above the `pkg` layer, so a scalar
+    the process carries wins over the env file (backlog #101, S0 cell
+    A): with `CFLAGS`/`MAKEOPTS` in the process env the phase sees the
+    process values, while the keys only the env file sets (`CC`/`CXX`/
+    `AR`/`RUSTFLAGS`/`ENV_UNSET`) still arrive from it --
     `MergeOptions::package_env_vars` ← `Config::package_env_vars`, layered
-    by `emerge_build::entry_package_env_vars` after `build_config_env`."""
+    by `emerge_build::entry_package_env_vars` with the calling-env
+    scalar drop. (The name keeps the pre-#101 wording; the corpus entry
+    is nodeid-keyed.)"""
     root = tmp_path / "root"
     import shutil
 
@@ -3506,11 +3512,56 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     env["ROOT"] = str(root)
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
-    # The run-wide values -- package.env must win over these for this pkg
-    # (portuale's current precedence; real's `env` layer outranks its
-    # `pkg` layer for a scalar set in the calling env too -- filed #101).
+    # The run-wide values -- the calling env wins over package.env for
+    # these two keys (real's `env`-over-`pkg` layer order, #101 S0 A).
     env["CFLAGS"] = "-O2 -pipe"
     env["MAKEOPTS"] = "-j3"
+    # Isolation: no other env-file key may leak in from the ambient
+    # environment (this host itself carries a toolchain-env for #95's
+    # live failure), or the per-key winner is not what the pin asserts.
+    for key in ("CC", "CXX", "AR", "RUSTFLAGS", "ENV_UNSET"):
+        env.pop(key, None)
+
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/penvbuildpkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/penvbuildpkg-1.0 merged." in result.stdout
+    assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
+        "CFLAGS=-O2 -pipe\n"
+        "MAKEOPTS=-j3\n"
+        "CC=fixture-cc\n"
+        "CXX=fixture-cxx\n"
+        "AR=fixture-ar\n"
+        "RUSTFLAGS=-C target-cpu=fixturepkg\n"
+        "ENV_UNSET=PENV_UNSET\n"
+    )
+
+
+def test_emerge_atom_source_build_package_env_applies_when_the_process_is_silent(
+    emerge_binary, tmp_path
+):
+    """The negative twin of the #101 pin above: with the process carrying
+    none of the env file's keys, the whole `penv-buildflags` set reaches
+    the phase (`PENVBUILDPKG_FLAGS` verbatim). Together the two pins show
+    the winner is per-key -- the calling env where set, the env file
+    where it is not -- which is real's `env`-over-`pkg` layer order, not
+    a run-wide clobber in either direction."""
+    root = tmp_path / "root"
+    import shutil
+
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    for key in ("CFLAGS", "MAKEOPTS", "CC", "CXX", "AR", "RUSTFLAGS", "ENV_UNSET"):
+        env.pop(key, None)
 
     result = subprocess.run(
         [str(emerge_binary), "dev-libs/penvbuildpkg"],
@@ -4503,15 +4554,17 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
 def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_path):
     """`emerge --resume` replays real builds, so resumed entries need the
     same phase env as a fresh `emerge <atom>` build: the run-wide
-    compiler/make flags (`MergeOptions::build_env` <- `build_config_env`)
-    and the per-package `package.env` overrides
+    compiler/make flags (`MergeOptions::build_env` <-
+    `run_wide_phase_env`) and the per-package `package.env` overrides
     (`MergeOptions::package_env_vars`). Before this the resume path set
     neither, so a resumed `src_install` saw `CFLAGS=""` (the per-entry
     resolved `USE` already flowed via `candidate_use_flags_display`).
     `dev-libs/schedbad` fails first so a resume list exists;
     `--resume --skipfirst` then merges `dev-libs/usebuildpkg` (records
     the run-wide flags) and `dev-libs/penvbuildpkg` (records its
-    `package.env` override of those same flags)."""
+    `package.env` values for the keys the process does not carry, and
+    the process values where it does -- real's `env`-over-`pkg` layer
+    order, backlog #101)."""
     import shutil
 
     root = tmp_path / "root"
@@ -4523,6 +4576,10 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
     env["CFLAGS"] = "-O2 -pipe"
     env["MAKEOPTS"] = "-j3"
+    # Isolation: no other env-file key may leak in from the ambient
+    # environment, or the per-key winner is not what the pin asserts.
+    for key in ("CC", "CXX", "AR", "RUSTFLAGS", "ENV_UNSET"):
+        env.pop(key, None)
 
     r = subprocess.run(
         [str(emerge_binary), "dev-libs/schedbad", "dev-libs/usebuildpkg", "dev-libs/penvbuildpkg"],
@@ -4541,7 +4598,15 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     assert (root / "usr/share/usebuildpkg/flags").read_text() == (
         "CFLAGS=-O2 -pipe\nMAKEOPTS=-j3\n"
     )
-    assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
+    assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
+        "CFLAGS=-O2 -pipe\n"
+        "MAKEOPTS=-j3\n"
+        "CC=fixture-cc\n"
+        "CXX=fixture-cxx\n"
+        "AR=fixture-ar\n"
+        "RUSTFLAGS=-C target-cpu=fixturepkg\n"
+        "ENV_UNSET=PENV_UNSET\n"
+    )
 
 
 def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
