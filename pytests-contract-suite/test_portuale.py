@@ -3753,6 +3753,125 @@ def test_emerge_atom_source_build_fails_for_a_missing_per_package_tmpdir(
     assert "does not exist." in result.stdout + result.stderr
 
 
+def _cfg_with_splitdebug_env(tmp_path, process_features):
+    """Hermetic configroot copy mapping only `dev-libs/splitdbgpkg` to an
+    env file with `FEATURES="splitdebug"` (backlog #98). The neighbour
+    `dev-libs/splitdbgnbrpkg` has no entry. `process_features` is the
+    calling env's `FEATURES` (`None` = unset)."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-splitdebug").write_text(
+        'FEATURES="splitdebug"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/splitdbgpkg penv-splitdebug\n")
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env.pop("FEATURES", None)
+    if process_features is not None:
+        env["FEATURES"] = process_features
+    return cfg, root, env
+
+
+def _debug_trees(root):
+    """Merged `.debug` files per probe binary (empty when estrip did not
+    split). Layout-tolerant: real nests them under `usr/lib/debug/` with
+    `.build-id` links beside them."""
+    probe = sorted(
+        str(p.relative_to(root))
+        for p in (root / "usr/lib/debug").rglob("splitdbg-hello.debug")
+    )
+    neighbour = sorted(
+        str(p.relative_to(root))
+        for p in (root / "usr/lib/debug").rglob("splitnbr-hello.debug")
+    )
+    return probe, neighbour
+
+
+def test_emerge_per_package_features_splitdebug_is_per_entry(
+    emerge_binary, tmp_path
+):
+    """Backlog #98 (S0 cell C shape): a `FEATURES="splitdebug"` env file
+    for `dev-libs/splitdbgpkg` splits *its* binary into a `.debug` tree
+    while the neighbour built in the same run keeps an unsplit binary --
+    the value is per-entry, not a run-wide clobber. Both binaries built
+    with `-g`, so estrip has info to split in both cases."""
+    cfg, root, env = _cfg_with_splitdebug_env(tmp_path, None)
+    assert cfg is not None  # the configroot copy carries the mapping
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/splitdbgpkg", "dev-libs/splitdbgnbrpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/splitdbgpkg-1.0 merged." in result.stdout
+    assert ">>> dev-libs/splitdbgnbrpkg-1.0 merged." in result.stdout
+    # Both binaries merged (both builds ran).
+    assert (root / "usr/bin/splitdbg-hello").is_file()
+    assert (root / "usr/bin/splitnbr-hello").is_file()
+    probe, neighbour = _debug_trees(root)
+    assert len(probe) == 1, probe
+    assert neighbour == [], neighbour
+
+
+def test_emerge_calling_env_prunes_a_per_package_features_token(
+    emerge_binary, tmp_path
+):
+    """Backlog #98 (S0 cell B shape): the calling env's `-splitdebug`
+    prunes the env file's `splitdebug` token, so no `.debug` tree is
+    produced for either package."""
+    _, root, env = _cfg_with_splitdebug_env(tmp_path, "-splitdebug")
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/splitdbgpkg", "dev-libs/splitdbgnbrpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (root / "usr/bin/splitdbg-hello").is_file()
+    probe, neighbour = _debug_trees(root)
+    assert probe == [], probe
+    assert neighbour == [], neighbour
+
+
+def test_standalone_ebuild_setup_sees_the_per_package_features(
+    ebuild_binary, tmp_path
+):
+    """Backlog #98 (standalone): the env file's `FEATURES` folds onto
+    the run-wide list in the standalone phase env too -- the resolved
+    base value must survive `phase_env_vars`' own `FEATURES` literal
+    (which only covers the no-config fallback)."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-standalone-features").write_text(
+        'FEATURES="standalone-probe"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/envdumppkg penv-standalone-features\n")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env.pop("FEATURES", None)
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+            "setup",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "standalone-probe" in result.stderr
+
+
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     emerge_binary, tmp_path
 ):
@@ -6287,7 +6406,12 @@ def test_ebuild_shell_bash_and_brush_compile_a_quoted_heredoc_ebuild(
     environment, the ebuild's own `src_compile` was replaced by `default`
     (a no-op), and `install` still exited 0 -- with an empty image. Both
     backends must compile the fixture and produce an identical `image/`
-    file set, not merely matching exit codes."""
+    file set, not merely matching exit codes. Hermetic configroot: the
+    host profile enables `splitdebug`, which splits debug info with
+    tmpdir-dependent build-id paths, so no two tmpdirs -- real's
+    included -- can produce identical file sets; the backend parity
+    this pins does not depend on it (the fixture config resolves no
+    `splitdebug`)."""
     if shutil.which("gcc") is None:
         pytest.skip("no gcc: the quoted-heredoc compile fixture cannot build")
 
@@ -6301,6 +6425,9 @@ def test_ebuild_shell_bash_and_brush_compile_a_quoted_heredoc_ebuild(
         env = dict(os.environ)
         portage_tmpdir = tmp_path / subdir
         env["PORTAGE_TMPDIR"] = str(portage_tmpdir)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(tmp_path / "root")
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
 
         result = subprocess.run(
             [str(ebuild_binary), "--shell", shell, ebuild_path, "install"],
