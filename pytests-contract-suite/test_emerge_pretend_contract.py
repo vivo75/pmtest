@@ -213,6 +213,11 @@ CASES = [
         ["--pretend", "-D", "dev-libs/deepusedepokconsumer"],
         0,
     ),
+    (
+        "an unfixable evaluated dep of an installed parent aborts the run (#132 D)",
+        ["--pretend", "-D", "dev-libs/deepusedepfconsumer"],
+        1,
+    ),
     ("--deep=N inline form", ["--pretend", "--deep=2", "dev-libs/deeppkg"], 0),
     ("--deep=0 matches not passing --deep at all", ["--pretend", "--deep=0", "dev-libs/deeppkg"], 0),
     ("--deep=-1 is a real, immediate parse error", ["--pretend", "--deep=-1", "dev-libs/deeppkg"], 2),
@@ -593,7 +598,7 @@ CASES = [
     (
         "recursion: --deep walk of an installed pkg's || group, --autounmask-use=n",
         ["--pretend", "-D", "--autounmask-use=n", "dev-libs/unsatuseinstconsumer"],
-        0,
+        1,
     ),
     (
         "recursion: [use]-dep unsat with the flag absent from IUSE -- real's Missing IUSE reason (backlog #20)",
@@ -3947,7 +3952,14 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
     `all_available` with the atom's own `[use]` block still attached
     (never stripping to `.without_use`), so alternative 1 came back
     `Unsatisfiable` and the group fell back to the literal `||`, enqueuing
-    BOTH alternatives -- the dead `doesnotexist-unsatuseor` included."""
+    BOTH alternatives -- the dead `doesnotexist-unsatuseor` included.
+
+    The `--autounmask-use=n` half aborts (rc 1, no list): with no flip
+    available the installed parent's USE-unsatisfiable dep is a hard miss,
+    and real agrees (bed `l0-fx-20260921T233342Z`: real rc 1 with the same
+    block; portuale matches it byte-for-byte modulo real's `for <root>`
+    suffix). #132 S5b removed the old installed-only rescue that had
+    this half resolving rc 0."""
     args = ["--pretend", "-D", "dev-libs/unsatuseinstconsumer"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -3962,10 +3974,8 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
 
     args_no_unmask = ["--pretend", "-D", "--autounmask-use=n", "dev-libs/unsatuseinstconsumer"]
     rust2 = _run([str(emerge_binary)], args_no_unmask, fixture_env)
-    assert rust2.returncode == 0
-    assert rust2.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/unsatuseinstconsumer-1.0 ",
-    ]
+    assert rust2.returncode == 1
+    assert rust2.stdout.splitlines() == []
     assert rust2.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/unsatusealt[unsatuseorflag]".',
@@ -13828,6 +13838,30 @@ def test_an_evaluated_conditional_use_dep_that_is_already_satisfied_moves_nothin
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/deepusedepokconsumer-1.0 ",
+    ]
+
+
+def test_an_unfixable_evaluated_dep_of_an_installed_parent_aborts_the_run(
+    emerge_binary, fixture_env
+):
+    """Arm D (S5b): dev-libs/deepusedepfparent is installed -flip and the
+    profile *forces* flip on the child, so the evaluated `[-flip]` is
+    unfixable -- no pool satisfies it and no autounmask flip can change
+    it. Real hard-aborts rc 1 (`emerge: there are no ebuilds to satisfy
+    "~dev-libs/deepusedepfchild-1.0[flip=]"`, bed run
+    `l0-fx-20260921T231520Z`, no Change USE rows). Portuale with S5
+    alone renders a `no visible ebuild` line yet resolves rc 0: its
+    `abort_outcome` rescues every installed-only `NoVisibleCandidate`,
+    but real's rescue is narrow (complete-mode depth, masked-parent
+    backward-compat) and never covers a use-constrained miss. The abort
+    path suppresses the merge list (Slice 4), like every other abort.
+    """
+    base = ["--pretend", "-D", "dev-libs/deepusedepfconsumer"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == []
+    assert rust.stderr.splitlines() == [
+        '!!! no visible ebuild for dependency "dev-libs/deepusedepfchild"',
     ]
 
 

@@ -105,3 +105,7 @@ app-misc/mopodmanok
 # #132 arm C: parent built +flip evaluates the same atom to `[flip]`,
 # which the installed +flip child satisfies -- nothing moves
 -D dev-libs/deepusedepokconsumer
+# #132 arm D (S5b): installed parent built -flip, child flip
+# profile-*forced* on, so `[-flip]` is unfixable -- real hard-aborts
+# (the live shape: no autounmaskable pool, no Change USE rows)
+-D dev-libs/deepusedepfconsumer

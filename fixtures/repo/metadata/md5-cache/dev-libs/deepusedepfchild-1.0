@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed +flip, flip profile-forced, so [-flip] is unfixable -- real hard-aborts (#132 arm D)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+SLOT=0
+_md5_=f0990e47fc64797a2a837db7d99d9d37

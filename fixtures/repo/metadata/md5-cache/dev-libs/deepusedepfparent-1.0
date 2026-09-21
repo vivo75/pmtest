@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed -flip; its RDEPEND atom carries a flip= conditional use-dep (#132 arm D)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+RDEPEND=~dev-libs/deepusedepfchild-1.0[flip=]
+SLOT=0
+_md5_=cacb410b804aede38fd3ce7746d02344

@@ -3,3 +3,12 @@
 # less specific than any real atom, to help exercise atom-specificity
 # ordering alongside the package.use.mask fixture files).
 */pkgusemaskforcepkg forceflag
+
+# dev-libs/deepusedepfchild is installed +flip; this entry force-enables
+# flip in its *effective* USE too, so the `[-flip]` its installed parent
+# (built -flip) evaluates `[flip=]` into is unfixable -- no pool can
+# satisfy it and no autounmask flip can change it. Real hard-aborts
+# (the shrunk #111 live shape, where the profile forced +wayland);
+# arm A differs only in that its package.use entry IS autounmaskable
+# (#132 arm D).
+dev-libs/deepusedepfchild flip
