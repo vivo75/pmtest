@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: New; RDEPENDs the installed deepusedepparent so a --deep walk recurses into it (#132 arm A)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/deepusedepparent
+SLOT=0
+_md5_=01ed500313172c3b125a0e70e4bcd71d

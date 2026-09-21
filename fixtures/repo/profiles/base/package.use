@@ -21,3 +21,12 @@ dev-libs/singletargetpkg lua_single_target_luajit -lua_single_target_lua5-1
 # package), NOT this effective set -- so dev-libs/deepvdbusetarget is
 # NOT pulled.
 dev-libs/deepvdbusepkg wantdep
+
+# dev-libs/deepusedepchild is installed with vdb USE="flip"; this entry
+# enables flip in its *effective* USE too, so neither the installed
+# instance nor a rebuild can satisfy the `[-flip]` its installed parent
+# (built -flip) evaluates `[flip=]` into -- real's three-pool USE
+# failure (#132 arm A). Arm B's deepusedepbchild deliberately has no
+# entry here, so its ebuild pool *can* satisfy [-flip] and real
+# rebuilds instead of aborting.
+dev-libs/deepusedepchild flip

@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed +flip; its RDEPEND atom evaluates [flip=] to [flip], already satisfied (#132 arm C)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+RDEPEND=~dev-libs/deepusedepbchild-1.0[flip=]
+SLOT=0
+_md5_=b24c25d61054ee567442f5364735bfda

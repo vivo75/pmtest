@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed +flip, profile enables flip, so no pool can satisfy [-flip] (#132 arm A)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+SLOT=0
+_md5_=a7b793a2a30f75ab355c7d5e3494030d

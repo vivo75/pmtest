@@ -94,3 +94,14 @@ app-misc/mopodmanok
 # nesting and the -v counters (host oracle 2026-09-19); the surrounding
 # walk sequence stays portuale's own (documented residue).
 --tree --update dev-libs/p2btarget dev-libs/p2bowner dev-libs/newpkg
+# #132 arm A: an installed parent built -flip evaluates its
+# `[flip=]` RDEPEND atom to `[-flip]`; the installed child is +flip and
+# the profile enables flip, so no pool satisfies it -- real's three-pool
+# USE failure (the shrunk #111 live shape)
+-D dev-libs/deepusedepconsumer
+# #132 arm B: same parent shape, child not profile-pinned, so real
+# rebuilds the child with flip off instead of aborting
+-D dev-libs/deepusedepbconsumer
+# #132 arm C: parent built +flip evaluates the same atom to `[flip]`,
+# which the installed +flip child satisfies -- nothing moves
+-D dev-libs/deepusedepokconsumer

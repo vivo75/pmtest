@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed +flip, no profile entry, so the ebuild pool can satisfy [-flip] by rebuilding (#132 arm B)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+SLOT=0
+_md5_=b20fc3991a066e743c121bef05275f82
