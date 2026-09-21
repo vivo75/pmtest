@@ -3575,6 +3575,45 @@ def test_emerge_atom_source_build_package_env_applies_when_the_process_is_silent
     assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
 
 
+def test_standalone_ebuild_setup_sees_the_full_resolved_config_env(
+    ebuild_binary, tmp_path
+):
+    """Backlog #100 (S0 cell F): a standalone `ebuild <file> setup`
+    exports real's full resolved config env (`config.environ()`), not
+    the old narrow `BUILD_VARS` base. Hermetically: copy the configroot,
+    put `CC="makeconf-cc"` in the copy's `make.conf` (no package.env
+    entry), and the `dev-libs/envdumppkg` `pkg_setup` dump shows
+    `CC=makeconf-cc`. Pre-#100 the phase saw `CC=`."""
+    import shutil
+
+    cfg = tmp_path / "cfg"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write('\nCC="makeconf-cc"\n')
+
+    portage_tmpdir = tmp_path / "portage-tmpdir"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(portage_tmpdir)
+    env.pop("CC", None)
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(cfg / "repo/dev-libs/envdumppkg/envdumppkg-1.0.ebuild"),
+            "setup",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    # Phase output lands on stderr (the phase runner's own stream).
+    assert "CC=makeconf-cc" in result.stderr
+
+
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     emerge_binary, tmp_path
 ):
