@@ -1,0 +1,7 @@
+EAPI=2
+DESCRIPTION=fixture package: upstream test_blocker pg0 dev-libs/X-2 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+RDEPEND=!=dev-libs/blk0y-2
+DEFINED_PHASES=-
+_md5_=ee8e4e3a4c52af330d981d01c8df50a6

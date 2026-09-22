@@ -1513,6 +1513,56 @@ CASES = [
     ("profile defaults walk: a leaf make.defaults cancels a parent package.use", ["--pretend", "-v", "dev-libs/interleavepkg"], 0),
     ("profile USE_EXPAND default is folded per-level, so a same-level package.use satisfies `^^`", ["--pretend", "-v", "dev-libs/singletargetpkg"], 0),
     ("blocker: strong (!!) blocker vs an installed package no walk pulls in is satisfied (rc 0, real `b`)", ["--pretend", "dev-libs/blockerpkg"], 0),
+    (
+        "blocker: upstream test_blocker pg0 order a/b/c merges X-1 (rc 0 like real; uninstall pairs Y-2, not Y-1 — #142)",
+        ["--pretend", "--backtrack=0", "dev-libs/blk0a", "dev-libs/blk0b", "dev-libs/blk0c"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg0 order a/c/b merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1)",
+        ["--pretend", "--backtrack=0", "dev-libs/blk0a", "dev-libs/blk0c", "dev-libs/blk0b"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg0 order b/a/c merges X-1 (rc 0 like real; uninstall pairs Y-2, not Y-1 — #142)",
+        ["--pretend", "--backtrack=0", "dev-libs/blk0b", "dev-libs/blk0a", "dev-libs/blk0c"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg0 order b/c/a merges X-2 against B's <X-2 bound (rc 0 like real; the candidate is #142)",
+        ["--pretend", "--backtrack=0", "dev-libs/blk0b", "dev-libs/blk0c", "dev-libs/blk0a"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg0 order c/a/b merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1)",
+        ["--pretend", "--backtrack=0", "dev-libs/blk0c", "dev-libs/blk0a", "dev-libs/blk0b"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg0 order c/b/a merges X-1 (rc 0 like real; uninstall pairs Y-3, not Y-1 — #142)",
+        ["--pretend", "--backtrack=0", "dev-libs/blk0c", "dev-libs/blk0b", "dev-libs/blk0a"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg1 C, soft BDEPEND !X (rc 0 like real; the spurious X uninstall is #143, not pinned)",
+        ["--pretend", "--buildpkgonly", "dev-libs/blk1c"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg1 D, soft DEPEND !X (rc 0 like real; the spurious X uninstall is #143, not pinned)",
+        ["--pretend", "--buildpkgonly", "dev-libs/blk1d"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg1 E, RDEPEND blockers ignored under buildpkgonly (rc 0 like real; uninstall + rows are #143)",
+        ["--pretend", "--buildpkgonly", "dev-libs/blk1e"],
+        0,
+    ),
+    (
+        "blocker: upstream test_blocker pg1 F, PDEPEND blockers ignored under buildpkgonly (rc 0 like real; uninstall + rows are #143)",
+        ["--pretend", "--buildpkgonly", "dev-libs/blk1f"],
+        0,
+    ),
     ("blocker: weak (!) merge-vs-merge match is unsolvable (real `B`, rc 1)", ["--pretend", "dev-libs/graphblockerparent"], 1),
     ("blocker: -v widens the [blocks b ] bracket by the mask column", ["--pretend", "-v", "dev-libs/blockerpkg"], 0),
     ("blocker: line prints after every package line, not inline", ["--pretend", "dev-libs/blockerorderpkg"], 0),
@@ -8325,6 +8375,63 @@ def test_strong_blocker_matches_an_installed_package(emerge_binary, fixture_env)
     assert columns.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/blockerpkg                                   "
         "[1.0]                        ",
+    ]
+
+
+def test_upstream_blocker_pg0_clean_orders_pin_x1_and_uninstall_y1(
+    emerge_binary, fixture_env
+):
+    """Upstream `test_blocker.py::testBlocker` pg0, bulk-translated for #50
+    batch 1 (`dev-libs/blk0{a,b,c,x,y}`; oracle `/tmp/fx-b1-blocker.json`,
+    captured from the real `ResolverPlayground`, not the source literal).
+
+    A/B/C depend on `dev-libs/X`, `<dev-libs/X-2`, `<dev-libs/X-3`, so the
+    only jointly satisfiable X is X-1; X-1's RDEPEND `!=dev-libs/Y-1`
+    uninstall-orders installed Y-1. Real's mergelist is `[X-1,
+    [uninstall]Y-1, !=Y-1, A-1, B-1, C-1]` in every argv order
+    (`--backtrack: 0`, `success=True`; the source marks A/B/C
+    `ambiguous_merge_order`, but X-1/Y-1 are fixed). Portuale renders the
+    `!=` blocker as the `=... (soft blocking ...)` satisfied row, exactly
+    like the blockerpkg pin above.
+
+    Only the `a c b` and `c a b` argv orders are clean today: in the
+    other four the uninstall target varies with walk order (Y-2/Y-3),
+    a spurious conflict WARNING prints, and the `b c a` order even merges
+    X-2 against B's `<X-2` bound — filed as #142, covered here by rc-only
+    CASES entries, not by this pin.
+    """
+    env = dict(fixture_env)
+    expected_merge = [
+        "[ebuild  N     ] dev-libs/blk0x-1 ",
+        "[ebuild  N     ] dev-libs/blk0a-1 ",
+        "[ebuild  N     ] dev-libs/blk0c-1 ",
+        "[ebuild  N     ] dev-libs/blk0b-1 ",
+        "[uninstall     ] dev-libs/blk0y-1 ",
+        '[blocks b      ] =dev-libs/blk0y-1 ("=dev-libs/blk0y-1" is soft blocking dev-libs/blk0x-1)',
+    ]
+    acb = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "dev-libs/blk0a", "dev-libs/blk0c", "dev-libs/blk0b"],
+        env,
+    )
+    assert acb.returncode == 0
+    assert acb.stderr == ""
+    assert acb.stdout.splitlines() == expected_merge
+
+    cab = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "dev-libs/blk0c", "dev-libs/blk0a", "dev-libs/blk0b"],
+        env,
+    )
+    assert cab.returncode == 0
+    assert cab.stderr == ""
+    assert cab.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/blk0x-1 ",
+        "[ebuild  N     ] dev-libs/blk0c-1 ",
+        "[ebuild  N     ] dev-libs/blk0a-1 ",
+        "[ebuild  N     ] dev-libs/blk0b-1 ",
+        "[uninstall     ] dev-libs/blk0y-1 ",
+        '[blocks b      ] =dev-libs/blk0y-1 ("=dev-libs/blk0y-1" is soft blocking dev-libs/blk0x-1)',
     ]
 
 
