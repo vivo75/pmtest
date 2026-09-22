@@ -56,6 +56,21 @@
     without that header. Output wording, not resolver behaviour.
   owner: portuale-oracle
 
+- id: fixture-miss-message-unsuffixed
+  categories: [advice, error]
+  slugs: ["*"]
+  match: "there are no ebuilds"
+  reason: >
+    Same staging-artifact class as fixture-masked-message-unsuffixed, for
+    the two sentences #135 (d) (Phase 5b S2) put on portuale's side:
+    `there are no ebuilds to satisfy` and `there are no ebuilds built
+    with USE flags to satisfy`. Real's copies carry the staged target
+    root (`for /tmp/l0-fixture-oracle/fixtures/.`, explained by
+    fixture-masked-path-suffix); portuale's deliberately do not (the
+    contract pins and the top-level miss keep the unsuffixed form). The
+    atom and the chain rows are identical.
+  owner: portuale-oracle
+
 - id: fixture-masked-message-unsuffixed
   categories: [advice, error]
   slugs: ["*"]

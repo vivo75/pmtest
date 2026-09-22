@@ -2634,7 +2634,8 @@ def test_root_deps_pinned_output(
 
     rust_without = _run([str(emerge_binary)], args_without, env)
     assert rust_without.returncode == 1
-    assert "no visible ebuild for dependency" in rust_without.stderr
+    # #135 (d): real's plain-miss sentence, not the bare NVC line
+    assert "there are no ebuilds to satisfy" in rust_without.stderr
 
     rust_with = _run([str(emerge_binary)], args_with, env)
     assert rust_with.returncode == 0
@@ -2668,7 +2669,7 @@ def test_bdepend_routes_to_the_running_root_for_a_cross_root_build_without_root_
     # the unresolved BDEPEND is reported as before.
     same = dict(fixture_env)  # fixture_env pins RUNNING_ROOT == ROOT
     rust_same = _run([str(emerge_binary)], args, same)
-    assert "no visible ebuild for dependency" in rust_same.stderr
+    assert "there are no ebuilds to satisfy" in rust_same.stderr
 
 
 def test_root_deps_disjunctive_branch_selection_pinned_output(
@@ -2696,7 +2697,8 @@ def test_root_deps_disjunctive_branch_selection_pinned_output(
 
     rust_without = _run([str(emerge_binary)], args_without, env)
     assert rust_without.returncode == 1
-    assert "no visible ebuild for dependency" in rust_without.stderr
+    # #135 (d): real's plain-miss sentence, not the bare NVC line
+    assert "there are no ebuilds to satisfy" in rust_without.stderr
 
     rust_with = _run([str(emerge_binary)], args_with, env)
     assert rust_with.returncode == 0
@@ -3593,7 +3595,8 @@ def test_root_deps_recursion_reports_an_unbuildable_build_dep(
     rust = _run([str(emerge_binary)], base, env)
     assert rust.returncode == 1
     assert rust.stdout == ""
-    assert '!!! no visible ebuild for dependency "dev-libs/rdrnothere"' in rust.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/rdrnothere"' in rust.stderr
+    assert "no visible ebuild" not in rust.stderr
 
 
 def test_diamond_dependency_is_deduped_and_ordered(emerge_binary, fixture_env):
@@ -3932,9 +3935,15 @@ def test_or_group_other_installed_some_bin_beats_plain_other(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == []
-    assert rust.stderr.splitlines() == [
-        '!!! no visible ebuild for dependency "dev-libs/opartlya"',
-        '!!! no visible ebuild for dependency "dev-libs/opartlyb"',
+    # #135 (d): real's plain-miss block per miss, not the bare NVC lines.
+    assert rust.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "dev-libs/opartlya".',
+        '(dependency required by "dev-libs/opartly-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/opartly" [argument])',
+        '',
+        'emerge: there are no ebuilds to satisfy "dev-libs/opartlyb".',
+        '(dependency required by "dev-libs/opartly-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/opartly" [argument])',
     ]
     assert "omissingelsepartly" not in rust.stdout and "omissingelsepartly" not in rust.stderr, (
         "the never-chosen plain-other alternative must not be reported"
@@ -3967,8 +3976,10 @@ def test_or_group_other_installed_any_slot_bin_beats_plain_other(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == []
-    assert rust.stderr.splitlines() == [
-        '!!! no visible ebuild for dependency "dev-libs/ofuzzyinstalled"',
+    assert rust.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "=dev-libs/ofuzzyinstalled-2.0".',
+        '(dependency required by "dev-libs/ofuzzy-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/ofuzzy" [argument])',
     ]
     assert "ofuzzymissing" not in rust.stdout and "ofuzzymissing" not in rust.stderr, (
         "the never-chosen plain-other alternative must not be reported"
@@ -4383,10 +4394,11 @@ def test_sub_slot_restricted_dependency_atom_rejects_a_real_mismatch(
     )
     assert result.returncode == 1
     assert result.stdout.splitlines() == []
-    assert (
-        result.stderr.splitlines()
-        == ['!!! no visible ebuild for dependency "dev-libs/subslotpkg"']
-    )
+    assert result.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "dev-libs/subslotpkg:0/3".',
+        '(dependency required by "dev-libs/subslotmismatchconsumer-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/subslotmismatchconsumer" [argument])',
+    ]
 
 
 def test_dependency_avoid_update_is_slot_aware(
@@ -4798,6 +4810,8 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
         "# required by dev-libs/aucasclate-1.0::testrepo\n"
+        "# required by dev-libs/aucasctop-1.0::testrepo\n"
+        "# required by dev-libs/aucasctop (argument)\n"
         ">=dev-libs/aucascmid-1.0 cascade\n"
         + BACKTRACK_TERMINATED_EARLY
     )
@@ -4819,7 +4833,11 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         {
             "atom": ">=dev-libs/aucascmid-1.0",
             "token": "cascade",
-            "dep_chain": ["required by dev-libs/aucasclate-1.0::testrepo"],
+            "dep_chain": [
+                "required by dev-libs/aucasclate-1.0::testrepo",
+                "required by dev-libs/aucasctop-1.0::testrepo",
+                "required by dev-libs/aucasctop (argument)",
+            ],
         }
     ]
     assert {e["package"] for e in payload["entries"]} == {
@@ -4883,7 +4901,8 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     assert rust.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/aubreakwant-1.0::testrepo\n"
+        "# required by dev-libs/aubreaktop-1.0::testrepo\n"
+        "# required by dev-libs/aubreaktop (argument)\n"
         ">=dev-libs/aubreaksub-1.0 brk\n"
         + BACKTRACK_TERMINATED_EARLY
     )
@@ -5956,10 +5975,10 @@ def test_autounmask_use_parent_flip_resolves_when_the_child_flag_is_masked(
     )
     assert n.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     assert n.stdout.strip() == ''
-    assert (
-        n.stderr.strip()
-        == '!!! no visible ebuild for dependency "dev-libs/parentflipchildpkg"'
+    assert n.stderr.strip().splitlines()[0] == (
+        'emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]".'
     )
+    assert "no visible ebuild" not in n.stderr
 
 
 def test_autounmask_use_parent_flip_re_resolves_the_whole_graph(
@@ -6013,7 +6032,7 @@ def test_autounmask_use_parent_flip_re_resolves_the_whole_graph(
         fixture_env,
     )
     assert "pfgraphextra" not in n.stdout
-    assert 'no visible ebuild for dependency "dev-libs/pfgraphchild"' in n.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/pfgraphchild' in n.stderr
 
 
 def test_unresolvable_dependency_is_reported_not_silently_dropped(
@@ -6026,10 +6045,13 @@ def test_unresolvable_dependency_is_reported_not_silently_dropped(
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/missingdep"], fixture_env)
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     assert result.stdout.splitlines() == []
-    assert (
-        result.stderr.strip()
-        == '!!! no visible ebuild for dependency "dev-libs/doesnotexist-anywhere"'
-    )
+    # #135 (d) (Phase 5b S2): real's plain-miss block with the queued
+    # atom and the `_get_dep_chain` rows, not the bare NVC line.
+    assert result.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "dev-libs/doesnotexist-anywhere".',
+        '(dependency required by "dev-libs/missingdep-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/missingdep" [argument])',
+    ]
 
 
 def test_usepkg_makes_a_binary_only_package_eligible(emerge_binary, fixture_env):
@@ -6328,7 +6350,7 @@ def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
         # The binary candidate resolved (its dep was walked far enough to
         # name it); the abort suppresses every merge line.
         assert rust.stdout.splitlines() == [], (pkg, rust.stdout)
-        assert f'no visible ebuild for dependency "{dep}"' in rust.stderr, pkg
+        assert f'there are no ebuilds to satisfy "{dep}' in rust.stderr, pkg
 
     # -v: same abort, still exit 1.
     v = _run(
@@ -6420,7 +6442,7 @@ def test_pkgdir_scan_finds_both_indexed_and_loose_binpkgs(
     )
     assert loose.returncode == 1
     assert loose.stdout.splitlines() == []
-    assert 'no visible ebuild for dependency "dev-libs/newpkg"' in loose.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in loose.stderr
 
 
 def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
@@ -6467,7 +6489,7 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     # no merge list since Slice 4 -- the `-3` build-id rendering is
     # pinned on the legacy gate instead, where the list still shows).
     assert rust.stdout.splitlines() == []
-    assert 'no visible ebuild for dependency "dev-libs/samepkg"' in rust.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
     off_env = dict(env, PORTUALE_ABORT_PATH="0")
     legacy = _run([str(emerge_binary)], args, off_env)
     # Real `output.py::_append_build_id`: the `-3` from the filename.
@@ -6926,7 +6948,7 @@ def test_binpkg_changed_deps_explicit_override(
     )
     assert base.returncode == 1
     assert base.stdout.splitlines() == []
-    assert 'no visible ebuild for dependency "dev-libs/bcdepold"' in base.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/bcdepold' in base.stderr
 
 
 def test_use_ebuild_visibility_enforces_the_check_under_usepkgonly(
@@ -7102,9 +7124,10 @@ def test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == []
-    assert rust.stderr.strip().splitlines() == [
-        '!!! no visible ebuild for dependency "dev-libs/doesnotexist-anywhere"',
-    ]
+    assert rust.stderr.strip().splitlines()[0] == (
+        'emerge: there are no ebuilds to satisfy "dev-libs/doesnotexist-anywhere".'
+    )
+    assert "no visible ebuild" not in rust.stderr
     assert "alsodoesnotexist-anywhere" not in rust.stderr, (
         "the never-selected alternative must not be reported"
     )
@@ -13952,11 +13975,16 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     queue the atom unevaluated, where a conditional form imposes no
     state constraint at all, and resolved rc 0.
 
-    Residue note: real's bed capture qualifies the chain
-    (`# required by dev-libs/deepusedepparent-1.0::testrepo`); portuale's
-    autounmask block renders the installed owner short
-    (`# required by dev-libs/deepusedepparent`). Display-only, out of
-    #132's scope — filed at S7.
+    #135 (e) (Phase 5b S2) closes the chain residue: real's bed capture
+    (`l0-fx-20260922T192350Z`) qualifies the installed owner
+    (`# required by dev-libs/deepusedepparent-1.0::testrepo`) and walks
+    the whole chain to the argument (three rows). Residue kept: real's
+    capture shows **no** `BACKTRACK_TERMINATED_EARLY` trailer on this
+    cell (its `backtrack: 0/20` means `_autounmask_backtrack_disabled`
+    was never set -- real's `depgraph.py:11735-11752` gate requires
+    backtracking to have been *active*), where portuale prints it
+    unconditionally on any autounmask batch. 14 pins depend on the
+    trailer, so the gate is not narrowed here.
     """
     base = ["--pretend", "-D", "dev-libs/deepusedepconsumer"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -13968,7 +13996,9 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     assert rust.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/deepusedepparent\n"
+        "# required by dev-libs/deepusedepparent-1.0::testrepo\n"
+        "# required by dev-libs/deepusedepconsumer-1.0::testrepo\n"
+        "# required by dev-libs/deepusedepconsumer (argument)\n"
         ">=dev-libs/deepusedepchild-1.0 -flip\n" + BACKTRACK_TERMINATED_EARLY
     )
 
@@ -14015,20 +14045,28 @@ def test_an_unfixable_evaluated_dep_of_an_installed_parent_aborts_the_run(
     profile *forces* flip on the child, so the evaluated `[-flip]` is
     unfixable -- no pool satisfies it and no autounmask flip can change
     it. Real hard-aborts rc 1 (`emerge: there are no ebuilds to satisfy
-    "~dev-libs/deepusedepfchild-1.0[flip=]"`, bed run
-    `l0-fx-20260921T231520Z`, no Change USE rows). Portuale with S5
-    alone renders a `no visible ebuild` line yet resolves rc 0: its
-    `abort_outcome` rescues every installed-only `NoVisibleCandidate`,
-    but real's rescue is narrow (complete-mode depth, masked-parent
-    backward-compat) and never covers a use-constrained miss. The abort
-    path suppresses the merge list (Slice 4), like every other abort.
+    "~dev-libs/deepusedepfchild-1.0[flip=]"` + the `_get_dep_chain`
+    rows, bed run `l0-fx-20260921T231520Z` / re-grounded
+    `l0-fx-20260922T192350Z`, no Change USE rows). Portuale with S5
+    alone rendered a bare `no visible ebuild` line and resolved rc 0;
+    S5b fixed the rc and #135 (d) (Phase 5b S2) fixed the block --
+    real's sentence with the *unevaluated* atom plus the chain, instead
+    of the bare `!!! no visible ebuild for dependency "<cp>"` line.
+    The staging `for <root>.` suffix stays portuale-absent (the
+    `fixture-masked-path-suffix` / `fixture-miss-message-unsuffixed`
+    class), matching the top-level miss and the two sibling arms. The
+    abort path suppresses the merge list (Slice 4), like every other
+    abort -- #135 (c) un-suppresses it separately.
     """
     base = ["--pretend", "-D", "dev-libs/deepusedepfconsumer"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == []
-    assert rust.stderr.splitlines() == [
-        '!!! no visible ebuild for dependency "dev-libs/deepusedepfchild"',
+    assert rust.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "~dev-libs/deepusedepfchild-1.0[flip=]".',
+        '(dependency required by "dev-libs/deepusedepfparent-1.0::testrepo" [installed])',
+        '(dependency required by "dev-libs/deepusedepfconsumer-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/deepusedepfconsumer" [argument])',
     ]
 
 
