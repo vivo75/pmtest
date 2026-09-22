@@ -114,3 +114,17 @@ app-misc/mopodmanok
 # resolves a running-root rebuild of the child with flip off instead of
 # silently dropping the dep as satisfied (the --root-deps half of #132)
 -D --root-deps dev-libs/deeprootdepconsumer
+# #50 S1 batch 1 (upstream test_blocker pg0): A/B/C force X-1, whose
+# RDEPEND `!=Y-1` uninstalls installed Y-1. The clean argv order guards
+# #142's fixed point (real: X-1 + [uninstall]Y-1, no warning)
+--backtrack=0 dev-libs/blk0a dev-libs/blk0c dev-libs/blk0b
+# ... and a divergent order (uninstall pairs Y-2 + spurious conflict
+# WARNING; #142, suppressed in known-divergences-fixture-oracle.yaml)
+--backtrack=0 dev-libs/blk0a dev-libs/blk0b dev-libs/blk0c
+# #50 S1 batch 1 (upstream test_blocker pg1, --buildpkgonly blockers):
+# soft BDEPEND `!X` leaves installed X untouched (real merges C-1 bare;
+# portuale spuriously uninstalls X — #143, suppressed)
+--buildpkgonly dev-libs/blk1c
+# ... and the hard DEPEND `!!X` abort (real rc 1; portuale merges +
+# uninstalls, rc 0 — #143, suppressed)
+--buildpkgonly dev-libs/blk1a

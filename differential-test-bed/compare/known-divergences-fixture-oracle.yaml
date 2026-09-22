@@ -95,6 +95,46 @@
     `test_needer_othermod_triangle_reports_the_installed_instance_conflict`).
   owner: claude-opus-5
 
+# -- #142/#143 (Phase 4 S1 batch 1, upstream test_blocker): the four
+#    blk cells added with the batch-1 widening. All three rows suppress
+#    live portuale bugs, scoped to the exact cell slug + finding
+#    categories, so any behavior change resurfaces. Delete when the
+#    numbered bug ships.
+
+- id: blk0-clean-order-uninstall-blocker-placement
+  categories: [order]
+  slugs: ["--backtrack_0_dev-libs_blk0a_dev-libs_blk0c_dev-libs_blk0b"]
+  match: "merge order diverges"
+  reason: >
+    Real interleaves the blocker-paired rows right after their owner:
+    `[ebuild N] blk0x-1`, `[uninstall] blk0y-1`, `[blocks b] =blk0y-1`,
+    then A/C/B. Portuale defers every uninstall/blocks row past all
+    `[ebuild N]` rows. Same row set (the `to <root>` suffix delta is
+    staging noise the comparator normalises), only the placement
+    differs — the display half of backlog #142 (log
+    `l0-fx-20260922T101821Z`).
+  owner: portuale-bug
+
+- id: blk0-divergent-order-wrong-uninstall-target
+  categories: [missing, extra]
+  slugs: ["--backtrack_0_dev-libs_blk0a_dev-libs_blk0b_dev-libs_blk0c"]
+  reason: >
+    Backlog #142's core: real uninstalls Y-1 (X-1's `!=Y-1` pairing);
+    portuale uninstalls Y-2 and prints its blocks row, so the Y-1 rows
+    are missing and the Y-2 rows extra. Same log.
+  owner: portuale-bug
+
+- id: blk1-buildpkgonly-blocker-divergences
+  categories: [extra, exit, error]
+  slugs: ["--buildpkgonly_dev-libs_blk1c", "--buildpkgonly_dev-libs_blk1a"]
+  reason: >
+    Backlog #143: under `--buildpkgonly` real ignores the soft BDEPEND
+    `!X` (merges blk1c-1 bare; portuale spuriously uninstalls blk1x-1
+    + blocks row) and aborts on the hard DEPEND `!!X` (rc 1,
+    `!!! --buildpkgonly requires all dependencies to be merged`;
+    portuale merges + uninstalls, rc 0). Same log.
+  owner: portuale-bug
+
 # -- #65 S0/S1/S2 + #71: the slot-operator bdeps matrix (FX_SLOTOP_BDEP=1
 #    FX_HOST_ROOTS=1, differential-test-bed/atomlists/l0-fixture-oracle-slotop.txt). The
 #    two artifact entries (totals duplication, the considep extra) were
