@@ -2773,11 +2773,13 @@ def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
     both (the S5-evaluated ordinary walk already rebuilds), so this pin
     isolates the two producers. Portuale's shape is its single
     `targets_running_root` entry (` to <running root>`), not real's doubled
-    child row (running-root entry plus target entry) — and without real's
-    `USE="-flip*"` column: running-root build entries carry an empty
-    `use_flags_display` by design (see the entry constructor's own doc
-    comment), so the renderer skips the USE display. That column gap is
-    filed separately and is not this pin's subject.
+    child row (running-root entry plus target entry) — but the `USE="-flip*"`
+    column is real's, and since #141 (Phase 5b S1) portuale prints it too:
+    the running-root build entry's display fields are populated from the
+    same `refresh_entry_use_display` seam the main walk uses, so the
+    rebuild row's flipped flag renders with real's `*` marker. Oracle:
+    bed `l0-fx-20260922T192350Z` (`## #141/#135/#138/#134/#136 S0`),
+    real's row `… deeprootdepchild-1.0 to <root>/ USE="-flip*"`.
     """
     env = dict(fixture_env)
     env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
@@ -2787,7 +2789,7 @@ def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
     assert rust.returncode == 0
     assert rust.stderr == ""
     assert rust.stdout == (
-        f"[ebuild   R    ] dev-libs/deeprootdepchild-1.0 to {env['ROOT']}\n"
+        f"[ebuild   R    ] dev-libs/deeprootdepchild-1.0 to {env['ROOT']} USE=\"-flip*\"\n"
         "[ebuild  N     ] dev-libs/deeprootdepconsumer-1.0 \n"
     )
 
