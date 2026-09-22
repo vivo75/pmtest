@@ -5134,6 +5134,7 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
     assert result.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/useflagpkg-1.0::testrepo\n"
         "# required by dev-libs/useflagpkg[-foo] (argument)\n"
         ">=dev-libs/useflagpkg-1.0 -foo\n"
         + BACKTRACK_TERMINATED_EARLY
@@ -5527,6 +5528,7 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
     assert result.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
         ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/autounmaskkeywordpkg-1.0::testrepo\n"
         "# required by dev-libs/autounmaskkeywordpkg (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
         + BACKTRACK_TERMINATED_EARLY
@@ -5583,6 +5585,7 @@ def test_autounmask_only_suppresses_the_merge_list(emerge_binary, fixture_env):
     assert rust.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
         ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/autounmaskkeywordpkg-1.0::testrepo\n"
         "# required by dev-libs/autounmaskkeywordpkg (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
     )
