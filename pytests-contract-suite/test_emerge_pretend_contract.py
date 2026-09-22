@@ -2310,6 +2310,22 @@ CASES = [
 ]
 
 
+def _assert_abort_preamble(stdout: str) -> None:
+    """#135 (c): an aborted resolve prints real's merge-list preamble on
+    stdout before the abort block on stderr -- the header, the blank,
+    `Calculating dependencies ... done!`, and the timing line (whose
+    seconds are wall time, so only the `backtrack: N/M` suffix is
+    asserted)."""
+    # Determinism cut: the wall-clock seconds real prints are omitted
+    # (byte-identical repeated runs are a jointly-owned gate); the line
+    # carries the `backtrack: N/M` signal only.
+    lines = stdout.splitlines()
+    assert lines[0] == "These are the packages that would be merged, in order:"
+    assert lines[1] == ""
+    assert lines[2] == "Calculating dependencies ... done!"
+    assert lines[3].startswith("Dependency resolution took (backtrack: ") and lines[3].endswith(").")
+
+
 def _run(cmd: list[str], args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
     result = subprocess.run(
         [*cmd, *args], capture_output=True, text=True, env=env, check=False
@@ -3515,7 +3531,10 @@ def test_abort_path_gate_off_restores_legacy_exit_code(
     rust_off = _run([str(emerge_binary)], args, off_env)
     assert rust_on.returncode == 1
     assert rust_off.returncode == 0
-    assert rust_on.stdout == ''
+    # #135 (c) (O7): the Slice-4 suppression is reversed -- gate-ON
+    # prints real's merge-list preamble before the abort block, not
+    # empty stdout. Gate-OFF keeps the legacy full list.
+    _assert_abort_preamble(rust_on.stdout)
     assert _merge_lines(rust_off.stdout) != []
     assert rust_on.stderr == rust_off.stderr
 
@@ -3594,7 +3613,7 @@ def test_root_deps_recursion_reports_an_unbuildable_build_dep(
 
     rust = _run([str(emerge_binary)], base, env)
     assert rust.returncode == 1
-    assert rust.stdout == ""
+    _assert_abort_preamble(rust.stdout)
     assert 'there are no ebuilds to satisfy "dev-libs/rdrnothere"' in rust.stderr
     assert "no visible ebuild" not in rust.stderr
 
@@ -3934,7 +3953,7 @@ def test_or_group_other_installed_some_bin_beats_plain_other(
     args = ["--pretend", "dev-libs/opartly"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     # #135 (d): real's plain-miss block per miss, not the bare NVC lines.
     assert rust.stderr.strip().splitlines() == [
         'emerge: there are no ebuilds to satisfy "dev-libs/opartlya".',
@@ -3975,7 +3994,7 @@ def test_or_group_other_installed_any_slot_bin_beats_plain_other(
     args = ["--pretend", "dev-libs/ofuzzy"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     assert rust.stderr.strip().splitlines() == [
         'emerge: there are no ebuilds to satisfy "=dev-libs/ofuzzyinstalled-2.0".',
         '(dependency required by "dev-libs/ofuzzy-1.0::testrepo" [ebuild])',
@@ -4047,7 +4066,7 @@ def test_or_group_use_unsat_alternative_reports_the_dependency_it_enqueued_witho
     args = ["--pretend", "--autounmask-use=n", "dev-libs/unsatuseor"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     assert rust.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/unsatusealt[unsatuseorflag]".',
@@ -4098,7 +4117,7 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
     args_no_unmask = ["--pretend", "-D", "--autounmask-use=n", "dev-libs/unsatuseinstconsumer"]
     rust2 = _run([str(emerge_binary)], args_no_unmask, fixture_env)
     assert rust2.returncode == 1
-    assert rust2.stdout.splitlines() == []
+    _assert_abort_preamble(rust2.stdout)
     assert rust2.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/unsatusealt[unsatuseorflag]".',
@@ -4126,7 +4145,7 @@ def test_use_unsat_missing_iuse_reports_the_missing_flag(
     args = ["--pretend", "--autounmask-use=n", "dev-libs/unsatuseiuse"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     assert rust.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/unsatuseiusetarget[noiuse]".',
@@ -4150,7 +4169,7 @@ def test_use_unsat_lists_only_the_latest_change_use_candidate(
     args = ["--pretend", "--autounmask-use=n", "dev-libs/unsatusealtmultidep"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     assert rust.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/unsatusealtmulti[unsatuseorflag]".',
@@ -4393,7 +4412,7 @@ def test_sub_slot_restricted_dependency_atom_rejects_a_real_mismatch(
         [str(emerge_binary)], ["--pretend", "dev-libs/subslotmismatchconsumer"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines() == []
+    _assert_abort_preamble(result.stdout)
     assert result.stderr.strip().splitlines() == [
         'emerge: there are no ebuilds to satisfy "dev-libs/subslotpkg:0/3".',
         '(dependency required by "dev-libs/subslotmismatchconsumer-1.0::testrepo" [ebuild])',
@@ -4910,7 +4929,7 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     # --autounmask-backtrack=y: the contradiction is detected, autounmask abandoned
     ab = ["--pretend", "--autounmask-backtrack=y", "dev-libs/aubreaktop"]
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
-    assert rust_ab.stdout.splitlines() == []
+    _assert_abort_preamble(rust_ab.stdout)
     assert "USE changes are necessary" not in rust_ab.stderr
     # Backlog #20: the block, not the bare line. Chain note: real shows
     # only its DFS-first parent branch (`aubreakwant` -> `aubreaktop` ->
@@ -5594,7 +5613,7 @@ def test_autounmask_dependency_gets_no_keyword_suggestion_by_default(emerge_bina
         fixture_env,
     )
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert result.stdout == ''
+    _assert_abort_preamble(result.stdout)
     _assert_masked_dep_block(
         result.stderr,
         "dev-libs/autounmaskkeywordpkg",
@@ -5827,7 +5846,7 @@ def test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n(
         fixture_env,
     )
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert result.stdout.splitlines() == []
+    _assert_abort_preamble(result.stdout)
     # Backlog #20; oracle (portage 3.0.81.3, abort-capture tree,
     # `--pretend --autounmask-use=n dev-libs/usedeprejectedpkg`) prints
     # exactly this block. The fixture ebuild now declares the IUSE the
@@ -5920,7 +5939,7 @@ def test_autounmask_use_parent_flip_suggestion_is_suppressed_by_autounmask_use_n
         fixture_env,
     )
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert result.stdout.strip() == ''
+    _assert_abort_preamble(result.stdout)
     # Backlog #20: the child row plus the parent-conditional row real
     # appends (`violated_conditionals`' all-conditional branch,
     # depgraph.py:6768-6858; oracle: abort-capture tree,
@@ -5974,7 +5993,7 @@ def test_autounmask_use_parent_flip_resolves_when_the_child_flag_is_masked(
         fixture_env,
     )
     assert n.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert n.stdout.strip() == ''
+    _assert_abort_preamble(n.stdout)
     assert n.stderr.strip().splitlines()[0] == (
         'emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]".'
     )
@@ -6044,7 +6063,7 @@ def test_unresolvable_dependency_is_reported_not_silently_dropped(
     reported on stderr, not silently dropped."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/missingdep"], fixture_env)
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert result.stdout.splitlines() == []
+    _assert_abort_preamble(result.stdout)
     # #135 (d) (Phase 5b S2): real's plain-miss block with the queued
     # atom and the `_get_dep_chain` rows, not the bare NVC line.
     assert result.stderr.strip().splitlines() == [
@@ -6349,7 +6368,7 @@ def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
         assert rust.returncode == 1, (pkg, rust.stdout, rust.stderr)
         # The binary candidate resolved (its dep was walked far enough to
         # name it); the abort suppresses every merge line.
-        assert rust.stdout.splitlines() == [], (pkg, rust.stdout)
+        _assert_abort_preamble(rust.stdout)
         assert f'there are no ebuilds to satisfy "{dep}' in rust.stderr, pkg
 
     # -v: same abort, still exit 1.
@@ -6441,7 +6460,7 @@ def test_pkgdir_scan_finds_both_indexed_and_loose_binpkgs(
         [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gpkgreadpkg"], fixture_env
     )
     assert loose.returncode == 1
-    assert loose.stdout.splitlines() == []
+    _assert_abort_preamble(loose.stdout)
     assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in loose.stderr
 
 
@@ -6488,7 +6507,7 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     # dep below); the unresolvable dep then aborts the resolve (exit 1,
     # no merge list since Slice 4 -- the `-3` build-id rendering is
     # pinned on the legacy gate instead, where the list still shows).
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
     off_env = dict(env, PORTUALE_ABORT_PATH="0")
     legacy = _run([str(emerge_binary)], args, off_env)
@@ -6947,7 +6966,7 @@ def test_binpkg_changed_deps_explicit_override(
         [str(emerge_binary)], ["--pretend", "--getbinpkgonly", "dev-libs/bcdeppkg"], fixture_env
     )
     assert base.returncode == 1
-    assert base.stdout.splitlines() == []
+    _assert_abort_preamble(base.stdout)
     assert 'there are no ebuilds to satisfy "dev-libs/bcdepold' in base.stderr
 
 
@@ -7123,7 +7142,7 @@ def test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable(
     args = ["--pretend", "dev-libs/anyofunresolvable"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     assert rust.stderr.strip().splitlines()[0] == (
         'emerge: there are no ebuilds to satisfy "dev-libs/doesnotexist-anywhere".'
     )
@@ -7433,7 +7452,7 @@ def test_use_expand_implicit_flag_is_valid_iuse_even_when_unlisted(
 
     bad = _run([str(emerge_binary)], ["--pretend", "dev-libs/implicitiusepkgmusl"], fixture_env)
     assert bad.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert bad.stdout == ''
+    _assert_abort_preamble(bad.stdout)
     # Backlog #20: the block, not the bare line. Divergence note: real
     # resolves this one through --autounmask-use (its blocked-change
     # suggestion names `>=dev-libs/implicitiuseprov-1.0 elibc_musl`),
@@ -9357,7 +9376,7 @@ def test_use_dep_equal_parent_mismatches_when_parent_flag_is_disabled(emerge_bin
         fixture_env,
     )
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    assert result.stdout.strip() == ''
+    _assert_abort_preamble(result.stdout)
     # Backlog #20: child row + the parent-conditional row (real
     # depgraph.py:6768-6858), matching the oracle capture
     # (`--pretend --autounmask-use=n dev-libs/useeqparentoffpkg`).
@@ -13461,7 +13480,7 @@ def test_masked_dependency_is_disclosed_with_its_mask_reasons(
     args = ["--pretend", "dev-libs/maskneedpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1  # abort path (Slice 3): masked-only dep aborts, exit 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     _assert_masked_dep_block(
         rust.stderr,
         "dev-libs/maskeddep",
@@ -13486,7 +13505,7 @@ def test_keyword_masked_dependency_is_disclosed_with_its_mask_reasons(
     args = ["--pretend", "dev-libs/kwneedpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1  # abort path (Slice 3): masked-only dep aborts, exit 1
-    assert rust.stdout.splitlines() == []
+    _assert_abort_preamble(rust.stdout)
     _assert_masked_dep_block(
         rust.stderr,
         "dev-libs/kwmaskeddep",
@@ -14061,7 +14080,10 @@ def test_an_unfixable_evaluated_dep_of_an_installed_parent_aborts_the_run(
     base = ["--pretend", "-D", "dev-libs/deepusedepfconsumer"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == []
+    # #135 (c) (O7: un-suppress): real prints the merge-list preamble
+    # and the timing line before the abort block. The seconds are wall
+    # time (never pinned); the backtrack counters are the signal.
+    _assert_abort_preamble(rust.stdout)
     assert rust.stderr.strip().splitlines() == [
         'emerge: there are no ebuilds to satisfy "~dev-libs/deepusedepfchild-1.0[flip=]".',
         '(dependency required by "dev-libs/deepusedepfparent-1.0::testrepo" [installed])',
