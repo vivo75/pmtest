@@ -218,6 +218,11 @@ CASES = [
         ["--pretend", "-D", "dev-libs/deepusedepfconsumer"],
         1,
     ),
+    (
+        "an installed parent's conditional BDEPEND is evaluated before the running-root satisfied check (#133)",
+        ["--pretend", "-D", "--root-deps", "dev-libs/deeprootdepconsumer"],
+        0,
+    ),
     ("--deep=N inline form", ["--pretend", "--deep=2", "dev-libs/deeppkg"], 0),
     ("--deep=0 matches not passing --deep at all", ["--pretend", "--deep=0", "dev-libs/deeppkg"], 0),
     ("--deep=-1 is a real, immediate parse error", ["--pretend", "--deep=-1", "dev-libs/deeppkg"], 2),
@@ -2695,6 +2700,56 @@ def test_root_deps_recursive_build_entry_pinned_output(
         "[ebuild  N     ] dev-libs/rootdepsbuildpkg-1.0 \n"
     )
     assert rust_with.stdout != rust_without.stdout
+
+
+def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
+    emerge_binary, fixture_env
+):
+    """--root-deps (#133, #132 S5 residue): dev-libs/deeprootdepparent is
+    installed with vdb USE="" (built -flip) and BDEPENDs
+    `~dev-libs/deeprootdepchild-1.0[flip=]`; the running root has the child
+    installed +flip. Real evaluates the atom to `[-flip]` (use_reduce with
+    token_class=Atom: `token.evaluate_conditionals(uselist)`), which the
+    +flip instance does not satisfy, and rebuilds the child against the
+    running root with flip off. Portuale used to flatten the producers
+    (`root_deps_satisfied_atoms` / `unsatisfied_root_deps_atoms`) without
+    evaluating and match running-root satisfaction version-only, so the raw
+    `[flip=]` was vacuously satisfied and the child was silently dropped.
+
+    Oracle: bed `l0-fx-20260922T082944Z` (`## #133 S0` in
+    differential-test-bed/findings/l0.md) — real prints the consumer N row
+    plus the child R rebuild (`USE="-flip*"`, rc 0); portuale printed the
+    consumer row alone. The `-D` control without --root-deps is clean on
+    both (the S5-evaluated ordinary walk already rebuilds), so this pin
+    isolates the two producers. Portuale's shape is its single
+    `targets_running_root` entry (` to <running root>`), not real's doubled
+    child row (running-root entry plus target entry) — and without real's
+    `USE="-flip*"` column: running-root build entries carry an empty
+    `use_flags_display` by design (see the entry constructor's own doc
+    comment), so the renderer skips the USE display. That column gap is
+    filed separately and is not this pin's subject.
+    """
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
+    args = ["--pretend", "-D", "--root-deps", "dev-libs/deeprootdepconsumer"]
+
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 0
+    assert rust.stderr == ""
+    assert rust.stdout == (
+        f"[ebuild   R    ] dev-libs/deeprootdepchild-1.0 to {env['ROOT']}\n"
+        "[ebuild  N     ] dev-libs/deeprootdepconsumer-1.0 \n"
+    )
+
+    # Control: without --root-deps the producers are unreachable (a strict
+    # no-op with root_deps_running_root None) and both sides already agree
+    # — a failure here means the fixture is wrong, not the product.
+    control = _run([str(emerge_binary)], ["--pretend", "-D", "dev-libs/deeprootdepconsumer"], env)
+    assert control.returncode == 0
+    assert control.stdout == (
+        "[ebuild   R    ] dev-libs/deeprootdepchild-1.0  USE=\"-flip*\"\n"
+        "[ebuild  N     ] dev-libs/deeprootdepconsumer-1.0 \n"
+    )
 
 
 def test_root_deps_build_entry_output_marks_the_running_root(
