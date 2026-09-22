@@ -13870,21 +13870,20 @@ def test_dynamic_deps_chooses_ebuild_vs_vdb_deps_for_an_installed_deep_dep(
 def test_dynamic_deps_default_appends_the_vdb_built_binding_dropped_by_the_ebuild(
     emerge_binary, fixture_env
 ):
-    """A1 (#26): real's FakeVartree._apply_dynamic_deps overlays the live
-    ebuild metadata and then appends the vdb's own built slot-operator
-    atoms (`:=` with a sub-slot, find_built_slot_operator_atoms). It does
-    NOT choose one source. dev-libs/builtbindpkg is installed with vdb
-    RDEPEND="dev-libs/builtbindtarget:0/1=" while its current ebuild
-    RDEPEND is "dev-libs/newpkg" -- with the append on, the default walks
-    BOTH; --dynamic-deps=n walks the vdb snapshot alone; and
-    --ignore-built-slot-operator-deps suppresses only the append (real
-    FakeVartree.py:171).
-
-    The append is gated `PORTUALE_DYNAMIC_DEPS_APPEND` (default off)
-    until the resolver can reconcile the vdb-built + ebuild-unbound pair
-    (two #24 oracle pins regress otherwise -- see
-    docs/history/025-tier2-closeout.deepseek.md); the default-off output is
-    pinned too, so both sides of the gate are covered."""
+    """A1 (#26), re-scoped by Phase 5 S1 (verdict b): portuale does NOT
+    append the vdb's built slot-operator atoms to the live ebuild
+    metadata — the default walks the live tree alone, even with
+    `PORTUALE_DYNAMIC_DEPS_APPEND=1` in the environment (the variable is
+    ignored; the gate and its append are removed). Real's
+    FakeVartree._apply_dynamic_deps would walk BOTH the live
+    `dev-libs/newpkg` and the vdb-recorded
+    `dev-libs/builtbindtarget:0/1=` here; portuale walks only the live
+    side (documented cut: the append broke both #24 pins, S0). The
+    `--dynamic-deps=n` vdb-snapshot arm is unchanged, and
+    `--ignore-built-slot-operator-deps` is accepted and behavior-neutral
+    on this shape (its remaining effect is the slot-op rebuild-scan
+    skip, pinned by
+    test_ignore_built_slot_operator_deps_suppresses_the_rebuild)."""
     base = ["--pretend", "-D", "--noreplace", "dev-libs/builtbindpkg"]
     default = _run([str(emerge_binary)], base, fixture_env)
     assert default.stdout.splitlines() == [
@@ -13901,7 +13900,6 @@ def test_dynamic_deps_default_appends_the_vdb_built_binding_dropped_by_the_ebuil
     appended = _run([str(emerge_binary)], base, append_env)
     assert appended.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/newpkg-1.0 ",
-        "[ebuild  N     ] dev-libs/builtbindtarget-1.0 ",
     ]
 
     ignored = _run(
@@ -16604,18 +16602,16 @@ def test_oracle_slotop_slotchange_case4_changedslot(
 def test_need_rebuild_trailer_fires_for_an_installed_parent(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#27 (025 A4): with A1's built-`:=` append on (the append gate),
-    `kde-base/ark`'s vdb binding `app-arch/libarchive:0/0=` walks
-    alongside the ebuild `:=`, the `--changed-slot` shape produces a real
-    slot conflict, and the installed parent's atom is recorded as a
-    puller (A4 `enqueue_dependencies` recording). `slot_collision.py`'s
-    `need_rebuild` scan then fires for the two flag reasons
-    (`--exclude`, `--useoldpkg-atoms`), byte-identical
-    With the append gate off no conflict forms, so no trailer -- pinned
-    as the negative control. The "ebuild is masked or unavailable" reason
-    needs an installed parent whose ebuild is present-but-masked reached
-    as a dependency (not a top-level target); left to the follow-up named
-    in docs/025 §11 F-A2."""
+    """#27 (025 A4), closed as a documented cut by Phase 5 S1 (verdict b):
+    the `need_rebuild` trailer needed A1's built-`:=` append to form its
+    conflict (`kde-base/ark`'s vdb binding `app-arch/libarchive:0/0=`
+    walking alongside the ebuild `:=`), and the append is removed — the
+    vdb binding never walks, no conflict forms, no trailer fires, even
+    with `PORTUALE_DYNAMIC_DEPS_APPEND=1` in the environment (ignored).
+    Real would print the `cannot be rebuilt` trailer here (its
+    FakeVartree always applies dynamic deps); portuale's silence is the
+    documented #26/#27 cut. Both flag arms (`--exclude`,
+    `--useoldpkg-atoms`) stay silent with rc 0."""
     root = _b1_root(
         tmp_path,
         ["kde-base/ark"],
@@ -16650,22 +16646,15 @@ def test_need_rebuild_trailer_fires_for_an_installed_parent(
     assert rust_off.returncode == 0
     assert "cannot be rebuilt" not in rust_off.stdout
 
-    for extra, reason in (
-        (["--exclude", "kde-base/ark"], "matched by --exclude argument"),
-        (
-            ["--useoldpkg-atoms", "kde-base/ark"],
-            "matched by --useoldpkg-atoms argument",
-        ),
+    for extra in (
+        ["--exclude", "kde-base/ark"],
+        ["--useoldpkg-atoms", "kde-base/ark"],
     ):
         args = base[:5] + extra + base[5:]
         rust = _run([str(emerge_binary)], args, env)
-        # #62: the trailer fires on a recorded slot conflict, and a
-        # recorded slot conflict exits 1 like real.
-        assert rust.returncode == 1
-        assert "!!! package(s) cannot be rebuilt for the reason(s) shown:" in rust.stdout
-        assert (
-            f"(kde-base/ark-4.10.0:0/0::testrepo, installed): {reason}" in rust.stdout
-        )
+        # Phase 5 S1: no append, no conflict, no trailer — rc 0.
+        assert rust.returncode == 0
+        assert "cannot be rebuilt" not in rust.stdout
 
 
 def test_oracle_slotop_regslotchange(
