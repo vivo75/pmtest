@@ -1,0 +1,21 @@
+# Phase 5b S0 — one cell per item, re-grounded 2026-09-22 (plan
+# 02.134-141-resolver-display-residues.md §3 S0). Not the default list:
+# this is the capture set the five slices' pins assert against.
+# #141 — the live red [use] cell
+-D --root-deps dev-libs/deeprootdepconsumer
+# #135 (a)(b)(e) + #138 + #134 — arm A: USE-failure abort, autounmask
+# chain, and the --debug rows (Candidates:/Child:)
+-D dev-libs/deepusedepconsumer
+# #135 (d) — arm D: real's "there are no ebuilds to satisfy <atom>"
+# block vs portuale's bare NVC line (the default-list cell that is red)
+-D dev-libs/deepusedepfconsumer
+# #135 (c)(d) — the --autounmask-use=n installed-|| abort (preamble +
+# block shape), not in the default list by design (S7)
+-D --autounmask-use=n dev-libs/unsatuseinstconsumer
+# #135 (c)(d) — libcnoisepkg's hard "no ebuilds to satisfy sys-libs/musl"
+# abort after backtrack (S6's expanded key)
+--update --deep dev-libs/libcnoisepkg
+# #136 — the slot-conflict instance set (S7 named slotusegroup; the
+# backlog entry names slotusetarget; both are drift-atom shapes)
+-D dev-libs/slotusetarget
+-D dev-libs/slotusegroup
