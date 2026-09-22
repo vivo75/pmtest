@@ -109,3 +109,8 @@ app-misc/mopodmanok
 # profile-*forced* on, so `[-flip]` is unfixable -- real hard-aborts
 # (the live shape: no autounmaskable pool, no Change USE rows)
 -D dev-libs/deepusedepfconsumer
+# #133: installed parent built -flip evaluates its `[flip=]` BDEPEND atom
+# to `[-flip]`; the running root's installed child is +flip, so real
+# resolves a running-root rebuild of the child with flip off instead of
+# silently dropping the dep as satisfied (the --root-deps half of #132)
+-D --root-deps dev-libs/deeprootdepconsumer

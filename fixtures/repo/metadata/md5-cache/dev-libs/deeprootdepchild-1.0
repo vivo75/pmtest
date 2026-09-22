@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed +flip; real rebuilds it with flip off for the evaluated [-flip] BDEPEND (#133)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+SLOT=0
+_md5_=7dce8b2c482880b95a0f38457af63b70

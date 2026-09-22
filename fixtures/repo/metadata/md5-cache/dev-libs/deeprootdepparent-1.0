@@ -1,0 +1,8 @@
+BDEPEND=~dev-libs/deeprootdepchild-1.0[flip=]
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed -flip; its BDEPEND atom carries a flip= conditional use-dep (#133)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+SLOT=0
+_md5_=2bbfd96e71546a6b3e6ae2c033844905
