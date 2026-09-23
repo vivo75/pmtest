@@ -9634,7 +9634,12 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
     conflict] line -- the same parent downgrade the old puller
     pre-masking produced, via real's feedback paths instead.
     `--backtrack=0` turns the search off, so the conflict is reported
-    instead."""
+    instead. Backlog #148: the reported conflict keeps both instances
+    as merge rows (host-real oracle 2026-09-23, real 3.0.82.2 on the
+    fixture tree, argv `emerge -p --backtrack=0 dev-libs/btparent`
+    under the suite fixture env: `[ebuild N] bttarget-1.0` then `-2.0`,
+    rc 1)."""
+    r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     assert r.returncode == 0
     assert r.stdout.splitlines() == [
@@ -9650,8 +9655,9 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         fixture_env,
     )
     assert r0.returncode == 1
-    assert r0.stdout.splitlines()[:4] == [
+    assert r0.stdout.splitlines()[:5] == [
         '[ebuild  N     ] dev-libs/bttarget-1.0 ',
+        '[ebuild  N     ] dev-libs/bttarget-2.0 ',
         '[ebuild  N     ] dev-libs/btconsumer-2.0 ',
         '[ebuild  N     ] dev-libs/btpin-1.0 ',
         '[ebuild  N     ] dev-libs/btparent-1.0 ',
@@ -9683,13 +9689,19 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
     pre-check fails, the runtime_pkg_mask trial is reverted, and the
     slot-collision block is reported -- and since #62 the run exits 1,
     like real 3.0.82.2 (`action_build`). Backlog #90 (S1): instances file
-    oldpin's 1.0 first -- real's own notice order (staged oracle)."""
+    oldpin's 1.0 first -- real's own notice order (staged oracle).
+    Backlog #148: the surviving conflict keeps both instances as merge
+    rows (host-real oracle 2026-09-23, real 3.0.82.2 on the fixture
+    tree, argv `emerge -p dev-libs/slotconflictunsolvable` under the
+    suite fixture env: `[ebuild N] slotconflicttarget-1.0` then `-2.0`,
+    rc 1) -- the walk's one-row-per-cp cut is gone."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/slotconflictunsolvable"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines()[:4] == [
+    assert result.stdout.splitlines()[:5] == [
         '[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ',
+        '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictoldpin-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictunsolvable-1.0 ',
@@ -9842,16 +9854,19 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     (nothing flippable), no need_rebuild trailer (no installed parent).
     Backlog #90 (S1): the walk resolves last-declared-first, so the
     1.0 instance files first -- real's own merge-list order (staged
-    oracle: 1.0 USE="x y" leads). The 2.0 merge row itself stays
-    absent -- one row per cp, the known dual-instance display gap
-    (same class as orbtblocked-bt0's missing row)."""
+    oracle: 1.0 USE="x y" leads). Backlog #148: the surviving conflict
+    keeps BOTH instances as merge rows (real's S0.1 capture in
+    02.148-slot-conflict-merge-list.md: 1.0 then 2.0 USE="(-x)",
+    rc 1) -- the walk's resolved_slots conflict arm graphs the second
+    instance beside the record instead of continuing past it."""
     args = ["--pretend", "dev-libs/slotusegroup"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stderr == ''
     out = rust.stdout
-    assert out.splitlines()[:5] == [
+    assert out.splitlines()[:6] == [
         '[ebuild  N     ] dev-libs/slotusetarget-1.0  USE="x y"',
+        '[ebuild  N     ] dev-libs/slotusetarget-2.0  USE="(-x)"',
         '[ebuild  N     ] dev-libs/slotuseplain-1.0 ',
         '[ebuild  N     ] dev-libs/slotusex-1.0 ',
         '[ebuild  N     ] dev-libs/slotusey-1.0 ',
@@ -10138,15 +10153,21 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
     as two top-level atoms: no common satisfying version, so backtracking
     leaves the slot-collision block in place. Backlog #90 (S1): the walk
     resolves last-declared-first, so oldpin's 1.0 files first -- real's
-    own notice order (staged oracle)."""
+    own notice order (staged oracle). Backlog #148: the surviving
+    conflict keeps both instances as merge rows (host-real oracle
+    2026-09-23, real 3.0.82.2 on the fixture tree, argv `emerge -p
+    dev-libs/slotconflictnewpin dev-libs/slotconflictoldpin` under the
+    suite fixture env: `[ebuild N] slotconflicttarget-1.0` then `-2.0`,
+    rc 1)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"],
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines()[:3] == [
+    assert result.stdout.splitlines()[:4] == [
         '[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ',
+        '[ebuild  N     ] dev-libs/slotconflicttarget-2.0 ',
         '[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 ',
         '[ebuild  N     ] dev-libs/slotconflictoldpin-1.0 ',
     ]
@@ -16240,7 +16261,11 @@ def test_oracle_missed_update_siblings_masked_together(
     "R2 — genuine upstream oracle"): the upstream-shaped `btgp` pin now
     carries that oracle, and the `--backtrack=1` block below pins
     portuale's low-budget conflict shape only. #36 is closed as
-    not-reproducible-as-framed."""
+    not-reproducible-as-framed. Backlog #148: the low-budget surviving
+    conflict keeps both `mgfc` instances as merge rows (host-real
+    oracle 2026-09-23, real 3.0.82.2 on the fixture tree, argv
+    `emerge -p --backtrack 1 dev-libs/mgfa` under the suite fixture
+    env: `[ebuild N] mgfc-1` then `mgfc-2`, rc 1)."""
     ok = _b1_run(["--pretend", "dev-libs/mgfa"], fixture_env, emerge_binary,
 )
     assert _b1_merges(ok.stdout) == [
@@ -16257,6 +16282,7 @@ def test_oracle_missed_update_siblings_masked_together(
     assert one.returncode == 1
     assert _b1_merges(one.stdout) == [
         "[ebuild  N     ] dev-libs/mgfc-1 ",
+        "[ebuild  N     ] dev-libs/mgfc-2 ",
         "[ebuild  N     ] dev-libs/mgfb-2 ",
         "[ebuild  N     ] dev-libs/mgfa-1 ",
     ]
