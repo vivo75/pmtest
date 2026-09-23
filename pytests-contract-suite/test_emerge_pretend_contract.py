@@ -1514,7 +1514,7 @@ CASES = [
     ("profile USE_EXPAND default is folded per-level, so a same-level package.use satisfies `^^`", ["--pretend", "-v", "dev-libs/singletargetpkg"], 0),
     ("blocker: strong (!!) blocker vs an installed package no walk pulls in is satisfied (rc 0, real `b`)", ["--pretend", "dev-libs/blockerpkg"], 0),
     (
-        "blocker: upstream test_blocker pg0 order a/b/c merges X-1 (rc 0 like real; uninstall pairs Y-2, not Y-1 — #142)",
+        "blocker: upstream test_blocker pg0 order a/b/c merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1, #142)",
         ["--pretend", "--backtrack=0", "dev-libs/blk0a", "dev-libs/blk0b", "dev-libs/blk0c"],
         0,
     ),
@@ -1524,12 +1524,12 @@ CASES = [
         0,
     ),
     (
-        "blocker: upstream test_blocker pg0 order b/a/c merges X-1 (rc 0 like real; uninstall pairs Y-2, not Y-1 — #142)",
+        "blocker: upstream test_blocker pg0 order b/a/c merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1, #142)",
         ["--pretend", "--backtrack=0", "dev-libs/blk0b", "dev-libs/blk0a", "dev-libs/blk0c"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg0 order b/c/a merges X-2 against B's <X-2 bound (rc 0 like real; the candidate is #142)",
+        "blocker: upstream test_blocker pg0 order b/c/a merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1, #142)",
         ["--pretend", "--backtrack=0", "dev-libs/blk0b", "dev-libs/blk0c", "dev-libs/blk0a"],
         0,
     ),
@@ -1539,27 +1539,37 @@ CASES = [
         0,
     ),
     (
-        "blocker: upstream test_blocker pg0 order c/b/a merges X-1 (rc 0 like real; uninstall pairs Y-3, not Y-1 — #142)",
+        "blocker: upstream test_blocker pg0 order c/b/a merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1, #142)",
         ["--pretend", "--backtrack=0", "dev-libs/blk0c", "dev-libs/blk0b", "dev-libs/blk0a"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 C, soft BDEPEND !X (rc 0 like real; the spurious X uninstall is #143, not pinned)",
+        "blocker: upstream test_blocker pg1 A, hard DEPEND !!X aborts under buildpkgonly (rc 1 like real — #143)",
+        ["--pretend", "--buildpkgonly", "dev-libs/blk1a"],
+        1,
+    ),
+    (
+        "blocker: upstream test_blocker pg1 B, hard BDEPEND !!X aborts under buildpkgonly (rc 1 like real — #143)",
+        ["--pretend", "--buildpkgonly", "dev-libs/blk1b"],
+        1,
+    ),
+    (
+        "blocker: upstream test_blocker pg1 C, soft BDEPEND !X (rc 0 like real; bare like real since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1c"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 D, soft DEPEND !X (rc 0 like real; the spurious X uninstall is #143, not pinned)",
+        "blocker: upstream test_blocker pg1 D, soft DEPEND !X (rc 0 like real; bare like real since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1d"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 E, RDEPEND blockers ignored under buildpkgonly (rc 0 like real; uninstall + rows are #143)",
+        "blocker: upstream test_blocker pg1 E, RDEPEND blockers ignored under buildpkgonly (rc 0 like real; bare like real since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1e"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 F, PDEPEND blockers ignored under buildpkgonly (rc 0 like real; uninstall + rows are #143)",
+        "blocker: upstream test_blocker pg1 F, PDEPEND blockers ignored under buildpkgonly (rc 0 like real; bare like real since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1f"],
         0,
     ),
@@ -8425,12 +8435,13 @@ def test_strong_blocker_matches_an_installed_package(emerge_binary, fixture_env)
     ]
 
 
-def test_upstream_blocker_pg0_clean_orders_pin_x1_and_uninstall_y1(
+def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     emerge_binary, fixture_env
 ):
     """Upstream `test_blocker.py::testBlocker` pg0, bulk-translated for #50
-    batch 1 (`dev-libs/blk0{a,b,c,x,y}`; oracle `/tmp/fx-b1-blocker.json`,
-    captured from the real `ResolverPlayground`, not the source literal).
+    batch 1 (`dev-libs/blk0{a,b,c,x,y}`; oracle
+    `differential-test-bed/logs/fx-b1-blocker.json` cases 0-5, captured
+    from the real `ResolverPlayground`, not the source literal).
 
     A/B/C depend on `dev-libs/X`, `<dev-libs/X-2`, `<dev-libs/X-3`, so the
     only jointly satisfiable X is X-1; X-1's RDEPEND `!=dev-libs/Y-1`
@@ -8441,45 +8452,99 @@ def test_upstream_blocker_pg0_clean_orders_pin_x1_and_uninstall_y1(
     `!=` blocker as the `=... (soft blocking ...)` satisfied row, exactly
     like the blockerpkg pin above.
 
-    Only the `a c b` and `c a b` argv orders are clean today: in the
-    other four the uninstall target varies with walk order (Y-2/Y-3),
-    a spurious conflict WARNING prints, and the `b c a` order even merges
-    X-2 against B's `<X-2` bound — filed as #142, covered here by rc-only
-    CASES entries, not by this pin.
+    Fixed by #142 (joint slot solve + stale-owner gate + keeper walk +
+    the uninstall-scheduling dance): every order merges X-1,
+    uninstalls exactly Y-1, and interleaves the blocker rows right after
+    their owner (bed `l0-fx-20260922T101821Z` blk0 cells). The skipped-
+    update WARNINGs follow real's missed-update rule (a removed version
+    is reported against every rejecting parent atom); their per-order
+    presence is bed-grounded for `a b c` (one X-2-vs-B block) and
+    `a c b` (silent) and provisional for the other four orders — the
+    close-out bed adds those cells, and any divergence from real there
+    reopens #142 instead of re-pinning here.
     """
     env = dict(fixture_env)
-    expected_merge = [
-        "[ebuild  N     ] dev-libs/blk0x-1 ",
-        "[ebuild  N     ] dev-libs/blk0a-1 ",
-        "[ebuild  N     ] dev-libs/blk0c-1 ",
-        "[ebuild  N     ] dev-libs/blk0b-1 ",
+    uninstall_rows = [
         "[uninstall     ] dev-libs/blk0y-1 ",
         '[blocks b      ] =dev-libs/blk0y-1 ("=dev-libs/blk0y-1" is soft blocking dev-libs/blk0x-1)',
     ]
-    acb = _run(
-        [str(emerge_binary)],
-        ["--pretend", "--backtrack=0", "dev-libs/blk0a", "dev-libs/blk0c", "dev-libs/blk0b"],
-        env,
-    )
-    assert acb.returncode == 0
-    assert acb.stderr == ""
-    assert acb.stdout.splitlines() == expected_merge
 
-    cab = _run(
-        [str(emerge_binary)],
-        ["--pretend", "--backtrack=0", "dev-libs/blk0c", "dev-libs/blk0a", "dev-libs/blk0b"],
-        env,
-    )
-    assert cab.returncode == 0
-    assert cab.stderr == ""
-    assert cab.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/blk0x-1 ",
-        "[ebuild  N     ] dev-libs/blk0c-1 ",
-        "[ebuild  N     ] dev-libs/blk0a-1 ",
-        "[ebuild  N     ] dev-libs/blk0b-1 ",
-        "[uninstall     ] dev-libs/blk0y-1 ",
-        '[blocks b      ] =dev-libs/blk0y-1 ("=dev-libs/blk0y-1" is soft blocking dev-libs/blk0x-1)',
+    def warn(skipped_version, atom, parent):
+        return [
+            "dev-libs/blk0x:0",
+            "",
+            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
+            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"\"",
+            "    ^               ^",
+            "",
+        ]
+
+    warn_header = [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
     ]
+    warn_x2_b = warn("2", "<dev-libs/blk0x-2", "blk0b")
+    warn_x3_b = warn("3", "<dev-libs/blk0x-2", "blk0b")
+    warn_x3_c = warn("3", "<dev-libs/blk0x-3", "blk0c")
+    cases = [
+        (["blk0a", "blk0b", "blk0c"], warn_header + warn_x2_b),
+        (["blk0a", "blk0c", "blk0b"], []),
+        (["blk0b", "blk0a", "blk0c"], warn_header + warn_x2_b),
+        (["blk0b", "blk0c", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
+        (["blk0c", "blk0a", "blk0b"], []),
+        (["blk0c", "blk0b", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
+    ]
+    for order, warning in cases:
+        atoms = [f"dev-libs/{p}" for p in order]
+        run = _run([str(emerge_binary)], ["--pretend", "--backtrack=0", *atoms], env)
+        assert run.returncode == 0
+        assert run.stderr == ""
+        expected = (
+            ["[ebuild  N     ] dev-libs/blk0x-1 "]
+            + uninstall_rows
+            + [f"[ebuild  N     ] dev-libs/{p}-1 " for p in order]
+            + warning
+        )
+        # The WARNING block trails a blank line; splitlines keeps it.
+        assert run.stdout.splitlines() == expected, "argv order " + " ".join(order)
+
+
+def test_upstream_blocker_pg1_buildpkgonly_gate(emerge_binary, fixture_env):
+    """Upstream `test_blocker.py::testBlockerBuildpkgonly`, bulk-translated
+    for #50 batch 1 (`dev-libs/blk1{a,b,c,d,e,f,x}`; oracle
+    `differential-test-bed/logs/fx-b1-blocker.json` cases 6-11, captured
+    from the real `ResolverPlayground`, not the source literal).
+
+    Under `--buildpkgonly` real evaluates only DEPEND/BDEPEND blockers:
+    a hard `!!` there aborts (`success=False`, mergelist `[A-1, !!X]`
+    with real's two `!!!` lines, rc 1), a soft `!` there is silently
+    satisfied with X untouched (bare `[C-1]`/`[D-1]`), and
+    RDEPEND/PDEPEND blockers are not evaluated at all (bare `[E-1]`/
+    `[F-1]`). Fixed by #143 (the `--buildpkgonly` blocker gate:
+    runtime-key blanking + soft-blocker satisfaction + the
+    uninstall-anchored abort); the bed facet is
+    `--buildpkgonly_dev-libs_blk1a` / `..._blk1c`
+    (`l0-fx-20260922T101821Z`: real rc 1 + two `!!!` lines vs bare).
+    """
+    env = dict(fixture_env)
+    abort_err = (
+        "\n!!! --buildpkgonly requires all dependencies to be merged.\n"
+        "!!! Cannot merge requested packages. Merge deps and try again.\n\n"
+    )
+    for pkg in ("dev-libs/blk1a", "dev-libs/blk1b"):
+        run = _run([str(emerge_binary)], ["--pretend", "--buildpkgonly", pkg], env)
+        assert run.returncode == 1
+        assert run.stdout.splitlines() == [
+            f"[ebuild  N     ] {pkg}-1 ",
+            "[uninstall     ] dev-libs/blk1x-1 ",
+            f'[blocks b      ] dev-libs/blk1x ("dev-libs/blk1x" is hard blocking {pkg}-1)',
+        ]
+        assert run.stderr == abort_err
+    for pkg in ("dev-libs/blk1c", "dev-libs/blk1d", "dev-libs/blk1e", "dev-libs/blk1f"):
+        run = _run([str(emerge_binary)], ["--pretend", "--buildpkgonly", pkg], env)
+        assert run.returncode == 0
+        assert run.stderr == ""
+        assert run.stdout.splitlines() == [f"[ebuild  N     ] {pkg}-1 "]
 
 
 def test_weak_blocker_matches_another_new_package_in_the_same_graph(emerge_binary, fixture_env):
@@ -8600,7 +8665,14 @@ def test_oracle_b4_satisfied_blocker_prints_after_the_uninstall_row(
     Error block on stderr.
 
     Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0",
-    u6).
+    u6) for the `b`-inline / `B`-tail / rc-1 properties. The ebuild order
+    follows real's uninstall-scheduling dance (#142 S2 F4b, proven
+    against real's own graph dumps and scheduling source: the blocker
+    owner waits on its unscheduled removal, so `blockerpkg` schedules
+    after the independent `blockerpartnerpkg`/`weakblockerparent` pair
+    instead of first); the pre-#142 pin had the stale portuale order
+    here. A `blockerpkg graphblockerparent` fixture-oracle bed cell
+    re-verifies the full bytes at Phase 9 close-out.
     """
     result = _run(
         [str(emerge_binary)],
@@ -8609,10 +8681,10 @@ def test_oracle_b4_satisfied_blocker_prints_after_the_uninstall_row(
     )
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/blockerpkg-1.0 ",
         "[ebuild  N     ] dev-libs/blockerpartnerpkg-1.0 ",
         "[ebuild  N     ] dev-libs/weakblockerpkg-1.0 ",
         "[ebuild  N     ] dev-libs/graphblockerparent-1.0 ",
+        "[ebuild  N     ] dev-libs/blockerpkg-1.0 ",
         "[uninstall     ] dev-libs/samepkg-1.0 ",
         '[blocks b      ] dev-libs/samepkg ("dev-libs/samepkg" is hard blocking dev-libs/blockerpkg-1.0)',
         '[blocks B      ] dev-libs/blockerpartnerpkg ("dev-libs/blockerpartnerpkg" is soft '
@@ -18902,6 +18974,12 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     The withhold counterpart (consumer as a world member) is the
     `l0-fixture-oracle-whpin.txt` bed cell -- it needs `FX_WORLD_EXTRA`
     and so lives in the bed, like D1's `rdcpin` cell, not here.
+    The uninstall schedules right after its owner `whblocker-2.0`
+    (real's uninstall-scheduling dance, #142 S2 F4b: the owner waits
+    on its unscheduled removal, then the ready removal pops first);
+    the pre-#142 pin had it after `whpuller-2.0`. A fixture-oracle bed
+    cell for this no-`FX_WORLD_EXTRA` shape re-verifies the full bytes
+    at Phase 9 close-out.
 
     The consumer's own removal row is what keeps the pin from firing:
     the blocker phase appends the `Uninstall` entry before the
@@ -18925,10 +19003,10 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         "[ebuild     U  ] dev-libs/whblocker-2.0 [1.0]",
-        "[ebuild     U  ] dev-libs/whpuller-2.0 [1.0]",
         "[uninstall     ] dev-libs/whtarget-1.0 ",
         '[blocks b      ] <dev-libs/whtarget-2.0 ("<dev-libs/whtarget-2.0" is '
         "soft blocking dev-libs/whblocker-2.0)",
+        "[ebuild     U  ] dev-libs/whpuller-2.0 [1.0]",
     ], result.stdout
 
 
