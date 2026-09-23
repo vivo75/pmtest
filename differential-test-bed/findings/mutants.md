@@ -151,3 +151,147 @@ Real-gap clusters (missed / timeouts):
 
 No tests were added in this slice, per the plan: the mutants above
 are the acceptance list for #144–#146.
+
+### Phase 8 (2026-09-23, backlog #146/#145/#144) — the unit tests, before/after
+
+Branch `backlog/144-146-merge-order-tests`. Clusters re-run from
+`rust/` with `cargo mutants --in-place --file
+portage-repo/src/merge_order.rs --timeout 300 --re '<cluster regex>'`;
+the after-runs use `--iterate` (only the previously-missed mutants are
+re-tested; previously-caught/unviable are carried over). The file had
+grown from 3199 to 4324 lines since the 2026-09-22 run, so the
+`--list` inventory — not the old line numbers — was the target list.
+
+| cluster | mutants | before caught/missed | after caught/missed | unviable | timeout |
+|---|---|---|---|---|---|
+| #146 dep-key/priority | 168 | 83 / 79 | **156 / 6** | 6 | 0 |
+| #145 installed/vdb | 62 | 14 / 46 | **59 / 1** | 1 | 1 |
+| #144 scheduler loop | 258 | 178 / 41 (one run, post-test) | **201 / 17** | 21 | 19 |
+
+The #144 cluster's "before" is the 2026-09-22 triage above plus the
+current `--list` inventory: the file had grown ~1100 lines, so the
+inventory was the target list, and the cluster was run once on the
+post-test tree (`--timeout 60`), then three `--iterate --timeout 20`
+passes over its missed/timeout sets (the 15
+`SerializeFrontier::add_edge` mutants are excluded — the pre-existing
+`frontier_add_edge_only_grows_survival` pins them and they are not in
+#144's list).
+
+**#146 survivors (all equivalent).**
+
+- `split_disjunctive` :175/:176 (`&&`→`||` in the nested-branch guard) —
+  the mutated condition can only differ when a `(` deeper than
+  `aod+1` is reached with `branch_group_depth` still `None`;
+  well-nested structured-reduce output always sets it at `aod+1` first.
+  Unreachable through `dep_edges_from_metadata`; the direct-token pin
+  covers the reachable branch.
+- `frontier_enabled -> true|false` — the leaf frontier is a pure
+  performance layer; `frontier_matches_direct_scans_*` and
+  `disabled_path_matches_direct_scans` pin both arms to identical leaf
+  sets and order, so forcing either arm is behavior-neutral by design.
+- `build_digraph` :2012 (`||`→`&&` in the uninstall reverse-edge loop)
+  — `g.children[owner]` can never hold the removal node at that point
+  (the forward walk's `match_candidates` drops every `Uninstall`
+  target), so the `any(...)` term is constantly false and the condition
+  reduces to `i == j`; `required_by` never names the removal's own cp
+  either.
+- `build_digraph` :2025 (delete the `satisfied` field from the reverse
+  edge's priority) — the literal sets `satisfied: false`, which is
+  already `DepPriority::default()`'s value.
+
+**#145 survivors.**
+
+- `2025:29` (delete `satisfied` from the reverse edge) — equivalent, as
+  under #146.
+- `1283:12` (delete `!` from `if !present.insert(key) { return; }`) —
+  **caught by timeout**: the flipped guard pushes an unbounded stream of
+  duplicate synthetic entries (each duplicate is re-queued), so the
+  closure loop never terminates; no bounded test can observe it, and it
+  is recorded rather than pinned around (batch §4 Phase 8).
+- `1155:21` (`&&`→`||` in the `if let Some(a) = atom && …` let-chain) —
+  **unviable**: let-chains do not accept `||`, so the mutant does not
+  compile.
+
+**#144 fix pass (reviewer counterexamples, 2026-09-23).** The first
+classification called 12 survivors equivalent; a fresh-context review
+produced concrete inputs where they change the selection. Five new
+tests cover them —
+`select_nodes_prefers_a_leaf_whose_parent_is_an_asap_node` (the
+asap-parent preference: 6 mutants),
+`select_nodes_promotes_only_an_unsatisfied_pdep_child` (the PDEPEND
+promotion predicate) and `select_nodes_pins_the_normal_range_cycle_pass`,
+`select_nodes_escalates_to_the_satisfied_range_before_the_roots` (the
+range-escalation guard; `select_nodes_pins_the_single_leaf_shortcut` and
+`select_nodes_defers_the_root_selection_when_asap_is_pending` were
+covered by the asap-preference test) — 11 caught and one
+(`2946:50`) recorded caught by timeout. The #145 survivor `1164:88`
+(`<`→`<=` in `pick_installed`) was also misclassified: `1.0` and
+`1.0-r0` compare equal (a missing revision is 0), so the mutant can
+replace the first vercmp-equal version; now caught by
+`add_installed_dependency_closure_keeps_the_first_of_vercmp_equal_versions`.
+
+**#144 survivors (17 missed + 19 timeouts, all classified).**
+
+The 17 missed (every one behavior-neutral under the shapes the resolver
+can produce):
+
+- `2025:29` (delete the explicit `satisfied: false` field) —
+  equivalent: `false` is `DepPriority::default()`'s value.
+- `2478:54` (`<`→`<=` in `elementary_cycles`' min-length update) —
+  equivalent: `<=` only re-assigns `min_len` to an equal value.
+- `2830:17` (`mo_iter += 1`→`*=`) and `3055:21` (delete `!` in the
+  `retlist_merges` count) — trace-only: both feed only the
+  `PORTUALE_MO_SEL` stderr line.
+- `2921:48`, `2921:61` ×3 (the `--debug` cycle-dump gate) and `3156:5`
+  (whole-body `debug_dump_cycle`) — trace-only: stderr dumps under
+  `--debug`.
+- `2938:41` (`sub.len() > 1`→`>= 1`) — equivalent: a one-node `sub`
+  harvests to the same node the `collect()` branch would take.
+- `2973:37` (`||`→`&&` in the promotion's already-queued guard) —
+  equivalent: the extra duplicate `asap` entry is pruned by
+  `asap.retain(alive)`.
+- `3325:18`/`3325:67` ×4, `3327:16` ×2 (the leftover weave-back's
+  bounds/sort arms) — equivalent: `select_nodes` schedules every real
+  entry, so `leftover` is always empty and the block's body never runs.
+
+The 19 timeouts, by family (a bounded test cannot observe a hang — the
+test hangs too; recorded *caught by timeout*, not pinned around):
+
+- `SerializeFrontier::build` 688:23/688:28 ×2 — the `m &= m - 1`
+  lowest-bit-clear (and its `+`/`/` variants) no longer clears bits, so
+  the survival-count loop never terminates.
+- `leaves_via -> vec![0]|vec![1]` — a bogus non-empty leaf list leaves
+  the scheduler removing nothing; `while any alive` never ends.
+- `gather_deps -> Some(empty)` / `find_smallest_cycle -> Some((empty|…, None))` ×4
+  — an empty cycle closure selects nothing, so the loop makes no
+  progress.
+- `harvest_cycle -> vec![]` / `2352:11 delete !` — an empty harvest (or
+  the skipped `while !remaining.is_empty()` loop) selects nothing.
+- `elementary_cycles::shortest_path 2449:43` (`&&`→`||`) — already-seen
+  nodes are re-enqueued, so the BFS frontier grows without bound.
+- `select_nodes 2946:35`, `2946:50`, `3015:16`, `3024:31`, `3089:16` —
+  guard flips that re-enter a no-progress iteration (2946:35/2946:50
+  with `asap` non-empty) or skip/repeat a removal; the `alive` set
+  stops shrinking.
+- `schedule_graph 3422:28` / `3431:12` — the prune loop's `removed`
+  flag/guard flips make it iterate forever.
+
+New `mod tests` functions (all in `merge_order.rs`): the #146 family
+(`key_priority`, `dep_edges_from_metadata` keys/priorities/blockers/
+slot-operators/disjunctions, `split_disjunctive` bookkeeping,
+`ignore_*` truth tables, `ignore_name`, `PriorityRange` rungs,
+`rank_best`, `select_dep_target` narrowing/elimination, `build_digraph`
+self-edges/blockers/top-atom narrowing/inline-vs-deferred/uninstall
+reverse edges/`required_by` fallback), the #145 family
+(`outcome_version`, `edge_satisfied_with`, `installed_candidates_by_cp`
+over the fixture vdb, `dep_edge_satisfied_by_installed`,
+`add_installed_dependency_closure` over runtime scratch vdbs including
+the injected-libc strip and the vercmp-equal pick), and the #144 family
+(`Digraph` primitives, `deep_system_deps`, `seed_toolchain_asap`,
+`gather_deps`, `find_smallest_cycle`, `harvest_cycle`, `cycle_report`,
+`tree_schedule_stuck`, `tree_note_selection`, `select_nodes` (greedy
+batch, runtime-cycle harvest, satisfied-range escalation, PDEPEND
+promotion, asap-parent preference, range-escalation guard),
+`serialize_merge_order`, `schedule_graph`, `tree_solved_replacements`,
+`suppressed_alt_edges`). No fixture was added and no product byte
+changed.
