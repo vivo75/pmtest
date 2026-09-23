@@ -118,13 +118,32 @@ app-misc/mopodmanok
 # RDEPEND `!=Y-1` uninstalls installed Y-1. The clean argv order guards
 # #142's fixed point (real: X-1 + [uninstall]Y-1, no warning)
 --backtrack=0 dev-libs/blk0a dev-libs/blk0c dev-libs/blk0b
-# ... and a divergent order (uninstall pairs Y-2 + spurious conflict
-# WARNING; #142, suppressed in known-divergences-fixture-oracle.yaml)
+# ... and the b-after-a order (real: X-1 + [uninstall]Y-1, one X-2-vs-B
+# skipped-update block; #142 fixed, unsuppressed)
 --backtrack=0 dev-libs/blk0a dev-libs/blk0b dev-libs/blk0c
+# #142 S2 close-out: the four missing pg0 orders (upstream testBlocker
+# oracle, cluster S0.1: all six orders succeed with mergelist [X-1,
+# [uninstall]Y-1, !=Y-1, <argv order>]; each order's skipped-update
+# WARNING is the joint solve's own missed-update notice, real-grounded
+# by its cell, not inferred)
+--backtrack=0 dev-libs/blk0b dev-libs/blk0a dev-libs/blk0c
+--backtrack=0 dev-libs/blk0b dev-libs/blk0c dev-libs/blk0a
+--backtrack=0 dev-libs/blk0c dev-libs/blk0a dev-libs/blk0b
+--backtrack=0 dev-libs/blk0c dev-libs/blk0b dev-libs/blk0a
 # #50 S1 batch 1 (upstream test_blocker pg1, --buildpkgonly blockers):
 # soft BDEPEND `!X` leaves installed X untouched (real merges C-1 bare;
-# portuale spuriously uninstalls X — #143, suppressed)
+# #143 fixed, unsuppressed)
 --buildpkgonly dev-libs/blk1c
-# ... and the hard DEPEND `!!X` abort (real rc 1; portuale merges +
-# uninstalls, rc 0 — #143, suppressed)
+# ... and the hard DEPEND `!!X` abort (real rc 1 with the merge list +
+# two `!!!` lines; #143 fixed, unsuppressed)
 --buildpkgonly dev-libs/blk1a
+# #142 S2 R1/R2: the u6 uninstall-scheduling shape as a two-atom flat
+# cell (merging-arm owners wait on their unadmitted removal; real's own
+# unsolved playground corroborates the u6 prefix). Row bytes are
+# real-grounded by this cell, not inferred.
+dev-libs/blockerpkg dev-libs/graphblockerparent
+# #91 S2 R2: the whpuller shape without FX_WORLD_EXTRA (contrast the
+# whpin list, which runs the same command with the installed whtarget
+# consumer in world). Full bytes real-grounded by this cell under the
+# uninstall-scheduling dance order.
+--update --deep --newuse --oneshot dev-libs/whpuller
