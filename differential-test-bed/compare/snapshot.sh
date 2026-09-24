@@ -67,6 +67,15 @@ PRUNE=(
   # (hence per-guest by construction) and regenerated every boot.
   # No-op on the container bed (no such tree there).
   "$ROOT/var/lib/cloud"
+  # Staging hygiene (L3 full-tree, see P16 #152 S1): the orchestration
+  # mounts the tool-under-test bundle into /usr/local/bin (the PM
+  # binary, `ebuild`/`emerge` and the cargo target dir -- deps/,
+  # .fingerprint/, *.rlib, *.d) -- identical on both sides by
+  # construction, never merge signal.  /etc/hosts, /etc/machine-id and
+  # /root/.bash_history are per-container identity / shell scratch.
+  # normalize.py mirrors these same drops for saved snapshots.
+  "$ROOT/usr/local/bin"
+  "$ROOT/etc/hosts" "$ROOT/etc/machine-id" "$ROOT/root/.bash_history"
 )
 # Extra root-relative paths to prune, `:`-separated (`SNAPSHOT_PRUNE`),
 # for a mount the caller knows about but this script cannot (the L3

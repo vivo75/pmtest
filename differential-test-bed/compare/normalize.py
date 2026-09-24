@@ -12,6 +12,7 @@ authority, keep the prose in sync. stdlib only.
 from __future__ import annotations
 
 import bz2
+import posixpath
 import re
 import sys
 import tarfile
@@ -43,8 +44,112 @@ PRESENCE_ONLY = [
 # presence check carry them.
 ENV_FILES = {"/etc/profile.env", "/etc/csh.env", "/etc/environment"}
 
+# --- filesystem: staging-hygiene drops (L3 full-tree only) -------------
+# Paths that are part of the test harness / the container's identity, not
+# of the merged rootfs, and so can never be portuale-vs-portage signal.
+# `snapshot.sh` prunes them for fresh L3 walks; the normaliser mirrors
+# the same rule so a saved pair re-normalises to the pruned equivalent.
+# `/usr/local/bin` is the mounted PM binary + its cargo target dir
+# (`deps/`, `.fingerprint/`, `*.rlib`, `*.d` …) -- identical on both
+# sides by construction (same mount). `/etc/hosts`, `/etc/machine-id`
+# and `/root/.bash_history` are per-container identity / shell scratch.
+DROP = [
+    re.compile(r"^/usr/local/bin/"),
+    re.compile(r"^/etc/hosts$"),
+    re.compile(r"^/etc/machine-id$"),
+    re.compile(r"^/root/\.bash_history$"),
+]
 
-def norm_files(prefix: Path) -> None:
+
+def _pruned(path: str) -> bool:
+    return any(rx.match(path) for rx in DROP)
+
+
+def _twin_families(prefix: Path) -> dict[str, str]:
+    """Map every basename that is one of a set of byte-identical *real*
+    files (a twin family) to its canonical member name.
+
+    Family = ≥2 type-`f` rows with the same (dirname, size, sha256) --
+    the keyed-libexec / getconf install pattern that bellwether binpkgs
+    record on disk as N copies of the same file under different names
+    (ld/ld.bfd, gcc-ar/x86_64-…-gcc-ar, the getconf managers, the
+    porttest setuid triple).  The names a family ships are identical on
+    the real and portuale sides, so the canonical (lexicographic minimum)
+    is the same string on both sides without any cross-side coupling.
+    Returns basename -> canonical (each member maps to the canonical;
+    non-members are absent).  Non-`f` rows and presence-blanked rows
+    (sha `-`) never join a family.
+    """
+    src = prefix.with_suffix(".files.tsv")
+    if not src.exists():
+        return {}
+    fam: dict[tuple, set[str]] = {}
+    for line in src.read_text().splitlines():
+        p = line.split("\t")
+        if len(p) != 9:
+            continue
+        path, typ, _, _, _, size, sha, _, _ = p
+        if typ != "f" or sha == "-":
+            continue
+        if path.startswith("/usr/lib/debug/"):
+            continue
+        d, b = posixpath.split(path)
+        fam.setdefault((d, size, sha), set()).add(b)
+    twins: dict[str, str] = {}
+    for members in fam.values():
+        if len(members) < 2:
+            continue
+        canon = sorted(members)[0]
+        for member in members:
+            # a name shared by two families keeps the smaller canonical
+            if member not in twins or canon < twins[member]:
+                twins[member] = canon
+    return twins
+
+
+def _canon_debug_leaf(path: str, twins: dict[str, str]) -> str:
+    """Canonicalise the stem of a `/usr/lib/debug/usr/…/foo.debug` leaf.
+
+    Only used for split-debug trees, and only when the stem names a real
+    twin member (so e.g. sln.debug or any non-twin debug file is left
+    untouched).  Real-file rows are never renamed -- this is called only
+    on paths under `/usr/lib/debug/`.
+    """
+    d, b = posixpath.split(path)
+    stem = b[:-6] if b.endswith(".debug") else b
+    canon = twins.get(stem)
+    if canon is None or canon == stem:
+        return path
+    return d + "/" + canon + (".debug" if b.endswith(".debug") else "")
+
+
+def _canon_buildid_link(path: str, link: str, twins: dict[str, str]) -> tuple[str, str]:
+    """Rewire a `/usr/lib/debug/.build-id/<xx>/<hash>[.debug]` symlink to
+    `@buildid:<canonical-resolved-target>`.
+
+    * the link target is relative to the link's dirname; resolve it to an
+      absolute path (`../../usr/...` from `<xx>` lands in
+      `/usr/lib/debug/usr/...`, the 5-up form lands in `/usr/...`);
+    * canonicalise the resolved target's basename through the twin map
+      (an `ld` link and an `ld.bfd` link pointing at the same inode must
+      key to the same path);
+    * the `@buildid:` prefix keeps the key out of the real-file path
+      namespace, which matters here because two different hash dirs can
+      resolve to the same binary (cc1/cc1plus).
+
+    Returns (new_path, canonical_link); the caller sets the row's size to
+    len(canonical_link) so a twin's differing link length can never fire
+    a SYMLINK/SIZE finding.
+    """
+    resolved = posixpath.normpath(posixpath.join(posixpath.dirname(path), link))
+    d, b = posixpath.split(resolved)
+    stem = b[:-6] if b.endswith(".debug") else b
+    canon = twins.get(stem, stem)
+    canonical = d + "/" + canon + (".debug" if b.endswith(".debug") else "")
+    return "@buildid:" + canonical, canonical
+
+
+def norm_files(prefix: Path, twins: dict[str, str]) -> None:
     src = prefix.with_suffix(".files.tsv")
     if not src.exists():
         (prefix.parent / (prefix.name + ".files.norm.tsv")).write_text("")
@@ -55,6 +160,8 @@ def norm_files(prefix: Path) -> None:
         if len(parts) != 9:
             continue
         path, typ, mode, uid, gid, size, sha, link, xattr = parts
+        if _pruned(path):
+            continue
         if path in ENV_FILES or any(rx.search(path) for rx in PRESENCE_ONLY):
             sha = "-"
             # a regenerated cache's *size* drifts too (e.g.
@@ -66,6 +173,15 @@ def norm_files(prefix: Path) -> None:
         # dirs with an identical entry set.
         if typ == "d":
             size = "-"
+        # R3 build-id / split-debug canonicalisation (see `_canon_buildid_link`
+        # and `_canon_debug_leaf`).  Order matters: a `.build-id` link is `l`,
+        # a split-debug leaf is `f`, so the two branches never collide.
+        if typ == "l" and path.startswith("/usr/lib/debug/.build-id/"):
+            path, link = _canon_buildid_link(path, link, twins)
+            sha = "-"
+            size = str(len(link))
+        elif typ == "f" and path.startswith("/usr/lib/debug/usr/") and path.endswith(".debug"):
+            path = _canon_debug_leaf(path, twins)
         out.append("\t".join([path, typ, mode, uid, gid, size, sha, link, xattr]))
     out.sort()
     (prefix.parent / (prefix.name + ".files.norm.tsv")).write_text("\n".join(out) + "\n")
@@ -130,25 +246,45 @@ def norm_environment(raw: bytes) -> str:
     return "\n".join(kept) + "\n"
 
 
-def norm_contents(text: str) -> str:
+def norm_contents(text: str, twins: dict[str, str]) -> str:
     out = []
     for ln in text.splitlines():
         f = ln.split()
         if not f:
             continue
         if f[0] == "obj" and len(f) >= 4:
-            # obj <path> <md5> <mtime>  -- blank mtime, keep md5
+            # obj <path> <md5> <mtime>  -- blank mtime, keep md5.
+            # A split-debug obj entry names the .debug leaf; twin members
+            # collide once canonicalised (the twin .debug files' md5s match
+            # across sides, so the two renamed entries become identical).
+            if f[1].startswith("/usr/lib/debug/usr/") and f[1].endswith(".debug"):
+                f[1] = _canon_debug_leaf(f[1], twins)
             out.append(f"obj {' '.join(f[1:-1])} <mtime>")
         elif f[0] == "sym" and len(f) >= 4:
-            # sym <path> -> <target> <mtime>
+            # sym <path> -> <target> <mtime>  -- blank mtime, keep target.
+            # A `.build-id/<xx>/<hash>[.debug]` sym entry keys by the
+            # canonical resolved target (`@buildid:` prefix) and rewrites
+            # the arrow target to that same absolute path, so a twin pair
+            # (ld vs ld.bfd) and a cross-side hash-dir pair (cc1/cc1plus)
+            # both become identical on the two sides.
+            if f[1].startswith("/usr/lib/debug/.build-id/"):
+                f[1], f[3] = _canon_buildid_link(f[1], f[3], twins)
             out.append(f"sym {' '.join(f[1:-1])} <mtime>")
+        elif f[0] == "dir" and len(f) >= 2 and f[1].startswith("/usr/lib/debug/.build-id/"):
+            # dir /usr/lib/debug/.build-id/<xx>  -- the per-architecture
+            # hash subdir the split-debug manager creates for a binary
+            # (cc1 appears under `5d` for the real side, `5a` for
+            # portuale).  Drop the hash, keep parent presence: the parent
+            # `dir /usr/lib/debug/.build-id` row already exists, so the
+            # collapse only ever dedupes to a line both sides emit.
+            out.append("dir /usr/lib/debug/.build-id")
         else:
             out.append(ln.rstrip())
     out.sort()
     return "\n".join(out) + "\n"
 
 
-def norm_vdb(prefix: Path) -> None:
+def norm_vdb(prefix: Path, twins: dict[str, str]) -> None:
     tar = prefix.with_suffix(".vdb.tar")
     dest = prefix.parent / (prefix.name + ".vdb")
     if dest.exists():
@@ -180,7 +316,7 @@ def norm_vdb(prefix: Path) -> None:
             elif name == "environment":
                 f.write_text(norm_environment(f.read_bytes()))
             elif name == "CONTENTS":
-                f.write_text(norm_contents(f.read_text()))
+                f.write_text(norm_contents(f.read_text(), twins))
             elif name == "metadata":
                 f.write_text(norm_metadata(f.read_text()))
             elif name == "repository":
@@ -192,8 +328,9 @@ def main(argv: list[str]) -> int:
         print(__doc__)
         return 2
     prefix = Path(argv[0])
-    norm_files(prefix)
-    norm_vdb(prefix)
+    twins = _twin_families(prefix)
+    norm_files(prefix, twins)
+    norm_vdb(prefix, twins)
     print(f"normalised {prefix}")
     return 0
 

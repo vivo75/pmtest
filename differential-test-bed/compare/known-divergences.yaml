@@ -131,29 +131,16 @@
     Evidence: logs/l0-vm-20260918T183537Z.
   owner: accepted-variance
 
-- id: l2-gpkg-dostrip-splitdebug
-  layer: l2
-  category: SYMLINK
-  path_glob: "/usr/lib/debug/.build-id/e0/2277*"
-  reason: >
-    #38 S0/S2: `porttest/setuid` installs three byte-identical binaries
-    (pt-setuid/pt-setgid/pt-sticky) that share one build-id; `estrip`
-    processes ELFs through `___parallel` and whichever name its
-    `__try_symlink` sees first becomes the target of the shared
-    `.build-id/e0/2277…` links. Real disagrees with itself: the
-    2026-09-08 oracle links `pt-setuid`, the 2026-09-13 real L2 build
-    links `pt-sticky`. Ungradable by construction; narrowed to this one
-    link pair. Everything else (paths, sizes, payloads, CONTENTS) now
-    matches the portage-built sibling exactly.
-  owner: portuale-bug
-
-- id: l2-gpkg-dostrip-splitdebug-contents
-  layer: l2
-  category: CONTENTS
-  path_glob: "porttest/setuid-1.0/CONTENTS"
-  match: "sym /usr/lib/debug/.build-id/e0/2277"
-  reason: "VDB CONTENTS sym-target residue of the same ungradable build-id link race."
-  owner: portuale-bug
+# The two l2-gpkg-dostrip-splitdebug* rows below were RETIRED by P16
+# #152 S1 (2026-09-24): the R3 normaliser (compare/normalize.py) now
+# canonicalises `.build-id` links + split-debug twins by resolved target,
+# which covers the porttest/setuid case exactly -- `test-diff-tolerance.py`
+# pins a synthetic e0/2277-shaped triple (three byte-identical copies
+# sharing one build-id, racy link target) going from raw-finding to clean
+# diff, and the saved Phase 7a L3 control pair re-diffs to 0 unexplained.
+# Keep the carve-out text immediately below as the audit trail.
+# (the old rows: l2-gpkg-dostrip-splitdebug SYMLINK /usr/lib/debug/.build-id/e0/2277*,
+#  l2-gpkg-dostrip-splitdebug-contents CONTENTS porttest/setuid-1.0/CONTENTS "sym …/e0/2277")
 
 - id: l2-vm-repo-revisions-vdb
   layer: l2

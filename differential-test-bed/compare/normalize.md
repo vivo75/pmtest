@@ -49,6 +49,48 @@ Applied by `normalize.py` before `diff.py`:
   `ca-certificates` bundle + hash symlinks.
 - `.keep` / `.keep_<cat>_<pn>-<slot>` files — presence only.
 - `/etc/.pwd.lock`, `/etc/.updated`, `/var/lib/portage/.keep*`.
+- Staging hygiene — paths that are part of the test harness / the
+  container's identity, not of the merged rootfs, are **dropped**
+  outright (both by `snapshot.sh`'s PRUNE list and, for saved
+  snapshots, by the normaliser): `/usr/local/bin/**` (the mounted PM
+  bundle + cargo target dir), `/etc/hosts`, `/etc/machine-id`,
+  `/root/.bash_history`.
+
+### R3 — `.build-id` links and split-debug twins (L2 cross-install, L3)
+
+Split-debug binpkgs install a *family* of byte-identical copies of a
+file under different names — the keyed-libexec tools (`ld`/`ld.bfd`),
+the getconf managers (`POSIX_V6_…`/`XBS5_…`/`POSIX_V7_…`), and the
+porttest setuid triple (`pt-setuid`/`pt-setgid`/`pt-sticky`) that share
+one build-id.  `estrip`'s `__try_symlink` points the shared
+`/usr/lib/debug/.build-id/<xx>/<hash>` links at whichever copy it saw
+first, so the *link target name* races between builds and between
+installers.  The normaliser canonicalises these so a legitimate
+portuale-vs-portage merge never reports them:
+
+- A **twin family** is ≥2 real (`f`) rows with the same
+  `(dirname, size, sha256)`; the canonical member is the lexicographic
+  minimum basename.  Families are derived per side (the shipped name
+  sets are identical on both sides, so the canonical is the same
+  string without cross-side coupling).  Non-`f` and presence-blanked
+  rows never join a family.
+- A `.build-id/<xx>/<hash>[.debug]` **symlink** is re-keyed to
+  `@buildid:<canonical-resolved-target>` — the target is resolved
+  relative to the link's dirname and canonicalised, and the row's
+  `link` is rewritten to that canonical absolute path (with `size`
+  recomputed to `len(link)`).  The `@buildid:` prefix keeps the key out
+  of the real-file path namespace, which matters because two different
+  hash dirs can resolve to the same binary (cc1/cc1plus).
+- A `/usr/lib/debug/usr/**/<name>.debug` **leaf** (fs row or vdb
+  CONTENTS `obj` entry) has its basename stem canonicalised when the
+  stem names a twin member.  Real-file rows are never renamed.
+- A vdb CONTENTS **sym** entry under `.build-id/` gets the same re-key
+  and its `-> target` rewritten to the canonical absolute target.
+- A CONTENTS **dir** line `/usr/lib/debug/.build-id/<xx>` collapses to
+  `dir /usr/lib/debug/.build-id` — the per-architecture hash subdir a
+  split-debug manager creates (cc1 lands in `5d` for one side, `5a`
+  for the other); the parent line already exists, so the collapse only
+  ever dedupes a row both sides already emit.
 
 ## VDB entry (`/var/db/pkg/<cat>/<pf>/`, L1+)
 
