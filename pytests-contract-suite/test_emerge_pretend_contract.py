@@ -532,6 +532,11 @@ CASES = [
         1,
     ),
     (
+        "circular dep: grandparent cycle in --tree still exits 1 (#154: the nomerge ancestor row gains USE, the error is unchanged)",
+        ["--pretend", "--tree", "dev-libs/gpcyclec"],
+        1,
+    ),
+    (
         "circular dep: four-ring with a USE-gated edge reports the lot-of-cycles trailer",
         ["--pretend", "dev-libs/cyc4a"],
         1,
@@ -3117,6 +3122,30 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
         " * disabling USE flags that trigger optional dependencies.\n"
     )
     assert "Change USE:" not in rust.stderr
+
+
+def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
+    emerge_binary, fixture_env
+):
+    """Backlog #154 (`--tree dev-libs/gpcyclec`, real 3.0.82.2 live
+    oracle): a merge node's ancestor occurrence renders as a `[nomerge]`
+    row that still carries the package's `USE="…"` display -- real
+    `Display.__call__` runs `_display_use` for every package with no
+    ordered/merge gate, and `print_messages` appends `" " + verboseadd`
+    (`_create_use_string`'s own trailing space makes real's row end
+    `USE="x" `; portuale's established convention omits trailing spaces,
+    as its merge rows already do, so the pinned row ends `USE="x"`).
+    `verbose_size` is merge-gated, so no size suffix follows on this arm.
+    Full stdout pinned; the stderr error block is the flat cell's."""
+    args = ["--pretend", "--tree", "dev-libs/gpcyclec"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/gpcyclec-1.0 ",
+        "[nomerge       ]  dev-libs/gpcyclea-1.0 USE=\"x\"",
+        "[ebuild  N     ]   dev-libs/gpcycleb-1.0 ",
+        "[ebuild  N     ]    dev-libs/gpcyclea-1.0  USE=\"x\"",
+    ], rust.stdout
 
 
 def test_circular_dep_conditional_grandparent_keeps_the_suggestion_with_followup(
