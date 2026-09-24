@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package with a computed SLOT (task #149): real metadata evaluates ver_cut(1) to 1
+EAPI=8
+KEYWORDS=amd64
+SLOT=1
+_md5_=7e928bd374bd04fab9007f9eb9dd105e

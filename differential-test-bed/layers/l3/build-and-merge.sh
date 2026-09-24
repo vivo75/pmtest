@@ -13,6 +13,8 @@
 #   L3_PORTAGE_PIN=3.0.82.2
 #   L3_SKIP_PORTAGE_UPGRADE=0
 #   L3_BUILD_ARGS="--emptytree --oneshot --usepkg=n --color=n"
+#   L3_JOBS=1                  MAKEOPTS -j only (1 = deterministic; batch
+#                              2026-09-24 R1: pass 20 on gate/source cells)
 #
 # Exit: the PM's own rc (0 green); a non-zero run still writes
 # `<out>.partial` and the merged-cpvs list so triage has data.
@@ -24,6 +26,7 @@ OUT=${3:?output prefix}
 PIN=${L3_PORTAGE_PIN:-3.0.82.2}
 SKIP_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}
 BUILD_ARGS=${L3_BUILD_ARGS:---emptytree --oneshot --usepkg=n --color=n}
+JOBS=${L3_JOBS:-1}
 
 case $PM in
   portage)  EM=/usr/sbin/emerge ;;
@@ -60,10 +63,12 @@ if ! grep -q 'portuale-l3 determinism block' /etc/portage/make.conf 2>/dev/null;
     printf 'FEATURES="-buildpkg -sign -ccache -distcc -cgroup -userpriv -usersandbox -userfetch -usersync sandbox pid-sandbox xattr filecaps splitdebug"\n' \
       >> /etc/portage/make.conf
   fi
-  cat >> /etc/portage/make.conf <<'EOF'
+  cat >> /etc/portage/make.conf <<EOF
 
 # portuale-l3 determinism block (differential-test-bed/layers/l3/build-and-merge.sh)
-MAKEOPTS="-j1"
+# MAKEOPTS is the L3_JOBS knob (MAKEOPTS only; batch 2026-09-24 R1:
+# 1 = deterministic, gate/source cells may raise it to 20).
+MAKEOPTS="-j${JOBS}"
 SOURCE_DATE_EPOCH=1740000000
 EMERGE_DEFAULT_OPTS=""
 EOF

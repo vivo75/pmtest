@@ -60,6 +60,7 @@ run_pm() {  # <label> <portage|portuale>
     -e "SNAPSHOT_PRUNE=$PM_REPO" \
     -e "L3_SKIP_PORTAGE_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L3_BUILD_ARGS=${L3_BUILD_ARGS:---emptytree --oneshot --usepkg=n --color=n}" \
+    -e "L3_JOBS=${L3_JOBS:-1}" \
     --entrypoint /bin/bash "$IMAGE" \
     /TEST/layers/l3/build-and-merge.sh "$pm" "$REL_ATOMLIST" "/TEST/logs/$RUN/$label" \
     2>&1 | tee "$OUT/$label.container.log"
@@ -117,6 +118,7 @@ summary() {  # <file> <label>
   echo
   echo "atoms  : $REL_ATOMLIST"
   echo "mode   : $MODE (control=${L3_CONTROL:-0})"
+  echo "jobs   : -j${L3_JOBS:-1} (MAKEOPTS; 1 = deterministic)"
   echo "dates  : $(date -u +%FT%TZ)"
   echo "portage: $OUT/portage.merge.log"
   echo "portuale: $OUT/portuale.merge.log"
@@ -194,8 +196,18 @@ PY
 
 rc=0
 # A PM that produced no snapshot means the run is invalid (setup error
-# or timeout), never "green": grade only complete same-run pairs.
-expected=(portage portuale)
+# or timeout), never "green": grade only complete same-run pairs. When
+# `L3_PM` restricts to one side (R5's `L3_PM=portuale` source gate),
+# only that side's snapshot is required -- there is no pair to diff, so
+# the graded signal is the side's own merge rc (its `build-and-merge.sh`
+# run) and snapshot being produced at all.
+expected=()
+if [ "$MODE" = both ] || [ "$MODE" = portage ]; then
+  expected+=(portage)
+fi
+if [ "$MODE" = both ] || [ "$MODE" = portuale ]; then
+  expected+=(portuale)
+fi
 if [ "${L3_CONTROL:-0}" = 1 ]; then
   expected+=(control-a control-b)
 fi

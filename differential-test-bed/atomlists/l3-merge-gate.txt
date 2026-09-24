@@ -1,0 +1,17 @@
+# Merge-path safety gate, SOURCE half -- the pair of running files plus
+# the backlog #149 probe package, built and merged from source.
+#
+# The L1 gate (atomlists/l1-merge-gate.txt) merges glibc+bash from
+# binpkg, which never runs the source path's `merge_after_install`
+# (it reads `meta_get("SLOT")` instead of `build-info/SLOT`). This cell
+# runs `--emptytree --oneshot --usepkg=n` instead, so it exercises the
+# source SLOT chain the L1 gate cannot (batch-2026-09-24 ruling R5).
+# mpdecimal is the #149 repro package (`SLOT="$(ver_cut 1)"`), verifying
+# the evaluated slot lands in the vdb while glibc+bash re-merging over
+# the live container exercises the merge-path safety gate from source.
+#
+#   differential-test-bed/run/l3-source-parity.sh differential-test-bed/atomlists/l3-merge-gate.txt
+#     (L3_PM=portuale L3_JOBS=20; batch R1/R5)
+sys-libs/glibc
+app-shells/bash
+dev-libs/mpdecimal
