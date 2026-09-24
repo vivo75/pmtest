@@ -78,6 +78,32 @@ podman_run_pm() {
     "$@"
 }
 
+# portuale's phase runtime needs the three `bin/`-helper files that
+# `import portage` (`portageq-wrapper`, `portageq`, `ebuild-pyhelper`).
+# They are *not* vendored into `bin/` (see portuale `bin/README.md`);
+# `ebuild_phases::bin_dir()` overlays the vendored `bin/` with the
+# gitignored Portage checkout's `bin/` only when that checkout exists at
+# `PORTUALE_PORTAGE_CHECKOUT` (unset by the bed) or
+# `<repo_root>/3rdparty/portage`. The container mounts `$PM_REPO` at its
+# own host path (below), so the host path this checks IS what the
+# container's phase exec sees. Without the checkout every `has_version`
+# / `best_version` call dies in `pkg_preinst` with an opaque
+# `portageq exit code: 127` (backlog #151); fail loud here instead.
+portuale_phase_helpers_preflight() {
+  [ "$PM_NAME" = portuale ] || return 0
+  local checkout="${PORTUALE_PORTAGE_CHECKOUT:-$PM_REPO/3rdparty/portage}"
+  if [ ! -x "$checkout/bin/portageq-wrapper" ]; then
+    echo "!!! [preflight] portuale's phase runtime can't find $checkout/bin/portageq-wrapper" >&2
+    echo "!!!   the gitignored Portage checkout (3rdparty/portage) is what provides the" >&2
+    echo "!!!   portage-importing bin helpers; the L1 container mounts \$PM_REPO only," >&2
+    echo "!!!   so a missing checkout means every glibc/bash merge dies with a" >&2
+    echo "!!!   'has_version: unexpected portageq exit code: 127' in pkg_preinst." >&2
+    echo "!!!   Fix: run 'setup.sh portage' in the portuale checkout (3rdparty/README.md)," >&2
+    echo "!!!   or stage the checkout under \$PM_REPO ($PM_REPO)." >&2
+    exit 2
+  fi
+}
+
 # Which build produced a run's numbers is part of the numbers, so every
 # run dir carries it: `pm.json` next to the logs, written before the
 # first container starts. `$PM_VERSION` is what the registry resolved

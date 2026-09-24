@@ -35,6 +35,7 @@ mkdir -p "$OUT" "$PKGCACHE"
 ln -sfn "$RUN" "$LOGS_DIR/l1-latest"
 
 ensure_pm_built "$OUT"
+portuale_phase_helpers_preflight
 ensure_image
 
 [ "${L1_REBUILD:-0}" = 1 ] && { echo ">>> L1_REBUILD: wiping $PKGCACHE"; rm -rf "${PKGCACHE:?}"/*; }
