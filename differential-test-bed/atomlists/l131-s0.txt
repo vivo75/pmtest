@@ -1,0 +1,17 @@
+# Phase 13 S0 — `--tree` walk-sequence oracle cells (#131 + #150).
+# Re-grounded 2026-09-24 (plan docs/02.131-tree-walk-sequence.md §S0 in
+# the portuale repo). Not the default list: this is the capture set the
+# S0 verdict quotes verbatim and S1/S2's pins assert against.
+#
+# u6 (`#131` residue 1): real's tree retlist puts `blockerpkg` after
+# `graphblockerparent`; portuale reverses the flat list instead.
+--tree dev-libs/blockerpkg dev-libs/graphblockerparent
+# p2b (`#131` residues 2+3): real leads with the merge owner, trails a
+# nested new-slot owner occurrence, and nests the dep child as `[N]`
+# where portuale nests `[U]`. Flat mode shows no row on either side.
+--tree --update dev-libs/p2btarget dev-libs/p2bowner dev-libs/newpkg
+# slotusegroup (`#150`, kin of #131): real nests `slotusetarget-1.0`
+# directly after `slotusex-1.0`; portuale prints a `[nomerge] slotusex`
+# ancestor line between the 2.0 and 1.0 rows. Flat list, rc and notice
+# are byte-real with or without it.
+--tree -D dev-libs/slotusegroup
