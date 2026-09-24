@@ -527,7 +527,7 @@ CASES = [
         1,
     ),
     (
-        "circular dep: conditional grandparent keeps the suggestion with followup",
+        "invalid: conditional USE-dep on a flag outside the owner's own IUSE masks the package",
         ["--pretend", "dev-libs/fucyclec"],
         1,
     ),
@@ -652,7 +652,8 @@ CASES = [
         ["--pretend", "dev-libs/subslotmismatchconsumer"],
         1,
     ),
-    ("recursion: USE-dep dependency atoms are resolved, not dropped", ["--pretend", "dev-libs/usedeppkg"], 0),
+    ("invalid: defaulted conditional USE-dep on a flag outside the owner's own IUSE masks the package", ["--pretend", "dev-libs/usedeppkg"], 1),
+    ("invalid: USE-conditional group on a flag outside the owner's own IUSE masks the package", ["--pretend", "dev-vcs/somercurial"], 1),
     (
         "recursion: a genuinely unsatisfied USE-dep dependency atom is rejected",
         ["--pretend", "dev-libs/usedeprejectedpkg"],
@@ -3148,32 +3149,34 @@ def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     ], rust.stdout
 
 
-def test_circular_dep_conditional_grandparent_keeps_the_suggestion_with_followup(
+def test_invalid_use_conditional_in_depend_masks_the_package(
     emerge_binary, fixture_env
 ):
-    """The `followup_change` arm of the same grandparent check (real
-    `_find_suggestions` step 9; `docs/history/find-suggestions-plan.md`
-    left exactly this variant without a fixture): `dev-libs/fucyclec`
-    build-depends on `dev-libs/fucyclea[x?]` with a *conditional* USE-dep,
-    so the "disable x on fucyclea" fix survives but is flagged as possibly
-    cascading upward -- real prints the `Change USE:` line *plus* the
-    ` (This change might require USE changes on parent packages.)`
-    trailer. Full stderr pinned."""
+    """Backlog #153 (P19): `dev-libs/fucyclec` has no `IUSE` but its
+    `DEPEND` names `dev-libs/fucyclea[x?]` -- real `Package._validate_deps`
+    (`Atom._validate_conditional_flags`) masks the whole candidate
+    `invalid` at construction, so the resolve fails with the all-masked
+    report before any cycle is ever walked (the fucyclea/fucycleb cycle is
+    still in the tree, unreachable). This pin replaces the old
+    `test_circular_dep_conditional_grandparent_keeps_the_suggestion_with_followup`,
+    whose `Change USE: -x` + followup trailer described a merge real never
+    makes (real 3.0.82.2, oracle captured against a `cp -a` copy of this
+    tree; portuale omits real's `for <root>.` suffix by the
+    fixture-miss-message-unsuffixed convention). Full stderr pinned; the
+    `--tree` twin is the l131-s1 bed cell."""
     args = ["--pretend", "dev-libs/fucyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
+    assert rust.stdout == ""
     assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/fucyclea-1.0 depends on\n"
-        " dev-libs/fucycleb-1.0 (buildtime)\n"
-        "  dev-libs/fucyclea-1.0 (buildtime)\n"
+        '!!! All ebuilds that could satisfy "dev-libs/fucyclec" have been masked.\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        "- dev-libs/fucyclec-1.0::testrepo (masked by: invalid: DEPEND: USE flag 'x' referenced in conditional 'x?' in atom 'dev-libs/fucyclea[x?]' is not in IUSE)\n"
         "\n"
-        "It might be possible to break this cycle\n"
-        "by applying the following change:\n"
-        "- dev-libs/fucyclea-1.0 (Change USE: -x)\n"
-        " (This change might require USE changes on parent packages.)\n"
-        "Note that this change can be reverted, once the package has been installed.\n"
+        "For more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook.\n"
+        "\n"
     )
 
 
@@ -4779,26 +4782,59 @@ def test_slot_operator_rebuild_cascades_through_a_multi_level_chain(
         _assert_harvested(rust)
 
 
-def test_use_dep_dependency_atoms_are_resolved_not_dropped(emerge_binary, fixture_env):
-    """dev-libs/usedeppkg's own RDEPEND is
-    "dev-libs/newpkg[bar(+)] dev-libs/multislotpkg:1[baz(+)?]" -- same
-    class of bug slot operators had (see
-    test_slot_operator_dependency_atoms_resolve_both_forms): before this
-    slice, portage-dep's v1 grammar didn't parse USE deps at all, so both
-    tokens would have been silently dropped from the graph. Both use-dep
-    flags are `(+)`-defaulted and missing from their own target's IUSE
-    (see use_deps_satisfied's own doc comment, portage-dep, for why that
-    trivially satisfies them regardless of profile USE state) -- proving
-    USE-dep atoms are genuinely resolved AND enforced now, not just
-    grammar-recognized-but-ignored (see the dedicated USE-dep enforcement
-    tests below for the rejection side of that)."""
+def test_invalid_defaulted_use_dep_conditional_masks_the_package(emerge_binary, fixture_env):
+    """Backlog #153 (P19): `dev-libs/usedeppkg` has no `IUSE` but its
+    `RDEPEND` names `dev-libs/multislotpkg:1[baz(+)?]` -- the `(+)`
+    default does NOT exempt the conditional from real
+    `Atom._validate_conditional_flags` (the default only matters for
+    *matching* against the target's IUSE; validation is against the
+    *owner's*), so real masks the candidate `invalid` and the resolve
+    fails with the all-masked report (real 3.0.82.2, oracle against a
+    `cp -a` copy of this tree). This pin replaces
+    `test_use_dep_dependency_atoms_are_resolved_not_dropped`, whose merge
+    list described a merge real never makes; the resolution side of that
+    test lives on in `test_autounmask_use_resolves_a_dependency_use_dep_mismatch`
+    (unconditional `[-foo]`, unaffected -- unconditional use-deps are
+    never owner-validated) and the slot-operator twin below. The atoms
+    are still genuinely parsed, not dropped: the message quotes
+    `dev-libs/multislotpkg:1[baz(+)?]` byte-for-byte, defaults included.
+    Full stderr pinned."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/usedeppkg"], fixture_env)
-    assert result.returncode == 0
-    assert result.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-        '[ebuild  N     ] dev-libs/multislotpkg-2.0 ',
-        '[ebuild  N     ] dev-libs/usedeppkg-1.0 ',
-    ]
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        "\n"
+        '!!! All ebuilds that could satisfy "dev-libs/usedeppkg" have been masked.\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        "- dev-libs/usedeppkg-1.0::testrepo (masked by: invalid: RDEPEND: USE flag 'baz' referenced in conditional 'baz?' in atom 'dev-libs/multislotpkg:1[baz(+)?]' is not in IUSE)\n"
+        "\n"
+        "For more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook.\n"
+        "\n"
+    )
+
+
+def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
+    """Backlog #153 (P19), the group half: `dev-vcs/somercurial-5.5.1` has
+    no `IUSE` but its `RDEPEND` gates `dev-python/sopypy` behind
+    `soflag? ( … )` -- real `_validate_deps` runs `use_reduce` with
+    `matchall=True`, so the inactive group is still validated and the
+    candidate is masked `invalid` (real 3.0.82.2, oracle against a `cp -a`
+    copy of this tree; the group message has no `in atom` part, unlike
+    the use-dep one). Full stderr pinned."""
+    result = _run([str(emerge_binary)], ["--pretend", "dev-vcs/somercurial"], fixture_env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        "\n"
+        '!!! All ebuilds that could satisfy "dev-vcs/somercurial" have been masked.\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        "- dev-vcs/somercurial-5.5.1::testrepo (masked by: invalid: RDEPEND: USE flag 'soflag' referenced in conditional 'soflag?' is not in IUSE)\n"
+        "\n"
+        "For more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook.\n"
+        "\n"
+    )
 
 
 def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
