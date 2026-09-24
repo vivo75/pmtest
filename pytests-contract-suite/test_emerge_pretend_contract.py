@@ -17898,7 +17898,8 @@ def test_oracle_76_wait_follows_the_selected_disjunctive_branch(emerge_binary, f
 def test_oracle_81_tree_only_satisfied_row_from_the_stuck_serializer(
     emerge_binary, fixture_env
 ):
-    """Backlog #81 S1/S2 (C0 p2b): the tree-only satisfied row.
+    """Backlog #81 S1/S2 (C0 p2b) + #131 S1: the tree-only satisfied row
+    and its walk sequence.
 
     `p2btarget-2.0` replaces installed `p2btarget-1.0` in-slot while the
     blocker owner `p2bowner` upgrades 1.0 -> 1.1 itself. Flat mode's
@@ -17910,13 +17911,14 @@ def test_oracle_81_tree_only_satisfied_row_from_the_stuck_serializer(
     (`merge_order::tree_solved_replacements`), hanging the row under the
     replacement exactly like an Inline row.
 
-    Host oracle, real 3.0.82.2, 2026-09-19: the `[blocks b]` bytes, the
-    nesting under the replacement, rc 0, and the `-v` counters
-    (`Conflict: 1 block (all satisfied)` in tree, absent in flat) all
-    match. The surrounding walk sequence stays portuale's own (real leads
-    with the merge owner and trails the nested new-slot occurrence;
-    portuale opens on the nomerge ancestor) -- documented residue on the
-    branch, same class as u6/multislotparent sibling order.
+    Host oracle, real 3.0.82.2, 2026-09-19 (row bytes, nesting, rc 0,
+    `-v` counters) and bed `l0-fx-20260924T090502Z` (full walk
+    sequence): real leads with the merge owner, interleaves `newpkg`
+    second, trails the nested `[nomerge]` owner occurrence with the
+    block + replacement nested under it. Portuale walks the tree-mode
+    serialization (`merge_order::tree_display_order`, #131 S1) instead
+    of the flat order, so the whole list below is byte-identical to
+    real modulo real's ` to <root>/` suffix.
     """
     args = [
         "--pretend",
@@ -17928,18 +17930,14 @@ def test_oracle_81_tree_only_satisfied_row_from_the_stuck_serializer(
     ]
     result = _run([str(emerge_binary)], args, fixture_env)
     assert result.returncode == 0
-    lines = result.stdout.splitlines()
-    row = lines.index(
+    assert result.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/p2bowner-1.1 [1.0]",
+        "[ebuild  N     ] dev-libs/newpkg-1.0 ",
+        "[nomerge       ] dev-libs/p2bowner-1.1 [1.0]",
         '[blocks b      ]  <dev-libs/p2btarget-2.0 ("<dev-libs/p2btarget-2.0" is '
-        "soft blocking dev-libs/p2bowner-1.1)"
-    )
-    # The row follows the owner's merge line with the replacement nested
-    # beneath it, like real. (Real additionally interleaves the newpkg
-    # merge, a nomerge-owner ancestor occurrence and a nested new-slot
-    # owner line around this core -- walk-sequence residue, same class as
-    # u6/multislotparent sibling order, documented on the branch.)
-    assert lines[row - 1] == "[ebuild     U  ] dev-libs/p2bowner-1.1 [1.0]"
-    assert lines[row + 1] == "[ebuild     U  ]   dev-libs/p2btarget-2.0 [1.0]"
+        "soft blocking dev-libs/p2bowner-1.1)",
+        "[ebuild     U  ]   dev-libs/p2btarget-2.0 [1.0]",
+    ], result.stdout
     # Flat mode shows no row for the same argv (both PMs agree).
     flat = _run(
         [str(emerge_binary)],
