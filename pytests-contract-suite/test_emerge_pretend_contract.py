@@ -17968,6 +17968,54 @@ def test_oracle_81_tree_only_satisfied_row_from_the_stuck_serializer(
     assert "Conflict:" not in verbose_flat.stdout
 
 
+def test_oracle_150_tree_shared_child_nests_without_a_nomerge_ancestor(
+    emerge_binary, fixture_env
+):
+    """Backlog #150 (S2; #148 S1 residue, kin of #131): the `--tree`
+    shared-child placement.
+
+    `-D dev-libs/slotusegroup` pulls two same-slot instances of
+    `dev-libs/slotusetarget` (1.0 via `slotusex`/`slotusey`, 2.0 via
+    `slotuseplain`; flat list, rc and notice byte-real since #148). Real
+    nests `slotusetarget-1.0` directly under `slotusex`'s first
+    occurrence; portuale used to re-descend the already-displayed
+    `slotusex` as a `[nomerge]` ancestor between the 2.0 and 1.0 rows,
+    and met the `slotusegroup` children in reversed-flat order. Walking
+    the tree-mode serialization (`merge_order::tree_display_order`,
+    #131 S1) keeps a live chain to the first occurrence, so the shared
+    child nests there with no ancestor line.
+
+    Bed `l0-fx-20260924T090502Z`, cell `--tree -D dev-libs/slotusegroup`
+    (real 3.0.82.2): the list below is byte-identical to real modulo
+    real's ` to <root>/` suffix. Flat output is #148's standing pin and
+    must not move (asserted minimally here via the missing `[nomerge]`).
+    """
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--tree", "-D", "dev-libs/slotusegroup"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    # The six merge rows come first (the slot-conflict notice follows;
+    # its bytes are #148's standing pin, not this one's).
+    assert result.stdout.splitlines()[:6] == [
+        "[ebuild  N     ] dev-libs/slotusegroup-1.0 ",
+        "[ebuild  N     ]  dev-libs/slotuseplain-1.0 ",
+        '[ebuild  N     ]   dev-libs/slotusetarget-2.0  USE="(-x)"',
+        "[ebuild  N     ]  dev-libs/slotusey-1.0 ",
+        "[ebuild  N     ]  dev-libs/slotusex-1.0 ",
+        '[ebuild  N     ]   dev-libs/slotusetarget-1.0  USE="x y"',
+    ], result.stdout
+    assert "[nomerge" not in result.stdout
+    flat = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-D", "dev-libs/slotusegroup"],
+        fixture_env,
+    )
+    assert flat.returncode == 1
+    assert "[nomerge" not in flat.stdout
+
+
 def test_oracle_87_rdepend_disjunctive_wait_is_default_bed_covered(
     emerge_binary, fixture_env
 ):

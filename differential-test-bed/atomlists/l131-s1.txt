@@ -1,0 +1,16 @@
+# Phase 13 S1/S2 — drift-review cells for the moved `--tree` outputs
+# (#131 + #150). Every `--tree` corpus key the S1/S2 product change
+# moves, re-verified against real 3.0.82.2 cell by cell (plan
+# docs/02.131-tree-walk-sequence.md §S1/S2). Not the default list:
+# the S0 atomlist (`l131-s0.txt`) holds the oracle cells; this one holds
+# the blast-radius cells whose new bytes the corpus bless adopts.
+--tree dev-libs/fucyclec
+--tree dev-libs/gpcyclec
+--tree dev-libs/mg2top
+--tree dev-libs/rdrcyc
+--tree dev-libs/scuseparent
+--tree dev-libs/slotconfgroup
+--tree dev-libs/slotconflictunsolvable
+--tree dev-libs/socmeta
+--tree @selected
+--tree @world
