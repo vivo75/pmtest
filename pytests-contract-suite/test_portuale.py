@@ -5364,6 +5364,51 @@ def test_standalone_ebuild_merge_applies_package_env_build_vars(emerge_binary, t
     assert flags == PENVBUILDPKG_FLAGS, flags
 
 
+def test_standalone_ebuild_package_applies_per_entry_binpkg_compress(
+    ebuild_binary, tmp_path
+):
+    """Standalone `ebuild <file> package` reads `BINPKG_COMPRESS`
+    from the package's own settings (real `doebuild.py:697` on the
+    setcpv'd config -- backlog #147 S3, oracle S0 C2: real writes a
+    gzip artefact with run-wide zstd). `dev-libs/penvcmppkg` carries
+    the `penv-compress` match (`BINPKG_COMPRESS=gzip`); the run-wide
+    value is deliberately left unset (no calling-env
+    `BINPKG_COMPRESS`, which would mask the match per #101 on both
+    sides -- same rule the `--buildpkgonly` pin documents). The
+    artefact stays on the single-instance layout: S3 moves no layout
+    (the STOPPED S1 arm owns that question, and real's standalone
+    `inject` uses the run-wide allocator either way). `FEATURES`
+    matching is deliberately not pinned here: no per-package
+    `FEATURES` token has a real-honored standalone-`package`
+    artefact effect (layout is run-wide, signing needs its own
+    oracle), so per O9 it is not implemented."""
+    pkgdir = tmp_path / "pkgdir"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(tmp_path / "root")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PKGDIR"] = str(pkgdir)
+    env["BINPKG_FORMAT"] = "xpak"
+    r = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(
+                Path(FIXTURES_ROOT)
+                / "repo/dev-libs/penvcmppkg/penvcmppkg-1.0.ebuild"
+            ),
+            "package",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    artefact = pkgdir / "dev-libs/penvcmppkg-1.0.tbz2"
+    assert artefact.is_file()
+    assert artefact.read_bytes()[:4] == b"\x1f\x8b\x08\x00", (
+        "the package.env BINPKG_COMPRESS=gzip match must reach the "
+        "standalone package pipe, not just the run-wide default"
+    )
+
+
 def test_standalone_ebuild_package_env_cc_reaches_the_tc_is_lto_probe(
     emerge_binary, tmp_path
 ):
