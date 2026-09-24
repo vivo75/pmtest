@@ -1967,6 +1967,61 @@ def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
     assert "PATH: dev-libs/packagepkg-1.0.gpkg.tar" in packages
 
 
+def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
+    emerge_binary, tmp_path
+):
+    """Real `--buildpkgonly` reads `BINPKG_COMPRESS` from the package's
+    own settings (`doebuild.py:697`, reached through its `package.env`
+    match) for the xpak pipe -- backlog #147 S2, oracle S0 B-xpak:
+    real writes a gzip artefact for the matched package (magic
+    `1f 8b`) and the run-wide fallback for its neighbour. The gpkg
+    half is deliberately not pinned here: real's `gpkg-helper.py`
+    reads the *run-wide* settings (`bin/gpkg-helper.py:49`), so
+    per-entry compression is xpak-only by real's own rule (S0
+    B-gpkg). The run-wide value is deliberately left unset (no
+    calling-env `BINPKG_COMPRESS`): real lets the calling
+    environment beat `package.env` for a scalar (#101's
+    `[run-wide, pkg, calling-env]` order), so a calling-env value
+    would mask the match on both sides -- the unmatched neighbour
+    pins the `bzip2` fallback both sides compute with no
+    `BINPKG_COMPRESS` anywhere (real's own `.get` default,
+    `doebuild.py:697`; fixture roots carry no `make.globals`
+    layer). Both artefacts stay on the single-instance layout: S2
+    moves no layout (that is the STOPPED S1 arm, not this slice).
+    `dev-libs/penvcmppkg` is the twin fixture that isolates the
+    compressor (its ebuild records nothing); `dev-libs/packagepkg`
+    is the unmatched neighbour (its RDEPEND is vdb-satisfied like
+    the other `--buildpkgonly` pins)."""
+    env = _real_build_env(tmp_path)
+    env["BINPKG_FORMAT"] = "xpak"
+    for atom in ("dev-libs/penvcmppkg", "dev-libs/packagepkg"):
+        result = subprocess.run(
+            [str(emerge_binary), "--buildpkgonly", atom],
+            capture_output=True,
+            text=True,
+            check=True,
+            env=env,
+        )
+        assert f">>> Building binary for {atom}-1.0..." in result.stdout
+
+    def magic(path):
+        data = Path(path).read_bytes()[:4]
+        assert len(data) == 4, f"{path} should hold a real archive"
+        return data
+
+    matched = Path(env["PKGDIR"]) / "dev-libs/penvcmppkg-1.0.tbz2"
+    assert matched.is_file()
+    assert magic(matched) == b"\x1f\x8b\x08\x00", (
+        "the package.env BINPKG_COMPRESS=gzip match must reach the "
+        "xpak pipe for this package only"
+    )
+    neighbour = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2"
+    assert neighbour.is_file()
+    assert magic(neighbour)[:3] == b"BZh", (
+        "the unmatched neighbour keeps the run-wide bzip2 fallback bytes"
+    )
+
+
 # Portage's own committed GnuPG test keyring
 # (`3rdparty/portage/lib/portage/tests/.gnupg` -- the same keys real's
 # own `test_gpkg_gpg.py` signs with): trusted `0x5D90EA06352177F6`,
