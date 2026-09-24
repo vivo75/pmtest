@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: per-package BINPKG_COMPRESS reaches the xpak pipe
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=d9eea9585a14dc14f5d87af4ec028f4a
