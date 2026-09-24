@@ -2022,6 +2022,77 @@ def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
     )
 
 
+def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
+    emerge_binary, tmp_path
+):
+    """Backlog #147 S1 ruling (i): the binpkg layout is run-wide-only
+    (real's bintree binds its allocator once, `bintree.py:529-531`),
+    while `BUILD_ID` follows the entry's own token (real
+    `EbuildBinpkg.py:47-48`) -- oracle S0 A2/D2. An overlay config
+    (copytree precedent:
+    `test_standalone_ebuild_setup_sees_the_per_package_features`)
+    negates the token for `dev-libs/packagepkg` only, with the
+    overlay `make.conf` putting run-wide multi-instance ON for
+    both sides: both packages take the multi path (the
+    negation moves no layout), the unnegated twin's index stanza
+    carries `BUILD_ID`, the negated neighbour's omits it. `EMERGE
+    -b` exercises the merge-side `package_after_install` call
+    (the `--buildpkgonly` twin shape is Rust-pinned); both merges
+    land rc 0 in a throwaway ROOT. Layering note: run-wide ON comes
+    from the overlay `make.conf` (config layer), and the calling
+    `FEATURES` carries only `buildpkg` -- a calling-env token
+    would re-add what `package.env` removes on both sides (#101
+    order, probed live in S1 D4: negation + calling token still
+    exports `BUILD_ID`)."""
+    import shutil
+
+    cfg = tmp_path / "cfg147s1"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    (cfg / "etc" / "portage" / "env" / "penv-nomulti").write_text(
+        'FEATURES="-binpkg-multi-instance"\n'
+    )
+    with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
+        fh.write("dev-libs/packagepkg penv-nomulti\n")
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write('FEATURES="${FEATURES} binpkg-multi-instance"\n')
+    root = tmp_path / "root147s1"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    pkgdir = tmp_path / "pkgdir147s1"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt147s1")
+    env["PKGDIR"] = str(pkgdir)
+    env["FEATURES"] = "buildpkg"
+    env.pop("BINPKG_COMPRESS", None)
+    env.pop("BINPKG_FORMAT", None)
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/penvcmppkg", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+
+    twin = pkgdir / "dev-libs/penvcmppkg/penvcmppkg-1.0-1.xpak"
+    assert twin.is_file(), "run-wide multi layout for the unnegated twin"
+    negated = pkgdir / "dev-libs/packagepkg/packagepkg-1.0-1.xpak"
+    assert negated.is_file(), "run-wide multi layout despite the negation"
+
+    stanzas = (pkgdir / "Packages").read_text().split("\n\n")
+
+    def stanza(cpv):
+        return next(b for b in stanzas if f"CPV: {cpv}\n" in b)
+
+    assert any(
+        line.startswith("BUILD_ID: ")
+        for line in stanza("dev-libs/penvcmppkg-1.0").splitlines()
+    ), "the unnegated twin exports its BUILD_ID"
+    assert all(
+        not line.startswith("BUILD_ID")
+        for line in stanza("dev-libs/packagepkg-1.0").splitlines()
+    ), "the negated neighbour exports none"
+
+
 # Portage's own committed GnuPG test keyring
 # (`3rdparty/portage/lib/portage/tests/.gnupg` -- the same keys real's
 # own `test_gpkg_gpg.py` signs with): trusted `0x5D90EA06352177F6`,
