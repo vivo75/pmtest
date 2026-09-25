@@ -537,6 +537,11 @@ CASES = [
         1,
     ),
     (
+        "tree: backtrack-abandoned parents display under the earliest-resolved puller (#155: [nomerge] mgfa/mgxa, not mgfb/mgxb)",
+        ["--pretend", "--tree", "dev-libs/mg2top"],
+        0,
+    ),
+    (
         "circular dep: four-ring with a USE-gated edge reports the lot-of-cycles trailer",
         ["--pretend", "dev-libs/cyc4a"],
         1,
@@ -16379,6 +16384,34 @@ def test_oracle_two_simultaneous_conflicts_defer_second_to_later_pass(
         "[ebuild  N     ] dev-libs/mgfa-1 ",
         "[ebuild  N     ] dev-libs/mgxa-1 ",
         "[ebuild  N     ] dev-libs/mg2top-1 ",
+    ]
+
+
+def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
+    emerge_binary, fixture_env
+):
+    """Backlog #155 (P21, display half): `--tree dev-libs/mg2top` nests
+    `mgfc-1` under `[nomerge] mgfa-1` (and `mgxc-1` under `[nomerge]
+    mgxa-1`), like real -- not under `[nomerge] mgfb-1`/`[nomerge]
+    mgxb-1`. Real's digraph parent lists follow edge-insertion
+    (resolution) order and the tree walk picks the first untraversed
+    parent; portuale enumerated display edges over merge-sorted array
+    position, letting the later-discovered `mgfb-1` precede `mgfa-1`.
+    `GraphEntry::discovery` (stamped pre-sort) now orders the
+    enumeration. The skipped-updates WARNING itself is #129 (needs
+    backtrack-trial state). Full stdout pinned (rc 0)."""
+    rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/mg2top"], fixture_env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/mg2top-1 ",
+        "[ebuild  N     ]  dev-libs/mgfa-1 ",
+        "[ebuild  N     ]   dev-libs/mgfb-1 ",
+        "[ebuild  N     ]  dev-libs/mgxa-1 ",
+        "[ebuild  N     ]   dev-libs/mgxb-1 ",
+        "[nomerge       ] dev-libs/mgfa-1",
+        "[ebuild  N     ]  dev-libs/mgfc-1 ",
+        "[nomerge       ] dev-libs/mgxa-1",
+        "[ebuild  N     ]  dev-libs/mgxc-1 ",
     ]
 
 
