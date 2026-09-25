@@ -10,6 +10,12 @@ PMTEST_PM=portage python3 -m pytest pytests-contract-suite -q   # testate il por
 PMTEST_PM=portuale python3 -m pytest pytests-contract-suite -q  # testate portuale (default)
 ```
 
+Il profilo cargo è scelto da `PMTEST_PROFILE` (`debug` o `release`,
+default `release`): vale sia per il flag di build (`--release` solo nel
+profilo `release`) sia per ogni path `target/<profile>/`, compresi quelli
+dichiarati in `managers.yaml`. Un valore diverso da `debug`/`release` è
+errore — un profilo scritto male non deve graduare un'altra build.
+
 ## Formato di una voce (`managers.yaml`)
 
 ```yaml
@@ -30,7 +36,7 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
     package: portuale          # package cargo del multicall (default: portuale)
     binary: /path/esplicito    # vince su emerge per la fixture product-binary
     versions_harness: /path    # override per-harness (default:
-    atom_harness: /path        #   <rust_dir>/target/release/<package-harness>)
+    atom_harness: /path        #   <rust_dir>/target/<profile>/<package-harness>)
 ```
 
 - `type: reference` — il PM oracolo (oggi il portage reale). Il suo
@@ -44,12 +50,15 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
   lo stesso percorso di un'installazione reale. I path relativi si
   risolvono contro la root di pmtest.
 - Risoluzione (a parità di voce): se la voce ha `repo`/`rust_dir` si
-  esegue **sempre** `cargo build --release` del `package` (cargo è il
+  esegue **sempre** una build cargo del `package` (cargo è il
   proprio controllo di aggiornamento: no-op se nulla è cambiato, ma
   nessun run può graduare un binario stale dopo una modifica al
   sorgente; `PMTEST_NO_BUILD=1` disattiva la build dove il binario è
   volutamente prebuilt) → poi si usa il path dichiarato, e se manca è
-  errore. Un PM senza `repo` (come `portage`) usa il path esplicito e
+  errore. Il profilo è quello di `PMTEST_PROFILE`: `_cargo_build` passa
+  `--release` solo con `release`, e ogni segmento `target/release/` o
+  `target/debug/` (yaml compreso) viene riscritto sul profilo attivo. Un
+  PM senza `repo` (come `portage`) usa il path esplicito e
   non ha harness neutrali: gli harness contract per lui fanno skip, i
   contract via `emerge` girano normali.
 - `version` — **risolta a run time, non scritta a mano**: `git` = commit
@@ -106,7 +115,7 @@ resto la usa — niente path di PM cablati altrove:
 | Consumatore | Come |
 |---|---|
 | `pytests-contract-suite/conftest.py` | `registry.applet/harness/product_binary` (un `NotProvided` diventa `skip`, ogni altro errore `fail`) |
-| `differential-test-bed/run/lib.sh` | `registry.py --sh` → `PM_NAME PM_PACKAGE PM_VERSION PM_EMERGE PM_BIN_DIR PM_REPO PM_RUST_DIR`; `--no-build` risolve senza costruire; `ensure_pm_built "$OUT"` scrive `pm.json` nella dir del run |
+| `differential-test-bed/run/lib.sh` | `registry.py --sh` → `PM_NAME PM_PACKAGE PM_VERSION PM_PROFILE PM_EMERGE PM_BIN_DIR PM_REPO PM_RUST_DIR`; `--no-build` risolve senza costruire; `ensure_pm_built "$OUT"` scrive `pm.json` nella dir del run |
 | `bench/run_benchmark.py` | `registry.harness("versions")` |
 | `scripts/primitive_tree_differential.py` | `registry.harness(...)` per i tre harness |
 | `scripts/portage_repin_review.py` | `registry.rust_dir(...)` (le citazioni da rivedere sono nei sorgenti del PM) |
