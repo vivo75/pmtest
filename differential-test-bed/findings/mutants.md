@@ -514,3 +514,82 @@ through rustup proxy shims here — prefix
 `RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu` (same 1.98.1
 compiler); and a re-run that reports only two early misses while
 `caught.txt` keeps growing is fine (stdout shows misses only).
+
+## #164 closeout (2026-09-26, branch `backlog/164-librs-masking`)
+
+S1–S6, all test-only in `rust/portage-repo/src/lib.rs` (one new `mod
+tests_164` block, 33 legs; no product byte, no pmtest counterpart —
+standalone commits). Direct legs observing each predicate's own result:
+hand-built `Candidate`s over a nonexistent repo location (no md5-cache
+entry means `invalid_use_conditional_reasons` is empty), `Binary`
+candidates carrying their own `binary_use`/`binary_deps` (no repo
+staging at all), hand-built `GraphEntry` vecs, and a scratch-repo
+writer with per-version KEYWORDS/LICENSE/SLOT for
+`visible_tree_matches`.
+
+Scope accounting (S0 on current `main`: `cargo mutants -p portage-repo
+--file portage-repo/src/lib.rs --in-place --timeout 300 --re
+'<nine cluster-4 names>'`, serial in-place — `--in-place` rejects
+`--jobs` in v27.1.0, so `-j 4` became serial; 133 mutants, 18 min):
+
+| Function | S0 missed | After | Killed by |
+|---|---|---|---|
+| `parse_license_tree` | 11 | 0 | S1 exact error positions (`pos + N` on every arm, incl. position 0) |
+| `keyword_masked_only` | 7 | 0 | S2 true/false + per-gate + mask/unmask + invalid legs |
+| `mask_masked_only` | 9 | 0 | S2, same shape |
+| `license_masked_only` | 7 | 0 | S2 + USE-conditional leg |
+| `use_masked_only` | 4 | 0 | S2 binary baked-USE legs |
+| `visible_tree_matches` | 9 | 0 | S3 scratch-repo legs (visible set, `!`/`=` constraints, LICENSE verdict) |
+| `masked_dep_chain` (+3 nested fns) | 9 | 0 | S4 decoy-pinned chain/installed/arg-lines legs |
+| `required_use_dep_chain` | 4 | 0 | S5 parent/argument/decoy/empty legs |
+| `autounmask_dep_chain` | 13 | 1 | S6 chain/upgrade/installed/self-loop legs; 1 proven equivalent (below) |
+
+Closeout re-run of the S0 command (touch first): **133 tested: 1
+missed / 130 caught / 2 unviable** (was 73 / 58 / 2). Real grounding
+for every mask/license verdict leg: `_getmaskingstatus`
+(`3rdparty/portage/lib/portage/package/ebuild/getmaskingstatus.py:43`,
+one `_MaskReason` per failing category — the "X alone" semantics),
+`LicenseManager.getMissingLicenses`/`_getMaskedLicenses`
+(`_config/LicenseManager.py:169,211`), `_pkg_visibility_check`
+(`depgraph.py:7562`), `_get_dep_chain_as_comment` (`depgraph.py:6457`),
+`_show_unsatisfied_dep` (`depgraph.py:6471`).
+
+Survivor buckets (line numbers are `portage-repo/src/lib.rs` at
+`4eaf0d02`):
+
+- Proven equivalent (1): `autounmask_dep_chain` 19302:31 (`match guard
+  *next != cur -> true`). The only divergence shape is a self-loop
+  (`required_by.first() == cur`): the mutant advances onto itself and
+  re-breaks on the `visited` set with the identical chain (the node is
+  always pushed first — every non-NVC/Uninstall outcome carries a
+  version; no-parent means the guard never evaluates; a longer cycle
+  has no self-edge). Hand-applied and observed surviving the full
+  644-test suite; pinned by the new self-loop leg.
+- Pre-existing unviable (2, unchanged from S0): `parse_license_tree`
+  `Ok(vec![Default::default()])` and
+  `masked_dep_chain::select_entry` `Some(Box::leak(Default))` — neither
+  target type implements `Default`, so neither compiles.
+
+No product divergence found: every mask/license verdict the legs pin
+matches real's reason-accumulation semantics above. Two test-design
+traps hit while writing legs (both fixed before committing, kept here
+so the next item doesn't re-learn them): (1) `test_config` accepts no
+license by default, so MIT-licensed scratch packages read as
+license-masked — accept `*` when the KEYWORDS verdict is the subject;
+(2) an operator-less versioned constraint (`!dev-libs/pkg-1.0`) is
+rejected as PMS-ambiguous by portage-dep (mirroring real
+`Atom.__init__`), making the constraint vacuous — use `!=...`.
+
+Scope-filter notes for the next items: `--re` also matches 4
+`BacktrackParams::initial` field-deletion mutants on EVERY filter
+(including a nonsense one — unconditional companions, caught
+throughout, unrelated to this cluster); and a `$`-anchored `--re`
+silently drops whole-body replacements (their names end in `[]`/
+`true`, not the function name) — S1–S3 ran gate-level rows anchored
+and whole-body rows fell through to this closeout run; S4–S6 ran
+unanchored. Prefer unanchored function-name scopes. `cargo fmt
+--check` stayed green at every slice commit here (the tree was clean
+at S0, so each slice hand-matched rustfmt instead of a closeout
+`cargo fmt` — no style commit needed); `cargo clippy --release
+--all-targets` zero warnings; `cargo test --release -p portage-repo`
+644 passed (611 + 33 new).
