@@ -5,8 +5,9 @@ Single source of truth for the registry: the pytest contract suite
 (`bench/run_benchmark.py`) and the differential test bed
 (`differential-test-bed/run/lib.sh`, through `--sh`) all resolve their
 binaries here instead of hardcoding a path. The active entry is picked
-by `$PMTEST_PM` (default: `portuale`); see `managers/README.md` for the
-entry format.
+by `$PMTEST_PM` (default: `portuale`) and the cargo profile by
+`$PMTEST_PROFILE` (`debug`/`release`, default: `release`); see
+`managers/README.md` for the entry format.
 
 Errors are raised, never printed: each caller maps them to its own
 idiom (pytest fail/skip, a shell exit, a benchmark error). Two kinds:
@@ -25,6 +26,7 @@ idiom (pytest fail/skip, a shell exit, a benchmark error). Two kinds:
 """
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -39,6 +41,14 @@ except ImportError:  # pragma: no cover - PyYAML is a documented host prereq
 PMTEST_ROOT = Path(__file__).resolve().parents[1]
 MANAGERS_YAML = PMTEST_ROOT / "managers" / "managers.yaml"
 DEFAULT_PM = "portuale"
+
+# Cargo profile for source builds and every `target/<profile>/` path.
+# `debug` carries asserts and un-stripped backtraces (local Rust loops);
+# `release` is the historical default. Wall times compare only within one
+# profile, so the active one is part of what a run must record.
+DEBUG_PROFILE = "debug"
+DEFAULT_PROFILE = "release"
+PROFILES = (DEBUG_PROFILE, DEFAULT_PROFILE)
 
 APPLETS = ("emerge", "ebuild", "mrg")
 
@@ -95,9 +105,52 @@ def active_pm(name=None):
     return name, reg[name] or {}
 
 
+def cargo_profile():
+    """Cargo profile for this run: `$PMTEST_PROFILE`, default `release`.
+
+    `debug` selects cargo's default profile (no `--release`, no invented
+    `--profile debug`); `release` keeps the historical `--release` flag and
+    `target/release/` paths. Unset or empty means `release`, so every
+    existing invocation is unchanged. Any other non-empty value is a hard
+    error rather than a silent fallback -- a mistyped profile must not
+    quietly grade a different build. `"0"` is not special: only the empty
+    string means default.
+    """
+    raw = os.environ.get("PMTEST_PROFILE", "")
+    if raw == "":
+        return DEFAULT_PROFILE
+    if raw not in PROFILES:
+        raise RegistryError(
+            f"PMTEST_PROFILE={raw!r} is not a cargo profile "
+            f"(expected one of: {', '.join(repr(p) for p in PROFILES)})"
+        )
+    return raw
+
+
+# A cargo target dir is `target/<profile>` as a whole path segment; it must
+# not match `.../mytarget/release...` nor `target/release-notes`.
+_TARGET_PROFILE_RE = re.compile(r"(?<![^/])target/(?:debug|release)(?=/|$)")
+
+
+def _profile_path(raw):
+    """Rewrite a cargo `target/<profile>/` segment to the active profile.
+
+    `managers.yaml` pins source-built binaries at `.../target/release/...`;
+    with `$PMTEST_PROFILE=debug` the same entry has to resolve to
+    `target/debug/...`, so the rewrite happens here once, for every
+    registry path. A path with no cargo profile segment (e.g.
+    `/usr/sbin/emerge`) is returned untouched.
+    """
+    return _TARGET_PROFILE_RE.sub(f"target/{cargo_profile()}", str(raw))
+
+
 def resolve_path(raw, canonical=False):
     """A registry path, made absolute. Relative entries resolve against
     the pmtest root; `a/../b` is normalised either way.
+
+    Any cargo `target/<profile>/` segment is rewritten to the active
+    profile first (`$PMTEST_PROFILE`), so a yaml path pinned at
+    `target/release` still runs the debug binary under `debug`.
 
     `canonical` additionally resolves symlinks, and is for *directories*
     only: a checkout's path is a container mount point and a prefix to
@@ -108,7 +161,8 @@ def resolve_path(raw, canonical=False):
     basename -- resolving it would change which applet runs, or run a
     wrapper that refuses to be called directly.
     """
-    p = Path(os.path.expandvars(os.path.expanduser(str(raw))))
+    p = _profile_path(os.path.expandvars(os.path.expanduser(str(raw))))
+    p = Path(p)
     p = p if p.is_absolute() else PMTEST_ROOT / p
     return p.resolve() if canonical else Path(os.path.abspath(p))
 
@@ -193,8 +247,12 @@ def _build_disabled():
 
 
 def _cargo_build(rust_dir_, package):
+    argv = ["cargo", "build"]
+    if cargo_profile() == DEFAULT_PROFILE:
+        argv.append("--release")
+    argv += ["--package", package]
     subprocess.run(
-        ["cargo", "build", "--release", "--package", package],
+        argv,
         cwd=rust_dir_,
         check=True,
     )
@@ -242,7 +300,7 @@ def declared_applet(kind, name=None):
     rd = rust_dir(pm)
     if rd is None:
         raise NotProvided(f"PM {name!r}: no {kind} path and no repo in registry")
-    return rd / "target" / "release" / pm.get("package", "portuale")
+    return rd / "target" / cargo_profile() / pm.get("package", "portuale")
 
 
 def applet(kind, name=None, build=True):
@@ -275,7 +333,7 @@ def harness(kind, name=None, build=True):
                 f"PM {name!r} ships no {package} harness "
                 "(no repo in registry) -- harness contract not applicable"
             )
-        binary = rd / "target" / "release" / package
+        binary = rd / "target" / cargo_profile() / package
     return _provide(name, pm, package, binary, build=build)
 
 
@@ -317,6 +375,7 @@ def _sh(argv):
         "PM_NAME": name,
         "PM_PACKAGE": pm.get("package", "portuale"),
         "PM_VERSION": pm_version(name),
+        "PM_PROFILE": cargo_profile(),
         "PM_EMERGE": str(emerge),
         "PM_BIN_DIR": str(emerge.parent),
         "PM_REPO": str(repo) if repo else "",
@@ -331,7 +390,10 @@ def main(argv):
         _sh(argv)
         return 0
     name, pm = active_pm()
-    print(f"{name} ({pm.get('type', 'unknown')}, version {pm_version(name)})")
+    print(
+        f"{name} ({pm.get('type', 'unknown')}, version {pm_version(name)}, "
+        f"profile {cargo_profile()})"
+    )
     for kind in APPLETS:
         try:
             print(f"  {kind}: {declared_applet(kind, name=name)}")
