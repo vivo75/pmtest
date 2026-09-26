@@ -52,6 +52,13 @@ if [ -d /porttest-overlay ] && grep -q '^porttest/' "$ATOMLIST"; then
 	masters = gentoo
 	auto-sync = no
 	EOF
+  # the porttest/installmask fixture ships files these patterns should
+  # drop at merge -- set in make.conf (the resolved-config layer) so
+  # BOTH PMs read it identically. (portuale reads env-var INSTALL_MASK
+  # for a source merge but not a --getbinpkg merge -- L1-d; put it here
+  # to actually exercise the mask logic.)
+  printf 'INSTALL_MASK="/usr/share/porttest/im/drop.txt /usr/share/porttest/im/*.log *.la"\n' \
+    >> /etc/portage/make.conf
 fi
 
 # --- sshd/ssh hygiene (both are harness bugs, not product) --------------
