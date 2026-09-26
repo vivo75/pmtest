@@ -4705,6 +4705,59 @@ def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_p
     )
 
 
+def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(
+    emerge_binary, tmp_path
+):
+    """Real `post_emerge()`'s info block (`lib/_emerge/post_emerge.py:
+    126-130` + `lib/portage/util/_info_files.py::chk_updated_info_files`):
+    `emerge dev-libs/dirregenpkg` into a scratch ROOT merges
+    `usr/share/info/dirregenpkg.info` (whose `START-INFO-DIR-ENTRY` block
+    names `* dirregenpkg:`), and the post-merge step regenerates
+    `usr/share/info/dir` with the host `/usr/bin/install-info`, records
+    the dir's mtime in `mtimedb["info"]`, and prints the real
+    `Regenerating...` / `Processed 1 info files.` lines. Skips when the
+    host has no `install-info` (real silently no-ops there too)."""
+    if not Path("/usr/bin/install-info").exists():
+        pytest.skip("no /usr/bin/install-info on this host")
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # INFOPATH reaches the post-merge step through the env.d collation
+    # real `settings.reload(); settings.regenerate()` derives
+    # `${ROOT}/etc/profile.env` from.
+    (root / "etc" / "env.d").mkdir(parents=True)
+    (root / "etc" / "env.d" / "50-test").write_text('INFOPATH="/usr/share/info"\n')
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/dirregenpkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+
+    info_dir = root / "usr/share/info"
+    assert (info_dir / "dirregenpkg.info").is_file()
+    index = (info_dir / "dir").read_text()
+    assert "* dirregenpkg: (dirregenpkg)." in index
+    assert list(info_dir.glob("dir*.old")) == []
+    assert "Regenerating GNU info directory index..." in result.stdout
+    assert "Processed 1 info files." in result.stdout
+
+    # The dir-mtime memo: `mtimedb["info"]` maps the absolute inforoot
+    # to the directory's mtime, so a later run with no change reports
+    # up-to-date instead of regenerating (covered hermetically in
+    # `rust/portuale/src/info_files.rs`; here just the persisted shape).
+    mtimedb = (root / "var/cache/edb/mtimedb").read_text()
+    assert '"info"' in mtimedb
+    assert str(info_dir) in mtimedb
+
+
 def _passwordless_sudo() -> list[str] | None:
     """`["sudo", "-n"]` when the host has passwordless sudo (the
     container test bed's convention; the L3 oracle bed relies on it), or
