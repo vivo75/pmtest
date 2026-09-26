@@ -166,6 +166,13 @@ comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.vdb-list
     [ -f "$d/CONTENTS" ] \
       && awk '$1=="obj"||$1=="sym"||$1=="dir" {print $2}' "$d/CONTENTS"
   done < "$OUT.vdb-list.txt"
+  # CONFIG_PROTECT divert files, mirroring layers/l1/consume.sh exactly:
+  # real Portage writes `._cfg????_*` siblings under a protected path, and
+  # without this a future cell whose merge diverts a config file would
+  # compare those rows as MISSING. `${FAR%/}/etc` keeps a leading single
+  # slash for the `/` far root this bed uses (FAR is ROOT-relative input,
+  # like the CONTENTS paths and the fixed tail below).
+  find "${FAR%/}/etc" -name '._cfg????_*' 2>/dev/null
   # mirrors layers/l1/consume.sh's fixed tail; paths absent in the far ROOT
   # are skipped by snapshot.sh, so candidate-only MISSING rows are honest.
   printf '%s\n' \
@@ -193,4 +200,8 @@ fi
 
 [ -f "$BASE/pid" ] && kill "$(cat "$BASE/pid")" 2>/dev/null
 log "done (worst mrg rc=$worst; candidate diffs are for S2, not triaged here)"
-exit 0
+# Exit the worst per-atom `mrg` rc (0 merged, 1 unit-failed, 2 setup error)
+# so the container rc the host records is meaningful. Per-atom rcs stay in
+# $OUT.mrg-rcs.tsv. (S1 review: the old unconditional `exit 0` made the
+# host's `mrg_rc` label always read 0.)
+exit "$worst"

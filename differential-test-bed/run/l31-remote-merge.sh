@@ -153,7 +153,10 @@ set -e
     ver=$(grep -h '^portage_version' "$prefix.meta.tsv" 2>/dev/null | cut -f2- || true)
     echo "$label	${ver:-unknown}"
   done
-  [ "$MODE" = candidate ] && echo "candidate_mrg_rc	$mrg_rc"
+  # The candidate container's rc = the worst per-atom `mrg` rc (consumed
+  # via `exit "$worst"` in consume-remote.sh); the per-atom split is in
+  # candidate/mrg.mrg-rcs.tsv. S1 review: the old label always read 0.
+  [ "$MODE" = candidate ] && echo "candidate_container_rc	$mrg_rc"
 } >> "$OUT/header.txt"
 
 ln -sfn "$RUN/l31-report.txt" "$LOGS_DIR/l31-report.txt"
