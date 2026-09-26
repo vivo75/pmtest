@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile install
+DESCRIPTION=fixture package: a variable unset in an earlier phase stays unset in a later one (#160)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=519f65cf90ac22c861c2f0084b84ef84
