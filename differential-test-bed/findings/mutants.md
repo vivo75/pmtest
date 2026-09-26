@@ -514,3 +514,92 @@ through rustup proxy shims here — prefix
 `RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu` (same 1.98.1
 compiler); and a re-run that reports only two early misses while
 `caught.txt` keeps growing is fine (stdout shows misses only).
+
+## #163 closeout (2026-09-26, branch `backlog/163-librs-display`)
+
+S1–S5, all test-only in `rust/portage-repo/src/lib.rs` (new
+`mod tests_163`, +~3900 lines, 81 tests; zero product bytes, no
+pmtest counterpart — standalone commits). Direct result-structure
+legs in the #161/#162 scratch-repo style (`repo_pkgs_163` /
+`write_pkg_163` / `install_163` / `resolve_163` + `RpOpts163` /
+`ctx_163` / `pass_163` helpers, one temp root per leg).
+
+S0 scope (`cargo mutants -p portage-repo --file
+portage-repo/src/lib.rs --in-place --timeout 300 -F
+'(resolve_pretend|assemble_result|use_unsat_parent_row|abort_outcome|refresh_entry_use_display)'`,
+180 mutants): **76 missed / 91 caught / 13 unviable**. Per-function
+missed at S0: `refresh_entry_use_display` 4 (of 9 rows),
+`use_unsat_parent_row` 6 (of 13), `resolve_pretend` 29 (of 96),
+`abort_outcome` 5 (of 14), `assemble_result` 32 (of 43). The 5
+strays (4 `BacktrackParams::initial` field deletions, all caught;
+1 `resolve_pretend_graph` whole-body row, unviable) needed nothing.
+
+Closeout re-run (same command, `touch` first, on the S5 tree):
+**2 missed / 165 caught / 13 unviable**. Per-function missed
+after: `resolve_pretend` 2, everything else 0 — 74 killed across
+S1–S5 (S1 5, S2 6, S3 4, S4 27, S5 32), every one hand-verified
+lethal by mutant application (focused `cargo test -p portage-repo
+--lib tests_163` run per mutant, restored with `git checkout --`).
+
+Survivor buckets (line numbers are the S0-run lines in
+`portage-repo/src/lib.rs` — the appended `tests_163` block shifts
+nothing before it; every row below was hand-applied and observed
+surviving):
+
+- Proven equivalent (1): 13097:33 (`&&` -> `||` in the
+  `_equiv_ebuild_visible` outer gate). The gate's body is a no-op
+  in exactly the shapes where the gate flips: with no binaries the
+  retain runs over an empty vec, and under `--usepkgonly` the
+  ebuild-visibility probe sees ebuilds only (binaries join the pool
+  after the block) while `some_ebuild_matches_atom` is false and
+  `uev` is false, so the inner retain never runs. Full `tests_163`
+  suite green under the mutant.
+- Unreachable (1): 13406:27 guard-`true` (`Some(use_deps) if true`).
+  Only `Some([])` could observe it, and `portage-dep`
+  `parse_use_deps` returns `None` for empty brackets (`foo[]` is
+  invalid, same as real) while `parse_atom` propagates that `None`
+  — so the arm is entered exactly when real enters it.
+- Unviable (13, tool-reported, no test possible): the four
+  whole-body `Default::default()` rows (`resolve_pretend`,
+  `abort_outcome`, `assemble_result`, `resolve_pretend_graph` —
+  none of those types implement `Default`), the six `&&` -> `||`
+  flips on `let`-chain arms (13328/13329/13330, 13499,
+  13541:9/13542:9/13543:9 — the `||` branch leaves the `let`
+  binding unbound), 10419:9 (`||` names an unintroduced binding),
+  and 25068:13 (same `let`-chain shape).
+
+Corrections to slice work (no rebases, following this file's own
+#161 review-pass precedent): the S4 `lonely` and `changed-deps`
+legs were redesigned mid-slice (masked ebuild / slot-skewed binary)
+after hand-application showed the `_equiv_ebuild_visible` filter
+drops any binary with no ebuild at its version regardless of the
+respect-use/changed-deps verdict; the S4 pin leg was redesigned
+(masked tree) after the downstream `matched`-filter was found to
+repair the `satisfies_extra_constraints` break; the S4 rebuilt
+`rebuilt` arm was restructured (top-level selective under
+`--update`) after the `--emptytree` arm was found to mask the
+disjunction mutant; a new best-path trigger test covers the
+best-version disjunction arms the `avoid_update` shortcut masks;
+the S5 dedup leg was redesigned (different-atom record) after the
+coalescing block was found to repair exact duplicates; the S1
+18968:52 kill lands through the installed leg too (`.find()`
+shadowing), not just the ghost leg.
+
+Method notes for #164–#166 (in addition to #161's): never edit or
+commit `lib.rs` while your own `--in-place` run is active — it
+restores the file to its startup snapshot after every mutant and
+silently wipes uncommitted work (S1 was lost exactly this way;
+`git checkout --` restores are only safe past a commit). Amend
+(`git commit --amend`) rather than stacking fixups when a
+hand-application round trips a leg redesign. Process-global
+setters (`set_useoldpkg_atoms`) need a dedicated cp plus a single
+set/reset pair in one test, or parallel legs observe each other's
+windows (here: `dev-libs/opkg`). The slot-operator vdb-scan token
+is `:slot/sub=` with no trailing colon (`dev-libs/prov:0/0=`
+parses; `:0/0:=` does not).
+
+No `cargo fmt` closeout commit: every slice kept `cargo fmt
+--check` green as it landed (one mid-S4 `cargo fmt` over own hunks
+only), and the closeout check is clean. Closeout gates:
+`cargo clippy --release --all-targets` zero warnings;
+`cargo test --release -p portage-repo` 738 passed / 0 failed.
