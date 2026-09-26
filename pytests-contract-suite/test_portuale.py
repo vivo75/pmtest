@@ -3381,6 +3381,65 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
     assert world_lines == sorted(world_lines)
 
 
+def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
+    emerge_binary, tmp_path
+):
+    """#160 real-execution pin: a vdb aux file the package itself `unset`
+    in an earlier phase must not be written, while one it still has a
+    value for must be.
+
+    Real `bin/phase-functions.sh`'s `__dyn_install` loop writes an aux
+    file only when its value is non-empty, and real
+    `config.environ()`'s `filter_calling_env`
+    (`lib/portage/package/ebuild/config.py:3275-3305`, bug #189417) is
+    what keeps `unset CFLAGS` -- `dev-build/ninja-1.13.2-r1`'s own
+    `src_compile` shape, mirrored by the `unsetcflagspkg` fixture -- from
+    leaking back into `src_install`. Before the fix portuale re-injected
+    the config `CFLAGS` into every later phase, so `src_install` still saw
+    it, `build-info/CFLAGS` existed, and the vdb carried a `CFLAGS` row
+    real omits (l3-20260925T074707Z Class 4). `CXXFLAGS`, never unset in
+    the ebuild, is the control: its row must stay. The whole shape is a
+    merged-vdb set difference, so it only shows on a real merge -- a
+    `--pretend` run never writes a vdb (this pin is therefore real
+    execution, not a CASES/contract entry)."""
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    # The calling env's own values: both flags are resolved into the
+    # config, so both reach the first phase. Only `src_compile`'s
+    # `unset CFLAGS` distinguishes them from then on.
+    env["CFLAGS"] = "-O2 -pipe"
+    env["CXXFLAGS"] = "-O2 -pipe"
+
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/unsetcflagspkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> dev-libs/unsetcflagspkg-1.0 merged." in result.stdout
+
+    # src_install's own view: the earlier `unset` stuck, the control flag
+    # survived (the record is merged, not just written to ${T}).
+    observed = root / "usr/share/unsetcflagspkg/unset-observed.txt"
+    assert observed.read_text() == "CFLAGS=<unset>\nCXXFLAGS=-O2 -pipe\n"
+
+    vdb = root / "var/db/pkg/dev-libs/unsetcflagspkg-1.0"
+    assert not (vdb / "CFLAGS").exists(), (
+        "#160: a value the ebuild unset in an earlier phase must not reach"
+        " the vdb"
+    )
+    assert (vdb / "CXXFLAGS").read_text().strip() == "-O2 -pipe", (
+        "a value the package still carries must stay in the vdb"
+    )
+
+
 def test_emerge_atom_docompress_compresses_docs_and_repairs_symlinks(
     emerge_binary, tmp_path
 ):
