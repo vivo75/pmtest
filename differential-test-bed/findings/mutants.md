@@ -295,3 +295,47 @@ promotion, asap-parent preference, range-escalation guard),
 `serialize_merge_order`, `schedule_graph`, `tree_solved_replacements`,
 `suppressed_alt_edges`). No fixture was added and no product byte
 changed.
+
+## `portage-repo/src/lib.rs` — run 2026-09-25 (backlog #52 P7b, batch `batch-2026-09-24.md`)
+
+Launch: `cargo mutants --in-place --file portage-repo/src/lib.rs`
+(branch `backlog/52-librs-mutants` both repos, portuale rev `a790a058`,
+clean tree before and after — only `mutants.out/` remained, removed;
+per-row data kept in the portuale workspace
+`.superpowers/sdd/batch-2026-09-24/p7b/`). Mutant count at launch
+**2729** (was 2207 in the plan; growth from Phase 13 + #153/#155, as
+predicted). Unmutated baseline green. Serial run, ~7 h wall clock.
+
+Result: **2729 tested: 1588 caught / 940 missed / 197 unviable / 4
+timeouts.** `lib.rs` holds 422 `#[test]`s, but the 132
+survivor-carrying functions have ~zero direct unit references — the
+same shape Phase 8 found in `merge_order.rs`: coverage lives in the
+black-box contract suite, which the mutation run does not execute.
+Timeouts (inspect, don't pin around): `delete ! in
+topological_removal_order` (7627:12, loop-divergence suspect, same
+family as Phase 8's `schedule_graph` hangs), `Backtracker::get ->
+Some(default)` (20574:9, default params likely re-enter backtracking
+forever), and two `alnum_sort_key` arithmetic rows (8543/8544, slow,
+not necessarily hung).
+
+Clusters (one backlog item each; each item's implementation classifies
+equivalent/trace-only rows the way Phase 8's review pass did — no
+tests written in this phase):
+
+| Item | Area | Missed | Representative functions |
+|---|---|---|---|
+| #161 | slot-conflict/backtracker driver | ~233 | `run_pass` (140), `direct_solve_slot_conflicts`, `build_residual_slot_conflicts`, `collect_feedback`, `Backtracker::feedback`, `slot_operator_rebuild_*` (+1 timeout) |
+| #162 | pure selection predicates | ~102 | `promote_tied_alternative`, `alternative_downgrade_demoted`, `params_equal`, `disjunction_preference`, `clean_selection`, `complete_graph_auto_enable`, `check_if_latest_atom_form`, `bare_cp` |
+| #163 | result/display assembly | ~88 | `resolve_pretend` (42), `assemble_result` (32), `use_unsat_parent_row`, `abort_outcome`, `refresh_entry_use_display` |
+| #164 | masking/visibility stack | ~63 | `autounmask_dep_chain`, `parse_license_tree`, `mask/license/keyword_masked_only`, `visible_tree_matches`, `required_use/masked_dep_chain` |
+| #165 | graph inputs (walk/installed/vdb, merge-order, blockers, use) | ~122 | `installed_reverse_dependents`, `vdb_fingerprint`, `find_repos_impl`, `enqueue_dependencies`, `topological_removal_order` (+1 timeout), `prune_cleanlist`, `resolve_blockers`, `file_blocker_conflicts`, `collect_unwalked_installed_blockers`, `parent_use_state` |
+| #166 | circular/instance-use solution residue | ~120 | `circular_dep_solutions` (17), `synthesize_surviving_conflict_entries`, `rebuilt_binary_changed`, `strip_revision`, `filter_usepkg_exclude_include`, `direct_solve_instance_use/arg_mode` |
+
+Plus ~212 whole-function-body rows with no function attribution,
+spread file-wide (heaviest: 82 in lines 0–1999, the top-of-file
+config/error/slot helpers) — each item's implementation reviews its
+area's share. Bucket hypothesis for
+all six: real unit-test gaps (black-box-covered, unit-invisible),
+with whole-body noops on small pure functions the likely-equivalent
+tail. O12-style stop not applicable (campaign phase, not a parity
+run); no stop fired — six clusters is the handful the plan asks for.
