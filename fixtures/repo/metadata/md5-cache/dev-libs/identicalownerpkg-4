@@ -1,0 +1,6 @@
+DEFINED_PHASES=install preinst
+DESCRIPTION=fixture package: a byte-identical file a preinst helper removes only when REPLACING_VERSIONS is unset (#158)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=6674ae053871e10d0d7b162f9197d506
