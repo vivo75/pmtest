@@ -1,0 +1,21 @@
+# L4 remote-merge bed (#31) -- S1/S2 atomlist.  See findings/l4.md
+# "## #31 S0".
+#
+# The far machine is the R9 hermetic stand-in (pmtest loopback_sshd + the
+# differential-test-bed container ROOT); a real off-box VM is deferred.
+#
+# Two cells, both tiny porttest overlay ebuilds (EAPI=8, no SRC_URI, build
+# in seconds with real Portage into a gpkg $PKGDIR):
+#
+#   porttest/setuid  THE minimal package.  4711/2755/1750/0600 modes +
+#                    distinct uid/gid on shared parents + real ELF bytes
+#                    + a vdb entry.  S0 already shows real Portage keeps
+#                    all three setuid/setgid/sticky bits while mrg remote
+#                    drops them (711/755/750) -- the one cell that makes
+#                    the bed's first candidate diff honest.
+#   porttest/phases  the §6 stage-2 hooks: every pkg_* phase appends to
+#                    /var/lib/porttest/phase.log, so the client-side
+#                    pretend/setup/preinst/postinst order (and merge type)
+#                    is observable in the far ROOT.
+porttest/setuid
+porttest/phases
