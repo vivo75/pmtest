@@ -17,5 +17,13 @@
 #                    /var/lib/porttest/phase.log, so the client-side
 #                    pretend/setup/preinst/postinst order (and merge type)
 #                    is observable in the far ROOT.
+#   porttest/installmask  the #170 cell: im/drop.txt, im/also-drop.log,
+#                    libporttest.la (+ onlydropped/x.log) only survive when
+#                    the merge ignores the bed mask
+#                    (INSTALL_MASK="/usr/share/porttest/im/drop.txt
+#                    /usr/share/porttest/im/*.log *.la" + /usr/share/info);
+#                    without it the l31 VDB comparison is vacuous on the
+#                    mask path.
 porttest/setuid
 porttest/phases
+porttest/installmask
