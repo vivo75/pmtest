@@ -12,13 +12,17 @@ Five transforms, each applied to a private copy of `fixtures/`:
    vdb and every atom string (output normalised back);
 5. reorder two non-overlapping `package.use` lines.
 
-A representative subset of `CASES` (the IUSE/IUSE_EXPAND/config-file
-heavy fixtures, at most three cases per fixture) runs pristine and
-transformed; `(exit, stdout, stderr)` must be byte-identical. This is a
-property test, not an exhaustive one (the plan's own wording). A
-transform that changes output is a genuine bug: fix it and keep the
-failing case as a permanent regression fixture rather than relaxing the
-transform.
+A representative subset of `CASES` runs pristine and transformed;
+`(exit, stdout, stderr)` must be byte-identical. This is a property test,
+not an exhaustive one (the plan's own wording). The subset covers the
+IUSE/IUSE_EXPAND/config-file heavy fixtures (at most three cases per
+fixture atom) plus one representative atom group per other resolver area
+(blockers, slot conflicts / slot operators, circular deps, keyword/mask
+visibility, `||`-group selection, autounmask, binary packages), and three
+description-matched cases whose argv carries no selectable atom (`@world` /
+`@system` expand from files, not from an atom string). A transform that
+changes output is a genuine bug: fix it and keep the failing case as a
+permanent regression fixture rather than relaxing the transform.
 """
 
 from __future__ import annotations
@@ -40,6 +44,8 @@ from test_emerge_pretend_contract import CASES
 REPO_NAMES = ("repo", "overlay", "independentoverlay", "layoutmasteroverlay", "repnamerepo")
 
 SUBSET_ATOMS = (
+    # USE-flag shapes (the original eight): IUSE/IUSE_EXPAND evaluation,
+    # package.use layering, REQUIRED_USE, wildcard expansion, build flags.
     "dev-libs/useflagpkg",
     "dev-libs/useexpandpkg",
     "dev-libs/iusedefaultpkg",
@@ -48,6 +54,51 @@ SUBSET_ATOMS = (
     "dev-libs/requireduseokpkg",
     "dev-libs/wildexpandpkg",
     "dev-libs/usebuildpkg",
+    # Blockers: upstream pg0 merge-order permutations (each ordering pulls
+    # all three atoms, so only blk0a is listed), a satisfied strong blocker,
+    # and an unsolvable weak blocker (rc 1, the `B` graph path).
+    "dev-libs/blk0a",
+    "dev-libs/blockerpkg",
+    "dev-libs/graphblockerparent",
+    # Slot conflicts / slot operators: backtrack-reconciled conflict,
+    # reported unsolvable conflict (rc 1, incl. the --backtrack=30 hint
+    # variant), and slot-operator dep atoms that must resolve, not drop.
+    "dev-libs/slotconflictparent",
+    "dev-libs/slotconflictunsolvable",
+    "dev-libs/slotoperatorpkg",
+    # Circular deps: upstream pg0 failure with USE suggestions (versioned
+    # `=dev-libs/cyc0z-N` atoms), the four-ring cycle trailer, and a plain
+    # cycle that terminates (rc 0).
+    "dev-libs/cyc0z",
+    "dev-libs/cyc4a",
+    "dev-libs/cycle-a",
+    # Keyword / mask visibility: installed-but-masked top-level atom,
+    # avoid_update keeping a masked dependency (its --emptytree downgrade
+    # and USE-dep siblings match the same atom prefix, covering the
+    # --emptytree shape too).
+    "dev-libs/keywordmaskedpkg",
+    "dev-libs/needskeywordmasked",
+    # `||`-group selection: the masked-alternative allow_masked pass, the
+    # installed-alternative preference (+ the unsatisfiable fallback and
+    # the LICENSE `||` sibling, which share the atom prefix).
+    "dev-libs/omasked",
+    "dev-libs/anyof",
+    # Autounmask: the backward USE cascade (plain, -v, and --autounmask-use=n
+    # siblings match the same atom).
+    "dev-libs/aucasctop",
+    # Binary packages: the --usepkg pool (invisible without it, eligible
+    # with it, excluded by --usepkg-exclude).
+    "dev-libs/binaryonlypkg",
+)
+
+# Cases whose argv carries no selectable atom: `@world` / `@system` expand
+# from the world file / profile packages files, not from an atom string, so
+# atom matching cannot reach them. Matched by exact description instead; a
+# renamed description fails loudly at import (see below), never silently.
+SUBSET_DESCRIPTIONS = (
+    "@world expands to the fixture world file's own atoms",
+    "@world combined with an explicit atom too",
+    "@system expands to the fixture profile chain's own packages files",
 )
 
 
@@ -67,6 +118,20 @@ def _subset() -> list[tuple[str, list[str], int]]:
 
 
 SUBSET = _subset()
+
+
+def _subset_extra() -> list[tuple[str, list[str], int]]:
+    by_description = {case[0]: case for case in CASES}
+    missing = [d for d in SUBSET_DESCRIPTIONS if d not in by_description]
+    if missing:
+        raise ValueError(f"metamorphic SUBSET_DESCRIPTIONS drifted, missing: {missing}")
+    picked = [c for c in SUBSET if c[0] in SUBSET_DESCRIPTIONS]
+    if picked:
+        raise ValueError(f"metamorphic subsets overlap, already atom-matched: {[d for d, _, _ in picked]}")
+    return [by_description[d] for d in SUBSET_DESCRIPTIONS]
+
+
+SUBSET = SUBSET + _subset_extra()
 
 _CAT_PKG = re.compile(r"(?<![\w/.-])([a-z0-9][\w.+-]*)/([\w.+-]+)")
 
