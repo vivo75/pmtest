@@ -6458,6 +6458,84 @@ def test_emerge_unmerge_backup_multi_instance_uses_the_subdir_layout(
     assert "PATH: dev-libs/emergeconfigpkg/emergeconfigpkg-1.0-1.gpkg.tar" in packages
 
 
+def test_emerge_unmerge_backup_make_conf_binpkg_format_xpak_is_obeyed(
+    emerge_binary, tmp_path
+):
+    """Backlog #173 review: `execute_unmerge`'s `FEATURES=unmerge-backup`
+    quickpkg resolves `BINPKG_FORMAT` through the same chain as every
+    other `PackageOptions` site (calling env over `make.conf`/profile/
+    `make.globals`, real `config` precedence) -- a `make.conf` value is
+    not ignored for the backup. Hermetically: copy the configroot and
+    put `BINPKG_FORMAT="xpak"` in the copy's `make.conf` (no calling-env
+    value). The `emerge -C` backup then names the old xpak `.tbz2` (real
+    `XPAKSTOP` trailer, installed file inside); setting the calling env
+    to `gpkg` on top flips that same config back to `.gpkg.tar`, proving
+    the env beats `make.conf`. Reuses `dev-libs/emergeconfigpkg`, so no
+    md5-cache entry is needed."""
+    import shutil
+    import tarfile as _tarfile
+
+    cfg = tmp_path / "cfg173unmerge"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write('\nBINPKG_FORMAT="xpak"\n')
+
+    root = tmp_path / "root"
+    (root / "var/lib/portage").mkdir(parents=True)
+    pkgdir = tmp_path / "pkgdir"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["PKGDIR"] = str(pkgdir)
+    env.pop("BINPKG_FORMAT", None)
+
+    ebuild = str(
+        cfg / "repo/dev-libs/emergeconfigpkg/emergeconfigpkg-1.0.ebuild"
+    )
+    link = tmp_path / "ebuild"
+    link.symlink_to(Path(emerge_binary).resolve())
+    r = subprocess.run(
+        [str(link), ebuild, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r.returncode == 0, r.stderr
+    assert (root / "usr/share/emergeconfigpkg/emergeconfigpkg.txt").is_file()
+
+    env["FEATURES"] = "unmerge-backup"
+    result = subprocess.run(
+        [str(emerge_binary), "-C", "dev-libs/emergeconfigpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> Building backup package for dev-libs/emergeconfigpkg-1.0" in result.stdout
+    tbz2 = pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2"
+    assert tbz2.is_file()
+    assert b"XPAKSTOP" in tbz2.read_bytes()[-4096:]
+    assert not (pkgdir / "dev-libs/emergeconfigpkg-1.0.gpkg.tar").exists()
+    with _tarfile.open(tbz2, "r|*") as tf:
+        names = [m.name.lstrip("./") for m in tf]
+    assert "usr/share/emergeconfigpkg/emergeconfigpkg.txt" in names
+    assert not (root / "var/db/pkg/dev-libs/emergeconfigpkg-1.0").exists()
+
+    # Calling env `gpkg` over the same `make.conf` `xpak`: reinstall,
+    # then the backup is a `.gpkg.tar` again.
+    env.pop("FEATURES", None)
+    r = subprocess.run(
+        [str(link), ebuild, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r.returncode == 0, r.stderr
+    (pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2").unlink()
+    env["FEATURES"] = "unmerge-backup"
+    env["BINPKG_FORMAT"] = "gpkg"
+    result = subprocess.run(
+        [str(emerge_binary), "-C", "dev-libs/emergeconfigpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (pkgdir / "dev-libs/emergeconfigpkg-1.0.gpkg.tar").is_file()
+    assert not (pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2").exists()
+
+
 def _merge_slotopdepspkg(emerge_binary, root, env):
     ebuild = str(
         Path(FIXTURES_ROOT)
