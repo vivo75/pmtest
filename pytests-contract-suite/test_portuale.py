@@ -27,6 +27,15 @@ import pytest
 
 FIXTURES_ROOT = str(Path(__file__).resolve().parents[1] / "fixtures")
 
+
+# Real `_emerge/post_emerge.py` -> `util/_info_files.py::chk_updated_info_files`
+# (backlog #176): after a merge that changed the vdb, with
+# `/usr/bin/install-info` present and no info dir to regenerate, real prints
+# a bare newline then ` * GNU info directory index is up-to-date.` on stdout
+# (`_info_files.py:29-32`); `--quiet-build` does not suppress it. These are
+# the only non-`>>>` lines the quiet-build pins below may see.
+_POST_EMERGE_INFO_LINES = frozenset({"", " * GNU info directory index is up-to-date."})
+
 # The merged `usr/share/penvbuildpkg/flags` file's expected content: the
 # `penv-buildflags` env file's values (backlog #95 -- CC/CXX/AR/RUSTFLAGS
 # are real's toolchain selectors the old BUILD_VARS filter dropped,
@@ -4423,6 +4432,8 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
     # `[ebuild` line, never a stray phase / shell diagnostic.
     for line in out.splitlines():
+        if line in _POST_EMERGE_INFO_LINES:
+            continue
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     assert (
         tmp_path / "portage-tmpdir/portage/dev-libs/schedleaf-a-1.0/temp/build.log"
@@ -4465,6 +4476,8 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     assert r.returncode == 0, r.stderr
     assert ">>> dev-libs/packagepkg-1.0 merged." in r.stdout
     for line in r.stdout.splitlines():
+        if line in _POST_EMERGE_INFO_LINES:
+            continue
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     log = tmp_path / "pt0" / log_rel
     assert log.is_file() and log.stat().st_size > 0
