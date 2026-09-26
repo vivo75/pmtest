@@ -585,7 +585,8 @@ CASES = [
         "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like real (rc 1; no suggestion, oracle solutions are empty)",
         ["--pretend", "=dev-libs/cyc0b-2"],
         1,
-    ),    (
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
