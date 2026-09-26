@@ -1,16 +1,21 @@
 #!/bin/bash
-# L32 -- the life-cycle bed (#32), S1 half. Four cells, each a real
-# lifecycle behaviour, run through one harness:
+# L32 -- the life-cycle + fault bed (#32). One harness, two halves:
 #
+# S1 life-cycle:
 #   C1  -C / --depclean    (S0 group 1)
 #   C2  soname bump -> preserved-libs (S0 group 2)
 #   C3  CONFIG_PROTECT over a user-modified config (S0 group 3)
 #   C4  --resume after SIGKILL mid-merge (S0 group 4)
 #
+# S2 fault injection:
+#   F1  disk-full / ENOSPC on a small dedicated tmpfs (S0 group 5a/5a2)
+#   F2  corrupt/truncated binpkg merged with --usepkgonly (S0 group 5b)
+#   F3  local binhost HTTP 500, abort then source fallback (S0 group 5c)
+#
 #   control   -- BOTH sides real Portage through the same harness; the two
 #                snapshots are normalised + diffed with NO allowlist and
-#                must be 0 unexplained. That is S1's gate and S2's noise
-#                floor.
+#                must be 0 unexplained. That is the gate and the noise
+#                floor for every cell.
 #   candidate -- reference side stays real Portage; the other side runs
 #                the SAME cell with portuale's real CLI
 #                (layers/l32/run-cell.sh portuale). Every diff row is
@@ -21,13 +26,14 @@
 # shape: same lib.sh helpers, same compare/ invocations, no new diff
 # semantics.
 #
-#   differential-test-bed/run/l32-lifecycle.sh [C1|C2|C3|C4|all]
+#   differential-test-bed/run/l32-lifecycle.sh [C1|C2|C3|C4|F1|F2|F3|all]
 #
 # Env: PORTTEST_IMAGE, PORTTEST_PODMAN,
 #      L32_MODE=control|candidate    (default control),
 #      L32_SKIP_BUILD=1              (prebuilt portuale; PMTEST_NO_BUILD=1),
 #      L32_REBUILD=1                 (force overlay regeneration),
 #      L32_SKIP_PORTAGE_UPGRADE=1    (keep the image Portage on both sides),
+#      L32_F1_TMPFS                  (F1 tmpfs size, default 16m),
 #      L1_JOBS / MAKEOPTS            (in-container -j, default -j2)
 #
 # Exit: control 0 green / 1 unexplained / 2 setup error; candidate always
@@ -42,8 +48,8 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 CELL=${1:-all}
 case $CELL in
-  all|C1|C2|C3|C4) ;;
-  *) echo "usage: l32-lifecycle.sh [C1|C2|C3|C4|all]" >&2; exit 2 ;;
+  all|C1|C2|C3|C4|F1|F2|F3) ;;
+  *) echo "usage: l32-lifecycle.sh [C1|C2|C3|C4|F1|F2|F3|all]" >&2; exit 2 ;;
 esac
 case ${L32_MODE:-control} in
   control|candidate) MODE=${L32_MODE:-control} ;;
@@ -97,13 +103,23 @@ echo ">>> run $RUN (mode=$MODE cell=$CELL) -> $OUT"
 run_cell() {  # <pm> <tag>  (tag is the path under <run>/<cell>/)
   local pm=$1 tag=$2
   local name="porttest-l32-${CELL}-${tag//\//-}-$$"
+  # F1 is the one cell with a mount of its own: a small DEDICATED tmpfs at
+  # the portage workdir, so ENOSPC never touches /home or the host /tmp.
+  # It is created *inside* the cell (after the fixture preflight) by
+  # run-cell.sh, which needs SYS_ADMIN to mount it; a host --tmpfs would
+  # also starve `upgrade_portage`'s own build in the same workdir.
+  local extra=()
+  case $CELL in
+    F1) extra=(--cap-add SYS_ADMIN) ;;
+  esac
   echo ">>> cell $CELL: $pm ($tag)"
   set +e
   nice -n 19 "$PODMAN" run --rm --name "$name" \
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private \
-    "${PM_MOUNTS[@]}" \
+    "${PM_MOUNTS[@]}" "${extra[@]}" \
     -v "$OVL_DIR:/l32-overlay:ro" \
     -e "MAKEOPTS=${MAKEOPTS:--j2}" \
+    -e "L32_F1_TMPFS=${L32_F1_TMPFS:-16m}" \
     -e "L32_SKIP_PORTAGE_UPGRADE=${L32_SKIP_PORTAGE_UPGRADE:-0}" \
     --entrypoint /bin/bash "$IMAGE" \
     /TEST/layers/l32/run-cell.sh "$pm" "$CELL" "/TEST/logs/$RUN/$CELL/$tag"
@@ -131,7 +147,7 @@ unexplained_of() {  # <report>
   echo "${n:-?}"
 }
 
-CELLS=(C1 C2 C3 C4)
+CELLS=(C1 C2 C3 C4 F1 F2 F3)
 if [ "$CELL" != all ]; then CELLS=("$CELL"); fi
 
 ROWS=()

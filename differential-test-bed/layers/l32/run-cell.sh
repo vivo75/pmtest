@@ -8,11 +8,18 @@
 #
 # Usage (from the host orchestrator):
 #   podman run ... IMAGE /TEST/layers/l32/run-cell.sh <portage|portuale> \
-#       <C1|C2|C3|C4> /TEST/logs/<run>/<cell>/<mode>/<side>
+#       <C1|C2|C3|C4|F1|F2|F3> /TEST/logs/<run>/<cell>/<mode>/<side>
 #
 # The cell command sequences mirror the S0 captures verbatim
-# (logs/l32-s0-*/scripts/g1..g4-*.sh); run-cell.sh only picks the binary
+# (logs/l32-s0-*/scripts/g1..g5*.sh); run-cell.sh only picks the binary
 # and adds the snapshot. No product code, no diff semantics.
+#
+# The F cells (S2, S0 group 5) deliberately fail a merge: a disk-full
+# tmpfs (F1), a truncated binpkg (F2) and a local binhost answering 500
+# (F3). The in-container exit code is never the gate here (real Portage
+# exits 143 on F1); every emergent rc and error-shape line is recorded
+# under "$OUT.logs" for the triage, and the snapshot still compares the
+# installed root/VDB the fault left behind.
 
 set -u
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -194,11 +201,201 @@ PY
   rc_of resume-actual
 }
 
+# ---------------------------------------------------------------------------
+# F1 -- disk-full / ENOSPC (S0 group 5a/5a2). The cell mounts a small
+# dedicated tmpfs at /var/tmp/portage (16 MiB) after the preflight; 10 MiB
+# of ballast makes the 64 MiB bigpkg payload hit ENOSPC deterministically
+# in src_install, with no /home or host /tmp involvement.
+# ---------------------------------------------------------------------------
+cell_f1() {
+  # The dedicated tmpfs is mounted HERE, after upgrade_portage/stage_overlay
+  # (which must use the full container disk). Mounting it in the host
+  # `podman run` would starve the portage-pin build in the same workdir.
+  mkdir -p /var/tmp/portage
+  if ! mount -t tmpfs -o "size=${L32_F1_TMPFS:-16m},mode=0755" tmpfs /var/tmp/portage; then
+    log "!!! F1: cannot mount the dedicated tmpfs at /var/tmp/portage"
+    exit 2
+  fi
+  log "F1: tmpfs ${L32_F1_TMPFS:-16m} mounted at /var/tmp/portage"
+  df -h /var/tmp/portage > "$G/tmpfs-before.txt" 2>&1
+  df -i /var/tmp/portage >> "$G/tmpfs-before.txt" 2>&1
+  dd if=/dev/zero of=/var/tmp/portage/ballast bs=1M count=10 status=none 2> "$G/ballast.err"
+  echo "ballast rc=$?" > "$G/ballast.rc"
+  df -h /var/tmp/portage > "$G/tmpfs-ballast.txt" 2>&1
+  du -sh /var/tmp/portage >> "$G/tmpfs-ballast.txt" 2>&1
+
+  $EM --oneshot --usepkg=n --color=n l32/bigpkg > "$G/merge.log" 2>&1
+  rc_of merge
+
+  {
+    echo "== df =="; df -h /var/tmp/portage; df -i /var/tmp/portage
+    echo "== vdb l32 =="; ls -la /var/db/pkg/l32/ 2>&1
+    echo "== -MERGING marker =="; ls -la /var/db/pkg/l32/-MERGING-* 2>&1
+    echo "== partial image payload =="; ls -la /var/tmp/portage/l32/bigpkg-1.0/image/usr/share/l32/big/ 2>&1
+    echo "== installed payload in / =="; ls -la /usr/share/l32/big/ 2>&1
+    echo "== build temp =="; ls -la /var/tmp/portage/l32/bigpkg-1.0/temp/ 2>&1
+  } > "$G/state-after.txt" 2>&1
+  find /var/db/pkg/l32 -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | sort > "$G/vdb-after.list"
+
+  python3 - <<'PY' > "$G/mtimedb-resume-key.txt" 2>&1
+import json
+try:
+    d = json.load(open('/var/cache/edb/mtimedb'))
+    print("resume key present:", 'resume' in d)
+    print(json.dumps(d.get('resume'), indent=1, sort_keys=True))
+except Exception as e:
+    print("ERR", e)
+PY
+  $EM --resume --pretend --color=n > "$G/resume-pretend.log" 2>&1
+  rc_of resume-pretend
+}
+
+# ---------------------------------------------------------------------------
+# F2 -- corrupt binary archive (S0 group 5b). Build a valid faultpkg
+# binpkg, then -- S2 gap fix -- unmerge faultpkg so the corrupt-merge run
+# starts from a root WITHOUT it (S0 left it installed, so "no partial vdb
+# entry" was unprovable). The corrupt copy is truncated to half and merged
+# with --usepkgonly so there is no ebuild fallback.
+# ---------------------------------------------------------------------------
+cell_f2() {
+  local pkg=/var/tmp/l32-pkgdir corrupt=/var/tmp/l32-corrupt probe=/var/tmp/l32-format-probe
+  rm -rf "$pkg" "$corrupt" "$probe"; mkdir -p "$pkg" "$probe"
+  export FEATURES="-buildpkg -cgroup -observability -ipc-sandbox -network-sandbox -pid-sandbox"
+
+  # S2 observation: name the binpkg each PM produces with the *unforced*
+  # default BINPKG_FORMAT. Real make.globals says gpkg; this side-by-side
+  # record is what shows a candidate whose default naming diverges.
+  PKGDIR="$probe" $EM --oneshot --usepkg=n --color=n --buildpkg l32/faultpkg > "$G/format-probe-build.log" 2>&1
+  echo "rc=$?" > "$G/format-probe-build.rc"
+  find "$probe" -type f -name 'faultpkg-1.0*' -printf '%f\n' 2>/dev/null | sort > "$G/format-probe.txt"
+
+  # Pin gpkg for the corrupt-archive scenario itself (real's own default):
+  # an explicit value isolates the fault from the default-naming question.
+  export PKGDIR="$pkg" BINPKG_FORMAT=gpkg
+
+  $EM --oneshot --usepkg=n --color=n --buildpkg l32/faultpkg l32/dep-a > "$G/build.log" 2>&1
+  rc_of build
+  find "$PKGDIR" -name '*.gpkg.tar' | sort > "$G/binpkgs.list" 2>&1
+  $EM --regen --quiet > "$G/regen.log" 2>&1
+  echo "rc=$?" > "$G/regen.rc"
+
+  $EM -C l32/faultpkg > "$G/unmerge-faultpkg.log" 2>&1
+  rc_of unmerge-faultpkg
+  find /var/db/pkg/l32 -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | sort > "$G/vdb-before-corrupt.list"
+
+  cp -a "$PKGDIR"/. "$corrupt"/ || true
+  local good
+  good=$(find "$corrupt" -name 'faultpkg-1.0*.gpkg.tar' | head -1)
+  {
+    echo "good archive: $good"; ls -l "$good" 2>&1
+  } > "$G/corrupt-archive.txt" 2>&1
+  local sz
+  sz=$(stat -c %s "$good")
+  truncate -s $((sz/2)) "$good"
+  ls -l "$good" >> "$G/corrupt-archive.txt" 2>&1
+  tar tf "$good" > "$G/corrupt-archive-tar.txt" 2>&1
+  echo "tar rc=$?" >> "$G/corrupt-archive-tar.txt"
+
+  export PKGDIR="$corrupt"
+  $EM --oneshot --usepkgonly --color=n l32/faultpkg > "$G/corrupt-merge.log" 2>&1
+  rc_of corrupt-merge
+  find /var/db/pkg/l32 -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | sort > "$G/corrupt-vdb.list"
+  {
+    echo "== vdb l32 =="; ls -la /var/db/pkg/l32/ 2>&1
+    echo "== partial faultpkg vdb entry? ==";
+    ls -d /var/db/pkg/l32/faultpkg-1.0 2>&1 || echo "none"
+    echo "== -MERGING marker =="; ls -d /var/db/pkg/l32/-MERGING-* 2>&1 || echo "none"
+    echo "== installed file =="; ls -la /usr/share/l32/faultpkg 2>&1
+  } > "$G/corrupt-state.txt" 2>&1
+  export PKGDIR="$pkg"
+}
+
+# ---------------------------------------------------------------------------
+# F3 -- local binhost answering HTTP 500 (S0 group 5c). A python stub on
+# 127.0.0.1:18765 returns 500 to every GET/HEAD; binrepos.conf declares
+# [l32-500] against it. F3a: a stale local PKGDIR (faultpkg removed) must
+# abort. F3b -- S2 gap fix -- an empty PKGDIR must fall back to the ebuild
+# and complete on this free-disk root (S0 died ENOSPC, rc 143).
+# ---------------------------------------------------------------------------
+cell_f3() {
+  local pkg=/var/tmp/l32-pkgdir nopkg=/var/tmp/l32-nopkg empty=/var/tmp/l32-empty-pkgdir
+  rm -rf "$pkg" "$nopkg" "$empty"; mkdir -p "$pkg" "$nopkg" "$empty"
+  export PKGDIR="$pkg" BINPKG_FORMAT=gpkg
+  export FEATURES="-buildpkg -cgroup -observability -ipc-sandbox -network-sandbox -pid-sandbox"
+
+  $EM --oneshot --usepkg=n --color=n --buildpkg l32/faultpkg l32/dep-a > "$G/build.log" 2>&1
+  rc_of build
+  $EM --regen --quiet > "$G/regen.log" 2>&1
+  echo "rc=$?" > "$G/regen.rc"
+  cp -a "$pkg"/. "$nopkg"/ || true
+  find "$nopkg" -name 'faultpkg*' -delete 2>/dev/null || true
+  $EM -C l32/faultpkg > "$G/unmerge-faultpkg.log" 2>&1
+  rc_of unmerge-faultpkg
+
+  cat > /var/tmp/l32-http-500.py <<'PY'
+import http.server, socketserver
+class H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(500); self.end_headers(); self.wfile.write(b"stub 500\n")
+    def do_HEAD(self):
+        self.send_response(500); self.end_headers()
+    def log_message(self, *a):
+        pass
+socketserver.TCPServer.allow_reuse_address = True
+with socketserver.TCPServer(("127.0.0.1", 18765), H) as s:
+    s.serve_forever()
+PY
+  python3 /var/tmp/l32-http-500.py > "$G/binhost-stub.log" 2>&1 &
+  local spid=$!
+  sleep 1
+  # Hermetic: the image pre-seeds a network binrepo ([gentoo] at
+  # distfiles.gentoo.org) plus a cached local index. Drop both so the
+  # ONLY binhost in play is the local 500 stub -- no side may reach the
+  # network (the cached [gentoo] index otherwise masks the fault).
+  rm -f /etc/portage/binrepos.conf/*.conf
+  rm -rf /var/cache/edb/binhost /var/cache/binhost /var/cache/l32-binhost
+  mkdir -p /etc/portage/binrepos.conf
+  cat > /etc/portage/binrepos.conf/l32.conf <<'EOF'
+[l32-500]
+priority = 50
+sync-uri = http://127.0.0.1:18765
+location = /var/cache/l32-binhost
+verify-signature = false
+EOF
+
+  # F3a: stale local index -> portage selects a binary that is not there.
+  export PKGDIR="$nopkg"
+  $EM --oneshot -k --getbinpkg --color=n l32/faultpkg > "$G/binhost-merge.log" 2>&1
+  rc_of binhost-merge
+  find /var/db/pkg/l32 -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | sort > "$G/binhost-vdb.list"
+  {
+    echo "== binrepos.conf =="; cat /etc/portage/binrepos.conf/l32.conf
+    echo "== vdb l32 =="; ls -la /var/db/pkg/l32/ 2>&1
+    echo "== installed =="; ls -la /usr/share/l32/faultpkg 2>&1
+  } > "$G/binhost-state.txt" 2>&1
+
+  # F3b: no local binpkg at all -> source fallback must complete here.
+  export PKGDIR="$empty"
+  $EM --oneshot -k --getbinpkg --color=n l32/faultpkg > "$G/binhost-fallback.log" 2>&1
+  rc_of binhost-fallback
+  find /var/db/pkg/l32 -maxdepth 1 -mindepth 1 -printf '%f\n' 2>/dev/null | sort > "$G/binhost-fallback-vdb.list"
+  {
+    echo "== vdb l32 =="; ls -la /var/db/pkg/l32/ 2>&1
+    echo "== installed file =="; ls -la /usr/share/l32/faultpkg 2>&1
+    echo "== did it build from source? =="; grep -E '^>>> Emerging \(|^>>> Emerging binary' "$G/binhost-fallback.log" 2>&1
+  } > "$G/binhost-fallback-state.txt" 2>&1
+  kill "$spid" 2>/dev/null || true
+  export PKGDIR="$pkg"
+}
+
 case $L32_CELL in
   C1) cell_c1 ;;
   C2) cell_c2 ;;
   C3) cell_c3 ;;
   C4) cell_c4 ;;
+  F1) cell_f1 ;;
+  F2) cell_f2 ;;
+  F3) cell_f3 ;;
   *) echo "unknown cell $L32_CELL" >&2; exit 2 ;;
 esac
 
