@@ -172,6 +172,14 @@ def diff_vdb(a: dict, b: dict, rep: Report, tolerate_payload: bool = False) -> N
         if pf == "CONTENTS":
             diff_contents(k, a[k], b[k], rep, tolerate_payload)
         else:
+            # TODO(#159 S0): a package's vdb `SIZE` is payload-sensitive -- it
+            # aggregates that package's file-size diffs, which under
+            # `--tolerate-payload` are already tolerated `[PAYLOAD]` rows,
+            # yet the aggregate is compared here as a hard `VDB` row (l3-core
+            # run `l3-20260925T074707Z`: only 2/381 SIZE files differ, each
+            # exactly the package's tolerated payload sum). Comparator-
+            # coverage gap, same family as #152's build-id keying; not
+            # reclassified here because that would move corpus outputs.
             va = a[k].strip().replace("\n", " | ")[:200]
             vb = b[k].strip().replace("\n", " | ")[:200]
             rep.add("VDB", k, f"portage={va!r} portuale={vb!r}")
