@@ -1908,8 +1908,12 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     itself (see emerge_build.rs's own module doc comment). `packagepkg`
     RDEPENDs on `samepkg`, which the shared fixture ROOT already has an
     installed vdb entry for, so --buildpkgonly's own real depgraph gate
-    (see the dry-run contract tests) has nothing to object to."""
+    (see the dry-run contract tests) has nothing to object to. With no
+    `BINPKG_FORMAT` anywhere, the artefact is a `.gpkg.tar` -- real
+    `cnf/make.globals:43`'s own default (backlog #173; the pre-#173 pin
+    expected the old xpak `.tbz2` here)."""
     env = _real_build_env(tmp_path)
+    env.pop("BINPKG_FORMAT", None)
     result = subprocess.run(
         [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
         capture_output=True,
@@ -1920,13 +1924,19 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     assert "[ebuild  N     ] dev-libs/packagepkg-1.0" in result.stdout
     assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
 
-    tbz2 = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2"
-    assert tbz2.is_file()
-    assert b"XPAKPACK" in tbz2.read_bytes()
+    gpkg = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar"
+    assert gpkg.is_file()
+    assert not (Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2").exists()
+
+    with tarfile.open(gpkg, "r") as container:
+        names = {Path(n).name for n in container.getnames()}
+    assert "gpkg-1" in names
+    assert "Manifest" in names
 
     packages = (Path(env["PKGDIR"]) / "Packages").read_text()
     assert "CPV: dev-libs/packagepkg-1.0" in packages
     assert "RDEPEND: dev-libs/samepkg" in packages
+    assert "PATH: dev-libs/packagepkg-1.0.gpkg.tar" in packages
 
 
 def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
@@ -1965,6 +1975,53 @@ def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
     packages = (Path(env["PKGDIR"]) / "Packages").read_text()
     assert "CPV: dev-libs/packagepkg-1.0" in packages
     assert "PATH: dev-libs/packagepkg-1.0.gpkg.tar" in packages
+
+
+def test_emerge_buildpkgonly_make_conf_binpkg_format_xpak_is_obeyed(
+    emerge_binary, tmp_path
+):
+    """Backlog #173: `BINPKG_FORMAT` follows the full config chain --
+    calling env over `make.conf` over profile over `make.globals`
+    (real `config` precedence). Hermetically: copy the configroot and
+    put `BINPKG_FORMAT="xpak"` in the copy's `make.conf` (no calling-env
+    value). The build then names the old xpak `.tbz2` with real
+    `XPAKPACK` bytes; setting the calling env to `gpkg` on top flips
+    that same config back to `.gpkg.tar`, proving the env beats
+    `make.conf`. No new fixture ebuild: `packagepkg` is reused, so no
+    md5-cache entry is needed."""
+    import shutil
+
+    cfg = tmp_path / "cfg173"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write('\nBINPKG_FORMAT="xpak"\n')
+
+    env = _real_build_env(tmp_path)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env.pop("BINPKG_FORMAT", None)
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    tbz2 = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2"
+    assert tbz2.is_file()
+    assert b"XPAKPACK" in tbz2.read_bytes()
+    assert not (Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar").exists()
+
+    env["BINPKG_FORMAT"] = "gpkg"
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    assert (Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar").is_file()
 
 
 def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
@@ -2073,9 +2130,12 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
     )
     assert r.returncode == 0, r.stderr
 
-    twin = pkgdir / "dev-libs/penvcmppkg/penvcmppkg-1.0-1.xpak"
+    # Backlog #173: no `BINPKG_FORMAT` configured here, so the real
+    # `make.globals` default (`gpkg`) names the multi-instance
+    # artefacts -- the pre-#173 pin expected the old xpak `.xpak` here.
+    twin = pkgdir / "dev-libs/penvcmppkg/penvcmppkg-1.0-1.gpkg.tar"
     assert twin.is_file(), "run-wide multi layout for the unnegated twin"
-    negated = pkgdir / "dev-libs/packagepkg/packagepkg-1.0-1.xpak"
+    negated = pkgdir / "dev-libs/packagepkg/packagepkg-1.0-1.gpkg.tar"
     assert negated.is_file(), "run-wide multi layout despite the negation"
 
     stanzas = (pkgdir / "Packages").read_text().split("\n\n")
@@ -4063,9 +4123,29 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     """`FEATURES=buildpkg` / `--buildpkg`/`-b` (real _emerge/EbuildBinpkg):
     a source `emerge <atom>` also writes a binpkg into $PKGDIR (before the
     vdb merge), then merges normally. `--buildpkg=n` wins over the
-    FEATURE."""
+    FEATURE. With no `BINPKG_FORMAT` configured, the artefact is a
+    `.gpkg.tar` -- real `cnf/make.globals:43`'s own default (backlog
+    #173; the pre-#173 pin expected the old xpak `.tbz2` here)."""
     import shutil
     import tarfile as _tarfile
+
+    def _gpkg_image_names(gpkg):
+        """The installed-file list inside a `.gpkg.tar`'s compressed
+        image member (the member suffix follows `BINPKG_COMPRESS`,
+        so it is located by prefix, not pinned). The inner tar is
+        rooted at `image/` (unlike an xpak's `./`), which is stripped
+        so entries read as installed paths."""
+        with _tarfile.open(gpkg, "r") as outer:
+            image_member = next(
+                n for n in outer.getnames() if "/image.tar." in f"/{n}"
+            )
+            with _tarfile.open(
+                fileobj=outer.extractfile(image_member), mode="r|*"
+            ) as inner:
+                return [
+                    m.name.lstrip("./").removeprefix("image/")
+                    for m in inner
+                ]
 
     def _fresh_root():
         root = tmp_path / f"root{_fresh_root.n}"
@@ -4091,12 +4171,10 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     )
     assert r.returncode == 0, r.stderr
     assert ">>> Building package for dev-libs/packagepkg-1.0..." in r.stdout
-    tbz2 = root / "pkgdir/dev-libs/packagepkg-1.0.tbz2"
-    assert tbz2.is_file()
-    assert b"XPAKSTOP" in tbz2.read_bytes()[-4096:]
-    with _tarfile.open(tbz2, "r|*") as tf:
-        names = [m.name.lstrip("./") for m in tf]
-    assert "usr/share/packagepkg/hello.txt" in names
+    gpkg = root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar"
+    assert gpkg.is_file()
+    assert not (root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").exists()
+    assert "usr/share/packagepkg/hello.txt" in _gpkg_image_names(gpkg)
     assert "CPV: dev-libs/packagepkg-1.0" in (root / "pkgdir/Packages").read_text()
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
 
@@ -4107,7 +4185,7 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert (root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").is_file()
+    assert (root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar").is_file()
 
     # --buildpkg=n wins over FEATURES=buildpkg: no binpkg, still merges.
     root, env = _fresh_root()
@@ -4117,7 +4195,7 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert not (root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").exists()
+    assert not (root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar").exists()
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
 
     # --buildpkg-exclude skips the binpkg for a matching entry (still merged);
@@ -4129,7 +4207,7 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert not (root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").exists()
+    assert not (root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar").exists()
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
 
     root, env = _fresh_root()
@@ -4139,7 +4217,7 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert (root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").is_file()
+    assert (root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar").is_file()
 
 
 def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
@@ -4167,7 +4245,9 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
         [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
         capture_output=True, text=True, check=True, env=env,
     )
-    assert (root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").is_file()
+    # Backlog #173: no `BINPKG_FORMAT` configured, so the default-built
+    # artefact is a `.gpkg.tar` (was `.tbz2` pre-#173).
+    assert (root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar").is_file()
 
     env["PORTAGE_TMPDIR"] = str(tmp_path / "ptmp-merge")
     r = subprocess.run(
@@ -4205,13 +4285,15 @@ def test_getbinpkg_merge_honours_env_install_mask(emerge_binary, tmp_path):
         return root, env
 
     # Build the binpkg into $PKGDIR once, then merge it from there.
+    # Backlog #173: no `BINPKG_FORMAT` configured, so the default-built
+    # artefact is a `.gpkg.tar` (was `.tbz2` pre-#173).
     root, env = _fresh_root(0)
     subprocess.run(
         [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
         capture_output=True, text=True, check=True, env=env,
     )
-    tbz2 = root / "pkgdir/dev-libs/packagepkg-1.0.tbz2"
-    assert tbz2.is_file()
+    gpkg = root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar"
+    assert gpkg.is_file()
 
     # Control: no INSTALL_MASK -> the file merges.
     env2 = dict(env)
@@ -6299,14 +6381,26 @@ def test_emerge_unmerge_backup_quickpkgs_before_removing(emerge_binary, tmp_path
     assert result.returncode == 0, result.stderr
     assert ">>> Building backup package for dev-libs/emergeconfigpkg-1.0" in result.stdout
 
-    # The backup binpkg exists, is a valid xpak (image tar + XPAK trailer),
-    # holds the installed file, and got a Packages index entry.
-    tbz2 = pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2"
-    assert tbz2.is_file()
-    assert b"XPAKSTOP" in tbz2.read_bytes()[-4096:]
-    with _tarfile.open(tbz2, "r|*") as tf:
-        names = [m.name.lstrip("./") for m in tf]
-    assert "usr/share/emergeconfigpkg/emergeconfigpkg.txt" in names
+    # The backup binpkg exists -- a `.gpkg.tar` by the real
+    # `make.globals` default (backlog #173; was an xpak `.tbz2`
+    # pre-#173) -- holds the installed file, and got a Packages
+    # index entry.
+    gpkg = pkgdir / "dev-libs/emergeconfigpkg-1.0.gpkg.tar"
+    assert gpkg.is_file()
+    assert not (pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2").exists()
+    with _tarfile.open(gpkg, "r") as outer:
+        names = {Path(n).name for n in outer.getnames()}
+        image_member = next(n for n in outer.getnames() if "/image.tar." in f"/{n}")
+        with _tarfile.open(
+            fileobj=outer.extractfile(image_member), mode="r|*"
+        ) as inner:
+            # The inner tar is rooted at `image/` (unlike an xpak's
+            # `./`), stripped so entries read as installed paths.
+            inner_names = [
+                m.name.lstrip("./").removeprefix("image/") for m in inner
+            ]
+    assert "gpkg-1" in names
+    assert "usr/share/emergeconfigpkg/emergeconfigpkg.txt" in inner_names
     packages = (pkgdir / "Packages").read_text()
     assert "CPV: dev-libs/emergeconfigpkg-1.0" in packages
 
@@ -6320,9 +6414,11 @@ def test_emerge_unmerge_backup_multi_instance_uses_the_subdir_layout(
 ):
     """`FEATURES="unmerge-backup binpkg-multi-instance"`: the quickpkg
     backup lands at real `_allocate_filename_multi`'s
-    `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.xpak` (real `bin/quickpkg` ->
-    `bintree.inject` -> `getname(..., allocate_new=True)`), not the bare
-    `<cat>/<pf>.tbz2` -- and the `Packages` entry carries `BUILD_ID`."""
+    `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.gpkg.tar` (real `bin/quickpkg` ->
+    `bintree.inject` -> `getname(..., allocate_new=True)` -- `.xpak`
+    pre-#173, when the xpak shape was still the default; backlog #173),
+    not the bare single-instance path -- and the `Packages` entry
+    carries `BUILD_ID`."""
     root = tmp_path / "root"
     (root / "var/lib/portage").mkdir(parents=True)
     pkgdir = tmp_path / "pkgdir"
@@ -6350,15 +6446,16 @@ def test_emerge_unmerge_backup_multi_instance_uses_the_subdir_layout(
     )
     assert result.returncode == 0, result.stderr
 
-    xpak = pkgdir / "dev-libs/emergeconfigpkg/emergeconfigpkg-1.0-1.xpak"
-    assert xpak.is_file(), sorted(p.name for p in pkgdir.rglob("*"))
+    gpkg = pkgdir / "dev-libs/emergeconfigpkg/emergeconfigpkg-1.0-1.gpkg.tar"
+    assert gpkg.is_file(), sorted(p.name for p in pkgdir.rglob("*"))
     assert not (pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2").exists()
-    assert b"XPAKSTOP" in xpak.read_bytes()[-4096:]
+    with tarfile.open(gpkg, "r") as container:
+        assert "gpkg-1" in {Path(n).name for n in container.getnames()}
 
     packages = (pkgdir / "Packages").read_text()
     assert "CPV: dev-libs/emergeconfigpkg-1.0" in packages
     assert "BUILD_ID: 1" in packages
-    assert "PATH: dev-libs/emergeconfigpkg/emergeconfigpkg-1.0-1.xpak" in packages
+    assert "PATH: dev-libs/emergeconfigpkg/emergeconfigpkg-1.0-1.gpkg.tar" in packages
 
 
 def _merge_slotopdepspkg(emerge_binary, root, env):
