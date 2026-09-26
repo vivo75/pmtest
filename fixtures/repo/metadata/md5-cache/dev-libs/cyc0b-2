@@ -1,0 +1,7 @@
+EAPI=0
+DESCRIPTION=fixture package: upstream test_circular_dependencies pg0 app-misc/B-2 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+DEPEND==dev-libs/cyc0a-2
+DEFINED_PHASES=-
+_md5_=52054fde8efb0e6955cd8deaa7495b43

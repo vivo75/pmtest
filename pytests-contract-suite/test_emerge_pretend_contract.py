@@ -545,6 +545,46 @@ CASES = [
         "circular dep: four-ring with a USE-gated edge reports the lot-of-cycles trailer",
         ["--pretend", "dev-libs/cyc4a"],
         1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions)",
+        ["--pretend", "=dev-libs/cyc0z-1"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        ["--pretend", "=dev-libs/cyc0z-2"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-3 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        ["--pretend", "=dev-libs/cyc0z-3"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-1 fails like real (rc 1; no suggestion, oracle solutions are empty)",
+        ["--pretend", "=dev-libs/cyc0w-1"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        ["--pretend", "=dev-libs/cyc0w-2"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-3 fails like real (rc 1; autounmask bar matches the oracle use_changes, still fails)",
+        ["--pretend", "=dev-libs/cyc0w-3"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0b-1 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        ["--pretend", "=dev-libs/cyc0b-1"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like real (rc 1; no suggestion, oracle solutions are empty)",
+        ["--pretend", "=dev-libs/cyc0b-2"],
+        1,
     ),    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
