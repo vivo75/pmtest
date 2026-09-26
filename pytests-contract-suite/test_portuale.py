@@ -1899,6 +1899,26 @@ def _real_build_env(tmp_path):
     return env
 
 
+def _gzip_make_conf_env(tmp_path, env):
+    """Point `env` at a private copy of the fixture config root whose
+    `make.conf` sets `BINPKG_COMPRESS="gzip"` (backlog Q6 of
+    `batch-2026-09-26.md`). Real Portage never exports `BINPKG_COMPRESS`
+    into a phase environment (`special_env_vars.environ_filter`), and
+    the gpkg image is compressed by `bin/gpkg-helper.py`, which rebuilds
+    `portage.settings` from that filtered env plus the config files -- so
+    only a config-file value reaches the gpkg compressor; a calling-env
+    one does not. The value keeps these tests off `zstd` (the real
+    `make.globals` default) so they don't need it installed."""
+    cfg = tmp_path / "cfg-gzip"
+    if not cfg.exists():
+        shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+        with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+            fh.write('\nBINPKG_COMPRESS="gzip"\n')
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env.pop("BINPKG_COMPRESS", None)
+    return env
+
+
 def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     emerge_binary, tmp_path
 ):
@@ -1941,7 +1961,7 @@ def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
     default) so the test doesn't need it installed."""
     env = _real_build_env(tmp_path)
     env["BINPKG_FORMAT"] = "gpkg"
-    env["BINPKG_COMPRESS"] = "gzip"
+    env = _gzip_make_conf_env(tmp_path, env)
     result = subprocess.run(
         [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
         capture_output=True,
@@ -2155,7 +2175,7 @@ def test_emerge_buildpkgonly_with_binpkg_signing_builds_a_signed_gpkg(
     try:
         env = _real_build_env(tmp_path)
         env["BINPKG_FORMAT"] = "gpkg"
-        env["BINPKG_COMPRESS"] = "gzip"
+        env = _gzip_make_conf_env(tmp_path, env)
         env["FEATURES"] = "binpkg-signing"
         _signing_env(env, home)
         result = subprocess.run(
@@ -2189,7 +2209,7 @@ def test_emerge_buildpkgonly_with_binpkg_signing_but_no_key_is_rejected(
     building anything."""
     env = _real_build_env(tmp_path)
     env["BINPKG_FORMAT"] = "gpkg"
-    env["BINPKG_COMPRESS"] = "gzip"
+    env = _gzip_make_conf_env(tmp_path, env)
     env["FEATURES"] = "binpkg-signing"
     result = subprocess.run(
         [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
@@ -2339,7 +2359,7 @@ def test_emerge_buildpkgonly_multi_instance_gpkg_exports_a_real_build_id(
     build must still succeed with the feature turned on."""
     env = _real_build_env(tmp_path)
     env["BINPKG_FORMAT"] = "gpkg"
-    env["BINPKG_COMPRESS"] = "gzip"
+    env = _gzip_make_conf_env(tmp_path, env)
     env["FEATURES"] = "binpkg-multi-instance packdebug splitdebug"
     result = subprocess.run(
         [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
