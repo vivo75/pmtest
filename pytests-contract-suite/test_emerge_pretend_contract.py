@@ -1077,6 +1077,11 @@ CASES = [
         0,
     ),
     (
+        "--emptytree: a keyword-masked installed DEPENDENCY downgrades to the visible stable",
+        ["--pretend", "--emptytree", "dev-libs/needskeywordmasked"],
+        0,
+    ),
+    (
         "avoid_update: a keyword-masked-but-installed DEPENDENCY with a satisfied USE-dep is kept",
         ["--pretend", "dev-libs/needskeywordmaskeduse"],
         0,
@@ -7140,6 +7145,31 @@ def test_keyword_masked_but_installed_dependency_is_kept_not_downgraded(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
+        '[ebuild  N     ] dev-libs/needskeywordmasked-1.0 ',
+    ]
+    assert result.stderr == ""
+
+
+def test_emptytree_downgrades_a_keyword_masked_installed_dependency(
+    emerge_binary, fixture_env
+):
+    """#157: the same dev-libs/needskeywordmasked dependency as the test
+    above, but under `--emptytree`. Real drops every installed candidate
+    before selection (`depgraph.py:7888-7899`: `if empty and
+    pkg.installed ...: continue`), so the dependency avoid_update return
+    (`depgraph.py:8453-8458`, `return inst_pkg`) never fires -- the
+    keyword-masked installed 2.0 is not a candidate at all and the
+    best visible stable 1.0 wins: a real downgrade, not a reinstall.
+    Before the #157 fix portuale kept the masked 2.0 and printed
+    `[ebuild R ~]`, the L3 `sys-apps/portage-3.0.82.2` shape."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--emptytree", "dev-libs/needskeywordmasked"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        '[ebuild     UD ] dev-libs/keywordmaskedpkg-1.0 [2.0]',
         '[ebuild  N     ] dev-libs/needskeywordmasked-1.0 ',
     ]
     assert result.stderr == ""
