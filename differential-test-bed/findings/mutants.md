@@ -339,3 +339,113 @@ all six: real unit-test gaps (black-box-covered, unit-invisible),
 with whole-body noops on small pure functions the likely-equivalent
 tail. O12-style stop not applicable (campaign phase, not a parity
 run); no stop fired — six clusters is the handful the plan asks for.
+
+## #161 closeout (2026-09-26, branch `backlog/161-librs-backtracker-driver-tests`)
+
+S1–S6r, all test-only in `rust/portage-repo/src/lib.rs` (`mod tests`;
++4386 lines, 53 `run_pass_*` legs plus S1–S5 legs for the other five
+functions; no product byte, no pmtest counterpart — standalone
+commits). Scratch-`ResolveCtx` harness in the Phase 8 S2 style
+(`CtxOpts161`/`ctx_161`/`run_161`, fixture-tree + scratch-repo legs).
+
+`run_pass` scope accounting (P7b inventory: 140 missed): S6a–S6o legs
+killed 48 (final full-scope `in run_pass$` re-run: 92 missed), then
+S6p killed 5 (23532:80, 23535:33, 23563:60, 23566:37, 23608:78 —
+genuine-Binary `with_bdeps` + `--buildpkgonly` legs, each verified
+lethal by hand-application), S6q killed 6 (23103:51, 23103:62,
+23563:33, 23563:63, 23608:51, 23608:81 — edge/oldbest asserts, each
+verified lethal), S6r killed 1 (22634, Reinstall-revisit reuse leg),
+and 2 more hand-verified lethal outside the scope runs (23823 pumask,
+23831 autounmask-mask commutator — scope-stale binaries reported them
+missed; touch-guarded hand-application failed as required). Total:
+62 killed, 78 classified survivors below. S1–S5 (other functions):
+slot-op scan/probe/bind/eliminate/entries (19 caught + 1 proven
+equivalent 14855:29), `params_equal`/`Backtracker` (57 caught + 1
+timeout `Backtracker::get`), `build_residual_slot_conflicts` (23
+caught + 1 unviable 18072), `collect_feedback` (14 caught),
+`direct_solve_slot_conflicts` + `slot_conflict_mask_choices` (19
+caught + 4 proven equivalent 18449x3/18462). The `Backtracker::get ->
+Some(default)` timeout (20574:9) stands: inspect, don't pin around.
+
+Survivor buckets (line numbers are `portage-repo/src/lib.rs` at
+`5bb7c875`; every row below was hand-applied and observed surviving
+except where noted):
+
+- Trace-only, no `PassResult` surface (3): 21364:25, 21492:29
+  (`resolver_debug() && first_pass` stderr gates); 21661:16
+  (`parent_atoms` dedup — unreachable in practice: `visited_atoms`
+  precludes pushing the same row twice).
+- Autounmask path, gate never opens in-harness (20): the parent-flip
+  block 21687:26, 21739:23, 21813:48, 21835:44, 21879:50/37/61,
+  21880:21, 21883:54/41/65, the suggestion gate 22357:17, and the
+  flip-fold overlay block 22854:47, 22892:62/49/73, 22893:33,
+  22896:66/53/77. All need `NoVisibleCandidate` +
+  `autounmask_suggest_use` (harness `BacktrackParams::default()` leaves
+  it false) + masked/forced-USE conditional-parent shapes. Recipe for
+  a follow-up: suggest_use params + mask fixtures + NVC probe.
+- Downgrade shapes absent from fixtures (2): 22057:13
+  (`resolved_version` Downgrade arm, missing-dep feedback),
+  22633:17 (`existing_version` Downgrade arm, slot revisit). No
+  newer-installed fixture exists; display/output contract pins cover
+  the rendering.
+- Binary-selection skew/divergence (20): respect-use gate
+  22534:17, 22535:17, 22536:17/20, 22541:71/44/84
+  (gate-shadowed: the finder closure never runs with the gate shut;
+  needs newuse/binary + USE-divergent binary/ebuild pair) and the
+  equiv-ebuild filter 22567:41/33/17/44, 22569:30, 22570:25,
+  22571:25, 22577:50, 22580:40, 22582:31, 22585:37, 22586:37 (needs a
+  version-skewed binary/tree shape: tree ebuild at another version so
+  the retain actually drops). 22582:26 additionally needs the
+  `use_ebuild_visibility` process global + `--useoldpkg-atoms`
+  (global-gated; harness carries neither).
+- Slot-op unrebuildable (6): 22656:41, 22657:21, 22658:21, 22659:21,
+  22701:35, 22706:29 (bare-`:=` + `built_equals_*`: needs an
+  installed-bound instance that cannot rebuild — excluded/vdb
+  interplay the scratch vdb cannot express).
+- Use-dep collision revisit (4): 22757:24, 22758:77, 22762:57,
+  22786:24 (needs a resolved_slots revisit whose existing version's
+  USE fails the second atom's `[use]` deps — per-version-USE-divergent
+  fixtures).
+- #57 direction-2 (1): 22935:37 (`installed_sub` find — needs the
+  installed+merge same-slot collision; #57's oracle cells pin it
+  end-to-end).
+- Proven equivalent (1): 23100:43 (New guard `new_slot -> true`:
+  `New` + `!new_slot` implies no installed refs at all, so the guard
+  arm yields `[]` either way).
+- Download recipe (1): 23280:29 (`candidate_source == Ebuild` for
+  `download_files` — unobservable with SRC_URI-less scratch ebuilds;
+  needs SRC_URI in the package writer + a non-empty-bytes assert).
+- REQUIRED_USE message nuances (2): 23392:25 (`Ok(Some(r))` arm —
+  needs a violation whose reduced form differs from normalized;
+  orrequseprefer-shaped), 23399:33 (`!repo.is_empty()` guard — needs
+  an empty-repo candidate in a violation).
+- Reinstall display nuance (1): 23472:17 (`reinst_flags` arm —
+  force-show vs changed-marker rendering identical in every
+  newuse shape; display contract pins cover it).
+- AI+merge coexistence (2): 23900:17, 23903:17 (`mergebound_cp_slots`
+  arms — the retain's drop arm never fires: no shape across 50+
+  legs co-emits an `AlreadyInstalled` entry with a merge-bound
+  same-cp slot; unreachable-in-practice).
+- Direct-solve removal (13): 23965:25, 23981:41, 24039:36,
+  24045:55/49, 24077:42, 24078:53, 24079:33/48, 24084:58,
+  24085:64/52/75 (everything downstream of a non-empty
+  `solved.removed`: keeper repoint (vdb vs tree), keeper blocker
+  collection + dedup. No `run_pass` leg produces a solved removal;
+  `direct_solve_slot_conflicts` itself is pinned at unit level by S5).
+- Replacement-wait (2): 24157:27/13 (`needs_tree_sim` — needs a
+  blocker satisfied by `Replacement`; #68/#72 shapes, contract-pinned).
+
+Method notes for the next cluster items (#162–#166): `cargo mutants
+-- <regex>` scope runs go stale fast on this file — always `touch`
+the file first (mtime-stale binaries report false misses; 23823/23831
+above), clear `rust/mutants.out` between runs, and restore with
+`git checkout --` (never from a `/tmp` backup older than the latest
+slice — S6p was once clobbered exactly that way). A leg that
+"passes" without proving its key property (S6p's first `with_bdeps`
+leg walked an ebuild, not a binary — caught only by instrumenting
+`candidate_source` at the gate) is worse than none: instrument the
+gate before trusting a green leg. `cargo fmt --check` (edition 2024
+via `cargo fmt`; a bare `rustfmt` without `--edition` silently uses
+2015 and reports clean) was already red at S1 (`e99e24f5`, 8 hunks)
+and drifted to ~70 by S6r — normalize with one `cargo fmt` at each
+item's closeout, never inside a test slice.
