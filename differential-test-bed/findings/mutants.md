@@ -449,3 +449,68 @@ via `cargo fmt`; a bare `rustfmt` without `--edition` silently uses
 2015 and reports clean) was already red at S1 (`e99e24f5`, 8 hunks)
 and drifted to ~70 by S6r — normalize with one `cargo fmt` at each
 item's closeout, never inside a test slice.
+
+## #162 closeout (2026-09-26, branch `backlog/162-librs-selection-predicates`)
+
+S1–S7, all test-only in `rust/portage-repo/src/lib.rs` (new
+`mod tests_162`, +~1400 lines, 46 tests; zero product bytes, no
+pmtest counterpart — standalone commits). Direct predicate-result
+legs in the #161 scratch-repo style (`repo_pkgs_162` /
+`install_162` / `entry_162` / `cand_162` / `qatom_162` helpers, one
+temp root per leg, `testrepo` scratch repos + scratch vdbs).
+
+S0 scope (`cargo mutants -p portage-repo --file
+portage-repo/src/lib.rs --in-place --timeout 300 -F
+'(bare_cp|clean_selection|alternative_downgrade_demoted|disjunction_preference|promote_tied_alternative|check_if_latest_atom_form|complete_graph_auto_enable|params_equal)'`,
+142 mutants: 118 in-body + 18 whole-body rows + 6 out-of-scope
+strays): **70 missed / 70 caught / 2 unviable**. Per-function missed
+at S0: `bare_cp` 6, `check_if_latest_atom_form` 6,
+`clean_selection` 10 (9 in-body + `-> vec![]`),
+`complete_graph_auto_enable` 8, `disjunction_preference` 10,
+`promote_tied_alternative` 15 (14 in-body + `-> 0`),
+`alternative_downgrade_demoted` 15 (14 in-body + `-> false`).
+`params_equal` 0 missed: all 31 rows already caught by #161 S2's
+`backtrack_params_equal_compares_every_accumulator`, so no S8 was
+needed. The 6 strays (`BacktrackParams::initial` field deletions +
+`parse_updates_content` guards mentioning `bare_cp`) were all
+S0-caught by existing legs.
+
+Closeout re-run (same command, `touch` first, on the S7 tree):
+**2 missed / 138 caught / 2 unviable**. Per-function missed after:
+`bare_cp` 1, `clean_selection` 1, everything else 0 — 68 killed
+across S1–S7 (S1 5, S2 9, S3 8, S4 6, S5 10, S6 15, S7 15).
+
+Survivor buckets (line numbers are `portage-repo/src/lib.rs` at
+`cbc40620`; every row below was hand-applied and observed
+surviving):
+
+- Proven equivalent (2): 272:9 (`||` -> `&&` in `bare_cp`'s version
+  arm — `portage-dep` `parse_atom_uncached` sets `version` exactly
+  when the `op` group is present and rejects the ambiguous
+  trailing-version form, so `version.is_some() <=> operator != None`
+  on every parseable atom while unparseable inputs return `None`
+  either way through `?`); 8379:69 (`&&` -> `||` in
+  `clean_selection`'s atom/cp guard — `match_from_list` requires cp
+  equality, so a non-empty match implies the guard).
+- Unviable (2, tool-reported, no test possible): 8369:5
+  (`clean_selection -> vec![Default::default()]` —
+  `PruneNodepsCp` has no `Default`); 11584:19 (`&&` -> `||` in
+  `promote_tied_alternative`'s `if let ... && let ...` — the RHS
+  names a binding the LHS never introduces, does not compile).
+
+Corrections to slice commit messages (no rebase, following this
+file's own #161 review-pass precedent): S1 (`22e2891a`) claims all
+six `||` -> `&&` flips killed — 272:9 above is the exception
+(equivalent, not killed; the leg kills the other five). S2
+(`30335e8d`) says "Kills 8" but lists, and kills, 9 (the
+whole-body `vec![]`, three `< 2` flips, the cross-slot best flip,
+both atom/cp `==` flips, the `&&` -> `||` and the `!is_empty`
+deletion — the tenth S0 row is the equivalent 8379:69).
+
+No `cargo fmt` closeout commit: every slice kept `cargo fmt --check`
+(edition 2024) green as it landed, so the closeout `cargo fmt`
+was a no-op. Host quirks for #163–#166: `cargo fmt`/`clippy` go
+through rustup proxy shims here — prefix
+`RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu` (same 1.98.1
+compiler); and a re-run that reports only two early misses while
+`caught.txt` keeps growing is fine (stdout shows misses only).
