@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #25 S0 provider, older sub-slot (installed)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/1
+_md5_=3d8f6c25230a2279f842a7c405c50c5d

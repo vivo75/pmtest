@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #25 S0 installed consumer pinning r25lib below 2.0 (weston shape)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=<dev-libs/r25lib-2.0:=
+SLOT=0
+_md5_=b4f46d2bc590b523b32183c8bd5b1667
