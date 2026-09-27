@@ -627,6 +627,46 @@ CASES = [
         1,
     ),
     (
+        "backtrack: upstream test_backtracking pg1 A B selective-update merges nothing like real (rc 0; missed A-2 warned, not pinned)",
+        ["--pretend", "--update", "--deep", "--selective", "dev-libs/bkt1a", "dev-libs/bkt1b"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg1 B A selective-update merges nothing like real (rc 0; missed A-2 warned, not pinned)",
+        ["--pretend", "--update", "--deep", "--selective", "dev-libs/bkt1b", "dev-libs/bkt1a"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg3 C D merges like real (rc 0; backtrack not needed, pinned below)",
+        ["--pretend", "--backtrack=1", "dev-libs/bkt3c", "dev-libs/bkt3d"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg3 D C merges like real (rc 0; backtrack not needed; missed-update warnings unverified, not pinned)",
+        ["--pretend", "--backtrack=1", "dev-libs/bkt3d", "dev-libs/bkt3c"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg4 B A merges like real (rc 0; Z-2 upgrade unblocks, pinned below)",
+        ["--pretend", "dev-libs/bkt4b", "dev-libs/bkt4a"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg4 A B merges like real (rc 0; Z-2 upgrade unblocks, pinned below)",
+        ["--pretend", "dev-libs/bkt4a", "dev-libs/bkt4b"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg5 =A-1 B merges like real (rc 0; pinned below)",
+        ["--pretend", "=dev-libs/bkt5a-1", "dev-libs/bkt5b"],
+        0,
+    ),
+    (
+        "backtrack: upstream test_backtracking pg5 B =A-1 merges like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/bkt5b", "=dev-libs/bkt5a-1"],
+        0,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
@@ -9073,6 +9113,71 @@ def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
         assert got.returncode == 0, atom
         assert got.stderr == "", atom
         assert got.stdout.splitlines() == rows, atom
+
+
+def test_upstream_backtracking_pg345_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_backtracking.py::testBacktrackNotNeeded` (pg3),
+    `::testBacktrackWithoutUpdates` (pg4) and `::testBacktracking` (pg5),
+    bulk-translated for #50 batch 6 (`dev-libs/bkt3{a,b,c,d}`,
+    `dev-libs/bkt4{a,b,z}`, `dev-libs/bkt5{a,b}`; oracle
+    `/tmp/opencode/o50d/perfile/bt.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    The 5 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned. Not pinned: pg1's two
+    selective-update cells (empty merge under a missed-update WARNING
+    whose text is unverified vs real), pg3's D/C order (same set but
+    with missed-update warnings for A-2/B-2), and the skipped @world
+    playgrounds pg0/pg2 (they need shared world entries).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["--backtrack=1", "dev-libs/bkt3c", "dev-libs/bkt3d"],
+            [
+                "[ebuild  N     ] dev-libs/bkt3a-1 ",
+                "[ebuild  N     ] dev-libs/bkt3b-1 ",
+                "[ebuild  N     ] dev-libs/bkt3c-1 ",
+                "[ebuild  N     ] dev-libs/bkt3d-1 ",
+            ],
+        ),
+        (
+            ["dev-libs/bkt4b", "dev-libs/bkt4a"],
+            [
+                "[ebuild     U  ] dev-libs/bkt4z-2 [1]",
+                "[ebuild  N     ] dev-libs/bkt4b-1 ",
+                "[ebuild  N     ] dev-libs/bkt4a-1 ",
+            ],
+        ),
+        (
+            ["dev-libs/bkt4a", "dev-libs/bkt4b"],
+            [
+                "[ebuild     U  ] dev-libs/bkt4z-2 [1]",
+                "[ebuild  N     ] dev-libs/bkt4a-1 ",
+                "[ebuild  N     ] dev-libs/bkt4b-1 ",
+            ],
+        ),
+        (
+            ["=dev-libs/bkt5a-1", "dev-libs/bkt5b"],
+            [
+                "[ebuild  N     ] dev-libs/bkt5a-1 ",
+                "[ebuild  N     ] dev-libs/bkt5b-1 ",
+            ],
+        ),
+        (
+            ["dev-libs/bkt5b", "=dev-libs/bkt5a-1"],
+            [
+                "[ebuild  N     ] dev-libs/bkt5a-1 ",
+                "[ebuild  N     ] dev-libs/bkt5b-1 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
