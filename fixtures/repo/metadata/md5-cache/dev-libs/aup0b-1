@@ -1,0 +1,8 @@
+EAPI=5
+DESCRIPTION=fixture package: upstream test_autounmask_parent pg0 dev-libs/B-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+IUSE=+bar +foo
+DEPEND=dev-libs/aup0d[foo(-)?,bar(-)?]
+DEFINED_PHASES=-
+_md5_=049a45e9ecdc5005390523a48482cabf
