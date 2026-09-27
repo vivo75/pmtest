@@ -1,8 +1,0 @@
-EAPI=8
-DESCRIPTION=fixture package: upstream test_broken_deps.py pg0 dev-qt/qtxmlpatterns-5.15.12 (bulk #50)
-KEYWORDS=amd64
-SLOT=0
-DEPEND==dev-libs/bdp0a-5.15.12*
-RDEPEND==dev-libs/bdp0a-5.15.12*
-DEFINED_PHASES=-
-_md5_=da78a5533ae3066dce3b89bf95a821f4

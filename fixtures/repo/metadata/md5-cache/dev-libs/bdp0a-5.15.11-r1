@@ -1,6 +1,0 @@
-EAPI=8
-DESCRIPTION=fixture package: upstream test_broken_deps.py pg0 dev-qt/qtcore-5.15.11-r1 (bulk #50)
-KEYWORDS=amd64
-SLOT=0
-DEFINED_PHASES=-
-_md5_=10d4307c510128e39c4a77ba074321d6
