@@ -16,9 +16,11 @@ real behavior to keep in sync between two implementations; this file
 is the only test surface for it.
 """
 
+import ctypes
 import getpass
 import os
 import shutil
+import signal
 import subprocess
 import tarfile
 from pathlib import Path
@@ -559,8 +561,8 @@ def loopback_sshd(tmp_path_factory):
     "client": fresh ed25519 client + host keys, an empty client ROOT
     with `var/db/pkg`, `StrictModes no` (the tmp dir lives under
     world-writable `/tmp`). Skip-gated on ssh/sshd/ssh-keygen presence.
-    Yields a dict with the mrg argv fragment + paths. The daemon is
-    killed on teardown."""
+    Yields a dict with the mrg argv fragment + paths. The daemon runs in
+    the foreground and dies with its parent via a parent-death signal."""
     for tool in ("ssh", "sshd", "ssh-keygen"):
         if shutil.which(tool) is None:
             pytest.skip(f"{tool} not available for the loopback-sshd fixture")
@@ -593,8 +595,17 @@ def loopback_sshd(tmp_path_factory):
     )
     # NOTE: this OpenSSH build refuses a PATH-resolved launch
     # ("sshd requires execution with an absolute path").
+    def _set_pdeathsig():
+        """Set parent-death signal on Linux so the daemon dies with pytest."""
+        try:
+            ctypes.CDLL(None, use_errno=True).prctl(1, signal.SIGTERM, 0, 0, 0)
+        except Exception:
+            # Ignore prctl failures (e.g., on non-Linux systems).
+            pass
+
     daemon = subprocess.Popen(
-        [sshd_bin, "-f", str(cfg), "-E", str(work / "log")],
+        [sshd_bin, "-D", "-f", str(cfg), "-E", str(work / "log")],
+        preexec_fn=_set_pdeathsig,
     )
     try:
         deadline = _time.time() + 15
@@ -627,7 +638,11 @@ def loopback_sshd(tmp_path_factory):
         }
     finally:
         daemon.terminate()
-        daemon.wait(timeout=10)
+        try:
+            daemon.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            daemon.kill()
+            daemon.wait()
 
 
 def _remote_base(sshd_client, extra=(), port=None):
