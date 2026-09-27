@@ -5808,6 +5808,62 @@ def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
     assert (root / "var/lib/portage/world").read_text() == ""
 
 
+def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
+    """Backlog #179: real `_emerge/actions.py` returns from the
+    `--pretend` branch (`display(...)`, `return os.EX_OK`) before
+    `Scheduler` exists -- and before the `resume_backup` rotation -- so
+    a preview never touches `mtimedb["resume"]`. A stale multi-item list
+    (one the rotation would also rewrite) must come back byte-identical,
+    and a bare root must gain no `mtimedb` at all."""
+    import json
+    import shutil
+
+    def _env(root):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(root / "pt")
+        return env
+
+    stale = {
+        "resume": {
+            "favorites": ["dev-libs/stale-a"],
+            "mergelist": [
+                ["ebuild", "/", "dev-libs/stale-a-1.0", "merge"],
+                ["ebuild", "/", "dev-libs/stale-b-1.0", "merge"],
+            ],
+            "myopts": {},
+        }
+    }
+
+    # Bare root: the preview resolves and prints, and leaves no mtimedb.
+    root = tmp_path / "root-bare"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert "dev-libs/schedok-1.0" in r.stdout
+    assert not (root / "var/cache/edb/mtimedb").exists()
+
+    # Stale list present: byte-identical afterwards (neither a fresh save
+    # nor the rotation may run on a preview).
+    root = tmp_path / "root-stale"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    mtimedb = root / "var/cache/edb/mtimedb"
+    mtimedb.parent.mkdir(parents=True, exist_ok=True)
+    mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    before = mtimedb.read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert mtimedb.read_bytes() == before
+
+
 def test_emerge_elog_echo_prints_a_message_summary(emerge_binary, tmp_path):
     """Real `elog_process` / `mod_echo` (default-on via `make.globals`
     `PORTAGE_ELOG_SYSTEM`): after the merge, the `elog`/`ewarn` messages an
