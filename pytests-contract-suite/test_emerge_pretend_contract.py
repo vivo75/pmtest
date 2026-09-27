@@ -622,6 +622,11 @@ CASES = [
         1,
     ),
     (
+        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like real (rc 1; USE changes necessary, bug 632598; merge choice differs, not pinned)",
+        ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"],
+        1,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
