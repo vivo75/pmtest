@@ -637,6 +637,16 @@ CASES = [
         1,
     ),
     (
+        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-1 fails like real (rc 1; B[foo?] unsatisfiable, B lacks foo)",
+        ["--pretend", "=dev-libs/mia0a-1"],
+        1,
+    ),
+    (
+        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-2 fails like real (rc 1; B[foo?,bar] unsatisfiable)",
+        ["--pretend", "=dev-libs/mia0a-2"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,

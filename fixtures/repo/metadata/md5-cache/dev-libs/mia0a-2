@@ -1,0 +1,8 @@
+EAPI=2
+DESCRIPTION=fixture package: upstream test_missing_iuse_and_evaluated_atoms pg0 dev-libs/A-2 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+IUSE=foo bar
+DEPEND=dev-libs/mia0b[foo?,bar]
+DEFINED_PHASES=-
+_md5_=514d4f9fb736dfd8eca054f30dc04214
