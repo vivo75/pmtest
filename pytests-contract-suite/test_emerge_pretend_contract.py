@@ -657,6 +657,156 @@ CASES = [
         1,
     ),
     (
+        "slotconflict: upstream test_slot_conflict_mask_update pg0 dev-libs/scm0a merges like real (rc 0; backtrack masks highest C first: C-1 + B-1 + A-1)",
+        ["--pretend", "dev-libs/scm0a"],
+        0,
+    ),
+    (
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-1 merges like real (rc 0; B[foo] via B-1 with +foo, pinned below)",
+        ["--pretend", "=dev-libs/udd0a-1"],
+        0,
+    ),
+    (
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-2 merges like real (rc 0; B[foo(+)] default-on via B-2, pinned below)",
+        ["--pretend", "=dev-libs/udd0a-2"],
+        0,
+    ),
+    (
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-3 merges like real (rc 0; B[foo(-)] resolves to B-1, pinned below)",
+        ["--pretend", "=dev-libs/udd0a-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0a-2 merges like real (rc 0; bar default-on satisfies || ( foo bar ) via bar, not foo)",
+        ["--pretend", "=dev-libs/rqu0a-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0a-3 merges like real (rc 0; +foo satisfies || ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0a-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0a-4 merges like real (rc 0; +foo +bar satisfies || ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0a-4"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0b-2 merges like real (rc 0; exactly one of foo/bar satisfies ^^ ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0b-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0b-3 merges like real (rc 0; +foo alone satisfies ^^ ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0b-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-1 merges like real (rc 0; +foo with bar off satisfies foo? ( !bar ))",
+        ["--pretend", "=dev-libs/rqu0c-1"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-4 fails like real (rc 1; +foo with bar off violates foo? ( bar ))",
+        ["--pretend", "=dev-libs/rqu0c-4"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-7 merges like real (rc 0; profile foo makes !foo? ( bar ) vacuous where real needs default +bar)",
+        ["--pretend", "=dev-libs/rqu0c-7"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-8 merges like real (rc 0; +foo makes !foo? ( bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-8"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-9 merges like real (rc 0; +foo makes !foo? ( bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-9"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-11 merges like real (rc 0; profile foo makes !foo? ( !bar ) vacuous where real checks !bar)",
+        ["--pretend", "=dev-libs/rqu0c-11"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-13 merges like real (rc 0; +foo makes !foo? ( !bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-13"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-14 merges like real (rc 0; +foo makes !foo? ( !bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-14"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-1 merges like real (rc 0; +w +x satisfies w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-1"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-2 merges like real (rc 0; +w +x +y +z satisfies w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-3 fails like real (rc 1; +w +x without y/z violates w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-3"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-4 fails like real (rc 1; +w without x violates w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-4"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-5 merges like real (rc 0; w off makes w? ( x || ( y z ) ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0d-5"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-1 merges like real (rc 0; profile foo with bar off satisfies ?? ( foo bar ) the other way vs real)",
+        ["--pretend", "=dev-libs/rqu0e-1"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-2 merges like real (rc 0; exactly one of foo/bar satisfies ?? ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0e-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-3 merges like real (rc 0; +foo alone satisfies ?? ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0e-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-5 merges like real (rc 0; empty ?? ( ) imposes nothing)",
+        ["--pretend", "=dev-libs/rqu0e-5"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0f-1 fails like real (rc 1; empty || ( ) unsatisfiable under EAPI 7)",
+        ["--pretend", "=dev-libs/rqu0f-1"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0f-2 fails like real (rc 1; empty ^^ ( ) unsatisfiable under EAPI 7)",
+        ["--pretend", "=dev-libs/rqu0f-2"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0f-3 merges like real (rc 0; empty ?? ( ) imposes nothing)",
+        ["--pretend", "=dev-libs/rqu0f-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg1 =rqu1p-1 fails like real (rc 1; preferred || alternative A-1 violates ^^ ( x y ))",
+        ["--pretend", "=app-misc/rqu1p-1"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
@@ -8728,6 +8878,35 @@ def test_strong_blocker_matches_an_installed_package(emerge_binary, fixture_env)
         "[ebuild  N     ] dev-libs/blockerpkg                                   "
         "[1.0]                        ",
     ]
+
+
+def test_upstream_use_dep_defaults_pg0_pins_mergelists(
+    emerge_binary, fixture_env
+):
+    """Upstream `test_use_dep_defaults.py::testUseDepDefaultse` pg0,
+    bulk-translated for #50 batch 5 (`dev-libs/udd0{a,b}`; oracle
+    `/tmp/opencode/o50c/perfile/udd.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    A-1 wants `B[foo]`, A-2 `B[foo(+)]`, A-3 `B[foo(-)]`; B-1 is
+    `IUSE=+foo` (EAPI 1), B-2 has no IUSE. Real merges `[B-1, A-1]`,
+    `[B-2, A-2]`, `[B-1, A-3]` (all `success=True`). All three cells
+    are clean today: portuale merges the same sets in the same order
+    with no warnings and empty stderr, so the exact rows are pinned.
+    """
+    env = dict(fixture_env)
+    for atom, dep in (
+        ("=dev-libs/udd0a-1", "dev-libs/udd0b-1  USE=\"foo\""),
+        ("=dev-libs/udd0a-2", "dev-libs/udd0b-2 "),
+        ("=dev-libs/udd0a-3", "dev-libs/udd0b-1  USE=\"foo\""),
+    ):
+        got = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert got.returncode == 0
+        assert got.stderr == ""
+        assert got.stdout.splitlines() == [
+            f"[ebuild  N     ] {dep}",
+            f"[ebuild  N     ] {atom.removeprefix('=')} ",
+        ]
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(

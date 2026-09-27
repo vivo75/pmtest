@@ -1,0 +1,6 @@
+EAPI=0
+DESCRIPTION=fixture package: upstream test_slot_conflict_mask_update pg0 dev-libs/C-2 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=1f5c13bf7c79ec58d1cdf7344cdadd51

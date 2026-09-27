@@ -1,0 +1,7 @@
+EAPI=0
+DESCRIPTION=fixture package: upstream test_required_use pg1 app-misc/p-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+RDEPEND=|| ( =dev-libs/rqu1a-1 =dev-libs/rqu1b-1 )
+DEFINED_PHASES=-
+_md5_=9fbedf8d777f3a1ba5ebc30c31276161
