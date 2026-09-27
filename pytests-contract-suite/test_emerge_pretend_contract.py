@@ -677,6 +677,136 @@ CASES = [
         0,
     ),
     (
+        "requse: upstream test_required_use pg0 =rqu0a-2 merges like real (rc 0; bar default-on satisfies || ( foo bar ) via bar, not foo)",
+        ["--pretend", "=dev-libs/rqu0a-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0a-3 merges like real (rc 0; +foo satisfies || ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0a-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0a-4 merges like real (rc 0; +foo +bar satisfies || ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0a-4"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0b-2 merges like real (rc 0; exactly one of foo/bar satisfies ^^ ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0b-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0b-3 merges like real (rc 0; +foo alone satisfies ^^ ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0b-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-1 merges like real (rc 0; +foo with bar off satisfies foo? ( !bar ))",
+        ["--pretend", "=dev-libs/rqu0c-1"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-4 fails like real (rc 1; +foo with bar off violates foo? ( bar ))",
+        ["--pretend", "=dev-libs/rqu0c-4"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-7 merges like real (rc 0; profile foo makes !foo? ( bar ) vacuous where real needs default +bar)",
+        ["--pretend", "=dev-libs/rqu0c-7"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-8 merges like real (rc 0; +foo makes !foo? ( bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-8"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-9 merges like real (rc 0; +foo makes !foo? ( bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-9"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-11 merges like real (rc 0; profile foo makes !foo? ( !bar ) vacuous where real checks !bar)",
+        ["--pretend", "=dev-libs/rqu0c-11"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-13 merges like real (rc 0; +foo makes !foo? ( !bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-13"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0c-14 merges like real (rc 0; +foo makes !foo? ( !bar ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0c-14"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-1 merges like real (rc 0; +w +x satisfies w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-1"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-2 merges like real (rc 0; +w +x +y +z satisfies w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-3 fails like real (rc 1; +w +x without y/z violates w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-3"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-4 fails like real (rc 1; +w without x violates w? ( x || ( y z ) ))",
+        ["--pretend", "=dev-libs/rqu0d-4"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0d-5 merges like real (rc 0; w off makes w? ( x || ( y z ) ) vacuous)",
+        ["--pretend", "=dev-libs/rqu0d-5"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-1 merges like real (rc 0; profile foo with bar off satisfies ?? ( foo bar ) the other way vs real)",
+        ["--pretend", "=dev-libs/rqu0e-1"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-2 merges like real (rc 0; exactly one of foo/bar satisfies ?? ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0e-2"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-3 merges like real (rc 0; +foo alone satisfies ?? ( foo bar ))",
+        ["--pretend", "=dev-libs/rqu0e-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0e-5 merges like real (rc 0; empty ?? ( ) imposes nothing)",
+        ["--pretend", "=dev-libs/rqu0e-5"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0f-1 fails like real (rc 1; empty || ( ) unsatisfiable under EAPI 7)",
+        ["--pretend", "=dev-libs/rqu0f-1"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0f-2 fails like real (rc 1; empty ^^ ( ) unsatisfiable under EAPI 7)",
+        ["--pretend", "=dev-libs/rqu0f-2"],
+        1,
+    ),
+    (
+        "requse: upstream test_required_use pg0 =rqu0f-3 merges like real (rc 0; empty ?? ( ) imposes nothing)",
+        ["--pretend", "=dev-libs/rqu0f-3"],
+        0,
+    ),
+    (
+        "requse: upstream test_required_use pg1 =rqu1p-1 fails like real (rc 1; preferred || alternative A-1 violates ^^ ( x y ))",
+        ["--pretend", "=app-misc/rqu1p-1"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
