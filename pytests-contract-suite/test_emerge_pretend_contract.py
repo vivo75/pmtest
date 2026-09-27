@@ -16293,6 +16293,52 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
     )
 
 
+def test_info_shows_the_calling_env_over_make_conf(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """Backlog #219: `emerge --info` prints the calling environment over
+    the config files. Real `action_info` reads `settings.get(k)`
+    (`_emerge/actions.py:2240`), which walks `lookuplist` env-first
+    (real `config.py:3178-3182`; `USE_ORDER "env:pkg:conf:…"` at
+    `:1031-1035`); portuale's dump read `other_vars` first with the
+    process env only as a fallback (`pretend.rs` "Config sources win"),
+    so a key `resolve_config` never env-folds itself showed the file
+    value. Hermetically: a copied configroot whose `make.conf` sets
+    `PORTAGE_BZIP2_COMMAND` / `PORTAGE_BUNZIP2_COMMAND` (both on real's
+    hardcoded `myvars` list, neither in `ENV_SCALAR_VARS`, so both reads
+    were inverted) to file values, with different calling-env values on
+    top -- `--info` must show the env values. `PKGDIR` (same block,
+    already env-folded, so unchanged) is guarded too.
+    `BINPKG_COMPRESS[*]` / `BINPKG_FORMAT` are not pinned: real never
+    prints them (absent from `myvars`, and the fixture profiles ship no
+    `info_vars` that could add them)."""
+    configroot = tmp_path / "configroot219"
+    shutil.copytree(fixtures_root / "etc", configroot / "etc", symlinks=True)
+    for entry in fixtures_root.iterdir():
+        if entry.name != "etc":
+            (configroot / entry.name).symlink_to(entry)
+    make_conf = configroot / "etc" / "portage" / "make.conf"
+    make_conf.write_text(
+        make_conf.read_text()
+        + '\nPORTAGE_BZIP2_COMMAND="conf-bzip2-219"\n'
+        + '\nPORTAGE_BUNZIP2_COMMAND="conf-bunzip2-219"\n'
+    )
+
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(configroot)
+    env["PORTAGE_BZIP2_COMMAND"] = "env-bzip2-219"
+    env["PORTAGE_BUNZIP2_COMMAND"] = "env-bunzip2-219"
+    env["PKGDIR"] = str(tmp_path / "pkgdir-env-219")
+
+    rust = _run([str(emerge_binary)], ["--info"], env)
+    assert rust.returncode == 0
+    assert '\nPORTAGE_BZIP2_COMMAND="env-bzip2-219"\n' in rust.stdout
+    assert '\nPORTAGE_BUNZIP2_COMMAND="env-bunzip2-219"\n' in rust.stdout
+    assert f'\nPKGDIR="{tmp_path / "pkgdir-env-219"}"\n' in rust.stdout
+    assert "conf-bzip2-219" not in rust.stdout
+    assert "conf-bunzip2-219" not in rust.stdout
+
+
 def test_info_atom_that_does_not_exist_errors_with_misspell_suggestions(
     emerge_binary, fixture_env
 ):
