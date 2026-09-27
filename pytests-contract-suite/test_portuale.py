@@ -7129,7 +7129,13 @@ def test_emerge_unmerge_backup_make_conf_binpkg_format_xpak_is_obeyed(
     `XPAKSTOP` trailer, installed file inside); setting the calling env
     to `gpkg` on top flips that same config back to `.gpkg.tar`, proving
     the env beats `make.conf`. Reuses `dev-libs/emergeconfigpkg`, so no
-    md5-cache entry is needed."""
+    md5-cache entry is needed. Backlog #202: the reinstall forces the
+    first backup's `Packages` `BUILD_TIME` into the re-merged vdb entry
+    before the second `emerge -C`, deterministically reproducing the
+    same-second re-merge state (real `BUILD_TIME` is epoch seconds) in
+    which the old code skipped the second backup with rc 0 -- real
+    `emerge -C` never consults the index there (its bintree is
+    unpopulated), so it always rebuilds."""
     import shutil
     import tarfile as _tarfile
 
@@ -7182,6 +7188,23 @@ def test_emerge_unmerge_backup_make_conf_binpkg_format_xpak_is_obeyed(
         [str(link), ebuild, "merge"], capture_output=True, text=True, check=False, env=env
     )
     assert r.returncode == 0, r.stderr
+    # Backlog #202: force the same-second re-merge collision. The first
+    # backup's `Packages` stanza still carries the first merge's
+    # second-granularity `BUILD_TIME` after the `.tbz2` is unlinked
+    # below; copying it into the re-merged vdb entry reproduces exactly
+    # the state of two merges landing in the same epoch second, instead
+    # of depending on wall-clock timing to hit it.
+    stanza_build_time = None
+    for block in (pkgdir / "Packages").read_text().split("\n\n"):
+        if "CPV: dev-libs/emergeconfigpkg-1.0" not in block.splitlines():
+            continue
+        for line in block.splitlines():
+            if line.startswith("BUILD_TIME:"):
+                stanza_build_time = line.split(":", 1)[1].strip()
+    assert stanza_build_time, (pkgdir / "Packages").read_text()
+    (root / "var/db/pkg/dev-libs/emergeconfigpkg-1.0/BUILD_TIME").write_text(
+        stanza_build_time + "\n"
+    )
     (pkgdir / "dev-libs/emergeconfigpkg-1.0.tbz2").unlink()
     env["FEATURES"] = "unmerge-backup"
     env["BINPKG_FORMAT"] = "gpkg"
