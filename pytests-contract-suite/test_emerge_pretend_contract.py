@@ -6904,11 +6904,13 @@ def test_quickpkg_direct_injects_source_root_packages(
     assert same.returncode == 1
 
 
-def _binscan_configroot(tmp_path, fixtures_root, binpkg_files):
+def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=None):
     """An ad-hoc PORTAGE_CONFIGROOT whose `PKGDIR` points at a directory
     that holds `binpkg_files` (copied from fixtures) but NO
     `Packages` index -- so `--usepkg`/`--usepkgonly` must fall back to
-    the real `bintree._populate_local` `$PKGDIR` directory scan."""
+    the real `bintree._populate_local` `$PKGDIR` directory scan. With
+    `packages_text` the index is written with that content instead
+    (backlog #199: a staged stale index)."""
     cfg = tmp_path / "cfg"
     repo = tmp_path / "repo"
     pkgdir = tmp_path / "binpkgs"
@@ -6925,7 +6927,10 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files):
         dest = pkgdir / "dev-libs" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(fixtures_root / "pkgdir/dev-libs" / name, dest)
-    assert not (pkgdir / "Packages").exists()
+    if packages_text is None:
+        assert not (pkgdir / "Packages").exists()
+    else:
+        (pkgdir / "Packages").write_text(packages_text)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -6971,6 +6976,106 @@ def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
         env,
     )
     assert v.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
+
+
+def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #199: with `FEATURES=-pkgdir-index-trusted` the local
+    `$PKGDIR` scan runs real `_populate_local(reindex=True)`
+    (`bintree.py:936-938`): a `Packages` stanza whose file is gone is
+    dropped from the pool (real `bintree.py:1353-1356`), instead of
+    being re-injected like the trusted default (backlog #187). A file
+    whose `_mtime_` changed is re-parsed from disk either way the pool
+    can tell, and a file no stanza covers is picked up in both modes.
+
+    The staged index holds a stale `packagepkg` stanza (genuine
+    metadata, bogus `_mtime_` -- trusted mode vouches it, untrusted
+    mode re-parses the file and lands on the same entry) plus a
+    `gonepkg` stanza whose file is absent (trusted mode re-injects it,
+    untrusted mode drops it); `gpkgreadpkg`'s file is present with no
+    stanza at all. Each binary's own `RDEPEND` is walked far enough to
+    name it, so the abort text tells which pool each mode resolved:
+    `packagepkg -> dev-libs/samepkg`, `gpkgreadpkg -> dev-libs/newpkg`
+    (both modes), `gonepkg -> dev-libs/samepkg` trusted but
+    `dev-libs/gonepkg` itself untrusted (nothing left to satisfy it)."""
+    pkgdir = tmp_path / "binpkgs"
+    size = (fixtures_root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").stat().st_size
+    packages_text = (
+        "TIMESTAMP: 0\n"
+        "\n"
+        "CPV: dev-libs/packagepkg-1.0\n"
+        "DEFINED_PHASES: install\n"
+        'DESCRIPTION: fixture package: real binary-package building (ebuild <file> package)\n'
+        "EAPI: 8\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/samepkg\n"
+        "SLOT: 0\n"
+        "USE: \n"
+        f"SIZE: {size}\n"
+        "_mtime_: 1\n"
+        "PATH: dev-libs/packagepkg-1.0.tbz2\n"
+        "\n"
+        "CPV: dev-libs/gonepkg-1.0\n"
+        "DEFINED_PHASES: -\n"
+        "DESCRIPTION: gone\n"
+        "EAPI: 8\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/samepkg\n"
+        "SLOT: 0\n"
+        "USE: \n"
+        "SIZE: 12345\n"
+        "_mtime_: 1\n"
+        "PATH: dev-libs/gonepkg-1.0.tbz2\n"
+    )
+    env = _binscan_configroot(
+        tmp_path,
+        fixtures_root,
+        ["packagepkg-1.0.tbz2", "gpkgreadpkg-1.0.gpkg.tar"],
+        packages_text,
+    )
+    untrusted = dict(env)
+    untrusted["FEATURES"] = "-pkgdir-index-trusted"
+
+    # The changed file resolves identically either way: trusted vouches
+    # the stale stanza, untrusted re-parses the same bytes from disk.
+    for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
+        rust = _run(
+            [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/packagepkg"], run_env
+        )
+        assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr, label
+
+    # The file no stanza covers resolves in both modes too.
+    for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
+        rust = _run(
+            [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gpkgreadpkg"], run_env
+        )
+        assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in rust.stderr, label
+
+    # The removed file: trusted re-injects the orphan stanza (the
+    # binary resolves and its dep is walked), untrusted drops it (the
+    # top-level atom itself is unsatisfiable).
+    rust = _run(
+        [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], env
+    )
+    assert rust.returncode == 1, rust.stdout + rust.stderr
+    _assert_abort_preamble(rust.stdout)
+    assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
+
+    rust = _run(
+        [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], untrusted
+    )
+    assert rust.returncode == 1, rust.stdout + rust.stderr
+    # No merge-list preamble here: with no candidate at all (no
+    # binary, no ebuild) the top-level atom fails before any
+    # merge-bound parent exists -- like the no-`--quickpkg-direct`
+    # leg of `test_quickpkg_direct_injects_source_root_packages`.
+    assert rust.stdout == "", rust.stdout
+    assert 'there are no ebuilds to satisfy "dev-libs/gonepkg"' in rust.stderr
 
 
 def test_binrepos_conf_is_read_as_a_directory_of_fragments(
