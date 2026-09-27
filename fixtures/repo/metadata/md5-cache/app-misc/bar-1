@@ -1,0 +1,7 @@
+EAPI=8
+DESCRIPTION=fixture package: upstream test_virtual_cycle pg0 app-misc/bar-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+RDEPEND=virtual/gzip
+DEFINED_PHASES=-
+_md5_=0205f73bcd5bb9d64128971f17e63efa

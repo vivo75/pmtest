@@ -1,0 +1,7 @@
+EAPI=8
+DESCRIPTION=fixture package: upstream test_virtual_cycle pg0 virtual/A-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+RDEPEND=virtual/B
+DEFINED_PHASES=-
+_md5_=454dffafc1fe81bc652fd5446e496a2d
