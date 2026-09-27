@@ -147,6 +147,35 @@ unexplained_of() {  # <report>
   echo "${n:-?}"
 }
 
+# Backlog #187: F3's exit codes are the finding the filesystem diff
+# cannot see (F3a installs nothing on either side once portuale aborts
+# like real; F3b installs the same tree) -- compare what each side
+# recorded for the stale-index abort (`binhost-merge`, real rc 1) and
+# the empty-PKGDIR fallback (`binhost-fallback`, real rc 0). `rc_of` in
+# run-cell.sh always writes both files, so a missing file is itself a
+# setup error, not a silent pass. Appends `[RC]` finding rows to the
+# cell report either way; returns 0 iff both steps agree, so a
+# mismatching rc fails the cell (rc=1) like an unexplained diff row.
+# F3 only -- every other cell keeps the filesystem/VDB verdict alone.
+check_f3_rc() {  # <report> <prefix-a> <prefix-b>
+  local report=$1 a=$2 b=$3 step a_rc b_rc bad=0
+  {
+    echo ""
+    echo "## exit-code findings (F3 only; a mismatch is a hard finding)"
+    for step in binhost-merge binhost-fallback; do
+      a_rc=$(cat "$a.logs/$step.rc" 2>/dev/null || echo "missing")
+      b_rc=$(cat "$b.logs/$step.rc" 2>/dev/null || echo "missing")
+      if [ "$a_rc" = "$b_rc" ]; then
+        echo "  [RC-OK] $step: portage rc=$a_rc portuale rc=$b_rc"
+      else
+        echo "  [RC] $step: portage rc=$a_rc vs portuale rc=$b_rc"
+        bad=1
+      fi
+    done
+  } >> "$report"
+  return "$bad"
+}
+
 CELLS=(C1 C2 C3 C4 F1 F2 F3)
 if [ "$CELL" != all ]; then CELLS=("$CELL"); fi
 
@@ -163,6 +192,9 @@ for c in "${CELLS[@]}"; do
     REPORT="$OUT/$c/control/report.txt"
     set +e; normalize_diff "control" "$A" "$B" "$REPORT"; rc=$?; set -e
     n=$(unexplained_of "$REPORT")
+    if [ "$c" = F3 ]; then
+      set +e; check_f3_rc "$REPORT" "$A" "$B"; [ "$?" = 0 ] || rc=1; set -e
+    fi
     ROWS+=("$c	control	$n	rc=$rc")
     [ "$rc" = 0 ] || BAD=1
   else
@@ -174,6 +206,9 @@ for c in "${CELLS[@]}"; do
     REPORT="$OUT/$c/candidate/report.txt"
     set +e; normalize_diff "candidate" "$A" "$B" "$REPORT"; rc=$?; set -e
     n=$(unexplained_of "$REPORT")
+    if [ "$c" = F3 ]; then
+      set +e; check_f3_rc "$REPORT" "$A" "$B"; [ "$?" = 0 ] || rc=1; set -e
+    fi
     ROWS+=("$c	candidate	$n	rc=$rc")
   fi
 done
