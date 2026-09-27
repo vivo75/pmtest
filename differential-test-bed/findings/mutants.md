@@ -653,3 +653,29 @@ before each scoped run, `rust/mutants.out` cleared between runs,
 restore with `git checkout --` (never from a backup), gate
 instrumented before trusting (the `:0=` slot-operator leg was verified
 to actually match before trusting its kills).
+
+Review follow-up (2026-09-27, portuale `test: address #165 review
+nits`): the `resolve_blockers` 16930:49 `installed_match` `&&` ->
+`||` row listed above as proven equivalent is killable, not
+equivalent. The diverging shape is the merge-bound twin: installed
+`target-1.0:0` beside merge-bound `target-1.0:1` (matched, so
+`merge_bound_match` is true and every other `installed_match` use
+short-circuits) plus a second same-slot entry `target-2.0:1`, which
+lets the mutant's widened `installed_match` take the replaced-in-slot
+arm and misfile the row as slot `Replacement` (an unsolvable
+uninstall with no `satisfied_by` on the original). New leg
+`resolve_blockers_requires_slot_and_version_for_an_installed_match`
+fails on the hand-applied mutant and passes on the original; the
+scoped tool re-run (`--in-place --timeout 300 -F '16930:49'`, 5
+tested including the 4 S0-caught `BacktrackParams::initial` strays)
+reports it `CaughtMutant`. This supersedes the S7-docstring correction
+above (the row is killed after all). Tallies move to: S7 8 kills,
+total killed 70, `resolve_blockers` missed 8→0, closeout 223 caught /
+18 missed / 13 unviable / 1 timeout (projected from the scoped
+re-run; no full re-run), equivalent bucket 9. Same commit also fixes
+the `tests_165` module docstring's real-source paths
+(`lib/_emerge/depgraph.py:8891 _validate_blockers`;
+`lib/_emerge/actions.py` `UnmergeDepPriority` /
+`ignore_priority_range` ~:1709), makes the volatile second-repo leg
+skip loudly (`eprintln!` + no `second` repo) where the host has no
+root-owned system dir, and removes the untracked `rust/mutants.out/`.
