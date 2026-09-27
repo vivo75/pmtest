@@ -514,3 +514,142 @@ through rustup proxy shims here — prefix
 `RUSTUP_TOOLCHAIN=stable-x86_64-unknown-linux-gnu` (same 1.98.1
 compiler); and a re-run that reports only two early misses while
 `caught.txt` keeps growing is fine (stdout shows misses only).
+
+## #165 closeout (2026-09-27, branch `backlog/165-librs-graph-inputs`)
+
+S1–S9 + S6b, all test-only in `rust/portage-repo/src/lib.rs` (new
+`mod tests_165`, +~2000 lines, 47 tests; zero product bytes, no pmtest
+counterpart — standalone commits). Scratch-vdb / scratch-repo legs in
+the Phase 8 S2 style (`dir_165` / `install_165` / `write_pkg_165` /
+`repo_165` / `entry_165` helpers, one temp root per leg, `testrepo`
+scratch repos + scratch vdbs). Every test observes the function's own
+return value (returned vectors, the vdb fingerprint, filed conflicts,
+queued atoms) — no end-to-end contract reproduction.
+
+S0 scope (`cargo mutants -p portage-repo --file
+portage-repo/src/lib.rs --in-place --timeout 300 -F
+'(installed_reverse_dependents|vdb_fingerprint|find_repos_impl|enqueue_dependencies|topological_removal_order|prune_cleanlist|resolve_blockers|file_blocker_conflicts|collect_unwalked_installed_blockers|parent_use_state)'`,
+255 mutants): **153 caught / 88 missed / 1 timeout / 13 unviable**.
+Per-function missed at S0: `installed_reverse_dependents` 13 (3
+whole-body + 10 in-body), `vdb_fingerprint` 10 + `mtime_nanos` 2,
+`find_repos_impl` 6, `parent_use_state` 4, `topological_removal_order`
+20 + 1 timeout, `prune_cleanlist` 6, `file_blocker_conflicts` 7,
+`collect_unwalked_installed_blockers` 6, `resolve_blockers` 8,
+`enqueue_dependencies` 6. Unviable (13, tool-reported, no test
+possible): `find_repos_impl` whole-body `Ok(vec![Default])`
+(`RepoConfig` has no `Default`), the `&&` -> `||` let-chain (the
+`text` binding goes unbound), `any(|k| k)` (`&bool` where `bool` is
+needed); `parent_use_state` `Some(Default::default())` (no `Default`
+on the tuple); two `topological_removal_order` whole-body
+`vec![Default::default()]` rows (`InstalledPackage` has no `Default`);
+`prune_cleanlist` `DepcleanResult::default()` (no `Default`);
+`file_blocker_conflicts` deleted `Uninstall` match arm (does not
+compile); `collect_unwalked` `&&` -> `||` (the `dep_atom` binding goes
+unbound); `resolve_blockers` `vec![Default::default()]`;
+`enqueue_dependencies` three `&&` -> `||` rows (each puts an `Option`
+in a `||` scrutinee position — type errors).
+
+Kills per slice (representative rows verified lethal by
+hand-application; the closeout re-run below is authoritative):
+S1 (`installed_reverse_dependents`) 12: whole-body x3, both `&&` ->
+`||` self-skip widenings, all three `==` -> `!=` self-skip flips, the
+blocker `!=` -> `==` flip, both cp-guard flips that admit a matchable
+atom, the match `delete !`.
+S2 (`vdb_fingerprint`) 5: whole-body `-> 0` / `-> 1`, nested
+`mtime_nanos` `-> 0` / `-> 1`, final `^` -> `&`. (The rotation `+` ->
+`-` and `count` `+=` -> `-=` rows were already S0-caught, panicking in
+pre-existing vdb legs; the S2 sensitivity leg pins them too.)
+S3 (`find_repos_impl`) 4: default-priority `==` -> `!=`, the
+`volatile` `||` -> `&&` flip, both heuristic `!` deletions.
+S4 (`parent_use_state`) 4: owner-lookup `&&` -> `||`, deleted
+`Upgrade` / `Downgrade` / `Reinstall` arms.
+S5 (`topological_removal_order`) 14: all three priority-arm deletions
++ the PDEPEND `-3` -> `3` flip, the `slot_op_built` `&&` -> `||`
+narrowing (via a sub-slot-less `:=` atom), the first `||` -> `&&`
+narrowing (which admits the self-edge), the `indeg` `+=` / `/=` rows,
+three `delete -` scan levels, the cycle-break `&&` -> `||`, the
+`!done` filter deletion. (The two viable whole-body rows and the `n <
+2` `>` flip were already S0-caught by the pre-existing order legs.)
+S6+S6b (`prune_cleanlist`) 4: the `>=` multi widening, the args outer
+`&&` -> `||`, the kept `&&` -> `||`, and (S6b) the guard `-> false`
+flip via 9.0/10.0 versions that disagree between lexicographic and
+version order (this host's tmpfs readdir is sorted, so last-scanned is
+always the version max with plain versions — probed directly).
+S7 (`resolve_blockers`) 7: deleted `Downgrade` / `Reinstall` arms,
+all four graphed-USE lookup mutants, the same-cp fallback `&&` ->
+`||`.
+S8 (`file_blocker_conflicts` 7 + `collect_unwalked` 6) 13: every
+S0-missed row in both functions.
+S9 (`enqueue_dependencies`) 6: every S0-missed row (each of the six
+verified lethal individually).
+Total killed: 69. Closeout re-run (same command, `touch` first):
+**222 caught / 19 missed / 13 unviable / 1 timeout** (255 tested in
+28m), i.e. per-function missed before→after: `find_repos_impl` 6→2,
+`parent_use_state` 4→0, `installed_reverse_dependents` 13→1,
+`vdb_fingerprint`+`mtime_nanos` 12→7, `topological_removal_order`
+20+1 timeout→6+1 timeout, `prune_cleanlist` 6→2,
+`file_blocker_conflicts` 7→0, `collect_unwalked` 6→0,
+`resolve_blockers` 8→1, `enqueue_dependencies` 6→0.
+
+The binding timeout (7627:12 `delete !` on `if !ready.is_empty()`):
+the mutant inverts the ready-batch branch, so any iteration with an
+empty ready set sorts nothing, emits nothing, and `continue`s without
+progress — an infinite loop on every cyclic input (the pre-existing
+two-cycle legs hang; the scoped run spends the full 300s on it). It is
+not pinned around: the new chain-DAG leg terminates on the mutant and
+fails in 0.00s (verified), because a DAG never takes the empty-ready
+branch. The tool still reports `timeout` (the pre-existing cycle legs
+hang), so the row stands as timeout with a demonstrated fast kill —
+the same inspect-don't-pin treatment as #161's `Backtracker::get`.
+
+Survivor buckets (19; every row hand-applied and observed surviving;
+line numbers are `portage-repo/src/lib.rs` on the item branch):
+- Proven equivalent (10): `installed_reverse_dependents` 6454:55
+(`||` -> `&&`: a wrongly admitted atom always fails the cp match, so
+the filed set never changes); `topological_removal_order` 7637:39
+(the -1 scan level can never pop a matchable edge — priorities are
+-4..-2 or 0, and anything eligible at -1 was already eligible at -2),
+7570:56 / 7572:39 / 7573:21 (the -1 priority: only a sub-slot `:=`
+atom takes it, and no `:slot/sub` candidate string ever matches one,
+so the edge never forms), 7572:52 (the RDEPEND condition `&&` ->
+`||`: promoting every RDEPEND edge -2 -> -1 moves the whole -2 bucket
+to the empty -1 bucket, preserving every pop), 7578:62 (the second
+`||` -> `&&`: `&&` binds tighter, so the `i == j` arm still
+short-circuits and skips; cross-cp admissions always fail the cp
+match); `prune_cleanlist` 8137:61 / 8161:58 (the inner `&&` -> `||`
+widenings: the outer full match still requires cp equality);
+`resolve_blockers` 16930:49 (`installed_match` `&&` -> `||`: an
+entry-sourced match always self-matches on slot+version and an
+installed-sourced match always self-matches, so only a twin-entry
+pathological shape could diverge).
+- Contract-preserving hash-mixing (7, all `vdb_fingerprint`): `^=` ->
+`|=` / `&=`, rotation `+` -> `*`, `%` -> `/` / `+`, `count` `+=` ->
+`*=`, final `^` -> `|`. Each keeps the fingerprint's
+stability-and-sensitivity contract (deterministic per tree, changes on
+structural change), so no deterministic oracle distinguishes them.
+- Trace-only (2, `find_repos_impl` 1394:16/20): the section-mismatch
+`eprintln` gate — no return-value effect.
+
+Corrections to slice commit messages (no rebase, per the #161 review
+precedent): S1 (`8479aaf0`) claims 11 killed + 2 equivalent — actually
+12 killed (the category `==` -> `!=` flip is lethal) + 1 equivalent
+(only the `||` -> `&&` narrowing). S5 (`208d9ef1`) claims the `-=`
+-> `/=` row equivalent — actually killed (divide-assign never decrements
+`indeg`; the chain then pops in cycle-break order) — and predates the
+re-run, so it omits the second `||` -> `&&` narrowing and the RDEPEND
+condition widening, both re-run-confirmed survivors with the proofs
+above. S6 (`c9f7a614`) claims three equivalents including the kept
+`&&` -> `||` — actually that row is killed by the kept-parents leg (a
+reachable-but-unmatched package with a walk edge files a third row);
+S6b (`e6cc3156`) killed the guard `-> false` the S6 legs missed. S7's
+merge-bound-match leg docstring first claimed the `installed_match`
+widening kill (amended in-commit once hand-application showed that row
+equivalent).
+
+No `cargo fmt` closeout commit: every slice kept `cargo fmt --check`
+(edition 2024) green as it landed, so the closeout `cargo fmt` was a
+no-op — same as #162. Method notes followed throughout: `touch`
+before each scoped run, `rust/mutants.out` cleared between runs,
+restore with `git checkout --` (never from a backup), gate
+instrumented before trusting (the `:0=` slot-operator leg was verified
+to actually match before trusting its kills).
