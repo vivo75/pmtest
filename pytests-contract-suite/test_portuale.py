@@ -1922,7 +1922,12 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
         env=env,
     )
     assert "[ebuild  N     ] dev-libs/packagepkg-1.0" in result.stdout
-    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    # Backlog #177: real `MergeListItem._start` prints
+    # `Emerging (N of M) cpv::repo` (here `ROOT` is the fixture tree
+    # itself); no `Installing`/`Completed` follows under `--buildpkgonly`
+    # (real `PackageMerge._should_show_status`).
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
+    assert ">>> Installing" not in result.stdout
 
     gpkg = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar"
     assert gpkg.is_file()
@@ -1959,7 +1964,7 @@ def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
         check=True,
         env=env,
     )
-    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
 
     gpkg = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar"
     assert gpkg.is_file()
@@ -2006,7 +2011,7 @@ def test_emerge_buildpkgonly_make_conf_binpkg_format_xpak_is_obeyed(
         check=True,
         env=env,
     )
-    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
     tbz2 = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2"
     assert tbz2.is_file()
     assert b"XPAKPACK" in tbz2.read_bytes()
@@ -2020,7 +2025,7 @@ def test_emerge_buildpkgonly_make_conf_binpkg_format_xpak_is_obeyed(
         check=True,
         env=env,
     )
-    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
     assert (Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar").is_file()
 
 
@@ -2059,7 +2064,7 @@ def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
             check=True,
             env=env,
         )
-        assert f">>> Building binary for {atom}-1.0..." in result.stdout
+        assert f">>> Emerging (1 of 1) {atom}-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
 
     def magic(path):
         data = Path(path).read_bytes()[:4]
@@ -2225,7 +2230,7 @@ def test_emerge_buildpkgonly_with_binpkg_signing_builds_a_signed_gpkg(
             check=True,
             env=env,
         )
-        assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+        assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
 
         gpkg = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar"
         assert gpkg.is_file()
@@ -2344,7 +2349,13 @@ def test_emerge_getbinpkgonly_merges_a_signed_gpkg_after_verifying(
         env=env,
     )
     assert result.returncode == 0, (result.stdout, result.stderr)
-    assert ">>> Merging binary package dev-libs/gpgsignedpkg-1.0" in result.stdout
+    # Backlog #177: real `MergeListItem._start`'s binary arm prints
+    # `Emerging binary (N of M) cpv::repo` (`REPO: gentoo` is the
+    # fixture `Packages` index's own claim); `Installing`/`Completed`
+    # follow from real `PackageMerge`.
+    assert f">>> Emerging binary (1 of 1) dev-libs/gpgsignedpkg-1.0::gentoo for {env['ROOT']}" in result.stdout
+    assert f">>> Installing (1 of 1) dev-libs/gpgsignedpkg-1.0::gentoo to {env['ROOT']}" in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/gpgsignedpkg-1.0::gentoo to {env['ROOT']}" in result.stdout
     root = Path(env["ROOT"])
     assert (root / "hello.txt").is_file()
     assert "signed hello" in (root / "hello.txt").read_text()
@@ -2408,7 +2419,7 @@ def test_emerge_buildpkgonly_multi_instance_gpkg_exports_a_real_build_id(
         check=True,
         env=env,
     )
-    assert ">>> Building binary for dev-libs/packagepkg-1.0..." in result.stdout
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
 
     # Real `bintree._allocate_filename_multi`: `<cat>/<pn>/<pf>-<build_id>.gpkg.tar`.
     gpkg = Path(env["PKGDIR"]) / "dev-libs/packagepkg/packagepkg-1.0-1.gpkg.tar"
@@ -3421,7 +3432,7 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/packagepkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in result.stdout
 
     assert (root / "usr/share/packagepkg/hello.txt").read_text().strip() == (
         "hello from packagepkg"
@@ -3483,7 +3494,7 @@ def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/unsetcflagspkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/unsetcflagspkg-1.0::testrepo to {root}" in result.stdout
 
     # src_install's own view: the earlier `unset` stuck, the control flag
     # survived (the record is merged, not just written to ${T}).
@@ -3534,7 +3545,7 @@ def test_emerge_atom_docompress_compresses_docs_and_repairs_symlinks(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/doccompresspkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/doccompresspkg-1.0::testrepo to {root}" in result.stdout
 
     docdir = root / "usr/share/doc/doccompresspkg-1.0"
     assert (docdir / "BIG.txt.bz2").is_file()
@@ -3648,8 +3659,8 @@ def test_emerge_emptytree_without_pretend_really_merges(emerge_binary, tmp_path)
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    for cpv in ("newpkg-1.0", "deeppkg2-1.0", "deeppkg-1.0"):
-        assert f">>> dev-libs/{cpv} merged." in result.stdout
+    for i, cpv in enumerate(("newpkg-1.0", "deeppkg2-1.0", "deeppkg-1.0")):
+        assert f">>> Completed ({i + 1} of 3) dev-libs/{cpv}::testrepo to {root}" in result.stdout
         assert (root / "var/db/pkg/dev-libs" / cpv / "CONTENTS").is_file()
     assert '>>> Recording dev-libs/deeppkg in "world" favorites file...' in result.stdout
     assert "dev-libs/deeppkg" in (root / "var/lib/portage/world").read_text().split()
@@ -3723,7 +3734,7 @@ def test_emerge_atom_source_build_sees_the_resolved_use_and_build_flags(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/usebuildpkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/usebuildpkg-1.0::testrepo to {root}" in result.stdout
     assert (root / "usr/share/usebuildpkg/state").read_text().strip() == "on"
     assert (root / "usr/share/usebuildpkg/flags").read_text() == (
         "CFLAGS=-O2 -pipe\nMAKEOPTS=-j3\n"
@@ -3775,7 +3786,7 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/penvbuildpkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/penvbuildpkg-1.0::testrepo to {root}" in result.stdout
     assert (root / "usr/share/penvbuildpkg/flags").read_text() == (
         "CFLAGS=-O2 -pipe\n"
         "MAKEOPTS=-j3\n"
@@ -3816,7 +3827,7 @@ def test_emerge_atom_source_build_package_env_applies_when_the_process_is_silent
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/penvbuildpkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/penvbuildpkg-1.0::testrepo to {root}" in result.stdout
     assert (root / "usr/share/penvbuildpkg/flags").read_text() == PENVBUILDPKG_FLAGS
 
 
@@ -3970,7 +3981,7 @@ def test_emerge_atom_source_build_sees_the_per_package_tmpdir(
         capture_output=True, text=True, check=False, env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/envdumppkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 1) dev-libs/envdumppkg-1.0::testrepo to {root}" in result.stdout
     assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in result.stderr
 
 
@@ -4055,8 +4066,8 @@ def test_emerge_per_package_features_splitdebug_is_per_entry(
         capture_output=True, text=True, check=False, env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert ">>> dev-libs/splitdbgpkg-1.0 merged." in result.stdout
-    assert ">>> dev-libs/splitdbgnbrpkg-1.0 merged." in result.stdout
+    assert f">>> Completed (1 of 2) dev-libs/splitdbgpkg-1.0::testrepo to {root}" in result.stdout
+    assert f">>> Completed (2 of 2) dev-libs/splitdbgnbrpkg-1.0::testrepo to {root}" in result.stdout
     # Both binaries merged (both builds ran).
     assert (root / "usr/bin/splitdbg-hello").is_file()
     assert (root / "usr/bin/splitnbr-hello").is_file()
@@ -4256,7 +4267,9 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     )
     assert r.returncode == 0, r.stderr
     assert "--getbinpkg" not in r.stderr
-    assert ">>> Merging binary package dev-libs/packagepkg-1.0..." in r.stdout
+    assert f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}" in r.stdout
+    assert f">>> Installing (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
+    assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
     assert (root / "usr/share/packagepkg/hello.txt").is_file()
 
@@ -4475,25 +4488,28 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert result.returncode == 0, result.stderr
     out = result.stdout
 
-    for pkg in ("schedleaf-a-1.0", "schedleaf-b-1.0", "schedparent-1.0"):
-        assert f">>> dev-libs/{pkg} merged." in out
+    # Backlog #177: real `PackageMerge` prints `Installing` then
+    # `Completed`, each `(N of M) cpv::repo`, per merged package.
+    for i, pkg in enumerate(("schedleaf-a-1.0", "schedleaf-b-1.0", "schedparent-1.0")):
+        assert f">>> Completed ({i + 1} of 3) dev-libs/{pkg}::testrepo to {root}" in out
+        assert f">>> Installing ({i + 1} of 3) dev-libs/{pkg}::testrepo to {root}" in out
         assert (root / f"var/db/pkg/dev-libs/{pkg}/CONTENTS").is_file()
 
     # Both leaves' builds start before either one merges -- the mark of
     # real parallel dispatch, not a serial build+merge per package.
-    emerge_a = out.index(">>> Emerging (dev-libs/schedleaf-a-1.0)")
-    emerge_b = out.index(">>> Emerging (dev-libs/schedleaf-b-1.0)")
+    emerge_a = out.index(f">>> Emerging (1 of 3) dev-libs/schedleaf-a-1.0::testrepo for {root}")
+    emerge_b = out.index(f">>> Emerging (2 of 3) dev-libs/schedleaf-b-1.0::testrepo for {root}")
     first_leaf_merge = min(
-        out.index(">>> dev-libs/schedleaf-a-1.0 merged."),
-        out.index(">>> dev-libs/schedleaf-b-1.0 merged."),
+        out.index(f">>> Completed (1 of 3) dev-libs/schedleaf-a-1.0::testrepo to {root}"),
+        out.index(f">>> Completed (2 of 3) dev-libs/schedleaf-b-1.0::testrepo to {root}"),
     )
     assert max(emerge_a, emerge_b) < first_leaf_merge
 
     # schedparent (the dependent) only starts building after both leaves
     # have merged.
-    assert out.index(">>> Emerging (dev-libs/schedparent-1.0)") > max(
-        out.index(">>> dev-libs/schedleaf-a-1.0 merged."),
-        out.index(">>> dev-libs/schedleaf-b-1.0 merged."),
+    assert out.index(f">>> Emerging (3 of 3) dev-libs/schedparent-1.0::testrepo for {root}") > max(
+        out.index(f">>> Completed (1 of 3) dev-libs/schedleaf-a-1.0::testrepo to {root}"),
+        out.index(f">>> Completed (2 of 3) dev-libs/schedleaf-b-1.0::testrepo to {root}"),
     )
 
     # Real `Scheduler.JobStatusDisplay`: a running "X of Y complete" line.
@@ -4545,7 +4561,7 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert ">>> dev-libs/packagepkg-1.0 merged." in r.stdout
+    assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
     for line in r.stdout.splitlines():
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     log = tmp_path / "pt0" / log_rel
@@ -4558,7 +4574,7 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert ">>> dev-libs/packagepkg-1.0 merged." in r.stdout
+    assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
     assert not (tmp_path / "pt1" / log_rel).is_file()
 
 
@@ -4598,7 +4614,7 @@ def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path)
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert ">>> dev-libs/packagepkg-1.0 merged." in r.stdout
+    assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
     t_log = tmp_path / "pt/portage/dev-libs/packagepkg-1.0/temp/build.log.gz"
     assert t_log.is_symlink(), "with PORTAGE_LOGDIR the T log links to the real log"
     targets = list(logdir.glob("dev-libs:packagepkg-1.0:*.log.gz"))
@@ -5110,7 +5126,9 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert ">>> dev-libs/schedok-1.0 merged." in r.stdout
+    # Backlog #177: the resumed entry re-derives its `::repo` (the saved
+    # resume list records only `cat/pkg-ver`) and counts `(1 of 1)`.
+    assert f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}" in r.stdout
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
     assert not mtimedb.exists()  # resume list cleared on success
 
@@ -5157,8 +5175,8 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
-    assert ">>> dev-libs/usebuildpkg-1.0 merged." in r.stdout
-    assert ">>> dev-libs/penvbuildpkg-1.0 merged." in r.stdout
+    assert f">>> Completed (1 of 2) dev-libs/usebuildpkg-1.0::testrepo to {root}" in r.stdout
+    assert f">>> Completed (2 of 2) dev-libs/penvbuildpkg-1.0::testrepo to {root}" in r.stdout
     assert (root / "usr/share/usebuildpkg/flags").read_text() == (
         "CFLAGS=-O2 -pipe\nMAKEOPTS=-j3\n"
     )
