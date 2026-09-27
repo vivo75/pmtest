@@ -5568,6 +5568,78 @@ def test_emerge_preserved_libs_advisory_and_rebuild_set(emerge_binary, tmp_path)
     ).read_text().strip() in ("{}", "{\n}")
 
 
+def test_emerge_two_consecutive_soname_bumps_replace_the_registry_record(emerge_binary, tmp_path):
+    """Backlog #178 (S0 oracle: real portage 3.0.82.2,
+    `PreservedLibsRegistry.register()` +
+    `dblink.treewalk()`'s `register(self.mycpv, slot, counter,
+    sorted(preserve_paths))`): two consecutive soname bumps
+    (`dev-libs/sonamebumplib` 1.0 -> 2.0 -> 3.0, each dropping the
+    previous soname while `dev-libs/consumesonamebump` still links
+    `.so.1`) keep one `dev-libs/sonamebumplib:0` record owned by the
+    merging package -- after the second bump the owner is
+    `dev-libs/sonamebumplib-3.0` with the still-needed `.so.1` path
+    list, the unneeded `.so.2` files are gone, and the newest
+    package's `CONTENTS` owns the preserved entries (see
+    `differential-test-bed/findings/l5.md` "## Group 2")."""
+    import json
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # A real Gentoo ROOT's `/etc/ld.so.conf` lists `/usr/lib64`, so the
+    # consumer in that libdir is found; the merge regenerates the file
+    # from env.d `LDPATH` itself.
+    env_d = root / "etc/env.d"
+    env_d.mkdir(parents=True, exist_ok=True)
+    (env_d / "99sonamebump").write_text('LDPATH="/usr/lib64"\n')
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    fix = Path(FIXTURES_ROOT) / "repo/dev-libs"
+    for name, version in [
+        ("sonamebumplib", "1.0"),
+        ("consumesonamebump", "1.0"),
+        ("sonamebumplib", "2.0"),
+        ("sonamebumplib", "3.0"),
+    ]:
+        r = subprocess.run(
+            [str(ebuild_link), str(fix / name / f"{name}-{version}.ebuild"), "merge"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert r.returncode == 0, r.stderr
+
+    counter_3 = (root / "var/db/pkg/dev-libs/sonamebumplib-3.0/COUNTER").read_text().strip()
+    registry = json.loads(
+        (root / "var/lib/portage/preserved_libs_registry").read_text()
+    )
+    assert registry == {
+        "dev-libs/sonamebumplib:0": [
+            "dev-libs/sonamebumplib-3.0",
+            counter_3,
+            [
+                "/usr/lib64/libsonamebump.so.1.0.0",
+                "/usr/lib64/libsonamebump.so.1",
+            ],
+        ]
+    }, registry
+    # The still-needed `.so.1` pair survives; the unneeded `.so.2` pair
+    # was unmerged with the replaced version.
+    assert (root / "usr/lib64/libsonamebump.so.1.0.0").is_file()
+    assert (root / "usr/lib64/libsonamebump.so.1").is_symlink()
+    assert not (root / "usr/lib64/libsonamebump.so.2.0.0").exists()
+    assert not (root / "usr/lib64/libsonamebump.so.2").exists()
+    contents_3 = (
+        root / "var/db/pkg/dev-libs/sonamebumplib-3.0/CONTENTS"
+    ).read_text()
+    assert "obj /usr/lib64/libsonamebump.so.1.0.0" in contents_3
+    assert "sym /usr/lib64/libsonamebump.so.1 " in contents_3
+    assert "libsonamebump.so.2" not in contents_3
+
+
 def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     """Real `_emerge/Scheduler.py::_save_resume_list` + `--resume`: a
     failed `emerge <atoms>` writes the still-unmerged packages to
