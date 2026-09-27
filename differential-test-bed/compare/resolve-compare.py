@@ -12,9 +12,9 @@ Reads a directory produced by ``differential-test-bed/layers/l0/in-container.sh`
 
 For every probe it normalises both merge lists and reports typed
 findings (missing / extra / version / flags / use / order / error /
-exit / totals). A finding is *explained* when it matches an entry in the
-allowlist (``known-divergences.yaml``); the run is GREEN iff every
-finding is explained.
+exit / totals / skipped-updates). A finding is *explained* when it
+matches an entry in the allowlist (``known-divergences.yaml``); the run
+is GREEN iff every finding is explained.
 
 Outputs ``<dir>/l0-report.txt`` (human) and ``<dir>/l0-report.json``
 (machine). Exit status: 0 green, 1 unexplained findings, 2 usage/IO.
@@ -26,6 +26,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from collections import Counter
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 
@@ -110,9 +111,137 @@ MASKED = re.compile(r'have been masked|is required to complete your request')
 REQUSE = re.compile(r'REQUIRED_USE (?:flag constraints are unsatisfied|not satisfied)')
 
 
-def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool]:
+# Backlog #227: real `_show_missed_update_slot_conflicts`
+# (`3rdparty/portage/lib/_emerge/depgraph.py:1652`, 3.0.82.2) prints one
+# `WARNING: One or more updates/rebuilds have been skipped due to a
+# dependency conflict:` block after the merge list (rc 0) -- one
+# `<slot_atom>` header per missed upgrade with its `conflicts with`
+# detail rows underneath. Portuale renders the same block from
+# `GraphResult::skipped_updates` (`rust/portuale/src/pretend.rs`,
+# "Backlog #90 (S2) + #92"). The block used to be silently dropped by
+# this comparator (none of its lines match MERGE/TOTAL/ERRLINE), so the
+# r25 cell reported 0 unexplained while portuale printed the warning
+# and real did not.
+SKIPPED_HEADER = (
+    "WARNING: One or more updates/rebuilds have been skipped "
+    "due to a dependency conflict:"
+)
+
+
+def _norm_skipped_detail(s: str) -> str:
+    """Normalise volatile bits out of a skipped-block detail line.
+
+    Real appends the target root to scheduled-for-merge consumers
+    (`merge to '<ROOT>'`) and to group headers (`for <ROOT>`); the
+    staged path varies per run dir, so only its presence is signal --
+    the path itself becomes a placeholder (same treatment as
+    `<builddir>` for error lines).
+    """
+    s = re.sub(r"/var/tmp/portage/\S+", "<builddir>", s)
+    s = re.sub(r"'[^']*'", "'<root>'", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _skipped_row_key(s: str) -> str:
+    """Package-identity key of a skipped-block detail line.
+
+    Strips the `KEY="..."` USE/USE_EXPAND displays (real's
+    `pkg_use_display` renders USE plus ABI_X86/ELIBC/... expansions,
+    portuale's `render_pkg_use_display` only USE) and the normalised
+    root suffixes -- those belong to the explanation text, compared
+    separately. What remains is which packages were skipped and which
+    atoms block them.
+    """
+    s = KV.sub("", s)
+    s = re.sub(r"\s+to\s+'<root>'", "", s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _is_skipped_group_header(s: str) -> bool:
+    """A group header is a bare `cat/pkg:slot` token (real's
+    `str(pkg.slot_atom)`, portuale's `{category}/{package}:{slot}`).
+
+    Any other non-indented line (the `!!!` abbreviated tail, autounmask
+    advice, `emerge:` errors, ...) ends the block instead.
+    """
+    toks = s.strip().split()
+    if len(toks) != 1:
+        return False
+    tok = toks[0]
+    return "/" in tok and ":" in tok and not tok.startswith(("!", "#", "["))
+
+
+def _parse_skipped_block(lines: list[str], i: int) -> tuple[dict, int]:
+    """Parse the skipped-update block starting at the WARNING header.
+
+    `lines[i]` is the header line. Returns (groups, next_i) where
+    groups maps header slot-atom -> {"with": sorted deduped missed-
+    version keys, "rows": sorted conflict-atom identity keys,
+    "expl": sorted normalised detail lines} (duplicate headers, as
+    portuale emits one block per rejecting parent while real groups
+    parents under one header, merge back together -- the per-group
+    `conflicts with` line is a per-header attribute, not a per-row
+    one, so it compares as a set), and next_i is the first unconsumed
+    line so a following section (`!!!` tail, autounmask advice, ...)
+    still flows through normal parsing.
+    """
+    groups: dict[str, dict[str, list[str]]] = {}
+    n = len(lines)
+    i += 1
+    while True:
+        while i < n and not strip_ansi(lines[i]).strip():
+            i += 1
+        if i >= n:
+            break
+        if not _is_skipped_group_header(strip_ansi(lines[i]).rstrip()):
+            break
+        header = strip_ansi(lines[i]).strip().split()[0]
+        i += 1
+        while i < n and not strip_ansi(lines[i]).strip():
+            i += 1
+        if i >= n:
+            break
+        with_line = strip_ansi(lines[i]).rstrip()
+        if not with_line[:1].isspace() or not with_line.strip().endswith("conflicts with"):
+            # malformed group: drop the header, resume normal parsing here
+            break
+        g = groups.setdefault(header, {"with": [], "rows": [], "expl": []})
+        g["expl"].append(_norm_skipped_detail(with_line))
+        g["with"].append(_skipped_row_key(_norm_skipped_detail(with_line)))
+        i += 1
+        while True:
+            while i < n and not strip_ansi(lines[i]).strip():
+                i += 1
+            if i >= n:
+                break
+            atom_line = strip_ansi(lines[i]).rstrip()
+            if not atom_line[:1].isspace():
+                break  # next group header or next section
+            g["expl"].append(_norm_skipped_detail(atom_line))
+            g["rows"].append(_skipped_row_key(_norm_skipped_detail(atom_line)))
+            i += 1
+            # The `^` marker line mirrors real's operator/version spans
+            # (`format_unmatched_atom`, `resolver/output.py:892`); an
+            # empty/all-space marker rstrips to a blank line, which the
+            # skip above already tolerates -- but a present marker is
+            # explanation text, so consume exactly one line when it
+            # looks like one rather than letting it masquerade as the
+            # next atom row.
+            if i < n and re.fullmatch(r"\s*(\^.*)?", strip_ansi(lines[i]).rstrip()):
+                marker = strip_ansi(lines[i]).rstrip()
+                if marker.strip():
+                    g["expl"].append(_norm_skipped_detail(marker))
+                i += 1
+    for g in groups.values():
+        g["with"] = sorted(set(g["with"]))
+        g["rows"].sort()
+        g["expl"].sort()
+    return groups, i
+
+
+def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool, dict]:
     """Return (merge-list, error lines, Total-or-None, advice set,
-    backtracking-terminated-early flag).
+    backtracking-terminated-early flag, skipped-update groups).
 
     The *advice set* is the actionable "you must change something"
     diagnostics -- needed USE-flag changes, masked-package requirements,
@@ -130,10 +259,15 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool]
     total: int | None = None
     advice: set[str] = set()
     terminated_early = False
+    skipped: dict = {}
     if not path.exists():
-        return pkgs, ["<no output file>"], None, advice, terminated_early
+        return pkgs, ["<no output file>"], None, advice, terminated_early, skipped
     in_use_block = False
-    for line in path.read_text(errors="replace").splitlines():
+    raw_lines = path.read_text(errors="replace").splitlines()
+    i = 0
+    while i < len(raw_lines):
+        line = raw_lines[i]
+        i += 1
         if "backtracking has terminated early" in line:
             terminated_early = True
         line = strip_ansi(line).rstrip()
@@ -165,6 +299,25 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool]
         mt = TOTAL.match(line)
         if mt:
             total = int(mt.group(1))
+            continue
+        if line.strip() == SKIPPED_HEADER:
+            # Backlog #227: the skipped-update block used to fall
+            # through to the error-line match below (or, worse, be
+            # dropped silently) -- parse it as its own category.
+            # `_parse_skipped_block` takes raw lines + the index of
+            # the line after the header (`i` already advanced past
+            # it) and returns the resume index.
+            # (real and portuale each print at most one; a second
+            # block merges into the first rather than replacing it)
+            new_groups, i = _parse_skipped_block(raw_lines, i)
+            for h, g in new_groups.items():
+                old = skipped.setdefault(h, {"with": [], "rows": [], "expl": []})
+                old["with"].extend(g["with"])
+                old["rows"].extend(g["rows"])
+                old["expl"].extend(g["expl"])
+                old["with"] = sorted(set(old["with"]))
+                old["rows"].sort()
+                old["expl"].sort()
             continue
         stripped = line.strip()
         if stripped.startswith("The following USE changes are necessary"):
@@ -201,13 +354,13 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool]
             n = re.sub(r"\b\d{4}-\d\d-\d\d\b", "<date>", n)
             n = re.sub(r"\s+", " ", n).strip()
             errs.append(n)
-    return pkgs, errs, total, advice, terminated_early
+    return pkgs, errs, total, advice, terminated_early, skipped
 
 
 def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Probe:
     pr = Probe(slug=slug, kind=kind, real_rc=rrc, ptl_rc=prc)
-    rpk, rerr, rtot, radv, r_trunc = parse(rp)
-    ppk, perr, ptot, padv, p_trunc = parse(pp)
+    rpk, rerr, rtot, radv, r_trunc, rskip = parse(rp)
+    ppk, perr, ptot, padv, p_trunc, pskip = parse(pp)
 
     def add(cat: str, detail: str) -> None:
         pr.findings.append({"category": cat, "detail": detail})
@@ -218,6 +371,16 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
         add("advice", f"real-only: {a}")
     for a in sorted(padv - radv):
         add("advice", f"portuale-only: {a}")
+
+    # -- skipped-update warning block (backlog #227) ---------------------
+    # Real `_show_missed_update_slot_conflicts` and portuale's
+    # `GraphResult::skipped_updates` rendering print this after the
+    # merge list with rc 0. Like advice it is compared on every path
+    # (even when exit codes differ): presence on one side only, and a
+    # different skipped package list, are findings; the explanation
+    # text (USE displays, `^` markers, root suffixes) is compared only
+    # when both sides print the block.
+    add_skipped_findings(pr, rskip, pskip)
 
     # -- autounmask merge-list truncation --------------------------------
     # Real, with `--autounmask-backtrack=n` (the default), can stop the
@@ -341,6 +504,76 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
         add("error", f"portuale-only message: {e}")
 
     return pr
+
+
+# --------------------------------------------------------------------------
+# skipped-update block comparison (backlog #227)
+# --------------------------------------------------------------------------
+def _only_in(a: list[str], b: list[str]) -> list[str]:
+    """Multiset difference, sorted (duplicate detail lines are real:
+    portuale emits one block per rejecting parent)."""
+    diff = Counter(a) - Counter(b)
+    return sorted(diff.elements())
+
+
+def add_skipped_findings(pr: Probe, rskip: dict, pskip: dict) -> None:
+    def add(detail: str) -> None:
+        pr.findings.append({"category": "skipped-updates", "detail": detail})
+
+    if bool(rskip) != bool(pskip):
+        side = "real" if rskip else "portuale"
+        missing = "portuale" if rskip else "real"
+        present = sorted(rskip if rskip else pskip)
+        add(
+            f"skipped-update block present for {side}, "
+            f"absent for {missing}: {', '.join(present)}"
+        )
+        return
+    if not rskip:
+        return
+    for h in sorted(set(rskip) - set(pskip)):
+        add(f"skipped package present for real, absent for portuale: {h}")
+    for h in sorted(set(pskip) - set(rskip)):
+        add(f"skipped package present for portuale, absent for real: {h}")
+    for h in sorted(set(rskip) & set(pskip)):
+        r_w, p_w = rskip[h]["with"], pskip[h]["with"]
+        r_rows, p_rows = rskip[h]["rows"], pskip[h]["rows"]
+        if r_w != p_w:
+            bits = []
+            r_only = _only_in(r_w, p_w)
+            p_only = _only_in(p_w, r_w)
+            if r_only:
+                bits.append("real-only: " + "; ".join(r_only))
+            if p_only:
+                bits.append("portuale-only: " + "; ".join(p_only))
+            add(f"{h}: skipped package list differs: {' | '.join(bits)}")
+        elif r_rows != p_rows:
+            bits = []
+            r_only = _only_in(r_rows, p_rows)
+            p_only = _only_in(p_rows, r_rows)
+            if r_only:
+                bits.append("real-only: " + "; ".join(r_only))
+            if p_only:
+                bits.append("portuale-only: " + "; ".join(p_only))
+            add(f"{h}: skipped package list differs: {' | '.join(bits)}")
+        elif rskip[h]["expl"] != pskip[h]["expl"]:
+            # Same packages, different explanation text (USE/USE_EXPAND
+            # displays, `^` markers, `to '<root>'` suffixes). Cap the
+            # quoted lines so one noisy block cannot flood the report.
+            bits = []
+            r_only = _only_in(rskip[h]["expl"], pskip[h]["expl"])
+            p_only = _only_in(pskip[h]["expl"], rskip[h]["expl"])
+            if r_only:
+                shown = "; ".join(r_only[:3])
+                if len(r_only) > 3:
+                    shown += f"; (+{len(r_only) - 3} more)"
+                bits.append(f"real-only ({len(r_only)}): {shown}")
+            if p_only:
+                shown = "; ".join(p_only[:3])
+                if len(p_only) > 3:
+                    shown += f"; (+{len(p_only) - 3} more)"
+                bits.append(f"portuale-only ({len(p_only)}): {shown}")
+            add(f"{h}: skipped-update explanation differs: {' | '.join(bits)}")
 
 
 # --------------------------------------------------------------------------

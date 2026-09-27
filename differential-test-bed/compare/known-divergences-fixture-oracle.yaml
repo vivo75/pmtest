@@ -89,6 +89,37 @@
 #    What remains is a genuine merge-order divergence in the three
 #    @world cells (below).
 
+# -- the skipped-update warning block (compared since backlog #227).
+
+- id: skipped-updates-installed-consumer-residue
+  category: skipped-updates
+  slugs:
+    - "--update_--deep_--newuse_--oneshot_dev-libs_r25target"
+    - "--update_--deep_--newuse_--oneshot_dev-libs_whpuller"
+  match: "skipped-update block present for portuale, absent for real"
+  reason: >
+    Portuale reconciles an installed world consumer's pin after the pass
+    and prints the skipped-update warning; real carries the consumer as a
+    complete-graph nomerge node, settles in pass 1 and prints nothing.
+    This is backlog #25's residue (S1c, `_minimize_children`, waits for
+    the slot-operator update probe #211; batch-2026-09-27 B13).
+  owner: portuale-bug
+
+- id: skipped-updates-use-display
+  category: skipped-updates
+  slugs:
+    - "--backtrack_0_dev-libs_blk0a_dev-libs_blk0b_dev-libs_blk0c"
+    - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0a_dev-libs_blk0c"
+    - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0c_dev-libs_blk0a"
+    - "--backtrack_0_dev-libs_blk0c_dev-libs_blk0b_dev-libs_blk0a"
+  match: "skipped-update explanation differs"
+  reason: >
+    Same skipped packages on both sides; real renders each package's
+    `pkg_use_display` (USE plus USE_EXPAND groups) and ` to '<root>'` on
+    the block's lines, portuale prints `USE=""` and no root suffix.
+    Backlog #230.
+  owner: portuale-bug
+
 - id: slotop-world-complete-graph-order
   category: order
   slugs:
