@@ -4149,14 +4149,6 @@ def test_abort_path_gate_off_restores_legacy_exit_code(
     assert rust_on.stderr == rust_off.stderr
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="oracle finding (Slice 3 capture, spec §4e): real prints no "
-    "'backtracking has terminated early' notice when the autounmask change "
-    "is the only problem (_success_without_autounmask short-circuits "
-    "need_config_change before _autounmask_backtrack_disabled is set); "
-    "portuale prints it for every autounmask change with backtrack off",
-)
 def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     emerge_binary, fixture_env
 ):
@@ -4167,7 +4159,9 @@ def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     returns on `_success_without_autounmask` before the notice's flag at
     :11759 is ever set). The notice does appear when another failure
     coincides (`abort-au-cycle`, `aucasctop`). Outside backlog #19's abort
-    path -- pinned here so the divergence has an oracle-backed target."""
+    path -- pinned here so the divergence has an oracle-backed target.
+    Backlog #217: the gate is ported (`GraphResult::
+    autounmask_backtrack_disabled`), so this now passes unmarked."""
     args = ["--pretend", "-v", "dev-libs/abort-au-plain"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4632,8 +4626,12 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
     proposed: `unsatusealt` merges with `USE="unsatuseorflag"` and the
     dead alternative is never enqueued. Before this commit both branches
     ranked `Unsatisfiable`, the group fell back to the literal `||`, and
-    the dead alternative was enqueued and reported (`!!! no visible
-    ebuild for dependency "dev-libs/doesnotexist-unsatuseor"`)."""
+    the     dead alternative was enqueued and reported (`!!! no visible
+    ebuild for dependency "dev-libs/doesnotexist-unsatuseor"`). Backlog
+    #217: no "terminated early" trailer -- the flip lands on the fresh
+    `||`-branch pick, so real reaches the `_success_without_autounmask`
+    tail (depgraph.py:5793) and `need_config_change` returns before the
+    notice's flag is set (:11713-11717)."""
     args = ["--pretend", "dev-libs/unsatuseor"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4648,11 +4646,6 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
         "# required by dev-libs/unsatuseor-1.0::testrepo",
         "# required by dev-libs/unsatuseor (argument)",
         ">=dev-libs/unsatusealt-1.0 unsatuseorflag",
-        "",
-        " * In order to avoid wasting time, backtracking has terminated early",
-        " * due to the above autounmask change(s). The --autounmask-backtrack=y",
-        " * option can be used to force further backtracking, but there is no",
-        " * guarantee that it will produce a solution.",
     ]
     assert "doesnotexist-unsatuseor" not in rust.stderr, (
         "the dead alternative must not be enqueued once the group resolves"
@@ -5495,7 +5488,12 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
     block on stderr carries the real two-line dep chain (`#required by
     <parent cpv>::<repo>` then `#required by <parent atom> (argument)`).
     (--autounmask-use=n keeps the old "no visible ebuild" behavior -- see
-    test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n.)"""
+    test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n.)
+    Backlog #217: no "terminated early" trailer -- the flip lands on the
+    fresh pick (the package is graphed with the flip, so real's
+    `want_restart_for_use_change` stays False), the resolve reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793), and
+    `need_config_change` returns before the notice's flag (:11713-11717)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/usedeprejectedpkg"], fixture_env
     )
@@ -5510,7 +5508,6 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
         "# required by dev-libs/usedeprejectedpkg-1.0::testrepo\n"
         "# required by dev-libs/usedeprejectedpkg (argument)\n"
         ">=dev-libs/useflagpkg-1.0 -foo\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -5683,7 +5680,11 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
 
     Default (keyword suggestions off): the >=2.0 dep just stays
     unresolvable (a non-fatal dependency warning), same as before.
-   """
+
+    Backlog #217: no "terminated early" trailer -- the slot settles on
+    2.0 with a lone keyword change, so real reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793).
+    """
     # default: no keyword suggestions -> >=2.0 unresolvable, top still merges
     d = _run([str(emerge_binary)], ["--pretend", "dev-libs/kwbacktop"], fixture_env)
     assert d.returncode == 1
@@ -5707,7 +5708,6 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
         "# required by dev-libs/kwbacktop-1.0::testrepo\n"
         "# required by dev-libs/kwbacktop (argument)\n"
         "=dev-libs/kwbackmid-2.0 ~amd64\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -5723,7 +5723,10 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
     higher 2.0 -- recording a keyword change AND a license change for the
     same version. Before, portuale's flat `keyword_masked_only` fallback
     dropped 2.0 (it also had a license problem) and settled on 1.0.
-   """
+    Backlog #217: no "terminated early" trailer -- both changes are lone
+    fresh-candidate picks, so real reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793).
+    """
     a = ["--pretend", "--autounmask", "dev-libs/multimaskconsumer"]
     rust = _run([str(emerge_binary)], a, fixture_env)
     assert rust.returncode == 1
@@ -5742,7 +5745,6 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
         "# required by dev-libs/multimaskconsumer-1.0::testrepo\n"
         "# required by dev-libs/multimaskconsumer (argument)\n"
         ">=dev-libs/multimaskdep-2.0 SomeEula\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
     # default (no keyword suggestions): the dep stays unresolvable
@@ -5842,7 +5844,10 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
     "package.use" …)`) goes to stderr, and the run exits **1** -- real
     `action_build`'s `if not success: display_problems(); return 1`
     fires for any autounmask config change, `--pretend` included
-    (verified against a live `emerge -pv www-client/firefox`)."""
+    (verified against a live `emerge -pv www-client/firefox`). Backlog
+    #217: no "terminated early" trailer -- the top-level flip is a
+    fresh-candidate one, so real reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "-v", "dev-libs/useflagpkg[-foo]"],
@@ -5859,7 +5864,6 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
         "# required by dev-libs/useflagpkg-1.0::testrepo\n"
         "# required by dev-libs/useflagpkg[-foo] (argument)\n"
         ">=dev-libs/useflagpkg-1.0 -foo\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -6239,7 +6243,9 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
     (real _writemsg + _get_dep_chain_as_comment: the `#required by ...`
     dep chain, then `=<cpv> <kw>`), and the run exits **1** -- real
     `action_build` returns 1 for any autounmask change under `--pretend`
-    too. v1 covers the "masked by KEYWORDS alone" case only."""
+    too. v1 covers the "masked by KEYWORDS alone" case only. Backlog
+    #217: no "terminated early" trailer -- a lone keyword change reaches
+    real's `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/autounmaskkeywordpkg"],
@@ -6253,7 +6259,6 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
         "# required by dev-libs/autounmaskkeywordpkg-1.0::testrepo\n"
         "# required by dev-libs/autounmaskkeywordpkg (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -6359,7 +6364,9 @@ def test_autounmask_dependency_gets_a_keyword_suggestion_once_enabled(emerge_bin
     following keyword changes are necessary to proceed:` block on stderr
     carries the real two-line dep chain (`#required by <parent
     cpv>::<repo>` then `#required by <parent atom> (argument)` -- real
-    _get_dep_chain_as_comment)."""
+    _get_dep_chain_as_comment). Backlog #217: no "terminated early"
+    trailer -- a lone keyword change reaches real's
+    `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/autounmaskdepconsumer"],
@@ -6378,7 +6385,6 @@ def test_autounmask_dependency_gets_a_keyword_suggestion_once_enabled(emerge_bin
         "# required by dev-libs/autounmaskdepconsumer-1.0::testrepo\n"
         "# required by dev-libs/autounmaskdepconsumer (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -6420,7 +6426,9 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
     entries -- and the `The following license changes are necessary to
     proceed:` block on stderr carries the two-line dep chain and the
     `>=<cpv> <license>` line (real `check_if_latest(pkg)` -> `>=` since
-    1.0 is the only version). Off without `--autounmask`."""
+    1.0 is the only version). Off without `--autounmask`. Backlog #217:
+    no "terminated early" trailer -- a lone license change reaches
+    real's `_success_without_autounmask` tail (depgraph.py:5793)."""
     off = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/licensemaskedconsumer"], fixture_env
     )
@@ -6455,7 +6463,6 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
         "# required by dev-libs/licensemaskedconsumer-1.0::testrepo\n"
         "# required by dev-libs/licensemaskedconsumer (argument)\n"
         ">=dev-libs/licensemaskedpkg-1.0 SomeEula\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
     # --autounmask-license=y alone enables it; --autounmask-license=n over
@@ -6502,7 +6509,9 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
     it. The `The following mask changes are necessary to proceed:` block
     has the `#required by` dep chain + a bare `=<cpv>` line (no token --
     a mask unmask has no keyword/flag). The `[ebuild N #]` bracket marker
-    reflects the still-`package.mask`'d state."""
+    reflects the still-`package.mask`'d state. Backlog #217: no
+    "terminated early" trailer -- a lone mask change reaches real's
+    `_success_without_autounmask` tail (depgraph.py:5793)."""
     assert (
         _run([str(emerge_binary)], ["--pretend", "dev-libs/hardmaskedpkg"], fixture_env).returncode
         == 1
@@ -6532,7 +6541,6 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
         "# required by dev-libs/maskmaskedconsumer-1.0::testrepo\n"
         "# required by dev-libs/maskmaskedconsumer (argument)\n"
         "=dev-libs/hardmaskedpkg-1.0\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
     j = _run(
@@ -7036,11 +7044,13 @@ def test_quickpkg_direct_injects_source_root_packages(
     assert same.returncode == 1
 
 
-def _binscan_configroot(tmp_path, fixtures_root, binpkg_files):
+def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=None):
     """An ad-hoc PORTAGE_CONFIGROOT whose `PKGDIR` points at a directory
     that holds `binpkg_files` (copied from fixtures) but NO
     `Packages` index -- so `--usepkg`/`--usepkgonly` must fall back to
-    the real `bintree._populate_local` `$PKGDIR` directory scan."""
+    the real `bintree._populate_local` `$PKGDIR` directory scan. With
+    `packages_text` the index is written with that content instead
+    (backlog #199: a staged stale index)."""
     cfg = tmp_path / "cfg"
     repo = tmp_path / "repo"
     pkgdir = tmp_path / "binpkgs"
@@ -7057,7 +7067,10 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files):
         dest = pkgdir / "dev-libs" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(fixtures_root / "pkgdir/dev-libs" / name, dest)
-    assert not (pkgdir / "Packages").exists()
+    if packages_text is None:
+        assert not (pkgdir / "Packages").exists()
+    else:
+        (pkgdir / "Packages").write_text(packages_text)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -7103,6 +7116,106 @@ def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
         env,
     )
     assert v.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
+
+
+def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #199: with `FEATURES=-pkgdir-index-trusted` the local
+    `$PKGDIR` scan runs real `_populate_local(reindex=True)`
+    (`bintree.py:936-938`): a `Packages` stanza whose file is gone is
+    dropped from the pool (real `bintree.py:1353-1356`), instead of
+    being re-injected like the trusted default (backlog #187). A file
+    whose `_mtime_` changed is re-parsed from disk either way the pool
+    can tell, and a file no stanza covers is picked up in both modes.
+
+    The staged index holds a stale `packagepkg` stanza (genuine
+    metadata, bogus `_mtime_` -- trusted mode vouches it, untrusted
+    mode re-parses the file and lands on the same entry) plus a
+    `gonepkg` stanza whose file is absent (trusted mode re-injects it,
+    untrusted mode drops it); `gpkgreadpkg`'s file is present with no
+    stanza at all. Each binary's own `RDEPEND` is walked far enough to
+    name it, so the abort text tells which pool each mode resolved:
+    `packagepkg -> dev-libs/samepkg`, `gpkgreadpkg -> dev-libs/newpkg`
+    (both modes), `gonepkg -> dev-libs/samepkg` trusted but
+    `dev-libs/gonepkg` itself untrusted (nothing left to satisfy it)."""
+    pkgdir = tmp_path / "binpkgs"
+    size = (fixtures_root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").stat().st_size
+    packages_text = (
+        "TIMESTAMP: 0\n"
+        "\n"
+        "CPV: dev-libs/packagepkg-1.0\n"
+        "DEFINED_PHASES: install\n"
+        'DESCRIPTION: fixture package: real binary-package building (ebuild <file> package)\n'
+        "EAPI: 8\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/samepkg\n"
+        "SLOT: 0\n"
+        "USE: \n"
+        f"SIZE: {size}\n"
+        "_mtime_: 1\n"
+        "PATH: dev-libs/packagepkg-1.0.tbz2\n"
+        "\n"
+        "CPV: dev-libs/gonepkg-1.0\n"
+        "DEFINED_PHASES: -\n"
+        "DESCRIPTION: gone\n"
+        "EAPI: 8\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/samepkg\n"
+        "SLOT: 0\n"
+        "USE: \n"
+        "SIZE: 12345\n"
+        "_mtime_: 1\n"
+        "PATH: dev-libs/gonepkg-1.0.tbz2\n"
+    )
+    env = _binscan_configroot(
+        tmp_path,
+        fixtures_root,
+        ["packagepkg-1.0.tbz2", "gpkgreadpkg-1.0.gpkg.tar"],
+        packages_text,
+    )
+    untrusted = dict(env)
+    untrusted["FEATURES"] = "-pkgdir-index-trusted"
+
+    # The changed file resolves identically either way: trusted vouches
+    # the stale stanza, untrusted re-parses the same bytes from disk.
+    for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
+        rust = _run(
+            [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/packagepkg"], run_env
+        )
+        assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr, label
+
+    # The file no stanza covers resolves in both modes too.
+    for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
+        rust = _run(
+            [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gpkgreadpkg"], run_env
+        )
+        assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in rust.stderr, label
+
+    # The removed file: trusted re-injects the orphan stanza (the
+    # binary resolves and its dep is walked), untrusted drops it (the
+    # top-level atom itself is unsatisfiable).
+    rust = _run(
+        [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], env
+    )
+    assert rust.returncode == 1, rust.stdout + rust.stderr
+    _assert_abort_preamble(rust.stdout)
+    assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
+
+    rust = _run(
+        [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], untrusted
+    )
+    assert rust.returncode == 1, rust.stdout + rust.stderr
+    # No merge-list preamble here: with no candidate at all (no
+    # binary, no ebuild) the top-level atom fails before any
+    # merge-bound parent exists -- like the no-`--quickpkg-direct`
+    # leg of `test_quickpkg_direct_injects_source_root_packages`.
+    assert rust.stdout == "", rust.stdout
+    assert 'there are no ebuilds to satisfy "dev-libs/gonepkg"' in rust.stderr
 
 
 def test_binrepos_conf_is_read_as_a_directory_of_fragments(
@@ -15165,13 +15278,12 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     #135 (e) (Phase 5b S2) closes the chain residue: real's bed capture
     (`l0-fx-20260922T192350Z`) qualifies the installed owner
     (`# required by dev-libs/deepusedepparent-1.0::testrepo`) and walks
-    the whole chain to the argument (three rows). Residue kept: real's
-    capture shows **no** `BACKTRACK_TERMINATED_EARLY` trailer on this
-    cell (its `backtrack: 0/20` means `_autounmask_backtrack_disabled`
-    was never set -- real's `depgraph.py:11735-11752` gate requires
-    backtracking to have been *active*), where portuale prints it
-    unconditionally on any autounmask batch. 14 pins depend on the
-    trailer, so the gate is not narrowed here.
+    the whole chain to the argument (three rows). That capture likewise
+    shows **no** `BACKTRACK_TERMINATED_EARLY` trailer on this cell (its
+    `backtrack: 0/20` means `_autounmask_backtrack_disabled` was never
+    set -- real's `depgraph.py:11735-11752` gate requires backtracking
+    to have been *active*); backlog #217 ports the gate, so the pin
+    below records the trailer-free bytes.
     """
     base = ["--pretend", "-D", "dev-libs/deepusedepconsumer"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -15186,7 +15298,7 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
         "# required by dev-libs/deepusedepparent-1.0::testrepo\n"
         "# required by dev-libs/deepusedepconsumer-1.0::testrepo\n"
         "# required by dev-libs/deepusedepconsumer (argument)\n"
-        ">=dev-libs/deepusedepchild-1.0 -flip\n" + BACKTRACK_TERMINATED_EARLY
+        ">=dev-libs/deepusedepchild-1.0 -flip\n"
     )
 
 
