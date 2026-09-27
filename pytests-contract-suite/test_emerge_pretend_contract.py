@@ -4262,6 +4262,35 @@ def test_use_unsat_conditional_miss_reports_the_parent_flip_row(
     )
 
 
+def test_use_unsat_conditional_miss_qualifies_the_chain_row_with_affecting_use(
+    emerge_binary, fixture_env
+):
+    """Backlog #135 arm (b): the same cell's chain. New
+    dev-libs/r135consumer (IUSE default-on `qml`) pulls the installed
+    parent behind `qml? ( ... )`, so real `_get_dep_chain`
+    (`depgraph.py:6257+` via `extract_affecting_use`: qml gates the edge
+    and is enabled) qualifies the consumer row `[qml]`. Same oracle as
+    arm (a)'s pin above; live shapes `real-rest-1.log`
+    (`dev-qt/qt5compat-6.11.2::gentoo[qml]`,
+    `sys-auth/polkit-126-r3::gentoo[kde]`). Pins the whole block
+    byte-exact (modulo real's `for <root>.` suffix, the adjudicated
+    `fixture-miss-message-unsuffixed` class)."""
+    args = ["--pretend", "-D", "--autounmask-use=n", "dev-libs/r135consumer"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds built with USE flags to satisfy "~dev-libs/r135leaf-1.0[flip=]".',
+        "!!! One of the following packages is required to complete your request:",
+        "- dev-libs/r135leaf-1.0::testrepo (Change USE: -flip)",
+        "- dev-libs/r135parent-1.0::testrepo (Change USE: +flip)",
+        '(dependency required by "dev-libs/r135parent-1.0::testrepo" [installed])',
+        '(dependency required by "dev-libs/r135consumer-1.0::testrepo[qml]" [ebuild])',
+        '(dependency required by "dev-libs/r135consumer" [argument])',
+    ]
+
+
 def test_use_unsat_missing_iuse_reports_the_missing_flag(
     emerge_binary, fixture_env
 ):
