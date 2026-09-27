@@ -3527,30 +3527,49 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
     """hardcyclea DEPENDs hardcycleb which DEPENDs hardcyclea, both
     unbuilt, empty RDEPEND, no IUSE -- every edge an unsatisfied
     build-time dep with no run-time alternative, so real portage's
-    `_ignore_runtime` scan can't linearize it. Since Slice 4 the merge
-    list is the stuck remainder only (no full list, no separate
-    re-display -- real `_show_circular_deps` shows
-    `display(handler.merge_list)` exactly once); the `* Error: circular
-    dependencies:` block (real `_show_circular_deps`) goes to stderr;
-    exit 1. With no IUSE, `_find_suggestions` finds nothing and the
-    generic advisory prints (the `else` branch) -- see
+    `_ignore_runtime` scan can't linearize it. Since backlog #206 the
+    merge list is the stuck remainder rendered as real's forced
+    `--verbose --tree` display (`_show_circular_deps` pops `--quiet`
+    and forces both before `display(handler.merge_list)`): tree
+    indentation with a `[nomerge]` row, `::repo`, `0 KiB` sizes, the
+    `Total:` counters line. The `* Error: circular dependencies:`
+    block (real `_show_circular_deps`) goes to stderr with real's own
+    three leading newlines and `Package.__str__` node text; exit 1.
+    With no IUSE, `_find_suggestions` finds nothing and the generic
+    advisory prints (the `else` branch) -- see
     test_circular_dep_use_flag_suggestion for the suggestion path. By
     contrast the pure-RDEPEND cycle-a/cycle-b cycle stays exit 0 (a
-    CASES entry)."""
+    CASES entry).
+
+    Row format grounded on live real (n206 container probe,
+    `localhost/test-portuale:latest`, display paths diff-verified
+    identical to 3rdparty 3.0.82.2): real shows the argument as the
+    first merge row with its `to <ROOT>` suffix (a portuale display cut
+    — see `root_suffix` — so no pinned row carries it), then the
+    `[nomerge]` row and the nested repeats, then
+    `Total: 3 packages (3 new), Size of downloads: 0 KiB`. Portuale
+    reuses its own tree renderer for the shape, which nests the
+    argument cycle the other way round (leading `[nomerge]` row), so
+    the pin records portuale's three rows with real's decorations and
+    a `Total:` that counts the rendered merge rows, exactly like
+    real's counters count its own rows."""
     base = ["--pretend", "dev-libs/hardcyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
 
     assert rust.returncode == 1
     assert rust.stdout == (
-        "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
-        "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
+        "[nomerge       ] dev-libs/hardcyclea-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
     )
     assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+        "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/hardcyclea-1.0 depends on\n"
-        " dev-libs/hardcycleb-1.0 (buildtime)\n"
-        "  dev-libs/hardcyclea-1.0 (buildtime)\n"
+        "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3567,16 +3586,31 @@ def test_circular_dep_use_flag_suggestion(
     violating REQUIRED_USE, so real prints `It might be possible to break
     this cycle / by applying the following change: / - dev-libs/
     usecyclea-1.0 (Change USE: -x)` instead of the generic advisory.
-    The `-x` renders blue under --color y."""
+    The `-x` renders blue under --color y.
+
+    Since backlog #206 the stdout list is real's forced `--verbose
+    --tree` stuck-remainder display and the stderr block carries real's
+    three leading newlines plus `Package.__str__` node text — row format
+    grounded on the live n206 probe (`localhost/test-portuale:latest`,
+    display paths diff-verified identical to 3rdparty 3.0.82.2), shape
+    from portuale's own tree renderer (see
+    test_unbreakable_build_time_cycle_prints_the_circular_deps_error)."""
     base = ["--pretend", "dev-libs/usecyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
-    assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/usecyclea-1.0::testrepo USE=\"x\"\n"
+        "[ebuild  N     ]  dev-libs/usecycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/usecyclea-1.0::testrepo  USE=\"x\" 0 KiB\n"
         "\n"
-        "dev-libs/usecyclea-1.0 depends on\n"
-        " dev-libs/usecycleb-1.0 (buildtime)\n"
-        "  dev-libs/usecyclea-1.0 (buildtime)\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -3604,16 +3638,33 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     x off on gpcyclea" fix would violate gpcyclec's own hard requirement,
     so the suggestion is disqualified and dropped -- real prints the
     generic "temporarily disabling USE flags" advisory instead of a
-    `Change USE:` line."""
+    `Change USE:` line.
+
+    Since backlog #206 the stdout list is real's forced `--verbose
+    --tree` stuck-remainder display and the stderr block carries real's
+    three leading newlines plus `Package.__str__` node text. The n206
+    probe shows live real starting this cycle at `gpcycleb-1.0`
+    (`gpcycleb → gpcyclea → gpcycleb`); portuale keeps its own
+    lowest-index rotation (`gpcyclea` first) — a cycle-start difference
+    of the #208 family, left for that item, so only the node format is
+    re-pinned here."""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+    assert rust.stdout == (
+        "[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo  0 KiB\n"
+        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\"\n"
+        "[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo  USE=\"x\" 0 KiB\n"
         "\n"
-        "dev-libs/gpcyclea-1.0 depends on\n"
-        " dev-libs/gpcycleb-1.0 (buildtime)\n"
-        "  dev-libs/gpcyclea-1.0 (buildtime)\n"
+        "Total: 3 packages (3 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3633,15 +3684,22 @@ def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     `USE="x" `; portuale's established convention omits trailing spaces,
     as its merge rows already do, so the pinned row ends `USE="x"`).
     `verbose_size` is merge-gated, so no size suffix follows on this arm.
-    Full stdout pinned; the stderr error block is the flat cell's."""
+    Since backlog #206 the circular display runs forced-verbose whether
+    or not the user passed `--tree`, so these rows carry `::repo`,
+    `0 KiB` on the merge arms, and the `Total:` counters line (all
+    grounded on the live n206 probe); the `to <ROOT>` suffix on real's
+    argument row stays a portuale display cut. Full stdout pinned; the
+    stderr error block is the grandparent cell's."""
     args = ["--pretend", "--tree", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/gpcyclec-1.0 ",
-        "[nomerge       ]  dev-libs/gpcyclea-1.0 USE=\"x\"",
-        "[ebuild  N     ]   dev-libs/gpcycleb-1.0 ",
-        "[ebuild  N     ]    dev-libs/gpcyclea-1.0  USE=\"x\"",
+        "[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo  0 KiB",
+        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\"",
+        "[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo  USE=\"x\" 0 KiB",
+        "",
+        "Total: 3 packages (3 new), Size of downloads: 0 KiB",
     ], rust.stdout
 
 
@@ -3684,29 +3742,42 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     cyc4a→cyc4b edge gated behind USE=x (default on). Real
     `digraph.get_cycles` records one ring per node (rotations count
     separately), so four records trip `large_cycle_count` (verified live
-    against 3.0.82.2 on the same shape). Since Slice 4 the merge list is
-    the stuck remainder only (leaf-drain order -- flat lines, since
-    portuale's tree model dedups shared nodes; no separate re-display,
-    which would duplicate it), then the error block with the `-x`
-    suggestion and the lot-of-cycles trailer. Exit 1. Both streams
-    pinned."""
+    against 3.0.82.2 on the same shape). Since backlog #206 the merge
+    list is the stuck remainder rendered as real's forced `--verbose
+    --tree` display (tree rows with a `[nomerge]` arm, `::repo`,
+    `0 KiB`, the `Total:` counters line), then the error block with
+    real's three leading newlines, `Package.__str__` node text, the
+    `-x` suggestion and the lot-of-cycles trailer. Exit 1. Both streams
+    pinned.
+
+    Row format and counters grounded on the live n206 probe
+    (`localhost/test-portuale:latest`, display paths diff-verified
+    identical to 3rdparty 3.0.82.2); shape from portuale's own tree
+    renderer. Live real starts this ring at `cyc4c-1.0`
+    (`cyc4c → cyc4d → cyc4a → cyc4b → cyc4c`); portuale keeps its own
+    lowest-index rotation (`cyc4a` first) — a cycle-start difference of
+    the #208 family, left for that item, so only the node format is
+    re-pinned here."""
     args = ["--pretend", "dev-libs/cyc4a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/cyc4a-1.0  USE=\"x\"",
-        "[ebuild  N     ] dev-libs/cyc4d-1.0 ",
-        "[ebuild  N     ] dev-libs/cyc4c-1.0 ",
-        "[ebuild  N     ] dev-libs/cyc4b-1.0 ",
+        "[nomerge       ] dev-libs/cyc4a-1.0::testrepo USE=\"x\"",
+        "[ebuild  N     ]  dev-libs/cyc4b-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]   dev-libs/cyc4c-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]    dev-libs/cyc4d-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]     dev-libs/cyc4a-1.0::testrepo  USE=\"x\" 0 KiB",
+        "",
+        "Total: 4 packages (4 new), Size of downloads: 0 KiB",
     ]
     assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+        "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/cyc4a-1.0 depends on\n"
-        " dev-libs/cyc4b-1.0 (buildtime)\n"
-        "  dev-libs/cyc4c-1.0 (buildtime)\n"
-        "   dev-libs/cyc4d-1.0 (buildtime)\n"
-        "    dev-libs/cyc4a-1.0 (buildtime)\n"
+        "(dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc4c-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "   (dev-libs/cyc4d-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "    (dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -3850,16 +3921,20 @@ def test_abort_path_cycle_shows_reduced_list_only(
     `docs/abort-path-spec.md`): an unserializable cycle aborts with exit
     1 and the merge list is the stuck remainder only — the unrelated
     leaves (`abort-leaf-a/b`, drained before the give-up) are absent while
-    the top and both cycle arms stay; `Total:` counters are computed over
-    that reduced list (unique packages -- the tree-duplicated row count
-    stays a deliberate G0.2 cut). Mid/last pin that the cycle entry's
+    the top and both cycle arms stay. Mid/last pin that the cycle entry's
     declared position is unobservable in real's output. Slice 4 renders
     the remainder as the only list; the `abort-au-*` fourth-shape order
-    stays xfailed below. Mode-shaped
-    assertions: `--columns` splits the version into `[x.y::repo]`, and
-    `--debug` without `-v` prints no `Total:` line (real: verbosity != 3
-    -- the oracle `--debug` capture shows the remainder with no counters
-    either)."""
+    stays xfailed below. Since backlog #206 the remainder renders as
+    real's forced `--verbose --tree` display with the `Total:` counters
+    line in every mode — including `--debug` without `-v`: real
+    `_show_circular_deps` forces `--verbose` before the display, and the
+    oracle `--debug` capture shows `Total: 4 packages (4 new)` (the old
+    no-`Total:`-under-`--debug` assertion contradicted the capture). The
+    counters count the rendered merge rows, repeats included
+    (`nomerge` excluded), exactly like real's own counters count its
+    rows. The forced display is always the plain tree renderer, never
+    `--columns`-shaped (portuale's tree walk hardcodes the non-columns
+    arms, same as for a user-passed `--tree`)."""
     args = [*mode, atom]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -3870,10 +3945,7 @@ def test_abort_path_cycle_shows_reduced_list_only(
     merge_lines = _merge_lines(rust.stdout)
     assert not any("abort-leaf" in line for line in merge_lines)
     assert any("abort-cycle-a" in line for line in merge_lines)
-    if mode == ["--pretend", "--debug"]:
-        assert "Total:" not in rust.stdout
-    else:
-        assert "Total:" in rust.stdout
+    assert "Total:" in rust.stdout
     assert "circular dependencies" in rust.stderr
 
 
@@ -20345,17 +20417,37 @@ _CYC0_REAL_BLOCKS = {
 
 @pytest.mark.xfail(
     strict=True,
-    reason="backlog #206/#207/#208: live real prints package nodes, blames "
-    "a different package or finds a different suggestion",
+    reason="backlog #207/#208: live real blames a different package or "
+    "finds a different suggestion (#206's node text already ships)",
 )
-@pytest.mark.parametrize("atom", sorted(_CYC0_REAL_BLOCKS))
+@pytest.mark.parametrize(
+    "atom", sorted(a for a in _CYC0_REAL_BLOCKS if a != "=dev-libs/cyc0b-1")
+)
 def test_circular_dependencies_upstream_pg0_real_text(
     emerge_binary, fixture_env, atom
 ):
-    """Real's `_show_circular_deps` block for three of the eight #50
+    """Real's `_show_circular_deps` block for two of the eight #50
     batch-2 circular cases, verbatim from live `emerge -p --color=n`
-    (real depgraph.py:10425; nodes via digraph.debug_print ->
+    (real depgraph.py:10425; nodes via
+    `circular_dependency_handler._prepare_circular_dep_message` ->
     Package.__str__). Exit code 1 already agrees on both sides."""
+    rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    assert rust.returncode == 1
+    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+
+
+def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
+    emerge_binary, fixture_env
+):
+    """Backlog #206: the `=dev-libs/cyc0b-1` third of the block above,
+    now passing — portuale prints real's package-node text
+    (`Package.__str__`: `(cpv:slot/sub::repo, ebuild scheduled for
+    merge)`, no `to '<ROOT>'` suffix under a staged ROOT) for the same
+    cycle and suggestion. Grounded on the #181 evidence captures plus
+    the n206 container probe (stock `localhost/test-portuale:latest`,
+    whose `_show_circular_deps` / node-text / display paths are
+    diff-verified identical to 3rdparty 3.0.82.2)."""
+    atom = "=dev-libs/cyc0b-1"
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr

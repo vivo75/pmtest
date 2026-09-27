@@ -507,7 +507,11 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     Slice 4 the `--solver=portage` path renders the stuck remainder only
     (no separate re-display); the pubgrub bridge result stays `Complete`
     by construction (no walk/backtrack to abandon -- Slice 2), so it
-    keeps the legacy list-plus-redisplay."""
+    keeps the legacy list-plus-redisplay. Since backlog #206 both paths
+    print real's `Package.__str__` node text with real's three leading
+    newlines, and the `--solver=portage` path renders the stuck remainder
+    as real's forced `--verbose --tree` display (same bytes as the walk
+    path); the pubgrub stdout shape is unchanged."""
     legacy_stdout = (
         "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
         "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
@@ -516,15 +520,18 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
         "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
     )
     partial_stdout = (
-        "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
-        "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
+        "[nomerge       ] dev-libs/hardcyclea-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
     )
     expected_stderr = (
-        "\n * Error: circular dependencies:\n"
+        "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/hardcyclea-1.0 depends on\n"
-        " dev-libs/hardcycleb-1.0 (buildtime)\n"
-        "  dev-libs/hardcyclea-1.0 (buildtime)\n"
+        "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
