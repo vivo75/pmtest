@@ -1,0 +1,7 @@
+EAPI=0
+DESCRIPTION=fixture package: upstream test_missing_iuse_and_evaluated_atoms pg0 dev-libs/B-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+IUSE=bar
+DEFINED_PHASES=-
+_md5_=beceb1520c60f114e187c734271dadec

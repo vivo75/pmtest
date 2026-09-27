@@ -622,6 +622,41 @@ CASES = [
         1,
     ),
     (
+        "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
+        ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=n fails like real (rc 1; newest A-2 via unstable B-1)",
+        ["--pretend", "--autounmask-keep-keywords=n", "dev-libs/akk0a"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y fails like real (rc 1; real prefers A-1 plus a foo use change)",
+        ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"],
+        1,
+    ),
+    (
+        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-1 fails like real (rc 1; B[foo?] unsatisfiable, B lacks foo)",
+        ["--pretend", "=dev-libs/mia0a-1"],
+        1,
+    ),
+    (
+        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-2 fails like real (rc 1; B[foo?,bar] unsatisfiable)",
+        ["--pretend", "=dev-libs/mia0a-2"],
+        1,
+    ),
+    (
+        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-1 fails like real (rc 1; D[-baz] unsatisfiable with --autounmask=n)",
+        ["--pretend", "--autounmask=n", "=dev-libs/odc0a-1"],
+        1,
+    ),
+    (
+        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-2 fails like real (rc 1; C keyword-masked with --autounmask=n)",
+        ["--pretend", "--autounmask=n", "=dev-libs/odc0a-2"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
