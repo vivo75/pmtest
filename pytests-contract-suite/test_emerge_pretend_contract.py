@@ -622,6 +622,11 @@ CASES = [
         1,
     ),
     (
+        "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
+        ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
