@@ -18476,6 +18476,116 @@ def test_oracle_slotop_rebuild_scan_honours_with_bdeps(
         ] == [], name
 
 
+def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #25 S1b-fix contract pin: the slotop `@world` cells with
+    bed-faithful installed metadata (vdb `EAPI=8` on every row).
+
+    Same matrix as `test_oracle_slotop_rebuild_scan_honours_with_bdeps`
+    above (installed `dev-libs/provpkg-1.0` `0/1`, tree `2.0` `0/2`, five
+    installed consumers bound through one key each with real's versioned
+    built atom `>=dev-libs/provpkg-1.0:0/1=`), except every installed row
+    also carries the vdb `EAPI` file the container bed stages
+    (`differential-test-bed/layers/l0-fixture-oracle/slotop-bdeps/vdb`;
+    the cells run with `FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1` per
+    `differential-test-bed/atomlists/l0-fixture-oracle-slotop.txt`).
+    Without that file real reads the installed EAPI as `"0"`
+    (`vdb`/`vartree.py:1054-1055`, no `slot_operator` support) and the
+    dynamic-deps overlay stands down -- which is why the EAPI-less twin
+    above cannot see this regression.
+
+    Real 3.0.82.2 upgrades the provider and rebuilds the consumers in
+    the `@world` shape (Total 9; 7 with `--usepkg`): the overlay's
+    recorded atoms (`FakeVartree._apply_dynamic_deps`,
+    `lib/_emerge/FakeVartree.py:146-191`) do not withhold because the
+    slot-operator update probe relaxes built `:S/SS=` parent atoms to
+    bare `:=` before checking the candidate
+    (`_slot_operator_check_reverse_dependencies`,
+    `lib/_emerge/depgraph.py:2472-2538`, `:2494-2502`). Portuale's S1b
+    overlay (`rust/portage-repo/src/lib.rs::installed_dep_string`)
+    appended the recorded atoms but the joint-satisfiability check kept
+    them raw, so only the installed instance satisfied the whole atom
+    set and the upgrade was withheld (no `provpkg-2.0` row, no consumer
+    `rR` rows, plus the skipped-update warning) -- the `BEDS 62951cd0:
+    STOP` row in `r25s1-progress.md`."""
+    installed = [
+        ("dev-libs", "provpkg", "1.0", "0/1", {"EAPI": "8"}),
+    ] + [
+        (
+            "dev-libs",
+            name,
+            "1.0",
+            "0",
+            {"EAPI": "8", key: ">=dev-libs/provpkg-1.0:0/1="},
+        )
+        for name, key in (
+            ("consrdep", "RDEPEND"),
+            ("consdep", "DEPEND"),
+            ("consbdep", "BDEPEND"),
+            ("conspdep", "PDEPEND"),
+            ("considep", "IDEPEND"),
+        )
+    ]
+    world = [
+        "dev-libs/provpkg",
+        "dev-libs/consrdep",
+        "dev-libs/consdep",
+        "dev-libs/consbdep",
+        "dev-libs/conspdep",
+        "dev-libs/considep",
+    ]
+    root = _b1_root(tmp_path, world, installed)
+    env = _b1_env(fixture_env, root)
+
+    def run(*args):
+        # stdout + stderr: the skipped-update warning goes to stderr.
+        r = _b1_run(["--pretend", *args], env, emerge_binary)
+        return r.stdout + r.stderr
+
+    def rebuilds(stdout):
+        return [
+            ln.split("] ", 1)[1].split(" ")[0]
+            for ln in _b1_merges(stdout)
+            if ln.startswith("[ebuild  rR") and "dev-libs/cons" in ln
+        ]
+
+    provider = "[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0]"
+    # @world: the provider upgrades and every consumer rebuilds.
+    out = run("--update", "--deep", "--newuse", "@world")
+    assert provider in _b1_merges(out)
+    assert rebuilds(out) == [
+        "dev-libs/consrdep-1.0",
+        "dev-libs/consdep-1.0",
+        "dev-libs/consbdep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/considep-1.0",
+    ]
+    assert "have been skipped" not in out
+    # @world --usepkg: bdeps off, runtime/install-time keys only.
+    out = run("--update", "--deep", "--newuse", "--usepkg", "@world")
+    assert provider in _b1_merges(out)
+    assert rebuilds(out) == [
+        "dev-libs/consrdep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/considep-1.0",
+    ]
+    assert "have been skipped" not in out
+    # @world --with-bdeps=y: same as the default.
+    out = run(
+        "--update", "--deep", "--newuse", "--with-bdeps=y", "@world"
+    )
+    assert provider in _b1_merges(out)
+    assert rebuilds(out) == [
+        "dev-libs/consrdep-1.0",
+        "dev-libs/consdep-1.0",
+        "dev-libs/consbdep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/considep-1.0",
+    ]
+    assert "have been skipped" not in out
+
+
 def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
     emerge_binary, tmp_path
 ):
