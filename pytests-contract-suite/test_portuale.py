@@ -4687,15 +4687,27 @@ def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_p
 def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
     emerge_binary, tmp_path
 ):
-    """Backlog #175 case (a): the only binhost 500s, but the local
-    `$PKGDIR/Packages` still lists a binary whose file is gone (stale
-    index). Real selects that binary and aborts rc 1
-    (`>>> Emerging binary` -> `!!! Tried to use non-existent binary ...`,
-    `BinpkgVerifier.py:50-51`), installing nothing. Portuale must match
-    that outcome: rc 1, the binary line, nothing installed. (The abort
-    wording itself is still portuale's own `no binpkg file` error, not
-    real's `Tried to use non-existent binary` pair -- deliberately
-    unpinned here; a follow-up slice owns that message.)"""
+    """Backlog #187 (the #175 case (a) residue): the only binhost 500s,
+    but the local `$PKGDIR/Packages` still lists a binary whose file is
+    gone (stale index). Real trusts the index (default
+    `FEATURES=pkgdir-index-trusted` runs `bintree._populate_local` with
+    `reindex=False`, `bintree.py:937-938,1057-1064`), selects that binary
+    (`>>> Emerging binary (1 of 1)`) and aborts rc 1 at merge:
+    `!!! Tried to use non-existent binary for '<cpv>'` +
+    `!!! Likely caused by an outdated index. Run 'emaint binhost -f'.`
+    (`BinpkgVerifier.py:48-52`), then real's `>>> Failed to emerge
+    <cpv>[ for <root>], Log file:` tail -- installing nothing, with no
+    `emerge:` line (a merge failure exits via `FAILURE`). Expected bytes
+    are the bed's real F3a log (run `l32-20260927T163413Z`,
+    `binhost-merge.log`, rc 1). Portuale used to fail here with its own
+    `no binpkg file under ...` error -- and, with any other binpkg file
+    still present (like the bed's surviving `dep-a`), fell all the way
+    back to the ebuild (rc 0).
+
+    The second build (`dev-libs/samepkg`, already installed in the
+    fixture vdb so resolution leaves it alone) keeps a live file in
+    `$PKGDIR`, pinning exactly that bed shape: a non-empty scan that
+    must still carry the orphan stanza."""
     import shutil
 
     server, port = _serve_binhost_500()
@@ -4707,17 +4719,24 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
         build_env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
         build_env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir-build")
         subprocess.run(
+            [str(emerge_binary), "--buildpkgonly", "dev-libs/samepkg"],
+            capture_output=True, text=True, check=True, env=build_env,
+        )
+        subprocess.run(
             [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
             capture_output=True, text=True, check=True, env=build_env,
         )
-        # The build wrote the `Packages` index; deleting just the file
-        # makes it stale, exactly like the bed's F3a (faultpkg removed
-        # from PKGDIR, index entry left behind).
+        # The builds wrote the `Packages` index; deleting just the
+        # packagepkg file makes its stanza stale, exactly like the
+        # bed's F3a (faultpkg removed from PKGDIR, index entry left
+        # behind, dep-a's binpkg still on disk).
         stale = list(pkgdir.rglob("packagepkg-1.0*.gpkg.tar"))
         assert stale, "the build should have left a binpkg to remove"
         for path in stale:
             path.unlink()
         assert "CPV: dev-libs/packagepkg-1.0" in (pkgdir / "Packages").read_text()
+        survivor = list(pkgdir.rglob("samepkg-1.0*.gpkg.tar"))
+        assert survivor, "the surviving binpkg keeps the scan non-empty"
 
         env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
         result = subprocess.run(
@@ -4732,6 +4751,26 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
             f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}"
             in result.stdout
         )
+        # Real's stale-index pair, byte for byte (`BinpkgVerifier.py`).
+        assert (
+            "!!! Tried to use non-existent binary for 'dev-libs/packagepkg-1.0'"
+            in result.stdout
+        )
+        assert (
+            "!!! Likely caused by an outdated index. Run 'emaint binhost -f'."
+            in result.stdout
+        )
+        # Real's failure tail, with this run's `for <root>` and log.
+        assert (
+            f">>> Failed to emerge dev-libs/packagepkg-1.0 for {root}, Log file:"
+            in result.stdout
+        )
+        assert ">>>  '" in result.stdout and "temp/build.log'" in result.stdout
+        # The tail is the whole failure: no `emerge:` line (real exits
+        # via `FAILURE`, not the action error path) and none of
+        # portuale's old `no binpkg file under ...` wording.
+        assert "emerge: " not in result.stderr
+        assert "no binpkg file under" not in result.stdout + result.stderr
         assert not (root / "usr/share/packagepkg/hello.txt").exists()
         assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists()
     finally:
