@@ -1,0 +1,6 @@
+EAPI=7
+DESCRIPTION=fixture package: upstream test_circular_choices_rust.py pg0 dev-lang/rust-bin-1.47.0 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=e721b214339c4326a2e15351e6e0869b

@@ -507,7 +507,11 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     Slice 4 the `--solver=portage` path renders the stuck remainder only
     (no separate re-display); the pubgrub bridge result stays `Complete`
     by construction (no walk/backtrack to abandon -- Slice 2), so it
-    keeps the legacy list-plus-redisplay."""
+    keeps the legacy list-plus-redisplay. Since backlog #206 both paths
+    print real's `Package.__str__` node text with real's three leading
+    newlines, and the `--solver=portage` path renders the stuck remainder
+    as real's forced `--verbose --tree` display (same bytes as the walk
+    path); the pubgrub stdout shape is unchanged."""
     legacy_stdout = (
         "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
         "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
@@ -516,15 +520,18 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
         "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
     )
     partial_stdout = (
-        "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
-        "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
+        "[nomerge       ] dev-libs/hardcyclea-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
     )
     expected_stderr = (
-        "\n * Error: circular dependencies:\n"
+        "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/hardcyclea-1.0 depends on\n"
-        " dev-libs/hardcycleb-1.0 (buildtime)\n"
-        "  dev-libs/hardcyclea-1.0 (buildtime)\n"
+        "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -2013,7 +2020,15 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     `dep-a` still writes both digests. `dev-libs/packagepkg` is the
     `SLOT="0"` shape here; the `SLOT="1"` shape is pinned by portuale's
     own `stanza_bytes_for_nondefault_slot_write_it_between_size_and_use`
-    Rust unit test (no buildable non-default-`SLOT` fixture exists)."""
+    Rust unit test (no buildable non-default-`SLOT` fixture exists).
+    Backlog #203: the same probe's `--buildpkg` stanza carries
+    `REPO_REVISIONS: {}` (sync-less overlay: `_setup_repo_revisions`
+    records an empty dict, `phase-functions.sh` still writes it), so
+    the portuale stanza must too -- pinned below, not just in the
+    `stanza_bytes_for_default_slot_omit_slot_and_keep_both_digests`
+    Rust unit test, to prove the whole real-execution chain (phase env
+    `PORTAGE_REPO_REVISIONS` -> real build-info writer -> archive ->
+    index) end to end."""
     env = _real_build_env(tmp_path)
     env.pop("BINPKG_FORMAT", None)
     result = subprocess.run(
@@ -2035,6 +2050,9 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     assert any(
         line.startswith("SHA1: ") for line in packages.splitlines()
     ), f"fixed SHA1 digest missing:\n{packages}"
+    assert any(
+        line == "REPO_REVISIONS: {}" for line in packages.splitlines()
+    ), f"sync-less REPO_REVISIONS must be carried like real's:\n{packages}"
 
     env["PORTAGE_CHECKSUM_FILTER"] = "-SHA1"
     subprocess.run(
@@ -5854,6 +5872,78 @@ def test_emerge_preserved_libs_advisory_and_rebuild_set(emerge_binary, tmp_path)
     ).read_text().strip() in ("{}", "{\n}")
 
 
+def test_emerge_two_consecutive_soname_bumps_replace_the_registry_record(emerge_binary, tmp_path):
+    """Backlog #178 (S0 oracle: real portage 3.0.82.2,
+    `PreservedLibsRegistry.register()` +
+    `dblink.treewalk()`'s `register(self.mycpv, slot, counter,
+    sorted(preserve_paths))`): two consecutive soname bumps
+    (`dev-libs/sonamebumplib` 1.0 -> 2.0 -> 3.0, each dropping the
+    previous soname while `dev-libs/consumesonamebump` still links
+    `.so.1`) keep one `dev-libs/sonamebumplib:0` record owned by the
+    merging package -- after the second bump the owner is
+    `dev-libs/sonamebumplib-3.0` with the still-needed `.so.1` path
+    list, the unneeded `.so.2` files are gone, and the newest
+    package's `CONTENTS` owns the preserved entries (see
+    `differential-test-bed/findings/l5.md` "## Group 2")."""
+    import json
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # A real Gentoo ROOT's `/etc/ld.so.conf` lists `/usr/lib64`, so the
+    # consumer in that libdir is found; the merge regenerates the file
+    # from env.d `LDPATH` itself.
+    env_d = root / "etc/env.d"
+    env_d.mkdir(parents=True, exist_ok=True)
+    (env_d / "99sonamebump").write_text('LDPATH="/usr/lib64"\n')
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    fix = Path(FIXTURES_ROOT) / "repo/dev-libs"
+    for name, version in [
+        ("sonamebumplib", "1.0"),
+        ("consumesonamebump", "1.0"),
+        ("sonamebumplib", "2.0"),
+        ("sonamebumplib", "3.0"),
+    ]:
+        r = subprocess.run(
+            [str(ebuild_link), str(fix / name / f"{name}-{version}.ebuild"), "merge"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert r.returncode == 0, r.stderr
+
+    counter_3 = (root / "var/db/pkg/dev-libs/sonamebumplib-3.0/COUNTER").read_text().strip()
+    registry = json.loads(
+        (root / "var/lib/portage/preserved_libs_registry").read_text()
+    )
+    assert registry == {
+        "dev-libs/sonamebumplib:0": [
+            "dev-libs/sonamebumplib-3.0",
+            counter_3,
+            [
+                "/usr/lib64/libsonamebump.so.1.0.0",
+                "/usr/lib64/libsonamebump.so.1",
+            ],
+        ]
+    }, registry
+    # The still-needed `.so.1` pair survives; the unneeded `.so.2` pair
+    # was unmerged with the replaced version.
+    assert (root / "usr/lib64/libsonamebump.so.1.0.0").is_file()
+    assert (root / "usr/lib64/libsonamebump.so.1").is_symlink()
+    assert not (root / "usr/lib64/libsonamebump.so.2.0.0").exists()
+    assert not (root / "usr/lib64/libsonamebump.so.2").exists()
+    contents_3 = (
+        root / "var/db/pkg/dev-libs/sonamebumplib-3.0/CONTENTS"
+    ).read_text()
+    assert "obj /usr/lib64/libsonamebump.so.1.0.0" in contents_3
+    assert "sym /usr/lib64/libsonamebump.so.1 " in contents_3
+    assert "libsonamebump.so.2" not in contents_3
+
+
 def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     """Real `_emerge/Scheduler.py::_save_resume_list` + `--resume`: a
     failed `emerge <atoms>` writes the still-unmerged packages to
@@ -6012,6 +6102,142 @@ def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
     # --oneshot carried through: schedok is NOT in world.
     assert (root / "var/lib/portage/world").read_text() == ""
+
+
+def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
+    """Backlog #179: real `_emerge/actions.py` returns from the
+    `--pretend` branch (`display(...)`, `return os.EX_OK`) before
+    `Scheduler` exists -- and before the `resume_backup` rotation -- so
+    a preview never touches `mtimedb["resume"]`. A stale multi-item list
+    (one the rotation would also rewrite) must come back byte-identical,
+    and a bare root must gain no `mtimedb` at all."""
+    import json
+    import shutil
+
+    def _env(root):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(root / "pt")
+        return env
+
+    stale = {
+        "resume": {
+            "favorites": ["dev-libs/stale-a"],
+            "mergelist": [
+                ["ebuild", "/", "dev-libs/stale-a-1.0", "merge"],
+                ["ebuild", "/", "dev-libs/stale-b-1.0", "merge"],
+            ],
+            "myopts": {},
+        }
+    }
+
+    # Bare root: the preview resolves and prints, and leaves no mtimedb.
+    root = tmp_path / "root-bare"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
+    # test starts from no resume list whatever earlier runs left there.
+    (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert "dev-libs/schedok-1.0" in r.stdout
+    assert not (root / "var/cache/edb/mtimedb").exists()
+
+    # Stale list present: byte-identical afterwards (neither a fresh save
+    # nor the rotation may run on a preview).
+    root = tmp_path / "root-stale"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
+    # test starts from no resume list whatever earlier runs left there.
+    (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
+    mtimedb = root / "var/cache/edb/mtimedb"
+    mtimedb.parent.mkdir(parents=True, exist_ok=True)
+    mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    before = mtimedb.read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert mtimedb.read_bytes() == before
+
+
+def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
+    """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
+    `["binary", root, cpv, "merge"]` resume item from the bintree, so the
+    resumed `(N of M) cpv::repo` line names the *binary's* repository (the
+    `Packages` index `REPO` field), never the ebuild repo. Portuale
+    re-derived the repo from the ebuild repos, so a resumed binary with no
+    ebuild anywhere printed a bare `cpv::`. `dev-libs/binaryonlypkg`
+    exists only as a local binpkg whose `Packages` stanza carries no
+    `REPO` -- a fresh `-k` merge shows `::__unknown__` (real
+    `portage.versions._unknown_repo`, the resolver's own fallback), and
+    the resumed merge must show the same. The resume list itself arises
+    naturally: `dev-libs/schedbad` (source, its `src_install` dies)
+    fails first, leaving the untouched binary entry behind."""
+    import json
+    import shutil
+
+    def _env(root):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(root / "pt")
+        env["PKGDIR"] = str(Path(FIXTURES_ROOT) / "pkgdir")
+        return env
+
+    # Fresh binary merge first, on its own root: the `::repo` a resumed
+    # entry must equal.
+    fresh = tmp_path / "root-fresh"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", fresh / "var")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/binaryonlypkg"],
+        capture_output=True, text=True, check=False, env=_env(fresh),
+    )
+    assert r.returncode == 0, r.stderr
+    assert (
+        f">>> Emerging binary (1 of 1) dev-libs/binaryonlypkg-1.0::__unknown__ for {fresh}"
+        in r.stdout
+    )
+
+    # A mixed run: schedbad fails, the binary is never attempted, and the
+    # saved list records both kinds.
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/schedbad", "dev-libs/binaryonlypkg"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 1
+    assert "emerge --resume" in r.stderr
+    saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
+    assert [x[2] for x in saved["resume"]["mergelist"]] == [
+        "dev-libs/schedbad-1.0",
+        "dev-libs/binaryonlypkg-1.0",
+    ]
+    assert [x[0] for x in saved["resume"]["mergelist"]] == ["ebuild", "binary"]
+
+    # `--resume --skipfirst` drops the failed source entry and replays
+    # the binary with the binary's own repository, like the fresh merge.
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--skipfirst"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert (
+        f">>> Emerging binary (1 of 1) dev-libs/binaryonlypkg-1.0::__unknown__ for {root}"
+        in r.stdout
+    )
+    assert (
+        f">>> Completed (1 of 1) dev-libs/binaryonlypkg-1.0::__unknown__ to {root}"
+        in r.stdout
+    )
+    assert (root / "var/db/pkg/dev-libs/binaryonlypkg-1.0/CONTENTS").is_file()
 
 
 def test_emerge_elog_echo_prints_a_message_summary(emerge_binary, tmp_path):
