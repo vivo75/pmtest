@@ -1,8 +1,8 @@
-EAPI=1
+EAPI=8
 DESCRIPTION=fixture package: upstream test_circular_dependencies pg0 dev-libs/Z-3 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 IUSE=+foo bar
 DEPEND=foo? ( !bar? ( dev-libs/cyc0y ) ) foo? ( dev-libs/cyc0y ) !bar? ( dev-libs/cyc0y )
 DEFINED_PHASES=-
-_md5_=3c1ebbd717d315ff12dc60fff45664fe
+_md5_=13cc17f5e0c454c6b1f454d4c841d4bd
