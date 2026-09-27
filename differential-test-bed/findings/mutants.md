@@ -682,3 +682,100 @@ No `cargo fmt` closeout commit: every slice kept `cargo fmt
 only), and the closeout check is clean. Closeout gates:
 `cargo clippy --release --all-targets` zero warnings;
 `cargo test --release -p portage-repo` 738 passed / 0 failed.
+
+## #166 closeout (2026-09-27, branch `backlog/166-librs-circular`)
+
+S1–S7, all test-only in `rust/portage-repo/src/lib.rs` (new
+`mod tests_166`, +~1050 lines, 17 tests; zero product bytes, no
+pmtest counterpart — standalone commits) plus one `style: rustfmt`
+closeout commit (plus a `#[allow(clippy::too_many_arguments)]` on the
+8-arg input builder, same shape as #161's `ds_input_161`). Direct
+predicate-result legs in the #161/#162 scratch style (own
+`dir_166`/`cfg_166`/`cand_166`/`write_pkg_166`/`repo_pkgs_166`/
+entry/conflict/instance helpers; hand-built `Candidate`s, scratch
+vdbs, scratch repos with real md5-cache entries, cycles handed in as
+cpv strings — no graph walk, no fixture-tree writes).
+
+S0 scope (`cargo mutants -p portage-repo --file
+portage-repo/src/lib.rs --in-place --timeout 300 --re
+'(circular_dep_solutions|synthesize_surviving_conflict_entries|
+rebuilt_binary_changed|strip_revision|
+filter_usepkg_exclude_include|direct_solve_instance_use|
+direct_solve_arg_mode)'`, unanchored per #164's note, serial
+in-place, `touch` first; 96 mutants, 11 min):
+**56 missed / 38 caught / 2 unviable**. Per-function missed at S0:
+`strip_revision` 6, `filter_usepkg_exclude_include` 4,
+`rebuilt_binary_changed` 5, `direct_solve_arg_mode` 4 (whole-body
+`-> true` already caught), `direct_solve_instance_use` 13 (9
+whole-body + 4 in-body; the version-arm `==`/`&&` pair already
+caught), `synthesize_surviving_conflict_entries` 7,
+`circular_dep_solutions` 17.
+
+Closeout re-run (same command, `touch` first, on the S7+style
+tree): **0 missed / 94 caught / 2 unviable** — all 56 killed
+across S1–S7 (S1 6, S2 4, S3 5, S4 4, S5 13, S6 7, S7 17), every
+in-body kill hand-verified lethal by mutant application (focused
+`cargo test -p portage-repo --lib` per mutant, restored with
+`git checkout --` past a commit).
+
+Survivor buckets: none — zero missed. Unviable (2, tool-reported,
+no test possible, unchanged from S0):
+`filter_usepkg_exclude_include -> vec![Default::default()]` and
+`circular_dep_solutions -> vec![Default::default()]` (neither
+`Candidate` nor `CircularSuggestion` implements `Default`).
+
+Slice notes (so the next item doesn't re-learn them):
+- Real grounding for the suggestion legs is
+  `_find_suggestions`
+  (`3rdparty/portage/lib/_emerge/resolver/circular_dependency.py:114`,
+  not `depgraph.py` as the brief's shorthand had it) — same
+  MAX_AFFECTING_USE=10, same product-enumeration, same
+  minimal-diff + grandparent hard/conditional distinction.
+- A 2-cycle cannot distinguish the parent-index `-` -> `+`
+  rotation (`+1 ≡ -1 mod 2`); the 3-ring leg exists for exactly
+  that mutant. Single-flag cycles likewise cannot distinguish the
+  mask-bit `<<` -> `>>` flips (`1>>0 == 1<<0`); the 2-flag leg
+  covers them.
+- The second MAX_AFFECTING_USE give-up sits *inside* the first
+  gate's block, so it is only reachable with >10 affecting flags:
+  the two 11-flag self-loop legs (retain-to-ten / retain-to-nine)
+  pin it. With N separately-gated occurrences of one atom the
+  minimal solution disables all N retained flags, not one.
+- `direct_solve_instance_use`'s shadowed (no-entry) arm is
+  deliberately unpinned: it returns `slot_conflict_flag_sets`'
+  `(declared, enabled)` pair as-is against the documented
+  `(enabled, declared)` contract (installed and entry arms agree
+  with the doc; the caller destructures `(enabled, declared)`).
+  Suspected product bug dating to #90 S2; out of scope for this
+  test-only item — coordinator ruling needed (filed as question
+  Q166-1 in the item report). No mutant needs that arm (its tail
+  call carries no in-body rows; whole-body rows die via the other
+  two arms).
+- Never `git checkout --` with uncommitted test work in the tree:
+  the hand-application restore wiped one S7 leg batch mid-item
+  (re-added from history, re-verified). Commit first, verify after
+  — the #163 note's rule applies to hand-application too, not just
+  to `--in-place` runs.
+- `cargo mutants -- <regex>` positionals are ignored for scoping;
+  the filter flag is `-F`/`--re` (v27.1.0).
+
+Whole-body inventory (P7b "~212 unattributed" residue): with the
+current tooling every `--list` row carries its function name, so
+"unattributed" was a P7b-run artifact — nothing to re-attribute.
+In this cluster's ranges there are 20 whole-body rows (12 S0-missed,
+all killed here: `strip_revision` x2, `direct_solve_instance_use`
+x9, `direct_solve_arg_mode -> false`; 6 S0-caught; 2 unviable).
+The remaining ~955 whole-body rows across 317 other functions are
+outside this item's scope (missed-status unmeasured — would need a
+full-file run); heaviest holders: `quarter_sort_key` (18),
+`move_chain_map_with` / `move_chain_map` (17 each),
+`resolved_version_meta_and_use` (16), `expand_new_virt` (13),
+`BacktrackParams::union_constraints` (13). Deferred to the
+coordinator.
+
+Closeout gates: `cargo fmt --check` clean;
+`cargo clippy --release --all-targets` zero warnings;
+`cargo test --release -p portage-repo` 788 passed / 0 failed
+(17 new; the debug-profile suite carries 2 additional pre-existing
+debug-only tests elsewhere). No beds — none apply to a test-only
+item.
