@@ -1,0 +1,7 @@
+EAPI=8
+DESCRIPTION=fixture package: upstream test_broken_deps.py pg0 kde-frameworks/syntax-highlighting-5.113.0 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+DEPEND=>=dev-libs/bdp0b-5.15.9:5
+DEFINED_PHASES=-
+_md5_=7c21d04737125e6420562e74b217cf20
