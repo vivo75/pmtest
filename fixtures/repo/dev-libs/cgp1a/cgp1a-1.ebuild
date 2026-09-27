@@ -1,0 +1,5 @@
+EAPI=0
+DESCRIPTION="fixture package: upstream test_complete_graph.py pg1 sys-apps/a-1 (bulk #50)"
+SLOT="0"
+KEYWORDS="amd64"
+RDEPEND=">=dev-libs/cgp1x-1 <dev-libs/cgp1x-2"
