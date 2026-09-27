@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: emerge --config runs pkg_config from the vdb-saved 
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=d9436a2f51080d4d378d6ece081a71ef
+_md5_=c93bc30e2ec6cbd685c3d21a12f47ad7

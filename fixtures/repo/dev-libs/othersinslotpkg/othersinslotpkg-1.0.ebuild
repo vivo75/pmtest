@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real unmerge others_in_slot check -- shares a file with othersinslotpkg-2.0, same SLOT"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	insinto /usr/share/${PN}

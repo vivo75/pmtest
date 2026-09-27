@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: a variable unset in an earlier phase stays unset in
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=519f65cf90ac22c861c2f0084b84ef84
+_md5_=3934fde86981f30709aac7b1934071a3

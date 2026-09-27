@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: a variable unset in an earlier phase stays unset in a later one (#160)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_compile() {

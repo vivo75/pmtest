@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real binary-package building (ebuild <file> package)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 RDEPEND="dev-libs/samepkg"
 
 src_install() {

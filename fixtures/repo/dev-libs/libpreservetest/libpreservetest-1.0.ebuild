@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real preserve-libs registration -- the library half"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_compile() {
 	echo 'int preservetest_value(void) { return 42; }' > "${T}/libpreservetest.c" || die

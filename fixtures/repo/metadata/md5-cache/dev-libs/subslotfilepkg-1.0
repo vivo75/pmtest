@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: real SLOT=0/1 sub-slot WITH a file (self-collision 
 EAPI=8
 KEYWORDS=amd64
 SLOT=0/1
-_md5_=91e814405738295649555a03f9d9fa8e
+_md5_=90392399669f35673e5e9b0562826440

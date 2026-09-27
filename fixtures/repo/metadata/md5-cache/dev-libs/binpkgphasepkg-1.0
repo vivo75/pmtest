@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: real pkg_preinst/pkg_postinst run for a binary-pack
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=54e44704e69229a2cd59f1e73348f3d9
+_md5_=079cf9df8e72ae8a014572e298e49696

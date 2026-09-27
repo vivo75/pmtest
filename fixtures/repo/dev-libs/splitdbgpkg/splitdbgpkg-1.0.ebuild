@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: per-package FEATURES=splitdebug probe (backlog #98)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_compile() {

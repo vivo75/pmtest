@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: pkg_preinst/pkg_postinst print observable markers, to prove their own output reaches a captured build.log under -jN/--quiet-build (docs/scope-backlog.md's B.1)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "hello from hookoutputpkg" > "${T}/hello.txt" || die

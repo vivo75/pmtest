@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: FEATURES=sandbox (SCOPE_BACKLOG Part 2.D) -- src_install writes a legit file into \${D} and also attempts a write outside the build tree, which the sandbox binary must deny"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "hello from fssandboxpkg" > "${T}/hello.txt" || die

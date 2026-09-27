@@ -6,6 +6,7 @@ SRC_URI="
 "
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE="test"
 
 # The distfiles are digest-verified stand-ins, not real archives -- this

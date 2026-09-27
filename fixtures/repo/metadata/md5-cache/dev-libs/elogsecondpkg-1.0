@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: second elog emitter, for multi-package mail_summary
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=6e0b9451a473781cc2d6dd2d799bb434
+_md5_=41e27262503698ddf1c9b29fe59f8cef

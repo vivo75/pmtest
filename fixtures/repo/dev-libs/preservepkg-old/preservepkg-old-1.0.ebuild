@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: preserve-libs collision exclusion -- the pre-existing 'owner' of a real preserved lib path"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	insinto /usr/lib/preservedtest

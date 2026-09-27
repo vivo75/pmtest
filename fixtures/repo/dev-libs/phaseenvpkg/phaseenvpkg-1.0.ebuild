@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: #37 S2 resolved phase env reaches keepdir (SLOT) and the phase itself (USE/FEATURES)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_install() {

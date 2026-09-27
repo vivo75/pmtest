@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: second elog emitter, for multi-package mail_summary"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	insinto /usr/share/${PN}

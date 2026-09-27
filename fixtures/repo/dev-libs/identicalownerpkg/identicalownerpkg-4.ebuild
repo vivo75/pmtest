@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: a byte-identical file a preinst helper removes only when REPLACING_VERSIONS is unset (#158)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_install() {

@@ -5,4 +5,4 @@ INHERIT=pilotcheck
 KEYWORDS=amd64
 SLOT=0
 _eclasses_=pilotcheck	e9b28d0ea8a4f1d83fcc81993ffd8744
-_md5_=79c73409ff5e9388478a7bc880e1e60f
+_md5_=925d7f7cc0b2bba57a775527280d1ff3

@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: the full binpkg pkg_* phase-hook chain (setup/preinst/postinst/prerm/postrm)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "payload ${PVR}" > "${T}/payload-${PVR}.txt" || die

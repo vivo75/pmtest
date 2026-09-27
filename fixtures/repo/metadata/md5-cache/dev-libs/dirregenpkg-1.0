@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: installs a GNU info file, so the post-merge info-di
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=ac49b5053b73c5ad9ada64b704b8b278
+_md5_=2b9fd1f9d008fb035fde907d4b37d179

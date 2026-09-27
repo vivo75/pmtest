@@ -3,4 +3,4 @@ DESCRIPTION=fixture package with a computed SLOT (task #149): real metadata eval
 EAPI=8
 KEYWORDS=amd64
 SLOT=1
-_md5_=7e928bd374bd04fab9007f9eb9dd105e
+_md5_=9301144073dfc32dfc7b37fdd2f8b9dd

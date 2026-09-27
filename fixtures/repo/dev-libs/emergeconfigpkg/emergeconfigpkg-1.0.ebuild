@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: emerge --config runs pkg_config from the vdb-saved env"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "payload ${PVR}" > "${T}/emergeconfigpkg.txt" || die

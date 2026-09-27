@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: package.env's non-USE half overrides the build-phas
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=0335e1f577fc5de039d2c7bf42eccec1
+_md5_=886e723001a48ca63a3b889806622af9

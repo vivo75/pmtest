@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: the resolved USE reaches the build phase (bin/ebuild.sh use())"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE="buildflag"
 
 src_install() {

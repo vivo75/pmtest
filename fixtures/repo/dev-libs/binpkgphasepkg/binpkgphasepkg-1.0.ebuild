@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real pkg_preinst/pkg_postinst run for a binary-package merge"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "binpkgphasepkg payload" > "${T}/payload.txt" || die

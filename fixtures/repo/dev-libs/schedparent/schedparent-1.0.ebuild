@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: Scheduler / parallel-build test (schedparent)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 RDEPEND="dev-libs/schedleaf-a dev-libs/schedleaf-b"
 
 src_install() {

@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: per-package BINPKG_COMPRESS reaches the xpak pipe"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_install() {

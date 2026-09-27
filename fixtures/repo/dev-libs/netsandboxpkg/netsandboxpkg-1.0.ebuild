@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: FEATURES={network,ipc,mount,pid}-sandbox (SCOPE_BACKLOG Part 2.D) -- its src_compile records the namespace ids it runs in, the interfaces it can see, and an outbound TCP connect, so a test can prove the phase ran isolated"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_compile() {
 	local ifaces connect

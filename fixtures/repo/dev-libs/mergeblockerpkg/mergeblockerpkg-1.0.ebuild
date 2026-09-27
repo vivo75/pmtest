@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real merge-time blocker collision exclusion -- RDEPEND blocks dev-libs/mergeblockedbypkg, whose own file this package also installs"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 RDEPEND="!dev-libs/mergeblockedbypkg"
 
 src_install() {
