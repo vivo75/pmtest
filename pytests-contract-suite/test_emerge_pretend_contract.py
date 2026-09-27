@@ -662,6 +662,21 @@ CASES = [
         0,
     ),
     (
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-1 merges like real (rc 0; B[foo] via B-1 with +foo, pinned below)",
+        ["--pretend", "=dev-libs/udd0a-1"],
+        0,
+    ),
+    (
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-2 merges like real (rc 0; B[foo(+)] default-on via B-2, pinned below)",
+        ["--pretend", "=dev-libs/udd0a-2"],
+        0,
+    ),
+    (
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-3 merges like real (rc 0; B[foo(-)] resolves to B-1, pinned below)",
+        ["--pretend", "=dev-libs/udd0a-3"],
+        0,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
@@ -8733,6 +8748,35 @@ def test_strong_blocker_matches_an_installed_package(emerge_binary, fixture_env)
         "[ebuild  N     ] dev-libs/blockerpkg                                   "
         "[1.0]                        ",
     ]
+
+
+def test_upstream_use_dep_defaults_pg0_pins_mergelists(
+    emerge_binary, fixture_env
+):
+    """Upstream `test_use_dep_defaults.py::testUseDepDefaultse` pg0,
+    bulk-translated for #50 batch 5 (`dev-libs/udd0{a,b}`; oracle
+    `/tmp/opencode/o50c/perfile/udd.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    A-1 wants `B[foo]`, A-2 `B[foo(+)]`, A-3 `B[foo(-)]`; B-1 is
+    `IUSE=+foo` (EAPI 1), B-2 has no IUSE. Real merges `[B-1, A-1]`,
+    `[B-2, A-2]`, `[B-1, A-3]` (all `success=True`). All three cells
+    are clean today: portuale merges the same sets in the same order
+    with no warnings and empty stderr, so the exact rows are pinned.
+    """
+    env = dict(fixture_env)
+    for atom, dep in (
+        ("=dev-libs/udd0a-1", "dev-libs/udd0b-1  USE=\"foo\""),
+        ("=dev-libs/udd0a-2", "dev-libs/udd0b-2 "),
+        ("=dev-libs/udd0a-3", "dev-libs/udd0b-1  USE=\"foo\""),
+    ):
+        got = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert got.returncode == 0
+        assert got.stderr == ""
+        assert got.stdout.splitlines() == [
+            f"[ebuild  N     ] {dep}",
+            f"[ebuild  N     ] {atom.removeprefix('=')} ",
+        ]
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
