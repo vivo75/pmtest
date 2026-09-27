@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed -flip; its RDEPEND atom carries a flip= conditional use-dep, so --autounmask-use=n aborts with real's parent-flip row beside the child row (#135 (a) S0)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+RDEPEND=~dev-libs/r135leaf-1.0[flip=]
+SLOT=0
+_md5_=b1d14bdb910c0b2548547b2434bf6728
