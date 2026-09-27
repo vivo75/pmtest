@@ -1,0 +1,7 @@
+EAPI=1
+DESCRIPTION=fixture package: upstream test_old_dep_chain_display pg0 dev-libs/D-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+IUSE=+baz
+DEFINED_PHASES=-
+_md5_=f65ea3a5d65e3e8be644ff453889d57f

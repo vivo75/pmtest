@@ -647,6 +647,16 @@ CASES = [
         1,
     ),
     (
+        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-1 fails like real (rc 1; D[-baz] unsatisfiable with --autounmask=n)",
+        ["--pretend", "--autounmask=n", "=dev-libs/odc0a-1"],
+        1,
+    ),
+    (
+        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-2 fails like real (rc 1; C keyword-masked with --autounmask=n)",
+        ["--pretend", "--autounmask=n", "=dev-libs/odc0a-2"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
