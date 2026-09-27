@@ -2138,6 +2138,152 @@ def test_emerge_buildpkgonly_make_conf_binpkg_format_xpak_is_obeyed(
     assert (Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.gpkg.tar").is_file()
 
 
+def test_emerge_buildpkgonly_make_conf_binpkg_chain_is_obeyed(
+    emerge_binary, tmp_path
+):
+    """Backlog #180: `PKGDIR` and `BINPKG_COMPRESS` follow the full
+    config chain -- calling env over `make.conf` over profile over
+    `make.globals` (real `config` precedence) -- for `xpak` runs, with
+    the Q6 carve-out for `gpkg` runs: real's `environ_filter`
+    (`special_env_vars.py:280-281`) keeps a calling-environment
+    `BINPKG_COMPRESS` out of the phase env, and `bin/gpkg-helper.py`
+    rebuilds `portage.settings` from that filtered env plus the config
+    files (pmtest `bf0692f`: env-only `gzip` still compresses `zst`,
+    `make.conf` `gzip` compresses `.gz`), so for `gpkg` only a
+    config-file value reaches the compressor. Hermetically: copy the
+    configroot; the copy's `make.conf` sets `PKGDIR` (a tmp dir),
+    `BINPKG_FORMAT="xpak"` and `BINPKG_COMPRESS="gzip"`, with no
+    calling-env values. The build then lands the old xpak `.tbz2` with
+    gzip magic (`1f 8b`) under the configured dir -- proving both
+    `make.conf` values are read, not ignored. Setting the calling env
+    to another `PKGDIR` plus `BINPKG_COMPRESS="bzip2"` on top flips
+    that same config to bzip2 bytes (`BZh`) under the env dir --
+    proving the env beats `make.conf` for `xpak`. Finally, calling-env
+    `BINPKG_FORMAT="gpkg"` (which beats the `make.conf` `xpak` per
+    #173) with the calling-env `bzip2` still standing builds a
+    `.gpkg.tar` whose members are `metadata.tar.gz`/`image.tar.gz` --
+    proving the env `BINPKG_COMPRESS` does *not* beat `make.conf` for
+    `gpkg`. No new fixture ebuild: `packagepkg` is reused, so no
+    md5-cache entry is needed."""
+    import shutil
+
+    cfg = tmp_path / "cfg180"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    pkgdir_conf = tmp_path / "pkgdir-conf"
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write(f'\nPKGDIR="{pkgdir_conf}"\n')
+        fh.write('\nBINPKG_FORMAT="xpak"\n')
+        fh.write('\nBINPKG_COMPRESS="gzip"\n')
+
+    env = _real_build_env(tmp_path)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env.pop("PKGDIR", None)
+    env.pop("BINPKG_FORMAT", None)
+    env.pop("BINPKG_COMPRESS", None)
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
+    tbz2 = pkgdir_conf / "dev-libs/packagepkg-1.0.tbz2"
+    assert tbz2.is_file(), sorted(p.name for p in pkgdir_conf.rglob("*"))
+    assert tbz2.read_bytes()[:2] == b"\x1f\x8b", (
+        "the make.conf BINPKG_COMPRESS=gzip must reach the xpak pipe"
+    )
+
+    # Calling env over the same make.conf: another PKGDIR, bzip2 wins.
+    pkgdir_env = tmp_path / "pkgdir-env"
+    env["PKGDIR"] = str(pkgdir_env)
+    env["BINPKG_COMPRESS"] = "bzip2"
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    tbz2 = pkgdir_env / "dev-libs/packagepkg-1.0.tbz2"
+    assert tbz2.is_file(), sorted(p.name for p in pkgdir_env.rglob("*"))
+    assert tbz2.read_bytes()[:3] == b"BZh", (
+        "the calling-env BINPKG_COMPRESS=bzip2 must beat make.conf gzip for xpak"
+    )
+
+    # Q6: the same calling-env bzip2 loses to make.conf gzip for gpkg.
+    env["BINPKG_FORMAT"] = "gpkg"
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    gpkg = pkgdir_env / "dev-libs/packagepkg-1.0.gpkg.tar"
+    assert gpkg.is_file(), sorted(p.name for p in pkgdir_env.rglob("*"))
+    with tarfile.open(gpkg, "r") as container:
+        names = {Path(n).name for n in container.getnames()}
+    assert "metadata.tar.gz" in names, (
+        "the make.conf BINPKG_COMPRESS=gzip must beat the calling-env "
+        f"bzip2 for gpkg, got {sorted(names)}"
+    )
+    assert "image.tar.gz" in names
+
+
+def test_emerge_buildpkgonly_make_conf_bzip2_command_is_obeyed(
+    emerge_binary, tmp_path
+):
+    """Backlog #180: `PORTAGE_BZIP2_COMMAND` follows the full chain too
+    -- calling env over `make.conf`/profile/`make.globals` (real
+    `cnf/make.globals:105` defaults it to `bzip2`) -- for *both*
+    formats, since the key is whitelisted into the phase env, never
+    `environ_filter`ed (`special_env_vars.py:143`, absent from `:257`).
+    Hermetically: copy the configroot; the copy's `make.conf` sets
+    `BINPKG_FORMAT="xpak"`, `BINPKG_COMPRESS="bzip2"` and a bogus
+    `PORTAGE_BZIP2_COMMAND`. The build then fails (no
+    `PORTAGE_COMPRESSION_COMMAND` reaches real `__dyn_package`, which
+    dies on its own guard) -- proving the `make.conf` value is read.
+    Setting the calling env to the real `bzip2` on top succeeds with
+    `BZh` bytes -- proving the env beats `make.conf`. `packagepkg` is
+    reused, so no md5-cache entry is needed."""
+    import shutil
+
+    cfg = tmp_path / "cfg180bzip2"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
+        fh.write('\nBINPKG_FORMAT="xpak"\n')
+        fh.write('\nBINPKG_COMPRESS="bzip2"\n')
+        fh.write('\nPORTAGE_BZIP2_COMMAND="definitely-not-a-compressor-180"\n')
+
+    env = _real_build_env(tmp_path)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env.pop("BINPKG_FORMAT", None)
+    env.pop("BINPKG_COMPRESS", None)
+    env.pop("PORTAGE_BZIP2_COMMAND", None)
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode != 0, (result.stdout, result.stderr)
+    assert not (Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2").exists()
+
+    env["PORTAGE_BZIP2_COMMAND"] = "bzip2"
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    tbz2 = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2"
+    assert tbz2.is_file()
+    assert tbz2.read_bytes()[:3] == b"BZh"
+
+
 def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
     emerge_binary, tmp_path
 ):
@@ -2429,9 +2575,10 @@ def _signed_binhost_env(tmp_path, home):
     env["ROOT"] = str(root)
     env["PORTAGE_RUNNING_ROOT"] = str(root)
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
-    # `PKGDIR` is env-var-sourced at portuale's CLI boundary (not read
-    # from `make.conf`), so it must be set explicitly -- otherwise the
-    # download lands in the real default `/var/cache/binpkgs`.
+    # `PKGDIR` follows the full chain at portuale's CLI boundary
+    # (backlog #180: calling env over `make.conf`/profile/
+    # `make.globals`) -- the env value here wins over the identical
+    # `make.conf` one, so the download still lands in this dir.
     env["PKGDIR"] = str(pkgdir)
     env["BINPKG_GPG_VERIFY_GPG_HOME"] = str(home)
     return env
