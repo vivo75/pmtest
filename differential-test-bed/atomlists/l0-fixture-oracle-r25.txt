@@ -16,6 +16,9 @@
 # Real merges `r25up-2.0` + `r25target-1.0` silently (`backtrack: 0/20`);
 # portuale prints the same two rows plus the skipped-update warning
 # (`--json` restarts 1) until the S1b/S1c overlay+minimizer port lands,
-# so an unexplained warning-divergence row is expected here until then
-# (no allowlist entry).
+# so an unexplained warning-divergence row was expected here until then
+# (no allowlist entry). It never showed: the fixture-oracle comparator does
+# not compare the "One or more updates/rebuilds have been skipped" block
+# (backlog #227), so this cell only checks the merge rows. The warning
+# and `--json` restarts are pinned by the contract suite instead (#25 S2).
 --update --deep --newuse --oneshot dev-libs/r25target

@@ -18062,7 +18062,9 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
     env = _b1_env(fixture_env, root)
 
     def run(*args):
-        return _b1_run(["--pretend", *args], env, emerge_binary).stdout
+        # stdout + stderr: the skipped-update warning goes to stderr.
+        r = _b1_run(["--pretend", *args], env, emerge_binary)
+        return r.stdout + r.stderr
 
     def rebuilds(stdout):
         return [
@@ -18082,6 +18084,7 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
         "dev-libs/conspdep-1.0",
         "dev-libs/considep-1.0",
     ]
+    assert "have been skipped" not in out
     # @world --usepkg: bdeps off, runtime/install-time keys only.
     out = run("--update", "--deep", "--newuse", "--usepkg", "@world")
     assert provider in _b1_merges(out)
@@ -18090,6 +18093,7 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
         "dev-libs/conspdep-1.0",
         "dev-libs/considep-1.0",
     ]
+    assert "have been skipped" not in out
     # @world --with-bdeps=y: same as the default.
     out = run(
         "--update", "--deep", "--newuse", "--with-bdeps=y", "@world"
@@ -18102,6 +18106,7 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
         "dev-libs/conspdep-1.0",
         "dev-libs/considep-1.0",
     ]
+    assert "have been skipped" not in out
 
 
 def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
