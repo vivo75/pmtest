@@ -592,6 +592,36 @@ CASES = [
         1,
     ),
     (
+        "autounmask: upstream test_autounmask_use_breakage pg0 c/b/a fails like real (rc 1; D wanted with foo and -foo at once)",
+        ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0c", "dev-libs/aub0b", "dev-libs/aub0a"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_use_breakage pg0 c/a/b fails like real (rc 1; D wanted with foo and -foo at once)",
+        ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0c", "dev-libs/aub0a", "dev-libs/aub0b"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_use_breakage pg0 b/c/a fails like real (rc 1; D wanted with foo and -foo at once)",
+        ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0b", "dev-libs/aub0c", "dev-libs/aub0a"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_use_breakage pg0 b/a/c fails like real (rc 1; D wanted with foo and -foo at once)",
+        ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0b", "dev-libs/aub0a", "dev-libs/aub0c"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_use_breakage pg0 a/c/b fails like real (rc 1; D wanted with foo and -foo at once)",
+        ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0a", "dev-libs/aub0c", "dev-libs/aub0b"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_use_breakage pg0 a/b/c fails like real (rc 1; D wanted with foo and -foo at once)",
+        ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0a", "dev-libs/aub0b", "dev-libs/aub0c"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
