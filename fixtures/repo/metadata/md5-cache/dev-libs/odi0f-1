@@ -1,0 +1,10 @@
+EAPI=7
+DESCRIPTION=fixture package: upstream test_onlydeps_ideps pg0 dev-libs/F-1 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+DEPEND=dev-libs/odi0b
+RDEPEND=dev-libs/odi0c
+PDEPEND=dev-libs/odi0d
+IDEPEND=dev-libs/odi0e
+DEFINED_PHASES=-
+_md5_=47dc08214b2e5963645c5893901b500d
