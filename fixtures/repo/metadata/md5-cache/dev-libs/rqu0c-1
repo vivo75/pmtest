@@ -1,8 +1,8 @@
-EAPI=4
+EAPI=8
 DESCRIPTION=fixture package: upstream test_required_use pg0 dev-libs/C-1 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 IUSE=+foo bar
 REQUIRED_USE=foo? ( !bar )
 DEFINED_PHASES=-
-_md5_=c2e7ff7dd81bc01514ddbdf58024f9ae
+_md5_=d976a4bf7c7cb0bedd8e657c98650032
