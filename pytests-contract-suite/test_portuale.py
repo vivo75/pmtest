@@ -5241,6 +5241,51 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert ">>> Jobs: 1 of 3 complete" in out
     assert ">>> Jobs: 3 of 3 complete" in out
 
+    # Backlog #197 (n197 container probe, real
+    # `_emerge/JobStatusDisplay.py::_display_status` on a non-tty): the
+    # `>>> Jobs:` line shape is `Jobs: C of M complete[, R running][,
+    # F failed][, W merge wait]<pad>Load avg: triple`, padded to the
+    # 68-column jobs field. The load average is nondeterministic, so it
+    # is normalized away (the #185 seconds-cut precedent for
+    # nondeterministic text); the counters, arms and padding are pinned
+    # exactly.
+    import re
+
+    norm = re.sub(r"Load avg: .*", "Load avg: NORM", out)
+    assert (
+        ">>> Jobs: 0 of 3 complete, 1 running"
+        + " " * 36
+        + "Load avg: NORM" in norm
+    )
+    assert (
+        ">>> Jobs: 3 of 3 complete" + " " * 47 + "Load avg: NORM" in norm
+    )
+    for line in norm.splitlines():
+        if not line.startswith(">>> Jobs:"):
+            continue
+        assert re.fullmatch(
+            r">>> Jobs: \d+ of 3 complete(, \d+ (running|failed|merge wait))* +Load avg: NORM",
+            line,
+        ), repr(line)
+    # Dispatch order is deterministic: the first `1 running` line (leaf
+    # A's dispatch) precedes both leaves' `>>> Emerging` lines, and the
+    # final `3 of 3` line follows the last `>>> Completed` line.
+    assert norm.index(">>> Jobs: 0 of 3 complete, 1 running") < min(
+        norm.index(f">>> Emerging (1 of 3) dev-libs/schedleaf-a-1.0::testrepo for {root}"),
+        norm.index(f">>> Emerging (2 of 3) dev-libs/schedleaf-b-1.0::testrepo for {root}"),
+    )
+    assert norm.index(
+        ">>> Jobs: 3 of 3 complete" + " " * 47 + "Load avg: NORM"
+    ) > norm.index(
+        f">>> Completed (3 of 3) dev-libs/schedparent-1.0::testrepo to {root}"
+    )
+    # Background mode (real `Scheduler._background_mode`): no leading
+    # blank line anywhere between the first and the last `>>> Jobs:`
+    # line -- every status line prints unblanked.
+    jobs_first = norm.index(">>> Jobs:")
+    jobs_last = norm.rindex(">>> Jobs: 3 of 3 complete")
+    assert "" not in norm[jobs_first:jobs_last].splitlines()
+
     # Real `--quiet-build` (on by default under `--jobs`): each build's
     # own phase output is captured to `${T}/build.log`, NOT interleaved on
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
@@ -5264,6 +5309,114 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert (
         tmp_path / "portage-tmpdir/portage/dev-libs/schedleaf-a-1.0/temp/build.log"
     ).is_file()
+
+
+def test_emerge_serial_merge_status_lines_carry_reals_leading_blank(
+    emerge_binary, tmp_path
+):
+    """Backlog #197, S1 (real `_emerge/Scheduler.py::_status_msg`): a
+    serial non-`--quiet` merge is not in background mode, so real
+    prefixes every `>>>` status line with a blank line -- and prints no
+    `>>> Jobs:` lines at all (the display is quiet). Merges the same
+    three-package `schedparent` set the `-j2` pin above merges, one job
+    at a time. Grounded in the n197 container probe (serial shape)."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["FEATURES"] = "keepwork"
+
+    r = subprocess.run(
+        [str(emerge_binary), "--oneshot", "dev-libs/schedparent"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    out = r.stdout
+    assert ">>> Jobs:" not in out
+    lines = out.splitlines()
+    statuses = [
+        i
+        for i, line in enumerate(lines)
+        if line.startswith(">>> Emerging (")
+        or line.startswith(">>> Installing (")
+        or line.startswith(">>> Completed (")
+    ]
+    # All nine status lines (three packages x Emerging/Installing/
+    # Completed) print, each immediately preceded by exactly one blank
+    # line.
+    assert len(statuses) == 9
+    for i in statuses:
+        assert lines[i - 1] == "", repr(lines[max(0, i - 2) : i + 1])
+
+
+def test_emerge_quiet_verbose_shows_jobs_lines_without_blanks(
+    emerge_binary, tmp_path
+):
+    """Backlog #197, S2 (real `Scheduler._background_mode` +
+    `JobStatusDisplay`): `--quiet --verbose` is background mode with the
+    display live, so a serial merge prints `>>> Jobs:` lines (start,
+    build-end, merge-land, like the n197 probe's s3 shape) with no
+    leading blanks anywhere; `--quiet` alone prints the same status
+    lines with neither blanks nor Jobs lines (the probe's s4 shape).
+    The load average is normalized away (the #185 precedent)."""
+    import re
+    import shutil
+
+    def _run(args, n):
+        root = tmp_path / f"root{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{n}")
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", "dev-libs/schedleaf-a"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr
+        return r.stdout, root
+
+    out, root = _run(["--quiet", "--verbose"], 0)
+    norm = re.sub(r"Load avg: .*", "Load avg: NORM", out)
+    assert (
+        ">>> Jobs: 0 of 1 complete, 1 running" + " " * 36 + "Load avg: NORM"
+        in norm
+    )
+    assert ">>> Jobs: 1 of 1 complete" + " " * 47 + "Load avg: NORM" in norm
+    assert f">>> Emerging (1 of 1) dev-libs/schedleaf-a-1.0::testrepo for {root}" in norm
+    assert (
+        f">>> Installing (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in norm
+    )
+    assert (
+        f">>> Completed (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in norm
+    )
+    # No leading blanks anywhere in the status region (up to the last
+    # status line; the post-merge `install-info` tail, when the host
+    # prints one, lives after it -- see `_POST_EMERGE_INFO_LINES`).
+    assert "" not in norm[: norm.index(">>> Jobs: 1 of 1 complete")].splitlines()
+
+    out, root = _run(["--quiet"], 1)
+    assert ">>> Jobs:" not in out
+    assert "" not in out[: out.index(">>> Completed (1 of 1)")].splitlines()
+    assert f">>> Emerging (1 of 1) dev-libs/schedleaf-a-1.0::testrepo for {root}" in out
+    assert (
+        f">>> Completed (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
 
 
 def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
