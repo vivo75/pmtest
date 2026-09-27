@@ -6166,6 +6166,140 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     assert mtimedb.read_bytes() == before
 
 
+def _nothing_to_merge_env(root):
+    """Backlog #225 shared harness: the #179 stale-list pattern -- a
+    copied fixture `var` tree as ROOT plus a stale two-item resume list
+    (one the `resume_backup` rotation would also rewrite), returning the
+    env and the mtimedb path with its pre-run bytes."""
+    import json
+    import shutil
+
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
+    # test starts from no resume list whatever earlier runs left there.
+    (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
+    mtimedb = root / "var/cache/edb/mtimedb"
+    mtimedb.parent.mkdir(parents=True, exist_ok=True)
+    stale = {
+        "resume": {
+            "favorites": ["dev-libs/stale-a"],
+            "mergelist": [
+                ["ebuild", "/", "dev-libs/stale-a-1.0", "merge"],
+                ["ebuild", "/", "dev-libs/stale-b-1.0", "merge"],
+            ],
+            "myopts": {},
+        }
+    }
+    mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    return env, mtimedb, mtimedb.read_bytes()
+
+
+def test_emerge_verbose_nothing_to_merge_leaves_the_resume_list_alone(
+    emerge_binary, tmp_path
+):
+    """Backlog #225: real `_emerge/actions.py:496-521` (`action_build`)
+    -- with a display flag (`--ask`/`--tree`/`--verbose`,
+    `actions.py:464-469`) and `mergecount == 0`, real prints `Nothing to
+    merge; quitting.` on stdout and returns `EX_OK` before the
+    `resume_backup` rotation (`:664-672`) and before `Scheduler`, so the
+    resume list and its backup stay untouched -- while the merge list and
+    `Total:` are shown first (`:485` plus the verbose counters). The
+    all-noop plan is `emerge --oneshot -u dev-libs/samepkg` (`samepkg`
+    is installed at the only visible version; the `-u` matters -- a bare
+    `--oneshot` reinstalls a top-level installed package, real's own
+    `is_top_level and not selective` bare `R` -- and `--oneshot` keeps
+    the selective-deferral arm at bay, `actions.py:514-516`)."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "--oneshot", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Nothing to merge" not in r.stderr
+    assert r.stdout.index("Total:") < r.stdout.index("Nothing to merge; quitting.")
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+
+
+def test_emerge_tree_nothing_to_merge_leaves_the_resume_list_alone(
+    emerge_binary, tmp_path
+):
+    """Backlog #225 (`_emerge/actions.py:496-521`), the `--tree` display
+    flag: same early return as the `--verbose` pin -- `Nothing to merge;
+    quitting.` on stdout, exit 0, stale two-item resume list
+    byte-identical with no `resume_backup` key. Same all-noop plan
+    (`--oneshot -u dev-libs/samepkg`; see the `--verbose` pin for why
+    both flags are needed)."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--tree", "--oneshot", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Nothing to merge" not in r.stderr
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+
+
+def test_emerge_ask_nothing_to_merge_never_prompts(emerge_binary, tmp_path):
+    """Backlog #225 (`_emerge/actions.py:496-521`), the `--ask` display
+    flag: real returns before `UserQuery`, so no prompt is ever shown --
+    the `No` answer piped on the pty goes unread. Same assertions as the
+    `--verbose`/`--tree` pins, plus `Would you like to merge` absent.
+    Same all-noop plan (`--oneshot -u dev-libs/samepkg`)."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    r = _run_with_ask_pty(
+        emerge_binary,
+        ["--ask", "--oneshot", "-u", "dev-libs/samepkg"],
+        "n\n",
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Would you like to merge" not in r.stdout
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+
+
+def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
+    emerge_binary, tmp_path
+):
+    """Backlog #225 negative: with no display flag real never enters the
+    `actions.py:464-469` branch, so `mergecount` stays `None`,
+    `Scheduler` runs, and `_save_resume_list` commits the (empty) list
+    (#179) -- after the `resume_backup` rotation (`:664-672`), which
+    fires here because the stale list holds two items. Same all-noop
+    plan (`--oneshot -u dev-libs/samepkg`); no `Nothing to merge`
+    anywhere."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--oneshot", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    saved = json.loads(mtimedb.read_text())
+    assert saved["resume"]["mergelist"] == []
+    assert saved["resume"]["favorites"] == ["dev-libs/samepkg"]
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
     """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
     `["binary", root, cpv, "merge"]` resume item from the bintree, so the
