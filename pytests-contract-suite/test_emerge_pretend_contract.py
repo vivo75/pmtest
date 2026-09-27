@@ -807,6 +807,121 @@ CASES = [
         1,
     ),
     (
+        "eapi: upstream test_eapi pg0 =epi0b-1.0 merges like real (rc 0; BDEPEND pulls A-1.0 first, pinned below)",
+        ["--pretend", "=dev-libs/epi0b-1.0"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-1.1 merges like real (rc 0; EAPI 1 IUSE default +foo, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-1.1"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-1.2 merges like real (rc 0; EAPI 2 IUSE default +foo, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-1.2"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-1.3 merges like real (rc 0; EAPI 3 IUSE default +foo, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-1.3"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-1.4 merges like real (rc 0; EAPI 4 IUSE default +foo, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-1.4"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-2.1 merges like real (rc 0; EAPI 1 slot dep B:0, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-2.1"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-2.2 merges like real (rc 0; EAPI 2 slot dep B:0, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-2.2"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-2.3 merges like real (rc 0; EAPI 3 slot dep B:0, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-2.3"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-2.4 merges like real (rc 0; EAPI 4 slot dep B:0, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-2.4"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-3.2 merges like real (rc 0; EAPI 2 use dep B[foo], pinned below)",
+        ["--pretend", "=dev-libs/epi1a-3.2"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-3.3 merges like real (rc 0; EAPI 3 use dep B[foo], pinned below)",
+        ["--pretend", "=dev-libs/epi1a-3.3"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-3.4 merges like real (rc 0; EAPI 4 use dep B[foo], pinned below)",
+        ["--pretend", "=dev-libs/epi1a-3.4"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-4.2 merges like real (rc 0; EAPI 2 strong block !!B unmatched, merges alone, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-4.2"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-4.3 merges like real (rc 0; EAPI 3 strong block !!B unmatched, merges alone, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-4.3"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-4.4 merges like real (rc 0; EAPI 4 strong block !!B unmatched, merges alone, pinned below)",
+        ["--pretend", "=dev-libs/epi1a-4.4"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-5.0 fails like real (rc 1; no such ebuild)",
+        ["--pretend", "=dev-libs/epi1a-5.0"],
+        1,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-5.1 fails like real (rc 1; no such ebuild)",
+        ["--pretend", "=dev-libs/epi1a-5.1"],
+        1,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-5.2 fails like real (rc 1; no such ebuild)",
+        ["--pretend", "=dev-libs/epi1a-5.2"],
+        1,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-5.3 fails like real (rc 1; no such ebuild)",
+        ["--pretend", "=dev-libs/epi1a-5.3"],
+        1,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-6.4 merges like real (rc 0; EAPI 4 use-dep default B[bar(+)], pinned below)",
+        ["--pretend", "=dev-libs/epi1a-6.4"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1a-7.4 merges like real (rc 0; EAPI 4 REQUIRED_USE satisfied; USE renders profile-shifted, not pinned)",
+        ["--pretend", "=dev-libs/epi1a-7.4"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg1 =epi1c-1 merges like real (rc 0; profile USE=foo pulls B-1 where real's empty profile merges C alone, not pinned)",
+        ["--pretend", "=dev-libs/epi1c-1"],
+        0,
+    ),
+    (
+        "eapi: upstream test_eapi pg2 =epi2b-1.0 merges like real (rc 0; IDEPEND pulls A-1.0 first, pinned below)",
+        ["--pretend", "=dev-libs/epi2b-1.0"],
+        0,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
@@ -8907,6 +9022,52 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
             f"[ebuild  N     ] {dep}",
             f"[ebuild  N     ] {atom.removeprefix('=')} ",
         ]
+
+
+def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_eapi.py::testBdepend` (pg0), `::testEAPI` (pg1) and
+    `::testIdepend` (pg2), bulk-translated for #50 batch 6
+    (`dev-libs/epi0{a,b}`, `dev-libs/epi1{a,b,c}`, `dev-libs/epi2{a,b}`;
+    oracle `/tmp/opencode/o50d/perfile/eapi.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    The 17 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned. The `USE="foo"` renders are
+    what real prints too: B-1 carries `IUSE=+foo` and every A-1.x
+    `IUSE=+foo`, so foo is default-on under real's empty profile as
+    well as the fixture profile. Two rc-matching cells are CASES but
+    deliberately not pinned: =epi1a-7.4 renders the profile-shifted
+    `USE="foo -bar"` where real merges via the +bar default alone, and
+    =epi1c-1 pulls B-1 under the profile's USE=foo where real's empty
+    profile merges C alone (batch 5's rqu precedent).
+    """
+    env = dict(fixture_env)
+    b = "dev-libs/epi1b-1  USE=\"foo\""
+    cases = [
+        ("=dev-libs/epi0b-1.0", ["[ebuild  N     ] dev-libs/epi0a-1.0 ", "[ebuild  N     ] dev-libs/epi0b-1.0 "]),
+        ("=dev-libs/epi1a-1.1", ['[ebuild  N     ] dev-libs/epi1a-1.1  USE="foo"']),
+        ("=dev-libs/epi1a-1.2", ['[ebuild  N     ] dev-libs/epi1a-1.2  USE="foo"']),
+        ("=dev-libs/epi1a-1.3", ['[ebuild  N     ] dev-libs/epi1a-1.3  USE="foo"']),
+        ("=dev-libs/epi1a-1.4", ['[ebuild  N     ] dev-libs/epi1a-1.4  USE="foo"']),
+        ("=dev-libs/epi1a-2.1", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.1 "]),
+        ("=dev-libs/epi1a-2.2", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.2 "]),
+        ("=dev-libs/epi1a-2.3", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.3 "]),
+        ("=dev-libs/epi1a-2.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.4 "]),
+        ("=dev-libs/epi1a-3.2", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.2 "]),
+        ("=dev-libs/epi1a-3.3", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.3 "]),
+        ("=dev-libs/epi1a-3.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.4 "]),
+        ("=dev-libs/epi1a-4.2", ["[ebuild  N     ] dev-libs/epi1a-4.2 "]),
+        ("=dev-libs/epi1a-4.3", ["[ebuild  N     ] dev-libs/epi1a-4.3 "]),
+        ("=dev-libs/epi1a-4.4", ["[ebuild  N     ] dev-libs/epi1a-4.4 "]),
+        ("=dev-libs/epi1a-6.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-6.4 "]),
+        ("=dev-libs/epi2b-1.0", ["[ebuild  N     ] dev-libs/epi2a-1.0 ", "[ebuild  N     ] dev-libs/epi2b-1.0 "]),
+    ]
+    for atom, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert got.returncode == 0, atom
+        assert got.stderr == "", atom
+        assert got.stdout.splitlines() == rows, atom
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
