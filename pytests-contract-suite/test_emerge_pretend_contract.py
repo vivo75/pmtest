@@ -587,6 +587,11 @@ CASES = [
         1,
     ),
     (
+        "autounmask: upstream test_autounmask_parent pg0 =aup0b-1 fails like real (rc 1; D lacks the foo/bar flags the (-)? defaults gate on)",
+        ["--pretend", "--autounmask", "=dev-libs/aup0b-1"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
