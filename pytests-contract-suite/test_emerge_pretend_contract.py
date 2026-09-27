@@ -692,6 +692,11 @@ CASES = [
         1,
     ),
     (
+        "recursion: conditional [flip=] deep miss under --autounmask-use=n aborts with real's parent-flip row and the [qml]-qualified chain (#135 (a)+(b))",
+        ["--pretend", "-D", "--autounmask-use=n", "dev-libs/r135consumer"],
+        1,
+    ),
+    (
         "an installed parent's unresolvable deep dep aborts even with no use-deps involved (#132 libcnoisepkg)",
         ["--pretend", "--update", "--deep", "dev-libs/libcnoisepkg"],
         1,
@@ -4256,6 +4261,69 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
         '(dependency required by "dev-libs/unsatuseinstconsumer" [argument])',
     ]
     assert "doesnotexist-unsatuseor" not in rust2.stderr
+
+
+def test_use_unsat_conditional_miss_reports_the_parent_flip_row(
+    emerge_binary, fixture_env
+):
+    """Backlog #135 arm (a): a conditional `[flip=]` deep miss under
+    `--autounmask-use=n`. dev-libs/r135parent is installed -flip and
+    RDEPENDs `~dev-libs/r135leaf-1.0[flip=]`; the leaf is installed +flip
+    and flip-on in the ebuild pool too (base `package.use`), so no pool
+    satisfies the `[-flip]` the parent evaluates `[flip=]` into. Real
+    `_show_unsatisfied_dep` (`depgraph.py:6768-6858`: the violated
+    `[flip=]` is entirely conditional, so the requirer joins
+    `missing_use_reasons` with its own flip) prints the child row *and*
+    the parent-flip row. Oracle: portage 3.0.82.2 in the
+    l0-fixture-oracle container on the #135 cell of `l0-fixture-oracle.txt` (`-p --color=n
+    -D --autounmask-use=n dev-libs/r135consumer`, rc 1). Live shape:
+    `real-rest-1.log` (`- dev-qt/qtdeclarative-6.11.2-r1::gentoo (Change
+    USE: +wayland)` beside the child's `-wayland` row). The chain-row
+    qualifier on this same cell is arm (b)'s own pin below."""
+    args = ["--pretend", "-D", "--autounmask-use=n", "dev-libs/r135consumer"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    lines = rust.stderr.splitlines()
+    assert (
+        'emerge: there are no ebuilds built with USE flags to satisfy "~dev-libs/r135leaf-1.0[flip=]".'
+        in lines
+    )
+    assert "- dev-libs/r135leaf-1.0::testrepo (Change USE: -flip)" in lines
+    assert "- dev-libs/r135parent-1.0::testrepo (Change USE: +flip)" in lines
+    assert (
+        '(dependency required by "dev-libs/r135parent-1.0::testrepo" [installed])'
+        in lines
+    )
+
+
+def test_use_unsat_conditional_miss_qualifies_the_chain_row_with_affecting_use(
+    emerge_binary, fixture_env
+):
+    """Backlog #135 arm (b): the same cell's chain. New
+    dev-libs/r135consumer (IUSE default-on `qml`) pulls the installed
+    parent behind `qml? ( ... )`, so real `_get_dep_chain`
+    (`depgraph.py:6257+` via `extract_affecting_use`: qml gates the edge
+    and is enabled) qualifies the consumer row `[qml]`. Same oracle as
+    arm (a)'s pin above; live shapes `real-rest-1.log`
+    (`dev-qt/qt5compat-6.11.2::gentoo[qml]`,
+    `sys-auth/polkit-126-r3::gentoo[kde]`). Pins the whole block
+    byte-exact (modulo real's `for <root>.` suffix, the adjudicated
+    `fixture-miss-message-unsuffixed` class)."""
+    args = ["--pretend", "-D", "--autounmask-use=n", "dev-libs/r135consumer"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds built with USE flags to satisfy "~dev-libs/r135leaf-1.0[flip=]".',
+        "!!! One of the following packages is required to complete your request:",
+        "- dev-libs/r135leaf-1.0::testrepo (Change USE: -flip)",
+        "- dev-libs/r135parent-1.0::testrepo (Change USE: +flip)",
+        '(dependency required by "dev-libs/r135parent-1.0::testrepo" [installed])',
+        '(dependency required by "dev-libs/r135consumer-1.0::testrepo[qml]" [ebuild])',
+        '(dependency required by "dev-libs/r135consumer" [argument])',
+    ]
 
 
 def test_use_unsat_missing_iuse_reports_the_missing_flag(

@@ -147,3 +147,12 @@ dev-libs/blockerpkg dev-libs/graphblockerparent
 # consumer in world). Full bytes real-grounded by this cell under the
 # uninstall-scheduling dance order.
 --update --deep --newuse --oneshot dev-libs/whpuller
+
+# #135 S0 (arms (a)+(b)): installed -flip parent evaluates its
+# `[flip=]` RDEPEND atom to `[-flip]`; no pool satisfies it (leaf
+# installed +flip, ebuild pool flip-on via base package.use), and
+# --autounmask-use=n forces the abort block instead of the fix. Real is
+# expected to print the child `Change USE: -flip` row, the parent-flip
+# `Change USE: +flip` row, and the qml?-gated consumer chain row with
+# its [qml] qualifier (live `real-rest-1.log` shapes).
+-D --autounmask-use=n dev-libs/r135consumer

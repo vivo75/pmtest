@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: New; RDEPENDs the installed r135parent behind qml? (default-on), so a --deep walk recurses into it and real qualifies this chain row [qml] (#135 (b) S0)
+EAPI=8
+IUSE=+qml
+KEYWORDS=amd64
+RDEPEND=qml? ( dev-libs/r135parent )
+SLOT=0
+_md5_=68decefa2bb1c7c5a4e2a304e79b0798

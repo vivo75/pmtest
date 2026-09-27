@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: installed +flip; repo ebuild flip-on via profile package.use, so no pool satisfies the [-flip] its installed parent evaluates [flip=] into (#135 (a) S0)
+EAPI=8
+IUSE=flip
+KEYWORDS=amd64
+SLOT=0
+_md5_=00ae71e08e5aefec494dcbc89d9af54c
