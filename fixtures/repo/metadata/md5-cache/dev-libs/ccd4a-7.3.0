@@ -1,0 +1,7 @@
+EAPI=7
+DESCRIPTION=fixture package: upstream test_circular_choices.py pg4 dev-python/pypy-7.3.0 (bulk #50)
+KEYWORDS=amd64
+SLOT=0/73
+DEPEND=|| ( dev-libs/ccd4b dev-libs/ccd4c )
+DEFINED_PHASES=-
+_md5_=512920f47060bf8f237ae2f2bed6097c

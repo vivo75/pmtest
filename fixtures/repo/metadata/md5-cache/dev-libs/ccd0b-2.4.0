@@ -1,0 +1,6 @@
+EAPI=0
+DESCRIPTION=fixture package: upstream test_circular_choices.py pg0 dev-lang/gwydion-dylan-bin-2.4.0 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=7dbe927569bfd64bc2e5dfc486cb49be

@@ -667,6 +667,26 @@ CASES = [
         0,
     ),
     (
+        "circular: upstream test_circular_choices pg0 dylan pulls -bin like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/ccd0a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg1 cmake --backtrack=0 fails like real (rc 1; bug 703440 circular, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd1c"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_choices pg3 cmake via virtual USE pulls bootstrap like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/ccd3c"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea merges like real (rc 0; real pulls -bin first, not pinned)",
+        ["--pretend", "dev-libs/ccd5a"],
+        0,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
@@ -9170,6 +9190,51 @@ def test_upstream_backtracking_pg345_pins_mergelists(emerge_binary, fixture_env)
             [
                 "[ebuild  N     ] dev-libs/bkt5a-1 ",
                 "[ebuild  N     ] dev-libs/bkt5b-1 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_circular_choices.py::testDirectCircularDependency`
+    (pg0) and `::testVirtualCmakeBootstrapUseConditional` (pg3),
+    bulk-translated for #50 batch 7 (`dev-libs/ccd0{a,b}`,
+    `dev-libs/ccd3{a,b,c}` + `virtual/ccd3v`; oracle
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    The 2 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned. Not pinned: pg1's
+    `--backtrack=0` cell (rc 1 matches real but the circular-error
+    text is unverified vs real), pg1's default-backtrack cell and
+    pg4 (portuale reports a circular error where real adjusts the
+    `||` preference — findings, no CASES), pg5 (rc 0 matches but
+    portuale merges [ccd5v, ccd5a] where real pulls ccd5b/-bin
+    first — finding, CASES only), and the pg2 `--depclean` cell
+    (needs a shared world entry).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["dev-libs/ccd0a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd0b-2.4.0 ",
+                "[ebuild  N     ] dev-libs/ccd0a-2.4.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd3c"],
+            [
+                "[ebuild  N     ] dev-libs/ccd3b-3.16.2 ",
+                '[ebuild  N     ] virtual/ccd3v-0  USE="bootstrap"',
+                "[ebuild  N     ] dev-libs/ccd3a-1.9.2 ",
+                "[ebuild  N     ] dev-libs/ccd3c-3.16.2 ",
             ],
         ),
     ]

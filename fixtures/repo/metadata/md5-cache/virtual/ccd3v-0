@@ -1,0 +1,8 @@
+EAPI=7
+DESCRIPTION=fixture package: upstream test_circular_choices.py pg3 virtual/cmake-0 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+IUSE=+bootstrap
+RDEPEND=bootstrap? ( dev-libs/ccd3b ) !bootstrap? ( dev-libs/ccd3c )
+DEFINED_PHASES=-
+_md5_=21c8b26cd7e7bd2c35b23349a65b479e

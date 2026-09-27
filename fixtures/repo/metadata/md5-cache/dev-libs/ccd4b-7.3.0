@@ -1,0 +1,8 @@
+EAPI=7
+DESCRIPTION=fixture package: upstream test_circular_choices.py pg4 dev-python/pypy-exe-7.3.0 (bulk #50)
+KEYWORDS=amd64
+SLOT=7.3.0
+IUSE=low-memory
+BDEPEND=!low-memory? ( dev-libs/ccd4a )
+DEFINED_PHASES=-
+_md5_=ba8c72cf22a6aa4cc11564230491a834
