@@ -1,0 +1,7 @@
+EAPI=6
+DESCRIPTION=fixture package: upstream test_autounmask_keep_keywords pg0 app-misc/A-2 (bulk #50)
+KEYWORDS=amd64
+SLOT=0
+RDEPEND=dev-libs/akk0b
+DEFINED_PHASES=-
+_md5_=99b9647e1e9823249599be0867d2d69f

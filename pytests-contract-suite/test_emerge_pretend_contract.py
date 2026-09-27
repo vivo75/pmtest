@@ -627,6 +627,16 @@ CASES = [
         1,
     ),
     (
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=n fails like real (rc 1; newest A-2 via unstable B-1)",
+        ["--pretend", "--autounmask-keep-keywords=n", "dev-libs/akk0a"],
+        1,
+    ),
+    (
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y fails like real (rc 1; real prefers A-1 plus a foo use change)",
+        ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"],
+        1,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
