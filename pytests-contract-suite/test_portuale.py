@@ -3432,7 +3432,18 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in result.stdout
+    emerging = f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}"
+    installing = f">>> Installing (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}"
+    completed = f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}"
+    assert emerging in result.stdout
+    assert installing in result.stdout
+    assert completed in result.stdout
+    # Backlog #177 review: real's `Installing` fires between the build
+    # and the merge (successful `EbuildBuild` → `Scheduler._build_exit`
+    # → `PackageMerge._start`, `Scheduler.py:1615-1621`), never before
+    # the build phases run.
+    assert result.stdout.index(emerging) < result.stdout.index(installing)
+    assert result.stdout.index(installing) < result.stdout.index(completed)
 
     assert (root / "usr/share/packagepkg/hello.txt").read_text().strip() == (
         "hello from packagepkg"
@@ -3450,6 +3461,70 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
     assert "dev-libs/packagepkg" in world_lines
     assert "dev-libs/samepkg" not in world_lines
     assert world_lines == sorted(world_lines)
+
+
+def test_emerge_failed_build_prints_emerging_but_no_installing_line(
+    emerge_binary, tmp_path
+):
+    """Real `Scheduler._build_exit` queues a `PackageMerge` (the task
+    whose `_start` prints `>>> Installing (N of M)`, and whose
+    `_install_exit` prints `>>> Completed`) only for a *successful*
+    build (`Scheduler.py:1615-1621`); a failed build prints `Emerging`
+    and nothing after it. Backlog #177 review: portuale's serial source
+    merge used to print `Installing` before the build phases ran, so a
+    failed build still showed it; the line now fires from the pre-merge
+    hook inside `run_merge`, after the build (and `--buildpkg`
+    packaging) succeed. The repo is built inline (no fixture touched):
+    one ebuild whose `src_install` dies."""
+    import hashlib
+
+    repo = tmp_path / "repo"
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles/default").mkdir(parents=True)
+    (repo / "metadata/md5-cache/dev-libs").mkdir(parents=True)
+    (repo / "dev-libs/failpkg").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("main\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ACCEPT_KEYWORDS="amd64"\nUSE=""\n'
+    )
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = " + str(repo) + "\n"
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    failpkg_ebuild = (
+        'EAPI=8\nDESCRIPTION="x"\nSLOT="0"\nKEYWORDS="amd64"\n'
+        '\nsrc_install() {\n\tdie "boom"\n}\n'
+    )
+    (repo / "dev-libs/failpkg/failpkg-1.0.ebuild").write_text(failpkg_ebuild)
+    (repo / "metadata/md5-cache/dev-libs/failpkg-1.0").write_text(
+        "DEFINED_PHASES=install\nDESCRIPTION=x\nEAPI=8\nKEYWORDS=amd64\nSLOT=0\n"
+        f"_md5_={hashlib.md5(failpkg_ebuild.encode()).hexdigest()}\n"
+    )
+
+    root = tmp_path / "root"
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(tmp_path / "dist")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
+    result = subprocess.run(
+        [str(emerge_binary), "--oneshot", "dev-libs/failpkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode != 0
+    assert (
+        f">>> Emerging (1 of 1) dev-libs/failpkg-1.0::main for {root}"
+        in result.stdout
+    )
+    # The build died, so real queues no merge: neither follow-up line.
+    assert ">>> Installing" not in result.stdout
+    assert ">>> Completed" not in result.stdout
+    assert "merge failed" in result.stderr
 
 
 def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
