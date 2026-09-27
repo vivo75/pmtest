@@ -4667,6 +4667,110 @@ def test_emerge_without_display_flags_shows_no_merge_list_like_real(
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
 
 
+def test_emerge_oneshot_prints_news_count_notice_twice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196: a real non-`--pretend` `emerge` prints the GLEP 42
+    news-count notice twice -- once before resolution (real
+    `_emerge/actions.py:4264`, `run_action`, only when `--pretend` is
+    absent) and again after the merge (real `_emerge/post_emerge.py:155`,
+    `post_emerge`, once the vdb changed). Both go through real
+    `post_emerge.py:37` `display_news_notification` (gated on `news` in
+    FEATURES plus a nonzero unread count, counted by real
+    `portage/news.py` `NewsManager`), printing real
+    `news.py:509` `display_news_notifications`' text:
+    ` * IMPORTANT: N news items need reading for repository '<repo>'.`
+    plus ` * Use eselect news read to view new items.`. The m185
+    container probe shows the pre-resolution notice standing first in
+    real's pre-`>>>` output (news, blank, header, `Calculating...`).
+    The fixture testrepo carries eleven news items, five of them
+    relevant (see `test_check_news_counts_unread_relevant_items`), so
+    the hermetic count here is 5. Real `display_news_notification` is
+    gated on `news` in FEATURES; the fixture config root ships no
+    `make.globals` (and the suite strips the calling-env `FEATURES`),
+    so this test opts in with `FEATURES="news"` -- the same layering a
+    real `FEATURES="news" emerge ...` invocation uses. The
+    `--buildpkgonly` step shows the pre-resolution notice only: it
+    never merges, so real's `_pkgs_changed` stays false and its
+    `post_emerge` early-returns with no second notice."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env["FEATURES"] = "news"
+
+    b = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert b.stdout.count("news items need reading") == 1
+    assert "5 news items need reading for repository 'testrepo'." in b.stdout
+    assert "Use eselect news read to view new items." in b.stdout
+    assert b.stdout.index("need reading") < b.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "ptmp-merge")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    # Twice: pre-resolution, then post-merge -- and in that order (the
+    # pre notice stands before `Calculating...`, the post notice after
+    # the last `>>>` merge line).
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
+    assert r.stdout.count("Use eselect news read to view new items.") == 2
+    assert r.stdout.index("need reading") < r.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+    assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
+    assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
+    # Real `NewsManager.updateItems`' own write-back: the evaluated
+    # items sit in `.unread` (and `.skip`) under ROOT.
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_buildpkgonly_without_news_feature_prints_no_notice(
+    emerge_binary, tmp_path
+):
+    """Backlog #196, the FEATURES gate: real
+    `_emerge/post_emerge.py:38` skips the notice wholesale unless
+    `news` is in `FEATURES` (no evaluation, no output, no state
+    files) -- so a non-`--pretend` run without the feature prints no
+    notice at either point. (The merge flow without the feature is
+    covered by every neighbouring `env.pop("FEATURES", None)` test,
+    e.g. the #185 no-merge-list test directly above.)"""
+    import shutil
+
+    root = tmp_path / "root-gated"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env.pop("FEATURES", None)
+
+    b = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert "news items need reading" not in b.stdout
+    assert "eselect news read" not in b.stdout
+    assert not (root / "var/lib/gentoo/news").exists()
+
+
 def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
     emerge_binary, tmp_path
 ):
