@@ -4358,6 +4358,76 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     assert (root / "usr/share/packagepkg/hello.txt").is_file()
 
 
+def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #174: real `emerge --oneshot --usepkgonly l32/faultpkg`
+    with the gpkg truncated to half (the `Packages` index still carries
+    the whole-file `SIZE`) *selects* the binary -- real's default
+    `FEATURES=pkgdir-index-trusted` trusts the index at scan -- and
+    fails at merge: `>>> Emerging binary (1 of 1)` then
+    `!!! Digest verification failed:` / `!!! <path>` /
+    `!!! Reason: Failed on size verification` / `!!! Got:` /
+    `!!! Expected:` / `File renamed to
+    '<path>._checksum_failure_.<rand>'` / `>>> Failed to emerge <cpv>`
+    (rc 1, clean root). Portuale used to fully parse the container at
+    scan, drop the candidate with `!!! Invalid binary package`, and end
+    in `there are no ebuilds to satisfy` -- none of real's block, its
+    strings, or the rename appeared.
+
+    Real-execution shape: build `dev-libs/packagepkg` into a scratch
+    `$PKGDIR` (which writes the index entry, like the bed's
+    `--buildpkg` + `--regen`), truncate the archive to half, and merge
+    it with `-k --oneshot`."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env.pop("FEATURES", None)
+
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    (built,) = sorted((root / "pkgdir/dev-libs").glob("packagepkg-1.0.*"))
+    whole = built.stat().st_size
+    half = whole // 2
+    with built.open("r+b") as f:
+        f.truncate(half)
+
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "ptmp-merge")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    # The binary is selected (not dropped at scan): real's merge block.
+    assert f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}" in r.stdout
+    assert "\n!!! Digest verification failed:\n" in r.stdout
+    assert f"!!! {built}\n" in r.stdout
+    assert "!!! Reason: Failed on size verification\n" in r.stdout
+    assert f"!!! Got: {half}\n" in r.stdout
+    assert f"!!! Expected: {whole}\n" in r.stdout
+    assert "there are no ebuilds to satisfy" not in r.stderr
+    assert "Invalid binary package" not in r.stderr
+    assert ">>> Failed to emerge dev-libs/packagepkg-1.0" in r.stdout
+    # Real's `._checksum_failure_.<rand>` rename in the same directory.
+    renamed = sorted((root / "pkgdir/dev-libs").glob(f"{built.name}._checksum_failure_.*"))
+    assert len(renamed) == 1, [p.name for p in (root / "pkgdir/dev-libs").iterdir()]
+    assert f"File renamed to '{renamed[0]}'" in r.stdout
+    assert not built.exists()
+    # Clean root: nothing unpacked, no vdb entry.
+    assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists()
+    assert not (root / "usr/share/packagepkg/hello.txt").exists()
+
+
 def test_getbinpkg_merge_honours_env_install_mask(emerge_binary, tmp_path):
     """`INSTALL_MASK` is in real portage's `environ_whitelist` and is
     non-incremental, so an `INSTALL_MASK="…" emerge -k --getbinpkg <atom>`
