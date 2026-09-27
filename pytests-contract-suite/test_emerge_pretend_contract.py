@@ -4240,7 +4240,7 @@ def test_use_unsat_conditional_miss_reports_the_parent_flip_row(
     `[flip=]` is entirely conditional, so the requirer joins
     `missing_use_reasons` with its own flip) prints the child row *and*
     the parent-flip row. Oracle: portage 3.0.82.2 in the
-    l0-fixture-oracle container on the `l135-s0.txt` cell (`-p --color=n
+    l0-fixture-oracle container on the #135 cell of `l0-fixture-oracle.txt` (`-p --color=n
     -D --autounmask-use=n dev-libs/r135consumer`, rc 1). Live shape:
     `real-rest-1.log` (`- dev-qt/qtdeclarative-6.11.2-r1::gentoo (Change
     USE: +wayland)` beside the child's `-wayland` row). The chain-row
