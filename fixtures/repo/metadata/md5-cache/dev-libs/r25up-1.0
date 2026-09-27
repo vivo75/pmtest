@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #25 S0 plain upgradable dep forcing complete mode (md4c shape)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=27b4073ed786c490d0c67c77721e2d53

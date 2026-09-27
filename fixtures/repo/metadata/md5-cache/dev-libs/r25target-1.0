@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #25 S0 update target pulling r25mid (rest shape: reaches r25lib only through the installed mid-puller) plus r25up
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/r25mid-1.0 >=dev-libs/r25up-1.0
+SLOT=0
+_md5_=964ba27788d4bd51b5dac98dc77066d4
