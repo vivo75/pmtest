@@ -1950,7 +1950,7 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     <atom>` -- deliberately WITHOUT `--pretend` -- is the one real,
     non-dry-run execution path portuale implements for `emerge`
     itself (see emerge_build.rs's own module doc comment). `packagepkg`
-    RDEPENDs on     `samepkg`, which the shared fixture ROOT already has an
+    RDEPENDs on `samepkg`, which the shared fixture ROOT already has an
     installed vdb entry for, so --buildpkgonly's own real depgraph gate
     (see the dry-run contract tests) has nothing to object to. With no
     `BINPKG_FORMAT` anywhere, the artefact is a `.gpkg.tar` -- real
