@@ -8619,6 +8619,17 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     `a c b` (silent) and provisional for the other four orders — the
     close-out bed adds those cells, and any divergence from real there
     reopens #142 instead of re-pinning here.
+
+    Order `b c a` is real-grounded, not provisional: bed
+    `l0-fx-20260927T125711Z` (`--pretend --backtrack=0 dev-libs/blk0b
+    dev-libs/blk0c dev-libs/blk0a`) shows real printing exactly one
+    `dev-libs/blk0x:0` block for the highest missed version (`-3`)
+    with both parents (`<dev-libs/blk0x-2`/blk0b,
+    `<dev-libs/blk0x-3`/blk0c) inside it — real's one-entry-per-slot
+    rule (`_get_missed_updates`), pinned here by #129 (which resolves
+    #142's divergence for this order). The expectation below matches
+    real's shape modulo the established `USE=""` / missing-ROOT-suffix
+    normalisation this pin already applies.
     """
     env = dict(fixture_env)
     uninstall_rows = [
@@ -8643,11 +8654,24 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     warn_x2_b = warn("2", "<dev-libs/blk0x-2", "blk0b")
     warn_x3_b = warn("3", "<dev-libs/blk0x-2", "blk0b")
     warn_x3_c = warn("3", "<dev-libs/blk0x-3", "blk0c")
+    # #129 review round 2: real's one-entry-per-slot shape for order
+    # `b c a` (bed `l0-fx-20260927T125711Z`) — one `-3` block with
+    # both parents inside, not one block per parent.
+    warn_x3_bc = [
+        "dev-libs/blk0x:0",
+        "",
+        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^               ^",
+        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^               ^",
+        "",
+    ]
     cases = [
         (["blk0a", "blk0b", "blk0c"], warn_header + warn_x2_b),
         (["blk0a", "blk0c", "blk0b"], []),
         (["blk0b", "blk0a", "blk0c"], warn_header + warn_x2_b),
-        (["blk0b", "blk0c", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
+        (["blk0b", "blk0c", "blk0a"], warn_header + warn_x3_bc),
         (["blk0c", "blk0a", "blk0b"], []),
         (["blk0c", "blk0b", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
     ]
