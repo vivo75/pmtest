@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: the splitdebug neighbour -- same -g build, no package.env entry (backlog #98)"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_compile() {

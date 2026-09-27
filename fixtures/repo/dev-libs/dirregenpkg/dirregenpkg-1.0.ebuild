@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: installs a GNU info file, so the post-merge info-dir regen has something to index"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	cat > "${T}/dirregenpkg.info" <<-EOF || die

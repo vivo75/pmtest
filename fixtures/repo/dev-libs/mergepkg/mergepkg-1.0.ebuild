@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real merge/filesystem mutation (task #55) -- a real file plus a real symlink"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "hello from mergepkg" > "${T}/hello.txt" || die

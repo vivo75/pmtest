@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: pkg_prerm/pkg_postrm emit elog/ewarn, for elog on unmerge"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	insinto /usr/share/${PN}

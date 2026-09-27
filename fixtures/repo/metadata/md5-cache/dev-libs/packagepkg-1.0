@@ -4,4 +4,4 @@ EAPI=8
 KEYWORDS=amd64
 RDEPEND=dev-libs/samepkg
 SLOT=0
-_md5_=040f5202f5775bd2e6da85179b11ba69
+_md5_=e9b320d13824de2d5b18ff88f3672a89

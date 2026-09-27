@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: docompress (binpkg-docompress + PORTAGE_COMPRESS) compresses \${D} docs"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_install() {

@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: per-package FEATURES=splitdebug probe (backlog #98)
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=6b31ae0029ce109513c9275fd38197b3
+_md5_=7a3eb0033ff4a33d9c01f1fe931bfad8

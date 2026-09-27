@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: emits elog/ewarn/einfo messages, for the elog echo 
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=772e9589c96d442f1f6faf43f7793792
+_md5_=a717bdfd38a246b420e26ea1bfdf893b

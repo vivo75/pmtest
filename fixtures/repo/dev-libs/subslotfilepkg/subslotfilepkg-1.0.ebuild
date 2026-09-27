@@ -3,6 +3,7 @@ EAPI=8
 DESCRIPTION="fixture package: real SLOT=0/1 sub-slot WITH a file (self-collision regression)"
 SLOT="0/1"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	echo "hello from subslotfilepkg" > "${T}/hello.txt" || die

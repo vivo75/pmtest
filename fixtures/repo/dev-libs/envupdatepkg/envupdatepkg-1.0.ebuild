@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: real env_update()/ldconfig triggering -- installs its own env.d entry and lib dir"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	insinto /etc/env.d

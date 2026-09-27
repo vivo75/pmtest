@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: #37 S2 resolved phase env reaches keepdir (SLOT) an
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=62715d43d85f62eae3d08f017fdcdc57
+_md5_=2fc798452f1bf5e6a38d8113c3a8d253

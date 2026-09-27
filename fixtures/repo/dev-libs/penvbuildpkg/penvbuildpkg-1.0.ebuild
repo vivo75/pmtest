@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: package.env's non-USE half overrides the build-phase flags"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 IUSE=""
 
 src_install() {

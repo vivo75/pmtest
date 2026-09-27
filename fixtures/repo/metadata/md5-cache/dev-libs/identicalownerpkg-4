@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: a byte-identical file a preinst helper removes only
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=6674ae053871e10d0d7b162f9197d506
+_md5_=57eeed012da0d7083b1d6deb10e66cfb

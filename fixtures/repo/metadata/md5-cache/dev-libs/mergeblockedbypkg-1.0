@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: real merge-time blocker collision exclusion -- the 
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=02546d722cb64ed495b522cabea29162
+_md5_=53c10c1da38aaeee60405bed32b7af31

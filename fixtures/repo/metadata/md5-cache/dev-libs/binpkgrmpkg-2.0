@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: the full binpkg pkg_* phase-hook chain (setup/prein
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=58eaba39bf2fc710973b5a05021d2b2d
+_md5_=5f44aaf9aa714379b095cbffbc02dffb

@@ -5,4 +5,4 @@ KEYWORDS=amd64
 RESTRICT=fetch
 SLOT=0
 SRC_URI=https://example.invalid/frp-payload.bin -> fetchrestrictpkg-1.0.tar.gz
-_md5_=c26de2f268cd3d879d79a23ba2dd39a5
+_md5_=684c82fecdee350dd24a395593c8fdb7

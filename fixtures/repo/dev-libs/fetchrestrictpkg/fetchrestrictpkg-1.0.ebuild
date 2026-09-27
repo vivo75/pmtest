@@ -3,6 +3,7 @@ DESCRIPTION="fixture package: RESTRICT=fetch -- the plain SRC_URI is never fetch
 SRC_URI="https://example.invalid/frp-payload.bin -> fetchrestrictpkg-1.0.tar.gz"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 RESTRICT="fetch"
 
 pkg_nofetch() {

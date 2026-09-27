@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: the splitdebug neighbour -- same -g build, no packa
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=e09038a6dbf47993234be197b24b3f24
+_md5_=27877800cfeeb3f6911048be30873fec

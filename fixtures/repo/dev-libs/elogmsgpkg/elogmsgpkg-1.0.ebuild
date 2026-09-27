@@ -2,6 +2,7 @@ EAPI=8
 DESCRIPTION="fixture package: emits elog/ewarn/einfo messages, for the elog echo module"
 SLOT="0"
 KEYWORDS="amd64"
+S="${WORKDIR}"
 
 src_install() {
 	insinto /usr/share/${PN}
