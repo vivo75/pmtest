@@ -4771,6 +4771,218 @@ def test_emerge_buildpkgonly_without_news_feature_prints_no_notice(
     assert not (root / "var/lib/gentoo/news").exists()
 
 
+def _news_env(tmp_path, name):
+    """Backlog #196 fix round 1: an isolated ROOT (a copy of the
+    fixtures' `var`, so merges/unmerges never touch the git-tracked
+    tree) with `FEATURES="news"` opted in -- the same layering a real
+    `FEATURES="news" emerge ...` invocation uses. Returns `(root,
+    env)`."""
+    import shutil
+
+    root = tmp_path / name
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env["FEATURES"] = "news"
+    return root, env
+
+
+def test_emerge_pretend_prints_news_count_notice_at_the_end_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real `emerge --pretend` prints the
+    GLEP 42 count notice at the end of the run (real
+    `_emerge/post_emerge.py:112-117`, `post_emerge`: the vdb never
+    changes under `--pretend`, so the `--pretend` arm prints the
+    notice through real `post_emerge.py:37`
+    `display_news_notification` -- gated on `news` in FEATURES plus a
+    nonzero unread count, counted by real `portage/news.py`
+    `NewsManager`). There is no pre-resolution notice under
+    `--pretend` (real `_emerge/actions.py:4264` only fires when
+    `--pretend` is absent), so exactly one notice appears, after the
+    merge list -- and real's own `updateItems` write-back lands in
+    `.unread` under ROOT, like on every other notice path."""
+    root, env = _news_env(tmp_path, "root-pretend-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    assert r.stdout.index("[ebuild") < r.stdout.index("need reading")
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_pretend_failed_resolve_still_prints_news_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real calls `post_emerge`
+    unconditionally after `action_build` (real
+    `_emerge/actions.py:4289-4297`), so the `--pretend` arm (real
+    `post_emerge.py:112-117`) prints the notice even when the resolve
+    itself failed. `dev-libs/anyofunresolvable` aborts the resolve
+    (its `||` RDEPEND has no visible candidate anywhere -- see
+    `test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable`),
+    yet the end notice still prints exactly once."""
+    root, env = _news_env(tmp_path, "root-pretend-fail-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "dev-libs/anyofunresolvable"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_failed_resolve_still_prints_pre_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 (review Minor item 6): the pre-resolution notice
+    (real `_emerge/actions.py:4264`) sits before `action_build`, so it
+    fires even when the resolve itself later fails -- a plain
+    `emerge dev-libs/anyofunresolvable` exits 1 with exactly one
+    notice (the pre one, before `Calculating...`), and no post notice
+    (nothing merged, so real's `_pkgs_changed` gate stays shut)."""
+    root, env = _news_env(tmp_path, "root-resolve-fail-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/anyofunresolvable"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    assert r.stdout.index("need reading") < r.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+    assert not (root / "var/db/pkg/dev-libs/anyofunresolvable-1.0").exists()
+
+
+def test_emerge_quiet_still_prints_news_count_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 (review Minor item 6): real
+    `display_news_notification` (real `post_emerge.py:37`) consults
+    neither `--quiet` nor `--ask` -- so a quiet `--buildpkgonly`
+    run with `news` in FEATURES still prints the (pre-resolution)
+    notice exactly once."""
+    root, env = _news_env(tmp_path, "root-quiet-news")
+
+    b = subprocess.run(
+        [str(emerge_binary), "-q", "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert b.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert b.stdout.count("Use eselect news read to view new items.") == 1
+
+
+def test_emerge_failed_merge_prints_news_notice_when_the_vdb_changed_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real `post_emerge.py:155` prints the
+    notice regardless of retval (`retval` only feeds `exit_msg`,
+    `:104-108`). `dev-libs/schedok` merges first, then
+    `dev-libs/schedbad`'s `src_install` dies (the deliberate fixture
+    build failure -- see
+    `test_emerge_jobs_keep_going_skips_a_failed_builds_dependents`):
+    the vdb changed, so the notice prints a second time, after the
+    failing `>>>` line -- two notices in total (pre + post-failure),
+    in that order."""
+    root, env = _news_env(tmp_path, "root-merge-fail-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/schedok", "dev-libs/schedbad"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
+    assert not (root / "var/db/pkg/dev-libs/schedbad-1.0").exists()
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
+    assert r.stdout.count("Use eselect news read to view new items.") == 2
+    assert r.stdout.index("need reading") < r.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+    assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
+
+
+def test_emerge_failed_merge_without_any_merge_prints_no_post_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: the failure-path notice is still
+    gated on real's `_pkgs_changed` (real `post_emerge.py:112-117`
+    early-returns when nothing changed). With the failing
+    `dev-libs/schedbad` first, nothing merges at all -- so only the
+    pre-resolution notice prints, exactly once."""
+    root, env = _news_env(tmp_path, "root-merge-fail-silent-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/schedbad", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert not (root / "var/db/pkg/dev-libs/schedok-1.0").exists()
+    assert not (root / "var/db/pkg/dev-libs/schedbad-1.0").exists()
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+
+
+def test_emerge_unmerge_prints_news_count_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real calls `post_emerge` after the
+    uninstall actions too (real `_emerge/actions.py:4164-4175` --
+    clean/depclean/prune/unmerge/rage-clean, except
+    deselect/buildpkgonly/fetchonly/pretend), whose tail is the same
+    GLEP 42 notice. Seed `dev-libs/binpkgrmpkg-1.0` via a direct
+    `ebuild <file> merge` (like the neighbouring `-C` test): a
+    pretend `-p -C` prints no notice (real skips `post_emerge`
+    under `--pretend`), while the real `-C` prints it exactly once,
+    after the removal -- and the package is really gone."""
+    root, env = _news_env(tmp_path, "root-unmerge-news")
+    v1 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/binpkgrmpkg/binpkgrmpkg-1.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r1 = subprocess.run(
+        [str(ebuild_link), v1, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r1.returncode == 0, r1.stderr
+    assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0").is_dir()
+
+    p = subprocess.run(
+        [str(emerge_binary), "-p", "-C", "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert p.returncode == 0, (p.stdout, p.stderr)
+    assert "news items need reading" not in p.stdout
+    assert "eselect news read" not in p.stdout
+    assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0").is_dir()
+
+    r = subprocess.run(
+        [str(emerge_binary), "-C", "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    assert r.stdout.index(">>> Unmerging (1 of 1)") < r.stdout.index("need reading")
+    assert not (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0").exists()
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
 def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
     emerge_binary, tmp_path
 ):
