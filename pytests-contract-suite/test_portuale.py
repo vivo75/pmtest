@@ -1955,7 +1955,12 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     (see the dry-run contract tests) has nothing to object to. With no
     `BINPKG_FORMAT` anywhere, the artefact is a `.gpkg.tar` -- real
     `cnf/make.globals:43`'s own default (backlog #173; the pre-#173 pin
-    expected the old xpak `.tbz2` here)."""
+    expected the old xpak `.tbz2` here). Backlog #185: a real
+    non-`--pretend` run without `--ask`/`--tree`/`--verbose` shows no
+    merge list (real `_emerge/actions.py:464-469`; m185 container probe,
+    `emerge --oneshot --usepkgonly probe/probe-a` in six shapes) -- only
+    the resolution-phase display (`Calculating dependencies ... done!`
+    + the timing line) before the first `>>>`."""
     env = _real_build_env(tmp_path)
     env.pop("BINPKG_FORMAT", None)
     result = subprocess.run(
@@ -1965,7 +1970,8 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
         check=True,
         env=env,
     )
-    assert "[ebuild  N     ] dev-libs/packagepkg-1.0" in result.stdout
+    assert "[ebuild" not in result.stdout
+    assert "Calculating dependencies ... done!" in result.stdout
     # Backlog #177: real `MergeListItem._start` prints
     # `Emerging (N of M) cpv::repo` (here `ROOT` is the fixture tree
     # itself); no `Installing`/`Completed` follows under `--buildpkgonly`
@@ -4393,6 +4399,57 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     assert (root / "usr/share/packagepkg/hello.txt").is_file()
 
 
+def test_emerge_without_display_flags_shows_no_merge_list_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #185: a real non-`--pretend` `emerge` with no display flags
+    shows no merge list before merging -- only the resolution-phase
+    display. Real `_emerge/actions.py:464-469` (the `mergelist_shown`
+    branch) shows the list only with `--ask`, `--tree` or `--verbose`;
+    the m185 container probe (`emerge --oneshot --usepkgonly
+    probe/probe-a` in six shapes, real 3.0.81.3 -- gating identical in
+    3.0.82.2 by source read) shows the plain shape printing
+    `Calculating dependencies ... done!` (real `stdout_spinner.py`,
+    STATIC mode) plus the timing line (real
+    `depgraph.py::_show_resolution_report`; the wall-clock seconds are
+    cut per the #135 determinism precedent, only the `backtrack: B/M`
+    signal is kept) and no list before the first `>>>`."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env.pop("FEATURES", None)
+
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert (root / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar").is_file()
+
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "ptmp-merge")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "[ebuild" not in r.stdout
+    assert "[binary" not in r.stdout
+    assert "These are the packages" not in r.stdout
+    assert "Calculating dependencies ... done!" in r.stdout
+    assert "Dependency resolution took (backtrack:" in r.stdout
+    assert r.stdout.index("Calculating dependencies ... done!") < r.stdout.index(
+        f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}"
+    )
+    assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
+
+
 def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
     emerge_binary, tmp_path
 ):
@@ -4963,9 +5020,21 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     # Real `--quiet-build` (on by default under `--jobs`): each build's
     # own phase output is captured to `${T}/build.log`, NOT interleaved on
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
-    # `[ebuild` line, never a stray phase / shell diagnostic.
+    # `[ebuild` line, never a stray phase / shell diagnostic -- plus, since
+    # backlog #185, real's resolution-phase display: a non-`--pretend` run
+    # prints `Calculating dependencies ... done!` and the timing line
+    # (with its trailing blank line) before the first merge line (m185
+    # container probe; no header and no list without
+    # `--ask`/`--tree`/`--verbose`), which are none of the merge-row
+    # prefixes below.
     for line in out.splitlines():
         if line in _POST_EMERGE_INFO_LINES:
+            continue
+        if (
+            line == ""
+            or line == "Calculating dependencies ... done!"
+            or line.startswith("Dependency resolution took (backtrack:")
+        ):
             continue
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     assert (
@@ -5000,7 +5069,12 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     log_rel = "portage/dev-libs/packagepkg-1.0/temp/build.log"
 
     # --quiet-build=y: stdout carries only portuale's own `>>>` /
-    # `[ebuild` lines; the phase output landed in build.log.
+    # `[ebuild` lines; the phase output landed in build.log. Since backlog
+    # #185, real's resolution-phase display also lands here: `Calculating
+    # dependencies ... done!` and the timing line (with its trailing blank
+    # line) precede the first merge line on every non-`--quiet`
+    # non-`--pretend` run (m185 container probe) -- none of them a
+    # merge-row prefix.
     root, env = _root(0)
     r = subprocess.run(
         [str(emerge_binary), "--quiet-build=y", "dev-libs/packagepkg"],
@@ -5010,6 +5084,12 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
     for line in r.stdout.splitlines():
         if line in _POST_EMERGE_INFO_LINES:
+            continue
+        if (
+            line == ""
+            or line == "Calculating dependencies ... done!"
+            or line.startswith("Dependency resolution took (backtrack:")
+        ):
             continue
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     log = tmp_path / "pt0" / log_rel
