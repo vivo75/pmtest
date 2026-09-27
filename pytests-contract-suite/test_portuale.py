@@ -4358,6 +4358,101 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     assert (root / "usr/share/packagepkg/hello.txt").is_file()
 
 
+def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #174 (review fixes): real `emerge --oneshot --usepkgonly
+    l32/faultpkg` with the gpkg truncated to half (the `Packages` index
+    still carries the whole-file `SIZE`) *selects* the binary -- real's
+    default `FEATURES=pkgdir-index-trusted` trusts the index at scan --
+    and fails at merge: `>>> Emerging binary (1 of 1)` then
+    `!!! Digest verification failed:` / `!!! <path>` /
+    `!!! Reason: Failed on size verification` / `!!! Got:` /
+    `!!! Expected:` / `File renamed to
+    '<path>._checksum_failure_.<8 x [a-z0-9_]>'` (real
+    `tempfile.mkstemp` shape) / `>>> Failed to emerge <cpv> for <root>,
+    Log file:` / blank / `>>>  '<build.log>'` (real
+    `Scheduler._failed_pkg_msg`, with the ` for <root>` suffix since
+    `ROOT != "/"`) -- and nothing else: no resume-list notice (real's
+    notices fire only for resolution-time failures), no `emerge: ...`
+    line (a merge failure exits via `FAILURE`), rc 1, clean root.
+    Portuale used to fully parse the container at scan, drop the
+    candidate with `!!! Invalid binary package`, and end in `there are
+    no ebuilds to satisfy` -- none of real's block, its strings, or
+    the rename appeared.
+
+    Real-execution shape: build `dev-libs/packagepkg` into a scratch
+    `$PKGDIR` (which writes the index entry, like the bed's
+    `--buildpkg` + `--regen`), truncate the archive to half, and merge
+    it with `-k --oneshot`."""
+    import re
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env.pop("FEATURES", None)
+
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    (built,) = sorted((root / "pkgdir/dev-libs").glob("packagepkg-1.0.*"))
+    whole = built.stat().st_size
+    half = whole // 2
+    with built.open("r+b") as f:
+        f.truncate(half)
+
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "ptmp-merge")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    # The binary is selected (not dropped at scan): real's merge block.
+    assert f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}" in r.stdout
+    assert "\n!!! Digest verification failed:\n" in r.stdout
+    assert f"!!! {built}\n" in r.stdout
+    assert "!!! Reason: Failed on size verification\n" in r.stdout
+    assert f"!!! Got: {half}\n" in r.stdout
+    assert f"!!! Expected: {whole}\n" in r.stdout
+    assert "there are no ebuilds to satisfy" not in r.stderr
+    assert "Invalid binary package" not in r.stderr
+    # Real `Scheduler._failed_pkg_msg(..., "emerge", "for")`: the
+    # ` for <root>` suffix (`ROOT != "/"` here), the `, Log file:`
+    # suffix, then `>>>  '<log>'` -- each on its own `>>>` line with a
+    # leading blank line. And nothing else: no resume-list notice, no
+    # `emerge:` line (both absent in real's log for this case).
+    log = tmp_path / "ptmp-merge/portage/dev-libs/packagepkg-1.0/temp/build.log"
+    assert f"\n>>> Failed to emerge dev-libs/packagepkg-1.0 for {root}, Log file:\n" in r.stdout
+    assert f"\n>>>  '{log}'\n" in r.stdout
+    assert "The resume list contains" not in r.stderr
+    assert "binpkg digest verification failed" not in r.stderr
+    # Real `SchedulerInterface.output(msg, log_path)`: the block lands
+    # in the package build.log too (non-empty, so real
+    # `_locate_failure_log` reports it).
+    logged = log.read_text()
+    assert "!!! Digest verification failed:\n" in logged
+    assert "!!! Reason: Failed on size verification\n" in logged
+    # Real's `._checksum_failure_.<rand>` rename in the same directory:
+    # `tempfile.mkstemp` shape, 8 characters over `[a-z0-9_]`.
+    renamed = sorted((root / "pkgdir/dev-libs").glob(f"{built.name}._checksum_failure_.*"))
+    assert len(renamed) == 1, [p.name for p in (root / "pkgdir/dev-libs").iterdir()]
+    rand = renamed[0].name.split("._checksum_failure_.", 1)[1]
+    assert re.fullmatch(r"[a-z0-9_]{8}", rand), renamed[0].name
+    assert f"File renamed to '{renamed[0]}'" in r.stdout
+    assert not built.exists()
+    # Clean root: nothing unpacked, no vdb entry.
+    assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists()
+    assert not (root / "usr/share/packagepkg/hello.txt").exists()
+
+
 def test_getbinpkg_merge_honours_env_install_mask(emerge_binary, tmp_path):
     """`INSTALL_MASK` is in real portage's `environ_whitelist` and is
     non-incremental, so an `INSTALL_MASK="…" emerge -k --getbinpkg <atom>`
