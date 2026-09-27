@@ -1,6 +1,6 @@
-EAPI=0
+EAPI=8
 DESCRIPTION=fixture package: upstream test_backtracking.py pg5 dev-libs/A-1 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 DEFINED_PHASES=-
-_md5_=ee4d7f41fa0446388f331a480a479c20
+_md5_=bdafe21f92bacb3868a9b581608d0880
