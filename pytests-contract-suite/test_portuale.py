@@ -2013,7 +2013,15 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     `dep-a` still writes both digests. `dev-libs/packagepkg` is the
     `SLOT="0"` shape here; the `SLOT="1"` shape is pinned by portuale's
     own `stanza_bytes_for_nondefault_slot_write_it_between_size_and_use`
-    Rust unit test (no buildable non-default-`SLOT` fixture exists)."""
+    Rust unit test (no buildable non-default-`SLOT` fixture exists).
+    Backlog #203: the same probe's `--buildpkg` stanza carries
+    `REPO_REVISIONS: {}` (sync-less overlay: `_setup_repo_revisions`
+    records an empty dict, `phase-functions.sh` still writes it), so
+    the portuale stanza must too -- pinned below, not just in the
+    `stanza_bytes_for_default_slot_omit_slot_and_keep_both_digests`
+    Rust unit test, to prove the whole real-execution chain (phase env
+    `PORTAGE_REPO_REVISIONS` -> real build-info writer -> archive ->
+    index) end to end."""
     env = _real_build_env(tmp_path)
     env.pop("BINPKG_FORMAT", None)
     result = subprocess.run(
@@ -2035,6 +2043,9 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     assert any(
         line.startswith("SHA1: ") for line in packages.splitlines()
     ), f"fixed SHA1 digest missing:\n{packages}"
+    assert any(
+        line == "REPO_REVISIONS: {}" for line in packages.splitlines()
+    ), f"sync-less REPO_REVISIONS must be carried like real's:\n{packages}"
 
     env["PORTAGE_CHECKSUM_FILTER"] = "-SHA1"
     subprocess.run(
