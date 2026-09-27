@@ -687,6 +687,31 @@ CASES = [
         0,
     ),
     (
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like real (rc 0; pinned below)",
+        ["--pretend", "=dev-libs/ccr0r-1.46*"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --update merges nothing like real (rc 0; empty merge, not pinned)",
+        ["--pretend", "--update", "=dev-libs/ccr0r-1.46*"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --deep --update merges nothing like real (rc 0; empty merge, not pinned)",
+        ["--pretend", "--deep", "--update", "=dev-libs/ccr0r-1.46*"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 r upgrades to 1.47 like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/ccr0r"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 r --update upgrades to 1.47 like real (rc 0; pinned below)",
+        ["--pretend", "--update", "dev-libs/ccr0r"],
+        0,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
@@ -9235,6 +9260,50 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
                 '[ebuild  N     ] virtual/ccd3v-0  USE="bootstrap"',
                 "[ebuild  N     ] dev-libs/ccd3a-1.9.2 ",
                 "[ebuild  N     ] dev-libs/ccd3c-3.16.2 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_rust_pg0_pins_mergelists(
+    emerge_binary, fixture_env
+):
+    """Upstream `test_circular_choices_rust.py::testCircularPypyExe` (pg0,
+    bug 756961: no circular report when a package replaces its own
+    buildtime dep), bulk-translated for #50 batch 7
+    (`dev-libs/ccr0{r,b}`; oracle `/tmp/opencode/o50e/perfile/ccr.json`,
+    captured from the real `ResolverPlayground`, not the source
+    literal).
+
+    The 3 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned. Not pinned: the two
+    `--update` empty merges (no rows to pin) and the `@world --deep
+    --update` cell (needs a shared world entry).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["=dev-libs/ccr0r-1.46*"],
+            [
+                "[ebuild   R    ] dev-libs/ccr0r-1.46.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccr0r"],
+            [
+                "[ebuild     U  ] dev-libs/ccr0r-1.47.0-r2 [1.46.0]",
+            ],
+        ),
+        (
+            ["--update", "dev-libs/ccr0r"],
+            [
+                "[ebuild     U  ] dev-libs/ccr0r-1.47.0-r2 [1.46.0]",
             ],
         ),
     ]
