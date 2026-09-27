@@ -27,6 +27,15 @@ import pytest
 
 FIXTURES_ROOT = str(Path(__file__).resolve().parents[1] / "fixtures")
 
+
+# Real `_emerge/post_emerge.py` -> `util/_info_files.py::chk_updated_info_files`
+# (backlog #176): after a merge that changed the vdb, with
+# `/usr/bin/install-info` present and no info dir to regenerate, real prints
+# a bare newline then ` * GNU info directory index is up-to-date.` on stdout
+# (`_info_files.py:29-32`); `--quiet-build` does not suppress it. These are
+# the only non-`>>>` lines the quiet-build pins below may see.
+_POST_EMERGE_INFO_LINES = frozenset({"", " * GNU info directory index is up-to-date."})
+
 # The merged `usr/share/penvbuildpkg/flags` file's expected content: the
 # `penv-buildflags` env file's values (backlog #95 -- CC/CXX/AR/RUSTFLAGS
 # are real's toolchain selectors the old BUILD_VARS filter dropped,
@@ -4505,6 +4514,8 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
     # `[ebuild` line, never a stray phase / shell diagnostic.
     for line in out.splitlines():
+        if line in _POST_EMERGE_INFO_LINES:
+            continue
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     assert (
         tmp_path / "portage-tmpdir/portage/dev-libs/schedleaf-a-1.0/temp/build.log"
@@ -4547,6 +4558,8 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     assert r.returncode == 0, r.stderr
     assert ">>> dev-libs/packagepkg-1.0 merged." in r.stdout
     for line in r.stdout.splitlines():
+        if line in _POST_EMERGE_INFO_LINES:
+            continue
         assert line.startswith((">>>", "[ebuild", "[blocks", "[nomerge")), repr(line)
     log = tmp_path / "pt0" / log_rel
     assert log.is_file() and log.stat().st_size > 0
@@ -4785,6 +4798,59 @@ def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_p
         "setup-1.0\npreinst-1.0\npostinst-1.0\n"
         "setup-2.0\npreinst-2.0\nprerm-1.0\npostrm-1.0\npostinst-2.0\n"
     )
+
+
+def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(
+    emerge_binary, tmp_path
+):
+    """Real `post_emerge()`'s info block (`lib/_emerge/post_emerge.py:
+    126-130` + `lib/portage/util/_info_files.py::chk_updated_info_files`):
+    `emerge dev-libs/dirregenpkg` into a scratch ROOT merges
+    `usr/share/info/dirregenpkg.info` (whose `START-INFO-DIR-ENTRY` block
+    names `* dirregenpkg:`), and the post-merge step regenerates
+    `usr/share/info/dir` with the host `/usr/bin/install-info`, records
+    the dir's mtime in `mtimedb["info"]`, and prints the real
+    `Regenerating...` / `Processed 1 info files.` lines. Skips when the
+    host has no `install-info` (real silently no-ops there too)."""
+    if not Path("/usr/bin/install-info").exists():
+        pytest.skip("no /usr/bin/install-info on this host")
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # INFOPATH reaches the post-merge step through the env.d collation
+    # real `settings.reload(); settings.regenerate()` derives
+    # `${ROOT}/etc/profile.env` from.
+    (root / "etc" / "env.d").mkdir(parents=True)
+    (root / "etc" / "env.d" / "50-test").write_text('INFOPATH="/usr/share/info"\n')
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+
+    result = subprocess.run(
+        [str(emerge_binary), "dev-libs/dirregenpkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+
+    info_dir = root / "usr/share/info"
+    assert (info_dir / "dirregenpkg.info").is_file()
+    index = (info_dir / "dir").read_text()
+    assert "* dirregenpkg: (dirregenpkg)." in index
+    assert list(info_dir.glob("dir*.old")) == []
+    assert "Regenerating GNU info directory index..." in result.stdout
+    assert "Processed 1 info files." in result.stdout
+
+    # The dir-mtime memo: `mtimedb["info"]` maps the absolute inforoot
+    # to the directory's mtime, so a later run with no change reports
+    # up-to-date instead of regenerating (covered hermetically in
+    # `rust/portuale/src/info_files.rs`; here just the persisted shape).
+    mtimedb = (root / "var/cache/edb/mtimedb").read_text()
+    assert '"info"' in mtimedb
+    assert str(info_dir) in mtimedb
 
 
 def _passwordless_sudo() -> list[str] | None:
