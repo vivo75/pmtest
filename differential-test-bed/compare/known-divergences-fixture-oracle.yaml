@@ -81,35 +81,6 @@
     the masked package set are the same.
   owner: portuale-oracle
 
-- id: triangle-residual-conflict-exit
-  category: exit
-  slugs: ["dev-libs_needer_dev-libs_othermod", "dev-libs_othermod_dev-libs_needer"]
-  match: "real rc=1 portuale rc=0"
-  reason: >
-    Deliberate convention, not a bug: portuale renders the slot-conflict
-    notice as *informational* and keeps exit 0, where real exits 1 (see
-    the `pretend.rs` slot-conflict renderer's own doc comment and #54 K1
-    / #57 K1, decided 2026-09-16). Since #57 S1 the block itself matches
-    -- portuale reports the same `dev-libs/paired:0` collision between
-    installed 1.0 (pulled in by othermod) and merge 2.0 (pulled in by
-    needer), in both argv orders -- so only the exit status differs.
-    Backlog #60 tracks revisiting the convention in a future release
-    (breaking change, needs a migration story for anything relying on
-    rc 0).
-  owner: claude-opus-5
-
-- id: triangle-residual-conflict-suppressed-merge-list
-  category: exit
-  slugs: ["dev-libs_needer_dev-libs_othermod", "dev-libs_othermod_dev-libs_needer"]
-  match: "merge-list comparison suppressed"
-  reason: >
-    The comparator suppresses merge-list comparison on the rc mismatch
-    above (`triangle-residual-conflict-exit`, the K1 convention); the two
-    merge lists are identical (3 entries each, verified in the saved
-    outputs and pinned by
-    `test_needer_othermod_triangle_reports_the_installed_instance_conflict`).
-  owner: claude-opus-5
-
 # -- #65 S0/S1/S2 + #71: the slot-operator bdeps matrix (FX_SLOTOP_BDEP=1
 #    FX_HOST_ROOTS=1, differential-test-bed/atomlists/l0-fixture-oracle-slotop.txt). The
 #    two artifact entries (totals duplication, the considep extra) were

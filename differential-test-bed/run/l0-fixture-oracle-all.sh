@@ -1,13 +1,13 @@
 #!/bin/bash
-# L0 fixture-oracle bed, all four atomlists in sequence (backlog #87).
+# L0 fixture-oracle bed, all five atomlists in sequence (backlog #87).
 #
-# There are four lists today (`atomlists/l0-fixture-oracle{,-host,-rdcpin,
-# -slotop}.txt`) and three env knobs (`FX_SLOTOP_BDEP`, `FX_WORLD_EXTRA`,
+# There are five lists today (`atomlists/l0-fixture-oracle{,-host,-rdcpin,
+# -slotop,-whpin}.txt`) and three env knobs (`FX_SLOTOP_BDEP`, `FX_WORLD_EXTRA`,
 # `FX_HOST_ROOTS`, declared at `run/l0-fixture-oracle.sh`'s call site and
 # `layers/l0-fixture-oracle/in-container.sh:84`), and only the first list
 # runs by default -- so #76 B3's and #79 D1's permanent cells are
 # exercised only when a human remembers the exact `FX_*` invocation.
-# This runner closes that gap: it runs all four lists with their
+# This runner closes that gap: it runs all five lists with their
 # documented knobs, one after the other, and reports a combined rc.
 # Everything after #87 in the Tier 2 close-out uses this as the standard
 # bed step.
@@ -28,6 +28,7 @@ LISTS=(
   "l0-fixture-oracle-host.txt|FX_HOST_ROOTS=1"
   "l0-fixture-oracle-rdcpin.txt|FX_WORLD_EXTRA=dev-libs/rdctarget"
   "l0-fixture-oracle-slotop.txt|FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1"
+  "l0-fixture-oracle-whpin.txt|FX_WORLD_EXTRA=dev-libs/whtarget"
 )
 
 failures=0
