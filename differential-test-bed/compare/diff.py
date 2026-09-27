@@ -183,7 +183,8 @@ def _size_tolerated(pkgdir: str, a: dict, b: dict, rep: Report) -> bool:
     A package's vdb SIZE aggregates its files' sizes, so a SIZE delta
     differs only because of tolerated payload exactly when no hard row
     remains for any file the package owns (per either side's CONTENTS)
-    nor for the package's own CONTENTS. Other vdb files of the package
+    nor for the package's own CONTENTS, and at least one tolerated payload row
+    sits under it. Other vdb files of the package
     (environment, CFLAGS, ...) describe the build rather than the
     payload, so they never block this.
     """
@@ -191,12 +192,16 @@ def _size_tolerated(pkgdir: str, a: dict, b: dict, rep: Report) -> bool:
         return False
     owned = _owned_paths(a.get(pkgdir + "/CONTENTS"), b.get(pkgdir + "/CONTENTS"))
     contents_key = pkgdir + "/CONTENTS"
+    saw_payload = False
     for f in rep.findings:
-        if f["category"] == PAYLOAD:
+        if f["path"] != contents_key and f["path"] not in owned:
             continue
-        if f["path"] == contents_key or f["path"] in owned:
+        if f["category"] != PAYLOAD:
             return False
-    return True
+        saw_payload = True
+    # A SIZE delta with no tolerated payload row under the package is not
+    # explained by payload: keep it hard.
+    return saw_payload
 
 
 def diff_vdb(a: dict, b: dict, rep: Report, tolerate_payload: bool = False) -> None:

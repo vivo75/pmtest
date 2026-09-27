@@ -258,7 +258,8 @@ def build_r3_cases(root: Path) -> None:
 # dev-libs/icu-78.3's 46585103 -> 46585040 exactly pkgdata.inc 808 ->
 # 745; both packages' only other vdb rows are the allowlisted
 # `environment` pair). SIZE is tolerated iff --tolerate-payload is on
-# and no hard row remains for any file the package owns.
+# and no hard row remains for any file the package owns, and at least
+# one tolerated payload row sits under it.
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 
@@ -311,6 +312,15 @@ def build_size_cases(root: Path) -> None:
     check("#191 sibling vdb metadata does not block SIZE tolerance",
           rc == 1 and "[PAYLOAD] cat/foo-1.0/SIZE" in out
           and "[VDB] cat/foo-1.0/environment" in out, out)
+
+    # Review fix: a SIZE delta with no tolerated payload row under the
+    # package (identical files on both sides) is not explained by payload
+    # and stays hard.
+    g = write_size_side(root, "sz-none-a", "100", SHA_A, "d" * 32)
+    h = write_size_side(root, "sz-none-b", "90", SHA_A, "d" * 32)
+    rc, out = run(["--tolerate-payload", str(g), str(h)])
+    check("#191 no payload evidence: SIZE stays hard",
+          rc == 1 and "[VDB] cat/foo-1.0/SIZE" in out, out)
 
 
 def main() -> int:
