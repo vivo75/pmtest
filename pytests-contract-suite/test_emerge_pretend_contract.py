@@ -4373,13 +4373,29 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
     `_dep_disjunctive_stack`). With `--backtrack=0` the conflict is
     reported instead, byte-identical to before this slice.
     Container-verified against real portage 3.0.82.2
-    (differential-test-bed/scripts/42-or-backtrack.sh)."""
+    (differential-test-bed/scripts/42-or-backtrack.sh).
+
+    Backlog #129 (S1): the settled `orbttool-2.0` slot-conflict mask
+    now also prints real's skip `WARNING` after the rows (real
+    `_get_missed_updates`, `depgraph.py:1529-1565`, reports every
+    masked version higher than the chosen one -- the 42 script's
+    row-only filter never captured this block, but the mergelist it
+    verifies proves the mask this notice reads). No abbreviated tail:
+    no missing-dependency mask survives on this path."""
     ok = _run([str(emerge_binary)], ["--pretend", "dev-libs/orbtblocked"], fixture_env)
     assert ok.returncode == 0
     assert ok.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/orbttool-1.0 ",
         "[ebuild  N     ] dev-libs/orbtclean-1.0 ",
         "[ebuild  N     ] dev-libs/orbtblocked-1.0 ",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/orbttool:0",
+        "",
+        '  (dev-libs/orbttool-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    =dev-libs/orbttool-1.0 required by (dev-libs/orbtblocked-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^                  ^^^",
+        "",
     ]
     # Full Rust-vs-Python lockstep: the backtracking path and the
     # --backtrack=0 conflict path both match byte-for-byte.
@@ -8603,6 +8619,17 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     `a c b` (silent) and provisional for the other four orders — the
     close-out bed adds those cells, and any divergence from real there
     reopens #142 instead of re-pinning here.
+
+    Order `b c a` is real-grounded, not provisional: bed
+    `l0-fx-20260927T125711Z` (`--pretend --backtrack=0 dev-libs/blk0b
+    dev-libs/blk0c dev-libs/blk0a`) shows real printing exactly one
+    `dev-libs/blk0x:0` block for the highest missed version (`-3`)
+    with both parents (`<dev-libs/blk0x-2`/blk0b,
+    `<dev-libs/blk0x-3`/blk0c) inside it — real's one-entry-per-slot
+    rule (`_get_missed_updates`), pinned here by #129 (which resolves
+    #142's divergence for this order). The expectation below matches
+    real's shape modulo the established `USE=""` / missing-ROOT-suffix
+    normalisation this pin already applies.
     """
     env = dict(fixture_env)
     uninstall_rows = [
@@ -8627,13 +8654,30 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     warn_x2_b = warn("2", "<dev-libs/blk0x-2", "blk0b")
     warn_x3_b = warn("3", "<dev-libs/blk0x-2", "blk0b")
     warn_x3_c = warn("3", "<dev-libs/blk0x-3", "blk0c")
+    # #129 review round 2: real's one-entry-per-slot shape for order
+    # `b c a` (bed `l0-fx-20260927T125711Z`) — one `-3` block with
+    # both parents inside, not one block per parent.
+    warn_x3_bc = [
+        "dev-libs/blk0x:0",
+        "",
+        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^               ^",
+        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^               ^",
+        "",
+    ]
     cases = [
         (["blk0a", "blk0b", "blk0c"], warn_header + warn_x2_b),
         (["blk0a", "blk0c", "blk0b"], []),
         (["blk0b", "blk0a", "blk0c"], warn_header + warn_x2_b),
-        (["blk0b", "blk0c", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
+        (["blk0b", "blk0c", "blk0a"], warn_header + warn_x3_bc),
         (["blk0c", "blk0a", "blk0b"], []),
-        (["blk0c", "blk0b", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
+        # Order `c b a`: real prints the same one `-3` block with both
+        # parents as `b c a` (bed `l0-fx-20260927T132853Z`, all six orders
+        # oracled; #129's output equals real's in every order modulo the
+        # USE/ROOT normalisation above).
+        (["blk0c", "blk0b", "blk0a"], warn_header + warn_x3_bc),
     ]
     for order, warning in cases:
         atoms = [f"dev-libs/{p}" for p in order]
@@ -9851,7 +9895,15 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
     as merge rows (host-real oracle 2026-09-23, real 3.0.82.2 on the
     fixture tree, argv `emerge -p --backtrack=0 dev-libs/btparent`
     under the suite fixture env: `[ebuild N] bttarget-1.0` then `-2.0`,
-    rc 1)."""
+    rc 1).
+
+    Backlog #129 (S1): the settled trial masks now also print real's
+    two skip notices after the rows (real `_get_missed_updates`,
+    `depgraph.py:1529-1565`): the slot-conflict `WARNING`
+    (`bttarget-2.0` vs `<bttarget-2.0`/`btpin-1.0`) plus the abbreviated
+    unsatisfied-dependencies tail (`btconsumer:0`, whose
+    `>=bttarget-2.0` still matches the backtrack-masked `bttarget-2.0`
+    at settle time -- real's `check_backtrack` probe raises)."""
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     assert r.returncode == 0
@@ -9860,6 +9912,19 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         '[ebuild  N     ] dev-libs/btconsumer-1.0 ',
         '[ebuild  N     ] dev-libs/btpin-1.0 ',
         '[ebuild  N     ] dev-libs/btparent-1.0 ',
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/bttarget:0",
+        "",
+        '  (dev-libs/bttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    <dev-libs/bttarget-2.0 required by (dev-libs/btpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^                  ^^^",
+        "",
+        "",
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies",
+        "!!! triggered by backtracking:",
+        "",
+        "dev-libs/btconsumer:0",
     ]
 
     r0 = _run(
@@ -16441,7 +16506,10 @@ def test_oracle_two_simultaneous_conflicts_defer_second_to_later_pass(
     conflict on the first pass; only the first becomes nodes, the second
     is handled under each sibling in later passes. The search settles
     with every `-1.0` and no conflict block -- the same set a bundled
-    trial would reach, via real's deferral order."""
+    trial would reach, via real's deferral order. Since #129 S1 the
+    settled trial masks also print real's two skip notices after the
+    rows (the `WARNING` + abbreviated tail, pinned by the `--tree`
+    test below); only the merge rows are asserted here."""
     rust = _b1_run(
         ["--pretend", "dev-libs/mg2top"],
         fixture_env,
@@ -16469,8 +16537,18 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
     parent; portuale enumerated display edges over merge-sorted array
     position, letting the later-discovered `mgfb-1` precede `mgfa-1`.
     `GraphEntry::discovery` (stamped pre-sort) now orders the
-    enumeration. The skipped-updates WARNING itself is #129 (needs
-    backtrack-trial state). Full stdout pinned (rc 0)."""
+    enumeration.
+
+    Backlog #129 (S1, notice half): the skipped-updates notices real
+    reports on this shape (`l0-fx-20260927T080515Z` oracle) now print
+    too -- the slot-conflict `WARNING` (`mgxc-2` vs `=mgxc-1`/`mgxa-1`,
+    `mgfc-3.0` vs `=mgfc-1`/`mgfa-1`, in first-mask order) fed by the
+    settled backtrack trial state (`GraphResult::skipped_updates`),
+    plus the abbreviated unsatisfied-dependencies tail (`mgxb:0`,
+    `mgfb:0`). Full stdout pinned (rc 0). Modulo portuale's
+    established display cuts (no `to '<ROOT>'` suffixes, bare `USE=""`
+    where real shows the profile `ELIBC="glibc"`/`ABI_X86="(64)"`
+    USE_EXPAND groups -- same cut as the #90 skip pin)."""
     rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/mg2top"], fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
@@ -16483,6 +16561,26 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
         "[ebuild  N     ]  dev-libs/mgfc-1 ",
         "[nomerge       ] dev-libs/mgxa-1",
         "[ebuild  N     ]  dev-libs/mgxc-1 ",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/mgxc:0",
+        "",
+        '  (dev-libs/mgxc-2:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    =dev-libs/mgxc-1 required by (dev-libs/mgxa-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^              ^",
+        "",
+        "dev-libs/mgfc:0",
+        "",
+        '  (dev-libs/mgfc-3.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    =dev-libs/mgfc-1 required by (dev-libs/mgfa-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        "    ^              ^",
+        "",
+        "",
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies",
+        "!!! triggered by backtracking:",
+        "",
+        "dev-libs/mgxb:0",
+        "dev-libs/mgfb:0",
     ]
 
 
@@ -16502,7 +16600,10 @@ def test_oracle_missed_update_siblings_masked_together(
     "R2 — genuine upstream oracle"): the upstream-shaped `btgp` pin now
     carries that oracle, and the `--backtrack=1` block below pins
     portuale's low-budget conflict shape only. #36 is closed as
-    not-reproducible-as-framed. Backlog #148: the low-budget surviving
+    not-reproducible-as-framed. Since #129 S1 the default-budget settle
+    also prints real's two skip notices after the rows (`mgfc-3.0`
+    `WARNING` + `mgfb:0` abbreviated tail); only the merge rows and the
+    low-budget block are asserted here. Backlog #148: the low-budget surviving
     conflict keeps both `mgfc` instances as merge rows (host-real
     oracle 2026-09-23, real 3.0.82.2 on the fixture tree, argv
     `emerge -p --backtrack 1 dev-libs/mgfa` under the suite fixture
