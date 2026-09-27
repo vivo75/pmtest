@@ -6097,6 +6097,136 @@ def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
     assert (root / "var/lib/portage/world").read_text() == ""
 
 
+def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
+    """Backlog #179: real `_emerge/actions.py` returns from the
+    `--pretend` branch (`display(...)`, `return os.EX_OK`) before
+    `Scheduler` exists -- and before the `resume_backup` rotation -- so
+    a preview never touches `mtimedb["resume"]`. A stale multi-item list
+    (one the rotation would also rewrite) must come back byte-identical,
+    and a bare root must gain no `mtimedb` at all."""
+    import json
+    import shutil
+
+    def _env(root):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(root / "pt")
+        return env
+
+    stale = {
+        "resume": {
+            "favorites": ["dev-libs/stale-a"],
+            "mergelist": [
+                ["ebuild", "/", "dev-libs/stale-a-1.0", "merge"],
+                ["ebuild", "/", "dev-libs/stale-b-1.0", "merge"],
+            ],
+            "myopts": {},
+        }
+    }
+
+    # Bare root: the preview resolves and prints, and leaves no mtimedb.
+    root = tmp_path / "root-bare"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert "dev-libs/schedok-1.0" in r.stdout
+    assert not (root / "var/cache/edb/mtimedb").exists()
+
+    # Stale list present: byte-identical afterwards (neither a fresh save
+    # nor the rotation may run on a preview).
+    root = tmp_path / "root-stale"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    mtimedb = root / "var/cache/edb/mtimedb"
+    mtimedb.parent.mkdir(parents=True, exist_ok=True)
+    mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    before = mtimedb.read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert mtimedb.read_bytes() == before
+
+
+def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
+    """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
+    `["binary", root, cpv, "merge"]` resume item from the bintree, so the
+    resumed `(N of M) cpv::repo` line names the *binary's* repository (the
+    `Packages` index `REPO` field), never the ebuild repo. Portuale
+    re-derived the repo from the ebuild repos, so a resumed binary with no
+    ebuild anywhere printed a bare `cpv::`. `dev-libs/binaryonlypkg`
+    exists only as a local binpkg whose `Packages` stanza carries no
+    `REPO` -- a fresh `-k` merge shows `::__unknown__` (real
+    `portage.versions._unknown_repo`, the resolver's own fallback), and
+    the resumed merge must show the same. The resume list itself arises
+    naturally: `dev-libs/schedbad` (source, its `src_install` dies)
+    fails first, leaving the untouched binary entry behind."""
+    import json
+    import shutil
+
+    def _env(root):
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(root / "pt")
+        env["PKGDIR"] = str(Path(FIXTURES_ROOT) / "pkgdir")
+        return env
+
+    # Fresh binary merge first, on its own root: the `::repo` a resumed
+    # entry must equal.
+    fresh = tmp_path / "root-fresh"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", fresh / "var")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/binaryonlypkg"],
+        capture_output=True, text=True, check=False, env=_env(fresh),
+    )
+    assert r.returncode == 0, r.stderr
+    assert (
+        f">>> Emerging binary (1 of 1) dev-libs/binaryonlypkg-1.0::__unknown__ for {fresh}"
+        in r.stdout
+    )
+
+    # A mixed run: schedbad fails, the binary is never attempted, and the
+    # saved list records both kinds.
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/schedbad", "dev-libs/binaryonlypkg"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 1
+    assert "emerge --resume" in r.stderr
+    saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
+    assert [x[2] for x in saved["resume"]["mergelist"]] == [
+        "dev-libs/schedbad-1.0",
+        "dev-libs/binaryonlypkg-1.0",
+    ]
+    assert [x[0] for x in saved["resume"]["mergelist"]] == ["ebuild", "binary"]
+
+    # `--resume --skipfirst` drops the failed source entry and replays
+    # the binary with the binary's own repository, like the fresh merge.
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--skipfirst"],
+        capture_output=True, text=True, check=False, env=_env(root),
+    )
+    assert r.returncode == 0, r.stderr
+    assert (
+        f">>> Emerging binary (1 of 1) dev-libs/binaryonlypkg-1.0::__unknown__ for {root}"
+        in r.stdout
+    )
+    assert (
+        f">>> Completed (1 of 1) dev-libs/binaryonlypkg-1.0::__unknown__ to {root}"
+        in r.stdout
+    )
+    assert (root / "var/db/pkg/dev-libs/binaryonlypkg-1.0/CONTENTS").is_file()
+
+
 def test_emerge_elog_echo_prints_a_message_summary(emerge_binary, tmp_path):
     """Real `elog_process` / `mod_echo` (default-on via `make.globals`
     `PORTAGE_ELOG_SYSTEM`): after the merge, the `elog`/`ewarn` messages an
