@@ -1988,6 +1988,65 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     assert "PATH: dev-libs/packagepkg-1.0.gpkg.tar" in packages
 
 
+def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
+    emerge_binary, tmp_path
+):
+    """Backlog #188: a portuale-written `Packages` stanza follows real's
+    stanza rules on the S0 shapes. Real `bintree._pkgindex_entry`
+    (`3rdparty/portage/lib/portage/dbapi/bintree.py:2289-2313`) plus
+    `PackageIndex.write`
+    (`3rdparty/portage/lib/portage/getbinpkg.py:153-177`): `SLOT` is
+    omitted when it is the default `"0"` (`_pkgindex_default_pkg_data`,
+    `bintree.py:609-629`; restored on read by `readBody`'s `setdefault`)
+    and written verbatim otherwise, and the digest keys are the fixed
+    `_pkgindex_hashes = ["MD5", "SHA1"]` (`bintree.py:548`), independent
+    of `PORTAGE_CHECKSUM_FILTER`. Probed against real Portage in
+    `localhost/test-portuale:latest`: `l32/dep-a` (`SLOT="0"`, default
+    config) has no `SLOT` line, `l32/slotpkg` (`SLOT="1"`) has
+    `SLOT: 1`, and a `PORTAGE_CHECKSUM_FILTER='-SHA1'` rebuild of
+    `dep-a` still writes both digests. `dev-libs/packagepkg` is the
+    `SLOT="0"` shape here; the `SLOT="1"` shape is pinned by portuale's
+    own `stanza_bytes_for_nondefault_slot_write_it_between_size_and_use`
+    Rust unit test (no buildable non-default-`SLOT` fixture exists)."""
+    env = _real_build_env(tmp_path)
+    env.pop("BINPKG_FORMAT", None)
+    result = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
+
+    packages = (Path(env["PKGDIR"]) / "Packages").read_text()
+    assert not any(
+        line.startswith("SLOT:") for line in packages.splitlines()
+    ), f"default SLOT must be omitted like real's:\n{packages}"
+    assert any(
+        line.startswith("MD5: ") for line in packages.splitlines()
+    ), f"fixed MD5 digest missing:\n{packages}"
+    assert any(
+        line.startswith("SHA1: ") for line in packages.splitlines()
+    ), f"fixed SHA1 digest missing:\n{packages}"
+
+    env["PORTAGE_CHECKSUM_FILTER"] = "-SHA1"
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True,
+        text=True,
+        check=True,
+        env=env,
+    )
+    packages = (Path(env["PKGDIR"]) / "Packages").read_text()
+    assert any(
+        line.startswith("MD5: ") for line in packages.splitlines()
+    ), f"MD5 must survive the checksum filter:\n{packages}"
+    assert any(
+        line.startswith("SHA1: ") for line in packages.splitlines()
+    ), f"SHA1 must survive the checksum filter like real's:\n{packages}"
+
+
 def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
     emerge_binary, tmp_path
 ):
