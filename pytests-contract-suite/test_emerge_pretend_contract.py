@@ -8673,7 +8673,11 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
         (["blk0b", "blk0a", "blk0c"], warn_header + warn_x2_b),
         (["blk0b", "blk0c", "blk0a"], warn_header + warn_x3_bc),
         (["blk0c", "blk0a", "blk0b"], []),
-        (["blk0c", "blk0b", "blk0a"], warn_header + warn_x2_b + warn_x3_b + warn_x3_c),
+        # Order `c b a`: real prints the same one `-3` block with both
+        # parents as `b c a` (bed `l0-fx-20260927T132853Z`, all six orders
+        # oracled; #129's output equals real's in every order modulo the
+        # USE/ROOT normalisation above).
+        (["blk0c", "blk0b", "blk0a"], warn_header + warn_x3_bc),
     ]
     for order, warning in cases:
         atoms = [f"dev-libs/{p}" for p in order]
