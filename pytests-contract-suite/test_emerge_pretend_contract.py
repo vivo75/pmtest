@@ -667,6 +667,66 @@ CASES = [
         0,
     ),
     (
+        "circular: upstream test_circular_choices pg0 dylan pulls -bin like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/ccd0a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg1 cmake --backtrack=0 fails like real (rc 1; bug 703440 circular, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd1c"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_choices pg3 cmake via virtual USE pulls bootstrap like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/ccd3c"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea merges like real (rc 0; real pulls -bin first, not pinned)",
+        ["--pretend", "dev-libs/ccd5a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like real (rc 0; pinned below)",
+        ["--pretend", "=dev-libs/ccr0r-1.46*"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --update merges nothing like real (rc 0; empty merge, not pinned)",
+        ["--pretend", "--update", "=dev-libs/ccr0r-1.46*"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --deep --update merges nothing like real (rc 0; empty merge, not pinned)",
+        ["--pretend", "--deep", "--update", "=dev-libs/ccr0r-1.46*"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 r upgrades to 1.47 like real (rc 0; pinned below)",
+        ["--pretend", "dev-libs/ccr0r"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices_rust pg0 r --update upgrades to 1.47 like real (rc 0; pinned below)",
+        ["--pretend", "--update", "dev-libs/ccr0r"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg0 libxml2 new-use=n rebuilds like real (rc 0; pinned below)",
+        ["--pretend", "--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 >=x-2 new-ver=n rebuild-if-new-slot=n merges like real (rc 0; pinned below)",
+        ["--pretend", "--complete-graph-if-new-ver=n", "--rebuild-if-new-slot=n", ">=dev-libs/cgp1x-2"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 <x-1 new-ver=n rebuild-if-new-slot=n merges like real (rc 0; pinned below)",
+        ["--pretend", "--complete-graph-if-new-ver=n", "--rebuild-if-new-slot=n", "<dev-libs/cgp1x-1"],
+        0,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
@@ -9170,6 +9230,152 @@ def test_upstream_backtracking_pg345_pins_mergelists(emerge_binary, fixture_env)
             [
                 "[ebuild  N     ] dev-libs/bkt5a-1 ",
                 "[ebuild  N     ] dev-libs/bkt5b-1 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_circular_choices.py::testDirectCircularDependency`
+    (pg0) and `::testVirtualCmakeBootstrapUseConditional` (pg3),
+    bulk-translated for #50 batch 7 (`dev-libs/ccd0{a,b}`,
+    `dev-libs/ccd3{a,b,c}` + `virtual/ccd3v`; oracle
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    The 2 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned. Not pinned: pg1's
+    `--backtrack=0` cell (rc 1 matches real but the circular-error
+    text is unverified vs real), pg1's default-backtrack cell and
+    pg4 (portuale reports a circular error where real adjusts the
+    `||` preference — findings, no CASES), pg5 (rc 0 matches but
+    portuale merges [ccd5v, ccd5a] where real pulls ccd5b/-bin
+    first — finding, CASES only), and the pg2 `--depclean` cell
+    (needs a shared world entry).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["dev-libs/ccd0a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd0b-2.4.0 ",
+                "[ebuild  N     ] dev-libs/ccd0a-2.4.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd3c"],
+            [
+                "[ebuild  N     ] dev-libs/ccd3b-3.16.2 ",
+                '[ebuild  N     ] virtual/ccd3v-0  USE="bootstrap"',
+                "[ebuild  N     ] dev-libs/ccd3a-1.9.2 ",
+                "[ebuild  N     ] dev-libs/ccd3c-3.16.2 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_rust_pg0_pins_mergelists(
+    emerge_binary, fixture_env
+):
+    """Upstream `test_circular_choices_rust.py::testCircularPypyExe` (pg0,
+    bug 756961: no circular report when a package replaces its own
+    buildtime dep), bulk-translated for #50 batch 7
+    (`dev-libs/ccr0{r,b}`; oracle `/tmp/opencode/o50e/perfile/ccr.json`,
+    captured from the real `ResolverPlayground`, not the source
+    literal).
+
+    The 3 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned. Not pinned: the two
+    `--update` empty merges (no rows to pin) and the `@world --deep
+    --update` cell (needs a shared world entry).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["=dev-libs/ccr0r-1.46*"],
+            [
+                "[ebuild   R    ] dev-libs/ccr0r-1.46.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccr0r"],
+            [
+                "[ebuild     U  ] dev-libs/ccr0r-1.47.0-r2 [1.46.0]",
+            ],
+        ),
+        (
+            ["--update", "dev-libs/ccr0r"],
+            [
+                "[ebuild     U  ] dev-libs/ccr0r-1.47.0-r2 [1.46.0]",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_complete_graph.py::testCompleteGraphUseChange` (pg0)
+    and `::testCompleteGraphVersionChange` (pg1), bulk-translated for
+    #50 batch 7 (`dev-libs/cgp0{x,q}`, `dev-libs/cgp1{x,a}`;
+    oracle `/tmp/opencode/o50e/perfile/cg.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    The 3 cells below are clean today: portuale merges the oracle's
+    exact set in the oracle's exact order with no warnings and empty
+    stderr, so the exact rows are pinned (`USE="icu*"` is real's
+    changed-USE marker, `UD` the stock downgrade letters — both
+    normal rendering, not warnings). Not pinned: pg0's
+    `new-use=y` cell (oracle rc 1, portuale rc 0 — finding, no
+    CASES), pg1's two `new-ver=y` cells (oracle rc 1, portuale rc
+    0 — findings, no CASES), and the three `--ignore-world` cells
+    (portuale answers rc 2 `not yet implemented` — finding, no
+    CASES). World caveat: upstream worlds (`x11-libs/qt-webkit`,
+    `sys-apps/a`) are not emitted as shared world entries, so the
+    non-`--ignore-world` cells run against the shared world file;
+    the three rc-0 pins match real anyway.
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
+            [
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"',
+            ],
+        ),
+        (
+            [
+                "--complete-graph-if-new-ver=n",
+                "--rebuild-if-new-slot=n",
+                ">=dev-libs/cgp1x-2",
+            ],
+            [
+                "[ebuild     U  ] dev-libs/cgp1x-2 [1]",
+            ],
+        ),
+        (
+            [
+                "--complete-graph-if-new-ver=n",
+                "--rebuild-if-new-slot=n",
+                "<dev-libs/cgp1x-1",
+            ],
+            [
+                "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
             ],
         ),
     ]
