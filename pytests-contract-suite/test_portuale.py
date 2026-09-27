@@ -4418,6 +4418,197 @@ def test_getbinpkg_merge_honours_env_install_mask(emerge_binary, tmp_path):
     assert "hello.txt" not in contents
 
 
+def _serve_binhost_500():
+    """The bed's F3 stub (`differential-test-bed/layers/l32/run-cell.sh`
+    `cell_f3`): every GET/HEAD answers 500. Ephemeral port (the bed pins
+    18765; a test takes whatever is free). Returns `(server, port)`; the
+    caller must `shutdown()` + `server_close()` in a `finally`."""
+    import http.server
+    import socketserver
+    import threading
+
+    class _H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(500)
+            self.end_headers()
+            self.wfile.write(b"stub 500\n")
+
+        def do_HEAD(self):
+            self.send_response(500)
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    socketserver.TCPServer.allow_reuse_address = True
+    server = socketserver.TCPServer(("127.0.0.1", 0), _H)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server, server.server_address[1]
+
+
+def _clientetc_with_500_binhost(tmp_path, port):
+    """A tmp `/etc/portage` copy of the fixture config (same repointing
+    `_write_tmp_clientetc` does) whose ONLY binhost is the 500 stub --
+    the bed's hermetic F3 setup (`rm -f binrepos.conf/*.conf` first, so
+    no side reaches the network and no cached index masks the fault)."""
+    import shutil as _shutil
+
+    clientetc = tmp_path / "clientetc"
+    _shutil.copytree(
+        Path(FIXTURES_ROOT) / "etc/portage",
+        clientetc / "etc/portage",
+        symlinks=True,
+    )
+    profile_link = clientetc / "etc/portage/make.profile"
+    profile_link.unlink(missing_ok=True)
+    profile_link.symlink_to(Path(FIXTURES_ROOT) / "repo/profiles/default")
+    (clientetc / "etc/portage/binrepos.conf").write_text(
+        "[http500]\n"
+        "priority = 50\n"
+        f"sync-uri = http://127.0.0.1:{port}\n"
+    )
+    repos_conf = clientetc / "etc/portage/repos.conf"
+    for conf in repos_conf.iterdir():
+        if not conf.is_file():
+            continue
+        lines = []
+        for line in conf.read_text().splitlines():
+            stripped = line.strip()
+            if stripped.startswith("location") and "=" in line:
+                _, _, value = line.partition("=")
+                value = value.strip()
+                if value and not value.startswith("/"):
+                    line = line.replace(value, str(Path(FIXTURES_ROOT) / value))
+            lines.append(line)
+        conf.write_text("\n".join(lines) + "\n")
+    return clientetc
+
+
+def _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir):
+    """Real-merge env against the tmp clientetc: fresh ROOT with the
+    fixture vdb (so `samepkg` reads as installed), empty-or-stale
+    caller-provided PKGDIR, proxy scrubbed so the loopback stub is
+    reached directly (the bed is hermetic the same way)."""
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(clientetc)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["PKGDIR"] = str(pkgdir)
+    env.pop("FEATURES", None)
+    for proxy in ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"):
+        env.pop(proxy, None)
+    return env
+
+
+def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_path):
+    """Backlog #175 case (b): the only binhost 500s every index fetch and
+    PKGDIR is empty. Real (`bintree._populate_remote`'s `except OSError`,
+    `bintree.py:1793-1809`) warns and resolves against the local pool,
+    so with no binary anywhere the run falls back to the ebuild, builds
+    from source, and exits 0 (`>>> Emerging (1 of 1)`, never `binary`).
+    Portuale used to abort pre-resolution with
+    `emerge: binhost ...: wget failed ...` + exit 1."""
+    import shutil
+
+    server, port = _serve_binhost_500()
+    try:
+        clientetc = _clientetc_with_500_binhost(tmp_path, port)
+        root = tmp_path / "root"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        pkgdir = tmp_path / "empty-pkgdir"
+        pkgdir.mkdir()
+        env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
+
+        result = subprocess.run(
+            [str(emerge_binary), "-k", "--getbinpkg", "--oneshot", "dev-libs/packagepkg"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert result.returncode == 0, result.stderr
+        # Real's own pair (stderr, shaped from the fetch -- see
+        # portuale's `emerge_getbinpkg::binhost_fetch_warning`).
+        assert (
+            f"!!! [http500] Error fetching binhost package info from "
+            f"'http://127.0.0.1:{port}'" in result.stderr
+        )
+        assert (
+            "!!! [http500] HTTP Error 500: Internal Server Error" in result.stderr
+        )
+        # The raw wget transcript never reaches either stream.
+        combined = result.stdout + result.stderr
+        assert "awaiting response" not in combined
+        # Source fallback: a plain `Emerging`, then a real build+merge.
+        assert (
+            f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}"
+            in result.stdout
+        )
+        assert ">>> Emerging binary" not in result.stdout
+        assert (root / "usr/share/packagepkg/hello.txt").read_text().strip() == (
+            "hello from packagepkg"
+        )
+        assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #175 case (a): the only binhost 500s, but the local
+    `$PKGDIR/Packages` still lists a binary whose file is gone (stale
+    index). Real selects that binary and aborts rc 1
+    (`>>> Emerging binary` -> `!!! Tried to use non-existent binary ...`,
+    `BinpkgVerifier.py:50-51`), installing nothing. Portuale must match
+    that outcome: rc 1, the binary line, nothing installed. (The abort
+    wording itself is still portuale's own `no binpkg file` error, not
+    real's `Tried to use non-existent binary` pair -- deliberately
+    unpinned here; a follow-up slice owns that message.)"""
+    import shutil
+
+    server, port = _serve_binhost_500()
+    try:
+        clientetc = _clientetc_with_500_binhost(tmp_path, port)
+        root = tmp_path / "root"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        pkgdir = tmp_path / "stale-pkgdir"
+        build_env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
+        build_env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir-build")
+        subprocess.run(
+            [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+            capture_output=True, text=True, check=True, env=build_env,
+        )
+        # The build wrote the `Packages` index; deleting just the file
+        # makes it stale, exactly like the bed's F3a (faultpkg removed
+        # from PKGDIR, index entry left behind).
+        stale = list(pkgdir.rglob("packagepkg-1.0*.gpkg.tar"))
+        assert stale, "the build should have left a binpkg to remove"
+        for path in stale:
+            path.unlink()
+        assert "CPV: dev-libs/packagepkg-1.0" in (pkgdir / "Packages").read_text()
+
+        env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
+        result = subprocess.run(
+            [str(emerge_binary), "-k", "--getbinpkg", "--oneshot", "dev-libs/packagepkg"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert result.returncode == 1, result.stderr + result.stdout
+        # The refresh was attempted and non-fatal (resolution proceeded
+        # to select the stale binary), then the run aborted.
+        assert "!!! [http500] Error fetching binhost package info from " in result.stderr
+        assert (
+            f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}"
+            in result.stdout
+        )
+        assert not (root / "usr/share/packagepkg/hello.txt").exists()
+        assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists()
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def test_emerge_atom_oneshot_does_not_touch_the_world_file(emerge_binary, tmp_path):
     """--oneshot/-1 (real Scheduler._world_atom's own suppression set):
     the package still merges, but its atom is NOT recorded in world."""
