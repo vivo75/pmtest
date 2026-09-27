@@ -160,28 +160,77 @@ def diff_contents(k: str, ta: str, tb: str, rep: Report, tolerate_payload: bool)
             rep.add("CONTENTS", k, f"{key[0]} {key[1]}: portage {ma[key]!r} portuale {mb[key]!r}")
 
 
+def _owned_paths(a_text: str | None, b_text: str | None) -> set[str]:
+    """Filesystem paths a package owns, from either side's vdb CONTENTS.
+
+    Data-driven package membership: no path heuristics, no package-name
+    allowlist. `dir` lines are included so a hard row on an owned
+    directory also blocks SIZE tolerance below.
+    """
+    owned: set[str] = set()
+    for text in (a_text, b_text):
+        if not text:
+            continue
+        for kind, path in _contents_map(text):
+            if kind in ("obj", "sym", "dir"):
+                owned.add(path)
+    return owned
+
+
+def _size_tolerated(pkgdir: str, a: dict, b: dict, rep: Report) -> bool:
+    """True when every file-level difference under pkgdir is tolerated.
+
+    A package's vdb SIZE aggregates its files' sizes, so a SIZE delta
+    differs only because of tolerated payload exactly when no hard row
+    remains for any file the package owns (per either side's CONTENTS)
+    nor for the package's own CONTENTS, and at least one tolerated payload row
+    sits under it. Other vdb files of the package
+    (environment, CFLAGS, ...) describe the build rather than the
+    payload, so they never block this.
+    """
+    if "/" not in pkgdir:
+        return False
+    owned = _owned_paths(a.get(pkgdir + "/CONTENTS"), b.get(pkgdir + "/CONTENTS"))
+    contents_key = pkgdir + "/CONTENTS"
+    saw_payload = False
+    for f in rep.findings:
+        if f["path"] != contents_key and f["path"] not in owned:
+            continue
+        if f["category"] != PAYLOAD:
+            return False
+        saw_payload = True
+    # A SIZE delta with no tolerated payload row under the package is not
+    # explained by payload: keep it hard.
+    return saw_payload
+
+
 def diff_vdb(a: dict, b: dict, rep: Report, tolerate_payload: bool = False) -> None:
     for k in sorted(a.keys() - b.keys()):
         rep.add("VDB", k, "vdb file present for portage, absent for portuale")
     for k in sorted(b.keys() - a.keys()):
         rep.add("VDB", k, "vdb file present for portuale, absent for portage")
+    deferred: list[str] = []
     for k in sorted(a.keys() & b.keys()):
         if a[k] == b[k]:
             continue
         pf = k.rsplit("/", 1)[-1]
         if pf == "CONTENTS":
             diff_contents(k, a[k], b[k], rep, tolerate_payload)
+        elif pf == "SIZE" and tolerate_payload:
+            # Decided after the CONTENTS rows (and diff_files, which the
+            # caller runs first) are in rep, so _size_tolerated sees the
+            # package's full file-level picture.
+            deferred.append(k)
         else:
-            # TODO(#159 S0): a package's vdb `SIZE` is payload-sensitive -- it
-            # aggregates that package's file-size diffs, which under
-            # `--tolerate-payload` are already tolerated `[PAYLOAD]` rows,
-            # yet the aggregate is compared here as a hard `VDB` row (l3-core
-            # run `l3-20260925T074707Z`: only 2/381 SIZE files differ, each
-            # exactly the package's tolerated payload sum). Comparator-
-            # coverage gap, same family as #152's build-id keying; not
-            # reclassified here because that would move corpus outputs.
             va = a[k].strip().replace("\n", " | ")[:200]
             vb = b[k].strip().replace("\n", " | ")[:200]
+            rep.add("VDB", k, f"portage={va!r} portuale={vb!r}")
+    for k in deferred:
+        va = a[k].strip().replace("\n", " | ")[:200]
+        vb = b[k].strip().replace("\n", " | ")[:200]
+        if _size_tolerated(k.rsplit("/", 1)[0], a, b, rep):
+            rep.add(PAYLOAD, k, f"size portage={va!r} portuale={vb!r}")
+        else:
             rep.add("VDB", k, f"portage={va!r} portuale={vb!r}")
 
 

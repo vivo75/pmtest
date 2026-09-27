@@ -251,6 +251,78 @@ def build_r3_cases(root: Path) -> None:
     r3_case("gcc-cc1-hash-dir", a, b, ["MISSING", "CONTENTS"])
 
 
+# --- R4 (#191): vdb SIZE inherits payload tolerance -----------------------
+# A package's vdb SIZE aggregates its files' sizes (grounded in the
+# l3-20260927T080452Z candidate pair: dev-lang/python-3.14.6_p1's SIZE
+# delta 62459637 -> 62458377 is exactly its tolerated file-size sum,
+# dev-libs/icu-78.3's 46585103 -> 46585040 exactly pkgdata.inc 808 ->
+# 745; both packages' only other vdb rows are the allowlisted
+# `environment` pair). SIZE is tolerated iff --tolerate-payload is on
+# and no hard row remains for any file the package owns, and at least
+# one tolerated payload row sits under it.
+SHA_A = "a" * 64
+SHA_B = "b" * 64
+
+
+def write_size_side(root: Path, name: str, size: str, foo_sha: str, foo_md5: str,
+                    bar_mode: str | None = None, env: str | None = None) -> Path:
+    prefix = root / name
+    lines = [f"/usr/bin/foo\tf\t0755\t0\t0\t10\t{foo_sha}\t-\t-"]
+    contents = [f"obj /usr/bin/foo {foo_md5} 1000"]
+    if bar_mode is not None:
+        lines.append(f"/usr/bin/bar\tf\t{bar_mode}\t0\t0\t5\t{'c' * 64}\t-\t-")
+        contents.append(f"obj /usr/bin/bar {'d' * 32} 1000")
+    contents.append("dir /usr")
+    (root / f"{name}.files.norm.tsv").write_text("\n".join(lines) + "\n")
+    (root / f"{name}.mtimes.tsv").write_text("/usr/bin/foo\t1000\n")
+    vdb = prefix.parent / (prefix.name + ".vdb") / "pkg" / "cat" / "foo-1.0"
+    vdb.mkdir(parents=True)
+    (vdb / "CONTENTS").write_text("\n".join(contents) + "\n")
+    (vdb / "SIZE").write_text(size + "\n")
+    if env is not None:
+        (vdb / "environment").write_text(env)
+    return prefix
+
+
+def build_size_cases(root: Path) -> None:
+    a = write_size_side(root, "sz-pos-a", "100", SHA_A, "d" * 32)
+    b = write_size_side(root, "sz-pos-b", "90", SHA_B, "e" * 32)
+    rc, out = run(["--tolerate-payload", str(a), str(b)])
+    check("#191 positive: SIZE tolerated when every file row is PAYLOAD",
+          rc == 0 and "[PAYLOAD] cat/foo-1.0/SIZE" in out
+          and "[VDB] cat/foo-1.0/SIZE" not in out, out)
+
+    c = write_size_side(root, "sz-neg-a", "100", SHA_A, "d" * 32, bar_mode="0755")
+    d = write_size_side(root, "sz-neg-b", "90", SHA_B, "e" * 32, bar_mode="0644")
+    rc, out = run(["--tolerate-payload", str(c), str(d)])
+    check("#191 negative: one hard file row keeps SIZE hard",
+          rc == 1 and "[VDB] cat/foo-1.0/SIZE" in out
+          and "[MODE] /usr/bin/bar" in out, out)
+
+    rc, out = run([str(a), str(b)])
+    check("#191 flag off: SIZE stays hard without --tolerate-payload",
+          rc == 1 and "[VDB] cat/foo-1.0/SIZE" in out, out)
+
+    # The l3 evidence shape: the package's only other vdb row is a hard
+    # `environment` pair (allowlisted downstream). It describes the
+    # build, not the payload, so it must not block SIZE tolerance.
+    e = write_size_side(root, "sz-env-a", "100", SHA_A, "d" * 32, env="A=1\n")
+    f = write_size_side(root, "sz-env-b", "90", SHA_B, "e" * 32, env="A=2\n")
+    rc, out = run(["--tolerate-payload", str(e), str(f)])
+    check("#191 sibling vdb metadata does not block SIZE tolerance",
+          rc == 1 and "[PAYLOAD] cat/foo-1.0/SIZE" in out
+          and "[VDB] cat/foo-1.0/environment" in out, out)
+
+    # Review fix: a SIZE delta with no tolerated payload row under the
+    # package (identical files on both sides) is not explained by payload
+    # and stays hard.
+    g = write_size_side(root, "sz-none-a", "100", SHA_A, "d" * 32)
+    h = write_size_side(root, "sz-none-b", "90", SHA_A, "d" * 32)
+    rc, out = run(["--tolerate-payload", str(g), str(h)])
+    check("#191 no payload evidence: SIZE stays hard",
+          rc == 1 and "[VDB] cat/foo-1.0/SIZE" in out, out)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="difftol.") as td:
         root = Path(td)
@@ -284,6 +356,8 @@ def main() -> int:
         check("layer l2 applies an l2 entry", rc == 0 and "l2-only" in out, out)
 
         build_r3_cases(root)
+
+        build_size_cases(root)
 
     print(f"\ntest-diff-tolerance: {'OK' if FAILED == 0 else f'{FAILED} failure(s)'}")
     return 1 if FAILED else 0
