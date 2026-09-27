@@ -18340,25 +18340,19 @@ def test_oracle_slotop_conflict_rebuild(
     assert not [ln for ln in merges if "app-misc/A-2" in ln or "app-misc/B-0" in ln]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug 486580 needs the v2 `#24b` `_slot_operator_update_probe` "
-    "family: the leaves' recorded built `somassb:1/1=` deps must be "
-    "re-resolved against the graph's `somassb:2/2`. Verified live "
-    "against the vendored portage (ResolverPlayground, "
-    "`_slot_operator_update_backtrack` fires per leaf); S5's "
-    "`_slot_change_probe` only handles *unbuilt* `:=`/`:S=` deps from a "
-    "merge-bound parent, so it does not fire here. The leaves are also "
-    "outside the CLI seeds (named atoms are not seeded -- S3 seeds the "
-    "walk's own graph).",
-)
 def test_oracle_slotop_conflict_mass_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_conflict_rebuild.py::testSlotConflictMassRebuild`
     (bug 486580, `somassa --backtrack 3 -uD`): real merges
     `[somassa-1, somassb-2, 5 leaves]`. Renamed (`somass*`; upstream
-    `app-misc/A-1` carries different deps than the fixture `A-1`)."""
+    `app-misc/A-1` carries different deps than the fixture `A-1`).
+    MATCHES real since #211 C1: the new-child-slot update-probe arm
+    (`depgraph.py:3121-3126`) schedules the installed leaves bound to the
+    abandoned slot even with an empty world (walked, not merely
+    reachable). Ported through the `slot_operator_rebuild_scan`, so the
+    leaves merge as walked `rR` nodes with the `causing rebuilds` block
+    (verified against the vendored portage's Playground mergelist)."""
     installed = [("app-misc", "somassb", "1", "1", {})]
     installed += [
         (
