@@ -547,42 +547,42 @@ CASES = [
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-1"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-2"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-3 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-3 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-3"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0w-1 fails like real (rc 1; no suggestion, oracle solutions are empty)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-1 fails like real (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0w-1"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0w-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0w-2"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0w-3 fails like real (rc 1; autounmask bar matches the oracle use_changes, still fails)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-3 fails like real (rc 1; autounmask bar matches the oracle use_changes, still fails; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0w-3"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0b-1 fails like real (rc 1; suggestion +bar -foo matches the oracle solution)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0b-1 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0b-1"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like real (rc 1; no suggestion, oracle solutions are empty)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like real (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0b-2"],
         1,
     ),
@@ -19984,3 +19984,62 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
             "    ^                            ^^^",
             "",
         ], (extra, result.stdout)
+
+
+# Backlog #181: live real `emerge -p` text for the upstream
+# test_circular_dependencies pg0 cases (#50 batch 2). The batch-2 CASES
+# check only the exit code; their labels cite the ResolverPlayground
+# solutions, which live `emerge` does not reproduce. Captures:
+# portuale docs/evidence/2026-09-27-181-circular-text/ (fixture-oracle run
+# l0-fx-20260927T202111Z, real Portage 3.0.82.2). Each pin is a strict
+# xfail until its backlog item lands.
+_CYC0_REAL_BLOCKS = {
+    # #206 only: same cycle and suggestion, real prints package nodes.
+    "=dev-libs/cyc0b-1": (
+        "(dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc0a-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        "It might be possible to break this cycle\n"
+        "by applying the following change:\n"
+        "- dev-libs/cyc0a-1 (Change USE: +bar -foo)\n"
+    ),
+    # #207: real backtracks and blames cyc0z-3, not the argument.
+    "=dev-libs/cyc0z-1": (
+        "(dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        "It might be possible to break this cycle\n"
+        "by applying the following change:\n"
+        "- dev-libs/cyc0z-3 (Change USE: +bar -foo)\n"
+    ),
+    # #208: real starts at cyc0y-1 and finds -foo on the autounmasked USE.
+    "=dev-libs/cyc0w-3": (
+        "(dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        "It might be possible to break this cycle\n"
+        "by applying the following change:\n"
+        "- dev-libs/cyc0z-3 (Change USE: -foo)\n"
+    ),
+}
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="backlog #206/#207/#208: live real prints package nodes, blames "
+    "a different package or finds a different suggestion",
+)
+@pytest.mark.parametrize("atom", sorted(_CYC0_REAL_BLOCKS))
+def test_circular_dependencies_upstream_pg0_real_text(
+    emerge_binary, fixture_env, atom
+):
+    """Real's `_show_circular_deps` block for three of the eight #50
+    batch-2 circular cases, verbatim from live `emerge -p --color=n`
+    (real depgraph.py:10425; nodes via digraph.debug_print ->
+    Package.__str__). Exit code 1 already agrees on both sides."""
+    rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    assert rust.returncode == 1
+    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
