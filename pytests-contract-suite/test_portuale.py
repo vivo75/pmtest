@@ -6129,6 +6129,9 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     # Bare root: the preview resolves and prints, and leaves no mtimedb.
     root = tmp_path / "root-bare"
     shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
+    # test starts from no resume list whatever earlier runs left there.
+    (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
     r = subprocess.run(
         [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
         capture_output=True, text=True, check=False, env=_env(root),
@@ -6141,6 +6144,9 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     # nor the rotation may run on a preview).
     root = tmp_path / "root-stale"
     shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
+    # test starts from no resume list whatever earlier runs left there.
+    (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
     mtimedb = root / "var/cache/edb/mtimedb"
     mtimedb.parent.mkdir(parents=True, exist_ok=True)
     mtimedb.write_text(json.dumps(stale, sort_keys=True))
