@@ -1,8 +1,8 @@
-EAPI=4
+EAPI=8
 DESCRIPTION=fixture package: upstream test_use_dep_defaults pg0 dev-libs/A-2 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 DEPEND=dev-libs/udd0b[foo(+)]
 RDEPEND=dev-libs/udd0b[foo(+)]
 DEFINED_PHASES=-
-_md5_=b2ad47547ad0db463fdbe7a06105f02c
+_md5_=b12e08dd1c8b90079f02da632a70b80e
