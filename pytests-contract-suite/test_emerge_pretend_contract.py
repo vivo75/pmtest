@@ -657,6 +657,11 @@ CASES = [
         1,
     ),
     (
+        "slotconflict: upstream test_slot_conflict_mask_update pg0 dev-libs/scm0a merges like real (rc 0; backtrack masks highest C first: C-1 + B-1 + A-1)",
+        ["--pretend", "dev-libs/scm0a"],
+        0,
+    ),
+    (
         "recursion: any-of group prefers the installed alternative over an earlier uninstalled one",
         ["--pretend", "dev-libs/anyof"],
         0,
