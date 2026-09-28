@@ -1,0 +1,7 @@
+EAPI=8
+DESCRIPTION=fixture package: --ignore-world at EAPI 8, installed world member bounding igw0x (backlog #223)
+KEYWORDS=amd64
+SLOT=0
+RDEPEND=>=dev-libs/igw0x-1 <dev-libs/igw0x-2
+DEFINED_PHASES=-
+_md5_=42e6739a8fd55d8a526714111721a26f

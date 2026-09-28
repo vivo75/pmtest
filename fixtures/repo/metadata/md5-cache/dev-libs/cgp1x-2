@@ -1,6 +1,6 @@
-EAPI=0
+EAPI=8
 DESCRIPTION=fixture package: upstream test_complete_graph.py pg1 sys-libs/x-2 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 DEFINED_PHASES=-
-_md5_=25602551a40d35f71eb0d23f608d514c
+_md5_=ddd3894bee6a42ef08a19ed4cb803284

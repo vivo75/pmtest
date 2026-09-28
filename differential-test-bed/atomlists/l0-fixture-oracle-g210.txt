@@ -1,0 +1,25 @@
+# #210 round 2 — the same-version slot-change reinstall cell, run with
+# `FX_WORLD_EXTRA="dev-libs/reinstslotconsumer dev-libs/reinstslotbound"`
+# (both installed consumers must be world members so real's
+# complete-graph walk reaches them as nomerge nodes whose recorded pins
+# (`:0/1` and the built `:0/1=`) constrain the reinstall -- the same
+# staging pattern as the `whpin`/`r25` cells; the consumers must stay out
+# of the committed world file, which every other fixture-ROOT test
+# shares):
+#
+#   FX_WORLD_EXTRA="dev-libs/reinstslotconsumer dev-libs/reinstslotbound" \
+#     differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g210.txt
+#
+# Shape (coordinator probe `differential-test-bed/logs/_g210-probe.txt`,
+# run dir `logs/l0-fx-20260927T225534Z`, real 3.0.82.2):
+# `reinstslottarget` installed at 1.0 (`SLOT="0/1"`) with 1.0 visible at
+# `SLOT="0/2"` (sub-slot move without a revbump); installed world
+# consumers `reinstslotconsumer` (`RDEPEND="dev-libs/reinstslottarget:0/1"`)
+# and `reinstslotbound` (live `RDEPEND="dev-libs/reinstslottarget:="`,
+# recorded `:0/1=`). For both argument cells real merges NOTHING and
+# prints the skipped-update warning for `dev-libs/reinstslottarget:0`
+# listing BOTH consumers' atoms, rc 0; for the `@world` cell real merges
+# the unrelated world updates and withholds the reinstall, rc 0.
+--changed-slot dev-libs/reinstslottarget
+--changed-slot --update --deep dev-libs/reinstslottarget
+--changed-slot --update --deep --newuse @world

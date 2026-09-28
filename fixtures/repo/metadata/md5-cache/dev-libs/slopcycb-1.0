@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/slopcyca
+DESCRIPTION=fixture package: mixed-priority unbreakable cycle, buildtime back-edge (#228)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=6b928c00ef1d422827004ede9242d00a

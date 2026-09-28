@@ -1,7 +1,7 @@
-EAPI=6
+EAPI=8
 DESCRIPTION=fixture package: upstream test_autounmask_use_backtrack.py pg0 dev-libs/A-1 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 RDEPEND=dev-libs/abk0c
 DEFINED_PHASES=-
-_md5_=bfc697dc1b3ae11b48ef67091d42dd26
+_md5_=41e278d5227edd106bbbd1088fc80561

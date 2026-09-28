@@ -517,6 +517,11 @@ CASES = [
         1,
     ),
     (
+        "circular dep: mixed-priority unserializable cycle prints per-edge labels (#228)",
+        ["--pretend", "dev-libs/slopcyca"],
+        1,
+    ),
+    (
         "circular dep: USE-flag suggestion (_find_suggestions)",
         ["--pretend", "dev-libs/usecyclea"],
         1,
@@ -727,6 +732,21 @@ CASES = [
         0,
     ),
     (
+        "complete: upstream test_complete_graph pg0 libxml2 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", "dev-libs/cgp0x"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 >=x-2 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", ">=dev-libs/cgp1x-2"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 <x-1 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", "<dev-libs/cgp1x-1"],
+        0,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
@@ -914,111 +934,6 @@ CASES = [
     (
         "eapi: upstream test_eapi pg0 =epi0b-1.0 merges like real (rc 0; BDEPEND pulls A-1.0 first, pinned below)",
         ["--pretend", "=dev-libs/epi0b-1.0"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.1 merges like real (rc 0; EAPI 1 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.1"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.2 merges like real (rc 0; EAPI 2 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.3 merges like real (rc 0; EAPI 3 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.4 merges like real (rc 0; EAPI 4 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.1 merges like real (rc 0; EAPI 1 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.1"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.2 merges like real (rc 0; EAPI 2 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.3 merges like real (rc 0; EAPI 3 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.4 merges like real (rc 0; EAPI 4 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-3.2 merges like real (rc 0; EAPI 2 use dep B[foo], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-3.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-3.3 merges like real (rc 0; EAPI 3 use dep B[foo], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-3.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-3.4 merges like real (rc 0; EAPI 4 use dep B[foo], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-3.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-4.2 merges like real (rc 0; EAPI 2 strong block !!B unmatched, merges alone, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-4.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-4.3 merges like real (rc 0; EAPI 3 strong block !!B unmatched, merges alone, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-4.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-4.4 merges like real (rc 0; EAPI 4 strong block !!B unmatched, merges alone, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-4.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.0 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.0"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.1 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.1"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.2 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.2"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.3 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.3"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-6.4 merges like real (rc 0; EAPI 4 use-dep default B[bar(+)], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-6.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-7.4 merges like real (rc 0; EAPI 4 REQUIRED_USE satisfied; USE renders profile-shifted, not pinned)",
-        ["--pretend", "=dev-libs/epi1a-7.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1c-1 merges like real (rc 0; profile USE=foo pulls B-1 where real's empty profile merges C alone, not pinned)",
-        ["--pretend", "=dev-libs/epi1c-1"],
         0,
     ),
     (
@@ -3570,6 +3485,57 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
         "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_mixed_priority_cycle_prints_each_edge_real_label(
+    emerge_binary, fixture_env
+):
+    """Backlog #228: `dev-libs/slopcyca -RDEPEND:=-> dev-libs/slopcycb
+    -DEPEND-> dev-libs/slopcyca` is unserializable -- the `RDEPEND` `:=`
+    edge is an unsatisfied `runtime_slot_op` priority, which no real
+    `ignore_priority` rung relaxes (real `_emerge/DepPriority.py`
+    `__str__`, `_emerge/DepPriorityNormalRange.py`, `_emerge/
+    DepPrioritySatisfiedRange.py`). Each stderr cycle line carries its
+    own edge's `priorities[-1]` label (real `_prepare_circular_dep_-
+    message`, `resolver/circular_dependency.py`), not the hardcoded
+    `(buildtime)` every earlier pin shows.
+
+    Grounded on one live-real probe (`localhost/test-portuale:latest`,
+    real 3.0.81.3; the label paths -- `DepPriority.__str__`, the
+    circular message and suggestions, `DepPrioritySatisfiedRange` -- are
+    byte-identical to 3rdparty 3.0.82.2, the display path per the n206
+    probe): real exits 1 with `slopcycb depends on / slopcyca
+    (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
+    (unconditional atoms give `_find_suggestions` nothing). Portuale
+    rotates to the requested atom (lowest entries index -- the #208
+    family, left for that item), so the pin records `slopcyca depends
+    on / slopcycb (runtime_slot_op) / slopcyca (buildtime)` with the
+    same per-edge labels; stdout is portuale's own forced verbose-tree
+    stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
+    the rendered merge rows) with real's decorations, exactly like the
+    `hardcyclea` pin above. Full probe outputs:
+    `/tmp/opencode/n228probe/out/slopcyc[a|b].{stdout,stderr}.txt`."""
+    base = ["--pretend", "dev-libs/slopcyca"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/slopcyca-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/slopcycb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/slopcyca-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) (runtime_slot_op)\n"
+        "  (dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -6991,7 +6957,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
         # BUILD_ID 2 has the highest BUILD_TIME -> it is the one picked.
         for bid, bt in ((1, 100), (2, 300), (3, 200))
     )
-    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nPACKAGES: 3\n\n{entries}")
+    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n{entries}")
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     # Default: the newer ebuild wins.
@@ -7253,7 +7219,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     bh2 = tmp_path / "binhost2"
     bh2.mkdir()
     (bh2 / "Packages").write_text(
-        "TIMESTAMP: 0\nPACKAGES: 1\n\n"
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
         "BUILD_ID: 1\nCPV: dev-libs/dirbinhostonly-1.0\nDEFINED_PHASES: -\n"
         "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nREPO: gentoo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
     )
@@ -9320,42 +9286,23 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
 
 
 def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
-    """Upstream `test_eapi.py::testBdepend` (pg0), `::testEAPI` (pg1) and
-    `::testIdepend` (pg2), bulk-translated for #50 batch 6
-    (`dev-libs/epi0{a,b}`, `dev-libs/epi1{a,b,c}`, `dev-libs/epi2{a,b}`;
-    oracle `/tmp/opencode/o50d/perfile/eapi.json`, captured from the real
-    `ResolverPlayground`, not the source literal).
+    """Upstream `test_eapi.py::testBdepend` (pg0) and `::testIdepend`
+    (pg2), bulk-translated for #50 batch 6 (`dev-libs/epi0{a,b}`,
+    `dev-libs/epi2{a,b}`; oracle `/tmp/opencode/o50d/perfile/eapi.json`,
+    captured from the real `ResolverPlayground`, not the source literal).
 
-    The 17 cells below are clean today: portuale merges the oracle's
-    exact set in the oracle's exact order with no warnings and empty
-    stderr, so the exact rows are pinned. The `USE="foo"` renders are
-    what real prints too: B-1 carries `IUSE=+foo` and every A-1.x
-    `IUSE=+foo`, so foo is default-on under real's empty profile as
-    well as the fixture profile. Two rc-matching cells are CASES but
-    deliberately not pinned: =epi1a-7.4 renders the profile-shifted
-    `USE="foo -bar"` where real merges via the +bar default alone, and
-    =epi1c-1 pulls B-1 under the profile's USE=foo where real's empty
-    profile merges C alone (batch 5's rqu precedent).
+    Backlog #220 dropped pg1 (`::testEAPI`, `dev-libs/epi1{a,b,c}`):
+    every pg1 cell's point is EAPI gating below EAPI 7 (withdrawn #204;
+    the EAPI-4 empty groups are withdrawn #200), and the re-run oracle
+    with all EAPIs raised to 8 confirms the gating is gone, so the
+    cases and their fixtures go together. The 2 cells below are clean
+    today: portuale merges the oracle's exact set in the oracle's exact
+    order with no warnings and empty stderr, so the exact rows are
+    pinned.
     """
     env = dict(fixture_env)
-    b = "dev-libs/epi1b-1  USE=\"foo\""
     cases = [
         ("=dev-libs/epi0b-1.0", ["[ebuild  N     ] dev-libs/epi0a-1.0 ", "[ebuild  N     ] dev-libs/epi0b-1.0 "]),
-        ("=dev-libs/epi1a-1.1", ['[ebuild  N     ] dev-libs/epi1a-1.1  USE="foo"']),
-        ("=dev-libs/epi1a-1.2", ['[ebuild  N     ] dev-libs/epi1a-1.2  USE="foo"']),
-        ("=dev-libs/epi1a-1.3", ['[ebuild  N     ] dev-libs/epi1a-1.3  USE="foo"']),
-        ("=dev-libs/epi1a-1.4", ['[ebuild  N     ] dev-libs/epi1a-1.4  USE="foo"']),
-        ("=dev-libs/epi1a-2.1", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.1 "]),
-        ("=dev-libs/epi1a-2.2", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.2 "]),
-        ("=dev-libs/epi1a-2.3", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.3 "]),
-        ("=dev-libs/epi1a-2.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.4 "]),
-        ("=dev-libs/epi1a-3.2", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.2 "]),
-        ("=dev-libs/epi1a-3.3", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.3 "]),
-        ("=dev-libs/epi1a-3.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.4 "]),
-        ("=dev-libs/epi1a-4.2", ["[ebuild  N     ] dev-libs/epi1a-4.2 "]),
-        ("=dev-libs/epi1a-4.3", ["[ebuild  N     ] dev-libs/epi1a-4.3 "]),
-        ("=dev-libs/epi1a-4.4", ["[ebuild  N     ] dev-libs/epi1a-4.4 "]),
-        ("=dev-libs/epi1a-6.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-6.4 "]),
         ("=dev-libs/epi2b-1.0", ["[ebuild  N     ] dev-libs/epi2a-1.0 ", "[ebuild  N     ] dev-libs/epi2b-1.0 "]),
     ]
     for atom, rows in cases:
@@ -9530,12 +9477,19 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned (`USE="icu*"` is real's
     changed-USE marker, `UD` the stock downgrade letters — both
-    normal rendering, not warnings). Not pinned: pg0's
+    normal rendering, not warnings). The three `--ignore-world` cells
+    (backlog #223: portuale now drops `@world` from the complete-graph
+    seeds exactly like real `depgraph.py:357-360`, so they merge the
+    oracle's exact rows too) are pinned in the same table — none of
+    the six cells touches an old-EAPI rule on the merged package
+    itself (plain atoms, no conditionals/slots on the merged rows;
+    the `[!icu?]` conditional lives on `cgp0q`, which neither graph
+    walks), so #220's EAPI raise leaves these rows unchanged.
+    Not pinned: pg0's
     `new-use=y` cell (oracle rc 1, portuale rc 0 — finding, no
     CASES), pg1's two `new-ver=y` cells (oracle rc 1, portuale rc
-    0 — findings, no CASES), and the three `--ignore-world` cells
-    (portuale answers rc 2 `not yet implemented` — finding, no
-    CASES). World caveat: upstream worlds (`x11-libs/qt-webkit`,
+    0 — findings, no CASES). World caveat: upstream worlds
+    (`x11-libs/qt-webkit`,
     `sys-apps/a`) are not emitted as shared world entries, so the
     non-`--ignore-world` cells run against the shared world file;
     the three rc-0 pins match real anyway.
@@ -9568,12 +9522,125 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
                 "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
             ],
         ),
+        (
+            ["--ignore-world", "dev-libs/cgp0x"],
+            [
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"',
+            ],
+        ),
+        (
+            ["--ignore-world", ">=dev-libs/cgp1x-2"],
+            [
+                "[ebuild     U  ] dev-libs/cgp1x-2 [1]",
+            ],
+        ),
+        (
+            ["--ignore-world", "<dev-libs/cgp1x-1"],
+            [
+                "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
+            ],
+        ),
     ]
     for args, rows in cases:
         got = _run([str(emerge_binary)], ["--pretend", *args], env)
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == rows, args
+
+
+def test_ignore_world_merges_only_the_arg_on_an_eapi_8_tree(
+    emerge_binary, fixture_env
+):
+    """`--ignore-world` on a modern-EAPI tree (backlog #223;
+    `dev-libs/igw0{x,a}`, EAPI 8).
+
+    Same shape as upstream `test_complete_graph.py::
+    testCompleteGraphVersionChange` pg1 (`dev-libs/cgp1{x,a}`, pinned
+    above), but written at EAPI 8 instead of the bulk-translated EAPI 0
+    the #220 raise has not reached yet: installed `igw0x-1` plus an
+    installed world-shaped consumer `igw0a-1` bounding it
+    (`>=igw0x-1 <igw0x-2`). Oracle: the real `ResolverPlayground` run at
+    EAPI 8 (`/tmp/opencode/n223/oracle_igw.py`, `PYTHONHASHSEED=0`,
+    `world=["dev-libs/igw0a"]`) answers both `--ignore-world` cells rc 0
+    with the requested version alone — EAPI raises nothing here, exactly
+    like the EAPI-0 oracle (`o50e-report.md` §5). Upstream's `world`
+    entry is not emitted as a shared world entry (world reason, same as
+    the `cgp1*` cells), so these run against the shared world file.
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["--ignore-world", ">=dev-libs/igw0x-2"],
+            [
+                "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+            ],
+        ),
+        (
+            ["--ignore-world", "<dev-libs/igw0x-1"],
+            [
+                "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_ignore_world_contrast_against_a_world_bound_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """`--ignore-world` contrast pin (backlog #223 fix round 1): the same
+    argument with and without the flag under a tmp ROOT whose world file
+    contains the bounding consumer `dev-libs/igw0a`.
+
+    Real semantics (`3rdparty/portage` 3.0.82.2): `--ignore-world`
+    empties `_required_set_names` (`lib/_emerge/depgraph.py:357-360`),
+    so `_complete_graph` (`:8677-8731`) no longer walks the world seeds;
+    without the flag the installed world member `igw0a-1`'s own pin
+    (`>=dev-libs/igw0x-1 <dev-libs/igw0x-2`) collides with the requested
+    out-of-range version. Grounded live against the real
+    `ResolverPlayground` at EAPI 8 (`world=["dev-libs/igw0a"]`,
+    `igw0{x,a}` ebuilds/installed as in the fixture): the plain
+    `>=dev-libs/igw0x-2` cell answers `success=False` with empty
+    `slot_collision_solutions`, while the `--ignore-world` cell answers
+    `success=True`, `mergelist=["dev-libs/igw0x-2"]` (same for
+    `<dev-libs/igw0x-1` vs `igw0x-0.1`) — the EAPI-8 mirror of upstream
+    `test_complete_graph.py::testCompleteGraphVersionChange`'s
+    `--complete-graph-if-new-ver=y` (fail) vs `--ignore-world` (pass)
+    cells. The tmp ROOT uses the `_world_extra_env` copied-fixture
+    pattern (shared world plus `dev-libs/igw0a`), so the shared fixture
+    world file stays untouched.
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/igw0a")
+    cases = [
+        (
+            ">=dev-libs/igw0x-2",
+            "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+        ),
+        (
+            "<dev-libs/igw0x-1",
+            "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+        ),
+    ]
+    for atom, row in cases:
+        plain = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert plain.returncode == 1, atom
+        assert plain.stderr == "", atom
+        merges = [
+            ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")
+        ]
+        assert merges == [row], atom
+        assert "slot conflict" in plain.stdout, atom
+        assert "dev-libs/igw0a-1" in plain.stdout, atom
+        flagged = _run(
+            [str(emerge_binary)], ["--pretend", "--ignore-world", atom], env
+        )
+        assert flagged.returncode == 0, atom
+        assert flagged.stderr == "", atom
+        assert flagged.stdout.splitlines() == [row], atom
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
@@ -11922,6 +11989,7 @@ Dependency and target selection:
       --rebuild-if-unbuilt, -new-rev, -new-ver, -new-slot  rebuild an installed package when a build dep is merged
       --rebuild-exclude ATOMS, --rebuild-ignore ATOMS  keep packages out of the rebuild triggers
       --complete-graph[=y|n], --complete-graph-if-new-use, --complete-graph-if-new-ver  force a full deep graph walk
+      --ignore-world[=y|n]  ignore the @world set and its dependencies (complete-graph walks args only)
       --dynamic-deps[=y|n]  walk the ebuild (y, default) or the vdb snapshot (n) during --deep
       --backtrack N         maximum resolver backtracking passes (default 10; 0 disables)
       --package-moves[=y|n]  apply profiles/updates/ package moves (default y)
@@ -11954,6 +12022,7 @@ Build scheduling:
   -l, --load-average N       hold new builds while the load average exceeds N
   -a, --ask[=y|n]            prompt for confirmation before a real merge or removal
       --ask-enter-invalid    with --ask: a bare Enter is not accepted as Yes
+      --read-news[=y|n]      with --ask: offer to read unread news via eselect
       --ignore-default-opts  ignore the EMERGE_DEFAULT_OPTS variable for this run
       --keep-going           on a build failure, drop that package's dependents and carry on
       --quiet-build[=y|n]    redirect a build's phase output to ${T}/build.log (implied by -j >1 and -q)
@@ -16706,6 +16775,76 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
     )
 
 
+def test_info_shows_the_calling_env_over_make_conf(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """Backlog #219: `emerge --info` prints the calling environment over
+    the config files. Real `action_info` reads `settings.get(k)`
+    (`_emerge/actions.py:2240`), which walks `lookuplist` env-first
+    (real `config.py:3178-3182`; `USE_ORDER "env:pkg:conf:…"` at
+    `:1031-1035`); portuale's dump read `other_vars` first with the
+    process env only as a fallback (`pretend.rs` "Config sources win"),
+    so a key `resolve_config` never env-folds itself showed the file
+    value. Hermetically: a copied configroot whose `make.conf` sets
+    `PORTAGE_BZIP2_COMMAND` / `PORTAGE_BUNZIP2_COMMAND` (both on real's
+    hardcoded `myvars` list, neither in `ENV_SCALAR_VARS`, so both reads
+    were inverted) to file values, with different calling-env values on
+    top -- `--info` must show the env values. `PKGDIR` (same block,
+    already env-folded, so unchanged) is guarded too.
+    `BINPKG_COMPRESS[*]` / `BINPKG_FORMAT` are not pinned: real never
+    prints them (absent from `myvars`, and the fixture profiles ship no
+    `info_vars` that could add them).
+
+    Fix round 1 (review REQUEST_CHANGES, Important 1): `CONFIG_PROTECT`,
+    `CONFIG_PROTECT_MASK`, `ENV_UNSET` are also on real's hardcoded
+    `myvars` list (`_emerge/actions.py:2202-2205`) but took the dedicated
+    `resolved_incremental` arm, which never saw the calling env
+    (`apply_env_layer` only noted `TRACKED_INCREMENTALS` members that are
+    also in `ENV_SCALAR_VARS` -- i.e. only `FEATURES`). Real stacks the
+    env as the final source of every `const.INCREMENTALS` member's fold
+    (`config.regenerate()`: `mydbs = configlist[:-1] + [backupenv]` at
+    `config.py:2735-2736`; all four keys are members, `const.py:125-138`),
+    so the same configroot also sets conflicting `make.conf` values for
+    the three keys with different calling-env values on top -- `--info`
+    must show the stacked, sorted union (env tokens folded in, not env
+    replacing the files)."""
+    configroot = tmp_path / "configroot219"
+    shutil.copytree(fixtures_root / "etc", configroot / "etc", symlinks=True)
+    for entry in fixtures_root.iterdir():
+        if entry.name != "etc":
+            (configroot / entry.name).symlink_to(entry)
+    make_conf = configroot / "etc" / "portage" / "make.conf"
+    make_conf.write_text(
+        make_conf.read_text()
+        + '\nPORTAGE_BZIP2_COMMAND="conf-bzip2-219"\n'
+        + '\nPORTAGE_BUNZIP2_COMMAND="conf-bunzip2-219"\n'
+        + '\nCONFIG_PROTECT="/conf-protect-219"\n'
+        + '\nCONFIG_PROTECT_MASK="/conf-mask-219"\n'
+        + '\nENV_UNSET="CONF_UNSET_219"\n'
+    )
+
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(configroot)
+    env["PORTAGE_BZIP2_COMMAND"] = "env-bzip2-219"
+    env["PORTAGE_BUNZIP2_COMMAND"] = "env-bunzip2-219"
+    env["PKGDIR"] = str(tmp_path / "pkgdir-env-219")
+    env["CONFIG_PROTECT"] = "/env-protect-219"
+    env["CONFIG_PROTECT_MASK"] = "/env-mask-219"
+    env["ENV_UNSET"] = "ENV_UNSET_219"
+
+    rust = _run([str(emerge_binary)], ["--info"], env)
+    assert rust.returncode == 0
+    assert '\nPORTAGE_BZIP2_COMMAND="env-bzip2-219"\n' in rust.stdout
+    assert '\nPORTAGE_BUNZIP2_COMMAND="env-bunzip2-219"\n' in rust.stdout
+    assert f'\nPKGDIR="{tmp_path / "pkgdir-env-219"}"\n' in rust.stdout
+    assert "conf-bzip2-219" not in rust.stdout
+    assert "conf-bunzip2-219" not in rust.stdout
+    # Incremental fold: the calling env stacks onto make.conf, sorted.
+    assert '\nCONFIG_PROTECT="/conf-protect-219 /env-protect-219"\n' in rust.stdout
+    assert '\nCONFIG_PROTECT_MASK="/conf-mask-219 /env-mask-219"\n' in rust.stdout
+    assert '\nENV_UNSET="CONF_UNSET_219 ENV_UNSET_219"\n' in rust.stdout
+
+
 def test_info_atom_that_does_not_exist_errors_with_misspell_suggestions(
     emerge_binary, fixture_env
 ):
@@ -18370,26 +18509,25 @@ def test_oracle_slotop_conflict_rebuild(
     assert not [ln for ln in merges if "app-misc/A-2" in ln or "app-misc/B-0" in ln]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug 486580 needs the v2 `#24b` `_slot_operator_update_probe` "
-    "family: the leaves' recorded built `somassb:1/1=` deps must be "
-    "re-resolved against the graph's `somassb:2/2`. Verified live "
-    "against the vendored portage (ResolverPlayground, "
-    "`_slot_operator_update_backtrack` fires per leaf); S5's "
-    "`_slot_change_probe` only handles *unbuilt* `:=`/`:S=` deps from a "
-    "merge-bound parent, so it does not fire here. The leaves are also "
-    "outside the CLI seeds (named atoms are not seeded -- S3 seeds the "
-    "walk's own graph).",
-)
 def test_oracle_slotop_conflict_mass_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_conflict_rebuild.py::testSlotConflictMassRebuild`
     (bug 486580, `somassa --backtrack 3 -uD`): real merges
     `[somassa-1, somassb-2, 5 leaves]`. Renamed (`somass*`; upstream
-    `app-misc/A-1` carries different deps than the fixture `A-1`)."""
-    installed = [("app-misc", "somassb", "1", "1", {})]
+    `app-misc/A-1` carries different deps than the fixture `A-1`).
+    MATCHES real since #211 C1: the new-child-slot update-probe arm
+    (`depgraph.py:3121-3126`) schedules the installed leaves bound to the
+    abandoned slot even with an empty world (walked, not merely
+    reachable). Ported through the `slot_operator_rebuild_scan`, so the
+    leaves merge as walked `rR` nodes with the `causing rebuilds` block
+    (verified against the vendored portage's Playground mergelist, and
+    against live real 3.0.82.2 in the #211 R2 container probe: the
+    rebuilds need EAPI-bearing vdb -- real's `FakeVartree` overlay
+    refuses EAPI-less records, so without the `EAPI` files below live
+    real merges no leaves while the Playground's EAPI-5 records do).
+    The `EAPI` files keep this pin's staging faithful to that oracle."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
     installed += [
         (
             "app-misc",
@@ -18397,6 +18535,7 @@ def test_oracle_slotop_conflict_mass_rebuild(
             "1",
             "0",
             {
+                "EAPI": "8",
                 "DEPEND": "app-misc/somassb:1/1=",
                 "RDEPEND": "app-misc/somassb:1/1=",
             },
@@ -18418,6 +18557,160 @@ def test_oracle_slotop_conflict_mass_rebuild(
         ("app-misc/somassc2c", "1"),
         ("app-misc/somassc3c", "1"),
         ("app-misc/somassc4c", "1"),
+    }
+
+
+def test_oracle_slotop_update_probe_refusal(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Real `_slot_operator_check_reverse_dependencies`
+    (`3rdparty/portage/lib/_emerge/depgraph.py:2472`, gates `:2622` and
+    `:2738`): the conflict-mass shape (bug 486580, `somassa
+    --backtrack 3 -uD`) plus an installed world parent
+    (`app-misc/somassveto-1`, recorded `<app-misc/somassb-2`) whose atom
+    the fresh `somassb-2` child violates. Real refuses the whole
+    replacement: the probe's candidate-child gate fails, so no leaf
+    rebuild is scheduled, while     `somassa-1` + `somassb-2` still merge
+    (verified against real 3.0.82.2 in the one container probe the
+    #211 R2 slice ran: control merges the 5 leaves at `backtrack: 1/3`,
+    the veto run merges only `somassa-1` + `somassb-2` at `0/3`; log in
+    the report). MATCHES real since #211 R2: the rebuild scan checks the
+    fresh candidate against every other in-scope installed parent (built
+    `:S/SS=` relaxed to `:=`) and withholds the edge on mismatch. The
+    veto parent rides the world file (complete-mode reachability, the
+    `FX_WORLD_EXTRA` staging pattern); its live ebuild carries the veto
+    atom itself (real only sees parent pins through the walked depstring
+    + the built-`:=` overlay, never raw vdb), and the `EAPI` files keep
+    the probe registration faithful (see the control pin above)."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
+    installed += [
+        (
+            "app-misc",
+            f"somassc{i}c",
+            "1",
+            "0",
+            {
+                "EAPI": "8",
+                "DEPEND": "app-misc/somassb:1/1=",
+                "RDEPEND": "app-misc/somassb:1/1=",
+            },
+        )
+        for i in range(5)
+    ]
+    installed.append(
+        (
+            "app-misc",
+            "somassveto",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "<app-misc/somassb-2"},
+        )
+    )
+    root = _b1_root(tmp_path, ["app-misc/somassveto"], installed)
+    rust = _b1_run(
+        ["--pretend", "--backtrack", "3", "--update", "--deep", "app-misc/somassa"],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/somass")}
+    assert got == {
+        ("app-misc/somassa", "1"),
+        ("app-misc/somassb", "2"),
+    }
+
+
+def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 item 2: the new-child-slot arm also probes
+    `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
+    mismatch. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and an
+    installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
+    form; the live ebuild carries bare `:=`); the run upgrades slot 1
+    to `mmprov-3` (`1/2`). Real's candidate loop
+    (`_iter_similar_available`, `depgraph.py:2660-2695`) ranges over
+    every available package, not only fresh-slot merges, so the probe
+    fires for the slot-1 upgrade against the slot-0-bound consumer and
+    the consumer rebuilds. MATCHES real since #211 item 2 (code-grounded:
+    the loop text has no entry-kind restriction; the direction follows
+    the R2-probe-validated new-slot arm). The `EAPI` files keep the
+    probe registration faithful (see the conflict-mass pin)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+
+
+def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 I1: the `--solver=` bridge threads the request's
+    `update`/top-level atoms into its rebuild fixpoint, so the
+    new-child-slot arm (both the fresh-slot and the item-2
+    bound-slot-mismatch halves, plus the R2 refusal) runs there exactly
+    as on the default path. On the `mmprov` shape the pubgrub walk
+    produces the same slot-1 `Upgrade` entry, and the bridge schedules
+    the same consumer rebuild. (`resolvo` does not resolve the direct
+    upgrade arg at all here -- an engine-side gap below this layer,
+    reported for filing; the conflict-mass shape likewise resolves
+    walked `:=` deps to installed inside both engines, so scan-level
+    agreement cannot reach it without engine-side probe scheduling.)"""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "--solver=pubgrub",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
     }
 
 
@@ -20470,6 +20763,106 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     ], result.stdout
 
 
+def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209: `--backtrack=0` must not skip the reverse-dependency
+    feed loop. Real `_resolve_conflicts` (`_emerge/depgraph.py:9444`)
+    calls `_complete_graph()` (`:8562`) with no `_allow_backtracking`
+    gate, so an installed world consumer's satisfiable pin enforces
+    in-pass even with backtracking off.
+
+    Hermetic r25 shape (#25 S0, the `FX_WORLD_EXTRA=dev-libs/r25consumer`
+    bed cell in `l0-fixture-oracle-r25.txt`): installed `r25consumer-1.0`
+    pins `<dev-libs/r25lib-2.0:=` (recorded `:0/1=` bound form) against
+    the `r25lib` 1.0->2.0 update pulled through installed `r25mid`'s
+    `:=` dep. Expected from real (`differential-test-bed/findings/l0.md`
+    "## #25 S0", default flags there: two merge rows, no warning,
+    `backtrack: 0/20` -- the selection path that withholds has no
+    backtracking gate anywhere in its chain, so `--backtrack=0` answers
+    the same; the coordinator's bed oracles the new bt0 cell directly):
+    `r25up-2.0 [U]` + `r25target-1.0 [N]`, rc 0, no skipped-update block,
+    no rebuild block (real's slot-op trigger is backtracking-gated), and
+    `--json` `restarts` 0. Before the fix portuale settled the root pass
+    without the pin and merged `r25lib-2.0` here."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "dev-libs/r25target",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/r25up-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/r25target-1.0 ",
+    ]
+    out = rust.stdout + rust.stderr
+    assert "have been skipped" not in out
+    assert "causing rebuilds" not in out
+    rj = _run([str(emerge_binary)], ["--pretend", "--json", *args[1:]], env)
+    assert rj.returncode == 0
+    assert json.loads(rj.stdout)["backtrack"] == {"restarts": 0, "max": 0}
+
+
+def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209 S0: a pin that cannot be satisfied when backtracking
+    is off is reported, not skipped and not warned away. Same r25 world
+    as above, but the hard requirement is an explicit `=r25lib-2.0`
+    argument the consumer's `<2.0` pin cannot hold alongside, so the scan
+    drops the pin and the residual conflict reports it.
+
+    Expected from real (g209 S0 container probe: real 3.0.81.3 staged
+    like the bed with `FX_WORLD_EXTRA=dev-libs/r25consumer`, argv
+    `emerge -p --backtrack=0 --update --deep --newuse --oneshot
+    "=dev-libs/r25lib-2.0"`; the reporting chain
+    (`_resolve_conflicts` -> `_complete_graph` -> unsatisfied-dep loop
+    -> `_process_slot_conflicts` -> `_solve_non_slot_operator_slot_conflicts`,
+    `3rdparty/portage` 3.0.82.2) carries no `_allow_backtracking` gate
+    on any link, so the pin lands as a slot-collision report): the 2.0
+    merge row, then the residual block pairing it (the `(Argument)`
+    puller) against installed 1.0 (the consumer pin), rc 1. One display
+    nit vs the probe: real renders the consumer's `:=` bound form
+    first, portuale the normalised `<2.0` form (same two parents, order
+    only; the `(and 1 more ...)` tail agrees)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "=dev-libs/r25lib-2.0",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines()[:1] == [
+        "[ebuild     U  ] dev-libs/r25lib-2.0 [1.0]",
+    ]
+    _assert_residual_slot_conflict_block(
+        rust.stdout,
+        env["ROOT"],
+        "dev-libs/r25lib:0",
+        "dev-libs/r25lib-2.0:0/2::testrepo",
+        [(None, "=dev-libs/r25lib-2.0", False)],
+        "dev-libs/r25lib-1.0:0/1::testrepo",
+        [
+            (
+                "dev-libs/r25consumer-1.0:0/0::testrepo",
+                "<dev-libs/r25lib-2.0",
+                True,
+            ),
+        ],
+    )
+
+
 def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     emerge_binary, fixture_env
 ):
@@ -20521,6 +20914,93 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
             "    ^                            ^^^",
             "",
         ], (extra, result.stdout)
+
+
+@pytest.mark.parametrize(
+    "extra_args", [[], ["--update", "--deep"]], ids=["changed-slot", "changed-slot-update-deep"]
+)
+def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
+    emerge_binary, fixture_env, tmp_path, fixtures_root, extra_args
+):
+    """Backlog #210 round 2: a same-version sub-slot change without a
+    revbump counts as a version change -- the reinstall is withheld, not
+    merged, when world-reachable installed consumers pin the old slot.
+
+    `dev-libs/reinstslottarget` is installed at 1.0 (`SLOT="0/1"`) with
+    1.0 visible at `SLOT="0/2"`; the copied world adds the installed
+    consumers `dev-libs/reinstslotconsumer`
+    (`RDEPEND="dev-libs/reinstslottarget:0/1"`) and
+    `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`), leaving the
+    shared fixture world untouched (the #54 K2/K3 copy pattern). Real
+    3.0.82.2 on the staged hermetic tree (coordinator probe
+    `differential-test-bed/logs/_g210-probe.txt`, run dir
+    `logs/l0-fx-20260927T225534Z`, `FX_WORLD_EXTRA` with both consumers)
+    merges NOTHING on either argv and prints the skipped-update warning
+    for `dev-libs/reinstslottarget:0` listing BOTH consumers' atoms, rc 0.
+
+    The pinned bytes are portuale's own rendering of that shape (one
+    block, bare `USE=""`, no `^` operator markers or root suffixes --
+    the #227 explanation-rendering gap, shared with the blk0 cells -- not
+    real's); the invariant (withhold, rc 0, both atoms named) is real's.
+    """
+    env = _world_extra_env(
+        fixture_env,
+        tmp_path,
+        fixtures_root,
+        "dev-libs/reinstslotconsumer",
+        "dev-libs/reinstslotbound",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--changed-slot", *extra_args, "dev-libs/reinstslottarget"],
+        env,
+    )
+    assert result.returncode == 0, (extra_args, result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/reinstslottarget:0",
+        "",
+        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed) USE=""',
+        "    ",
+        '    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed) USE=""',
+        "    ",
+        "",
+    ], (extra_args, result.stdout)
+    assert result.stderr == "", (extra_args, result.stderr)
+
+
+def test_oracle_210_slot_change_reinstall_ignores_a_noop_argument_consumer(
+    emerge_binary, fixture_env
+):
+    """Backlog #210 round 2 (Q2a): a top-level argument that settles
+    `AlreadyInstalled` is a no-op request, not a digraph node in real, so
+    its recorded pin never constrains the reinstall.
+
+    Same target shape as above but the consumer stays out of `@world`
+    and is passed as an argument instead. Real 3.0.82.2 reinstalls the
+    target silently here (`[ebuild R]`, rc 0 -- the round-1 probe in
+    `g210-report.md` §S0, all three `T C` shapes byte-identical); the
+    constraint only fires once the required-set walk reaches the
+    consumer (the withhold cell above). Before the #210 fix portuale
+    matched real here only because the reinstall filled no constraint
+    source at all; the pin gates this shape stays silent.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--changed-slot",
+            "dev-libs/reinstslottarget",
+            "dev-libs/reinstslotconsumer",
+        ],
+        fixture_env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/reinstslottarget-1.0 [1.0]",
+    ], result.stdout
 
 
 # Backlog #181: live real `emerge -p` text for the upstream

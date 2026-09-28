@@ -154,18 +154,23 @@ def _skipped_row_key(s: str) -> str:
     """
     s = KV.sub("", s)
     s = re.sub(r"\s+to\s+'<root>'", "", s)
+    # real's installed parents carry ` in '<root>'` (`Package.__str__`)
+    s = re.sub(r"\s+in\s+'<root>'", "", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
 def _is_skipped_group_header(s: str) -> bool:
-    """A group header is a bare `cat/pkg:slot` token (real's
-    `str(pkg.slot_atom)`, portuale's `{category}/{package}:{slot}`).
+    """A group header is a `cat/pkg:slot` token (real's
+    `str(pkg.slot_atom)`, portuale's `{category}/{package}:{slot}`),
+    optionally followed by real's ` for <root>`.
 
     Any other non-indented line (the `!!!` abbreviated tail, autounmask
     advice, `emerge:` errors, ...) ends the block instead.
     """
     toks = s.strip().split()
-    if len(toks) != 1:
+    # Real appends ` for <root>` when ROOT != "/" (`depgraph.py:1662-1664`);
+    # the staged fixture oracle always runs with such a root.
+    if not (len(toks) == 1 or (len(toks) == 3 and toks[1] == "for")):
         return False
     tok = toks[0]
     return "/" in tok and ":" in tok and not tok.startswith(("!", "#", "["))

@@ -777,6 +777,7 @@ def _write_tmp_binhost(tmp_path):
     size = (binhost / "dev-libs/binpkgrmpkg-1.0.tbz2").stat().st_size
     (binhost / "Packages").write_text(
         "TIMESTAMP: 0\n"
+        "VERSION: 0\n"
         "PACKAGES: 1\n"
         "\n"
         "BUILD_ID: 1\n"
@@ -995,7 +996,7 @@ def _write_tmp_keep_binhost(tmp_path):
         )
         records.append(record)
     (binhost / "Packages").write_text(
-        "TIMESTAMP: 0\nPACKAGES: 3\n\n" + "\n".join(records)
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n" + "\n".join(records)
     )
     return binhost
 
@@ -2573,7 +2574,7 @@ def _signed_binhost_env(tmp_path, home):
     shutil.copy(src, binhost / "dev-libs/gpgsignedpkg-1.0.gpkg.tar")
     body = (binhost / "dev-libs/gpgsignedpkg-1.0.gpkg.tar").read_bytes()
     (binhost / "Packages").write_text(
-        "TIMESTAMP: 0\n\n"
+        "TIMESTAMP: 0\nVERSION: 0\n\n"
         "CPV: dev-libs/gpgsignedpkg-1.0\n"
         "DEFINED_PHASES: -\n"
         "DESCRIPTION: signed test package\n"
@@ -4674,6 +4675,501 @@ def test_emerge_without_display_flags_shows_no_merge_list_like_real(
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
 
 
+def test_emerge_oneshot_prints_news_count_notice_twice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196: a real non-`--pretend` `emerge` prints the GLEP 42
+    news-count notice twice -- once before resolution (real
+    `_emerge/actions.py:4264`, `run_action`, only when `--pretend` is
+    absent) and again after the merge (real `_emerge/post_emerge.py:155`,
+    `post_emerge`, once the vdb changed). Both go through real
+    `post_emerge.py:37` `display_news_notification` (gated on `news` in
+    FEATURES plus a nonzero unread count, counted by real
+    `portage/news.py` `NewsManager`), printing real
+    `news.py:509` `display_news_notifications`' text:
+    ` * IMPORTANT: N news items need reading for repository '<repo>'.`
+    plus ` * Use eselect news read to view new items.`. The m185
+    container probe shows the pre-resolution notice standing first in
+    real's pre-`>>>` output (news, blank, header, `Calculating...`).
+    The fixture testrepo carries eleven news items, five of them
+    relevant (see `test_check_news_counts_unread_relevant_items`), so
+    the hermetic count here is 5. Real `display_news_notification` is
+    gated on `news` in FEATURES; the fixture config root ships no
+    `make.globals` (and the suite strips the calling-env `FEATURES`),
+    so this test opts in with `FEATURES="news"` -- the same layering a
+    real `FEATURES="news" emerge ...` invocation uses. The
+    `--buildpkgonly` step shows the pre-resolution notice only: it
+    never merges, so real's `_pkgs_changed` stays false and its
+    `post_emerge` early-returns with no second notice."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env["FEATURES"] = "news"
+
+    b = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert b.stdout.count("news items need reading") == 1
+    assert "5 news items need reading for repository 'testrepo'." in b.stdout
+    assert "Use eselect news read to view new items." in b.stdout
+    assert b.stdout.index("need reading") < b.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "ptmp-merge")
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--oneshot", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    # Twice: pre-resolution, then post-merge -- and in that order (the
+    # pre notice stands before `Calculating...`, the post notice after
+    # the last `>>>` merge line).
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
+    assert r.stdout.count("Use eselect news read to view new items.") == 2
+    assert r.stdout.index("need reading") < r.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+    assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
+    assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
+    # Real `NewsManager.updateItems`' own write-back: the evaluated
+    # items sit in `.unread` (and `.skip`) under ROOT.
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_buildpkgonly_without_news_feature_prints_no_notice(
+    emerge_binary, tmp_path
+):
+    """Backlog #196, the FEATURES gate: real
+    `_emerge/post_emerge.py:38` skips the notice wholesale unless
+    `news` is in `FEATURES` (no evaluation, no output, no state
+    files) -- so a non-`--pretend` run without the feature prints no
+    notice at either point. (The merge flow without the feature is
+    covered by every neighbouring `env.pop("FEATURES", None)` test,
+    e.g. the #185 no-merge-list test directly above.)"""
+    import shutil
+
+    root = tmp_path / "root-gated"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env.pop("FEATURES", None)
+
+    b = subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert "news items need reading" not in b.stdout
+    assert "eselect news read" not in b.stdout
+    assert not (root / "var/lib/gentoo/news").exists()
+
+
+def _news_env(tmp_path, name):
+    """Backlog #196 fix round 1: an isolated ROOT (a copy of the
+    fixtures' `var`, so merges/unmerges never touch the git-tracked
+    tree) with `FEATURES="news"` opted in -- the same layering a real
+    `FEATURES="news" emerge ...` invocation uses. Returns `(root,
+    env)`."""
+    import shutil
+
+    root = tmp_path / name
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "portage-tmpdir")
+    env["PKGDIR"] = str(root / "pkgdir")
+    env["FEATURES"] = "news"
+    return root, env
+
+
+def test_emerge_pretend_prints_news_count_notice_at_the_end_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real `emerge --pretend` prints the
+    GLEP 42 count notice at the end of the run (real
+    `_emerge/post_emerge.py:112-117`, `post_emerge`: the vdb never
+    changes under `--pretend`, so the `--pretend` arm prints the
+    notice through real `post_emerge.py:37`
+    `display_news_notification` -- gated on `news` in FEATURES plus a
+    nonzero unread count, counted by real `portage/news.py`
+    `NewsManager`). There is no pre-resolution notice under
+    `--pretend` (real `_emerge/actions.py:4264` only fires when
+    `--pretend` is absent), so exactly one notice appears, after the
+    merge list -- and real's own `updateItems` write-back lands in
+    `.unread` under ROOT, like on every other notice path."""
+    root, env = _news_env(tmp_path, "root-pretend-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    assert r.stdout.index("[ebuild") < r.stdout.index("need reading")
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_pretend_failed_resolve_still_prints_news_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real calls `post_emerge`
+    unconditionally after `action_build` (real
+    `_emerge/actions.py:4289-4297`), so the `--pretend` arm (real
+    `post_emerge.py:112-117`) prints the notice even when the resolve
+    itself failed. `dev-libs/anyofunresolvable` aborts the resolve
+    (its `||` RDEPEND has no visible candidate anywhere -- see
+    `test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable`),
+    yet the end notice still prints exactly once."""
+    root, env = _news_env(tmp_path, "root-pretend-fail-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "dev-libs/anyofunresolvable"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_failed_resolve_still_prints_pre_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 (review Minor item 6): the pre-resolution notice
+    (real `_emerge/actions.py:4264`) sits before `action_build`, so it
+    fires even when the resolve itself later fails -- a plain
+    `emerge dev-libs/anyofunresolvable` exits 1 with exactly one
+    notice (the pre one, before `Calculating...`), and no post notice
+    (nothing merged, so real's `_pkgs_changed` gate stays shut)."""
+    root, env = _news_env(tmp_path, "root-resolve-fail-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/anyofunresolvable"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    assert r.stdout.index("need reading") < r.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+    assert not (root / "var/db/pkg/dev-libs/anyofunresolvable-1.0").exists()
+
+
+def test_emerge_quiet_still_prints_news_count_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 (review Minor item 6): real
+    `display_news_notification` (real `post_emerge.py:37`) consults
+    neither `--quiet` nor `--ask` -- so a quiet `--buildpkgonly`
+    run with `news` in FEATURES still prints the (pre-resolution)
+    notice exactly once."""
+    root, env = _news_env(tmp_path, "root-quiet-news")
+
+    b = subprocess.run(
+        [str(emerge_binary), "-q", "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env,
+    )
+    assert b.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert b.stdout.count("Use eselect news read to view new items.") == 1
+
+
+def test_emerge_failed_merge_prints_news_notice_when_the_vdb_changed_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real `post_emerge.py:155` prints the
+    notice regardless of retval (`retval` only feeds `exit_msg`,
+    `:104-108`). `dev-libs/schedok` merges first, then
+    `dev-libs/schedbad`'s `src_install` dies (the deliberate fixture
+    build failure -- see
+    `test_emerge_jobs_keep_going_skips_a_failed_builds_dependents`):
+    the vdb changed, so the notice prints a second time, after the
+    failing `>>>` line -- two notices in total (pre + post-failure),
+    in that order."""
+    root, env = _news_env(tmp_path, "root-merge-fail-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/schedok", "dev-libs/schedbad"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
+    assert not (root / "var/db/pkg/dev-libs/schedbad-1.0").exists()
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
+    assert r.stdout.count("Use eselect news read to view new items.") == 2
+    assert r.stdout.index("need reading") < r.stdout.index(
+        "Calculating dependencies ... done!"
+    )
+    assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
+
+
+def test_emerge_failed_merge_without_any_merge_prints_no_post_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: the failure-path notice is still
+    gated on real's `_pkgs_changed` (real `post_emerge.py:112-117`
+    early-returns when nothing changed). With the failing
+    `dev-libs/schedbad` first, nothing merges at all -- so only the
+    pre-resolution notice prints, exactly once."""
+    root, env = _news_env(tmp_path, "root-merge-fail-silent-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/schedbad", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert not (root / "var/db/pkg/dev-libs/schedok-1.0").exists()
+    assert not (root / "var/db/pkg/dev-libs/schedbad-1.0").exists()
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+
+
+def test_emerge_unmerge_prints_news_count_notice_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #196 fix round 1: real calls `post_emerge` after the
+    uninstall actions too (real `_emerge/actions.py:4164-4175` --
+    clean/depclean/prune/unmerge/rage-clean, except
+    deselect/buildpkgonly/fetchonly/pretend), whose tail is the same
+    GLEP 42 notice. Seed `dev-libs/binpkgrmpkg-1.0` via a direct
+    `ebuild <file> merge` (like the neighbouring `-C` test): a
+    pretend `-p -C` prints no notice (real skips `post_emerge`
+    under `--pretend`), while the real `-C` prints it exactly once,
+    after the removal -- and the package is really gone."""
+    root, env = _news_env(tmp_path, "root-unmerge-news")
+    v1 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/binpkgrmpkg/binpkgrmpkg-1.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r1 = subprocess.run(
+        [str(ebuild_link), v1, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r1.returncode == 0, r1.stderr
+    assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0").is_dir()
+
+    p = subprocess.run(
+        [str(emerge_binary), "-p", "-C", "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert p.returncode == 0, (p.stdout, p.stderr)
+    assert "news items need reading" not in p.stdout
+    assert "eselect news read" not in p.stdout
+    assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0").is_dir()
+
+    r = subprocess.run(
+        [str(emerge_binary), "-C", "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert r.stdout.count("Use eselect news read to view new items.") == 1
+    assert r.stdout.index(">>> Unmerging (1 of 1)") < r.stdout.index("need reading")
+    assert not (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0").exists()
+    unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
+    assert len(unread) == 5
+
+
+def test_emerge_resume_prints_news_notices_like_real(emerge_binary, tmp_path):
+    """Backlog #231 (a): real `run_action` prints the pre-resolution
+    news-count notice before `action_build` -- and the resume handling
+    lives inside `action_build` (real `_emerge/actions.py:220-4289`)
+    -- so a resumed build prints it too; real `post_emerge`
+    (`post_emerge.py:155`, called unconditionally at
+    `actions.py:4289-4297`) prints the post notice once the resumed
+    merge changed the vdb. `dev-libs/schedbad`'s src_install dies, so
+    the seed run (`schedbad` first: nothing merges) prints the notice
+    exactly once; `--resume --pretend` prints it exactly once (the
+    `post_emerge.py:112-117` pretend arm -- the pre notice is itself
+    `--pretend`-gated); `--resume --skipfirst` merges `schedok` and
+    prints it twice, pre before `>>> Resuming...` and post after the
+    last `>>>` line."""
+    import json
+
+    root, env = _news_env(tmp_path, "root-resume-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/schedbad", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    mtimedb = root / "var/cache/edb/mtimedb"
+    saved = json.loads(mtimedb.read_text())
+    assert [x[2] for x in saved["resume"]["mergelist"]] == [
+        "dev-libs/schedbad-1.0", "dev-libs/schedok-1.0",
+    ]
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--pretend"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--skipfirst"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
+    assert r.stdout.count("Use eselect news read to view new items.") == 2
+    assert r.stdout.index("need reading") < r.stdout.index(">>> Resuming")
+    assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
+    assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
+    assert not mtimedb.exists()  # resume list cleared on success
+
+
+def test_mrg_remote_success_prints_no_post_merge_notice_like_real(
+    mrg_binary, fixture_env, tmp_path
+):
+    """Backlog #231 (b): the remote-execution early return skips
+    `post_emerge`'s tail -- correctly so. The remote plan merges onto
+    the remote host; the local `${ROOT}/var/db/pkg` is never touched,
+    so real's `_pkgs_changed` gate (real
+    `_emerge/post_emerge.py:112-117`) evaluates false and -- the run
+    being non-`--pretend` -- the tail would print nothing. Same
+    local-transport setup as
+    `test_mrg_remote_resolve_merges_a_binhost_binary` but with
+    `FEATURES="news"` and a fixture-`var` client ROOT (the hermetic
+    5-count vdb): the pre-resolution notice prints exactly once,
+    before `Calculating...`, and no post-merge notice follows the
+    remote merge."""
+    import shutil as _shutil
+
+    binhost = _write_tmp_binhost(tmp_path)
+    clientetc = _write_tmp_clientetc(tmp_path, binhost)
+    root = tmp_path / "root-remote-news"
+    _shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = _remote_resolve_env(fixture_env, root, clientetc)
+    env["FEATURES"] = "news"
+    result = subprocess.run(
+        [str(mrg_binary),
+         "--getbinpkgonly",
+         "--remote-hostname", "localtest",
+         "--remote-transport", "local",
+         "--remote-root", str(root),
+         "--remote-workdir", str(tmp_path / "work-news"),
+         "--remote-etc-portage", f"server:{clientetc}",
+         "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> Remote merged dev-libs/binpkgrmpkg-1.0" in result.stdout
+    assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0/CONTENTS").is_file()
+    assert result.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert result.stdout.index("need reading") < result.stdout.index("Calculating")
+
+
+def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n"):
+    """Run `emerge --ask --read-news --oneshot dev-libs/schedok` with
+    stdin on a pty (real `actions.py:3920-3926` rejects `--ask` on a
+    non-terminal). `script(1)` provides the pty -- resolved absolutely
+    so a test can empty `PATH` -- and its own stdin (a pipe here) feeds
+    the child's answers. Returns the completed process."""
+    import shlex as _shlex
+    import shutil as _shutil
+
+    script = _shutil.which("script") or "/usr/bin/script"
+    argv = [
+        str(emerge_binary),
+        "--ask", "--read-news", "--oneshot", "dev-libs/schedok",
+    ]
+    cmd = " ".join(_shlex.quote(a) for a in argv)
+    return subprocess.run(
+        [script, "-qec", cmd, "/dev/null"],
+        input=answers,
+        capture_output=True, text=True, check=False, env=env,
+    )
+
+
+def test_emerge_ask_read_news_spawns_eselect_like_real(emerge_binary, tmp_path):
+    """Backlog #231 (c): real `_emerge/actions.py:4266-4281` -- once
+    the pre-resolution notice printed, `--ask --read-news` prompts
+    "Would you like to read the news items while calculating
+    dependencies?" and spawns `eselect news read` on "Yes", then
+    continues into the resolve. The stub on `PATH` records its argv;
+    the declined merge prompt still exits 130 with `Quitting.`."""
+    root, env = _news_env(tmp_path, "root-ask-read-news")
+    stubdir = tmp_path / "stubs"
+    stubdir.mkdir()
+    marker = stubdir / "eselect.log"
+    (stubdir / "eselect").write_text(
+        f'#!/bin/sh\necho "$@" >> {marker}\n'
+    )
+    (stubdir / "eselect").chmod(0o755)
+    env["PATH"] = f"{stubdir}{os.pathsep}{env.get('PATH', '')}"
+
+    r = _read_news_pty_run(emerge_binary, env)
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert "Quitting." in r.stdout
+    assert marker.read_text() == "news read\n"
+
+
+def test_emerge_ask_read_news_no_skips_eselect_like_real(emerge_binary, tmp_path):
+    """Backlog #231 (c), the "No" arm: real's `== "Yes"` check fails,
+    so no spawn happens and the run continues -- the stub marker never
+    appears, while the notice still printed once and the declined merge
+    prompt still exits 130."""
+    root, env = _news_env(tmp_path, "root-ask-read-news-no")
+    stubdir = tmp_path / "stubs-no"
+    stubdir.mkdir()
+    marker = stubdir / "eselect.log"
+    (stubdir / "eselect").write_text(
+        f'#!/bin/sh\necho "$@" >> {marker}\n'
+    )
+    (stubdir / "eselect").chmod(0o755)
+    env["PATH"] = f"{stubdir}{os.pathsep}{env.get('PATH', '')}"
+    r = _read_news_pty_run(emerge_binary, env, answers="No\nNo\n")
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert not marker.exists()
+
+
+def test_emerge_ask_read_news_without_eselect_prints_real_hint(
+    emerge_binary, tmp_path
+):
+    """Backlog #231 (c): real catches the spawn's `OSError` (eselect
+    missing) and prints `Please install eselect to use this feature.`
+    (real `_emerge/actions.py:4284-4287`). `PATH` is emptied so the
+    spawn must fail; the "Yes" is still consumed and the declined merge
+    prompt still exits 130. (`script` merges the child's stderr into
+    the pty, so the message is asserted on stdout here; the dedicated
+    Rust test pins the stderr stream with separate pipes.)"""
+    root, env = _news_env(tmp_path, "root-ask-read-news-missing")
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    env["PATH"] = str(empty)
+    r = _read_news_pty_run(emerge_binary, env)
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Please install eselect to use this feature." in r.stdout
+
+
 def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
     emerge_binary, tmp_path
 ):
@@ -5241,6 +5737,48 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert ">>> Jobs: 1 of 3 complete" in out
     assert ">>> Jobs: 3 of 3 complete" in out
 
+    # Backlog #197 (n197 container probe, real
+    # `_emerge/JobStatusDisplay.py::_display_status` on a non-tty): the
+    # `>>> Jobs:` line shape is `Jobs: C of M complete[, R running][,
+    # F failed][, W merge wait]` plus real's space padding to the
+    # 68-column jobs field. Real's `Load avg:` trailer is cut (fix
+    # round 1, coordinator ruling B14: repeated-run determinism is a
+    # jointly-owned gate, nondeterministic values never go to stdout --
+    # exactly like #185 cut the resolution seconds); the counters, arms
+    # and padding are pinned exactly, with no test-side normalisation.
+    import re
+
+    assert (
+        ">>> Jobs: 0 of 3 complete, 1 running" + " " * 36 in out
+    )
+    assert ">>> Jobs: 3 of 3 complete" + " " * 47 in out
+    assert "Load avg:" not in out
+    for line in out.splitlines():
+        if not line.startswith(">>> Jobs:"):
+            continue
+        assert re.fullmatch(
+            r">>> Jobs: \d+ of 3 complete(, \d+ (running|failed|merge wait))* +",
+            line,
+        ), repr(line)
+    # Dispatch order is deterministic: the first `1 running` line (leaf
+    # A's dispatch) precedes both leaves' `>>> Emerging` lines, and the
+    # final `3 of 3` line follows the last `>>> Completed` line.
+    assert out.index(">>> Jobs: 0 of 3 complete, 1 running") < min(
+        out.index(f">>> Emerging (1 of 3) dev-libs/schedleaf-a-1.0::testrepo for {root}"),
+        out.index(f">>> Emerging (2 of 3) dev-libs/schedleaf-b-1.0::testrepo for {root}"),
+    )
+    assert out.index(
+        ">>> Jobs: 3 of 3 complete" + " " * 47
+    ) > out.index(
+        f">>> Completed (3 of 3) dev-libs/schedparent-1.0::testrepo to {root}"
+    )
+    # Background mode (real `Scheduler._background_mode`): no leading
+    # blank line anywhere between the first and the last `>>> Jobs:`
+    # line -- every status line prints unblanked.
+    jobs_first = out.index(">>> Jobs:")
+    jobs_last = out.rindex(">>> Jobs: 3 of 3 complete")
+    assert "" not in out[jobs_first:jobs_last].splitlines()
+
     # Real `--quiet-build` (on by default under `--jobs`): each build's
     # own phase output is captured to `${T}/build.log`, NOT interleaved on
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
@@ -5264,6 +5802,182 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert (
         tmp_path / "portage-tmpdir/portage/dev-libs/schedleaf-a-1.0/temp/build.log"
     ).is_file()
+
+
+def test_emerge_serial_merge_status_lines_carry_reals_leading_blank(
+    emerge_binary, tmp_path
+):
+    """Backlog #197, S1 (real `_emerge/Scheduler.py::_status_msg`): a
+    serial non-`--quiet` merge is not in background mode, so real
+    prefixes every `>>>` status line with a blank line -- and prints no
+    `>>> Jobs:` lines at all (the display is quiet). Merges the same
+    three-package `schedparent` set the `-j2` pin above merges, one job
+    at a time. Grounded in the n197 container probe (serial shape)."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["FEATURES"] = "keepwork"
+
+    r = subprocess.run(
+        [str(emerge_binary), "--oneshot", "dev-libs/schedparent"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    out = r.stdout
+    assert ">>> Jobs:" not in out
+    lines = out.splitlines()
+    statuses = [
+        i
+        for i, line in enumerate(lines)
+        if line.startswith(">>> Emerging (")
+        or line.startswith(">>> Installing (")
+        or line.startswith(">>> Completed (")
+    ]
+    # All nine status lines (three packages x Emerging/Installing/
+    # Completed) print, each immediately preceded by exactly one blank
+    # line -- fix round 1: the pre-merge `println!` duplicated the
+    # first one, so the first line's predecessors are pinned too (its
+    # second predecessor is real's resolution-timing trailer, whose own
+    # blank is the only other blank allowed there).
+    assert len(statuses) == 9
+    for i in statuses:
+        assert lines[i - 1] == "", repr(lines[max(0, i - 2) : i + 1])
+    for i in statuses[1:]:
+        assert lines[i - 2] != "", repr(lines[i - 2 : i + 1])
+    first = statuses[0]
+    assert lines[first - 1] == "" and lines[first - 2] == "", repr(
+        lines[max(0, first - 3) : first + 1]
+    )
+    assert lines[first - 3] != "", repr(lines[max(0, first - 3) : first + 1])
+
+
+def test_emerge_quiet_verbose_shows_jobs_lines_without_blanks(
+    emerge_binary, tmp_path
+):
+    """Backlog #197, S2 (real `Scheduler._background_mode` +
+    `JobStatusDisplay`): `--quiet --verbose` is background mode with the
+    display live, so a serial merge prints `>>> Jobs:` lines (start,
+    build-end, merge-land, like the n197 probe's s3 shape) with no
+    leading blanks anywhere; `--quiet` alone prints the same status
+    lines with neither blanks nor Jobs lines (the probe's s4 shape).
+    Real's `Load avg:` trailer is cut (fix round 1, coordinator ruling
+    B14 -- see the `-j2` pin above), so the lines pin byte-for-byte."""
+    import shutil
+
+    def _run(args, n):
+        root = tmp_path / f"root{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{n}")
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", "dev-libs/schedleaf-a"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr
+        return r.stdout, root
+
+    out, root = _run(["--quiet", "--verbose"], 0)
+    assert ">>> Jobs: 0 of 1 complete, 1 running" + " " * 36 in out
+    assert ">>> Jobs: 1 of 1 complete" + " " * 47 in out
+    assert "Load avg:" not in out
+    assert f">>> Emerging (1 of 1) dev-libs/schedleaf-a-1.0::testrepo for {root}" in out
+    assert (
+        f">>> Installing (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
+    assert (
+        f">>> Completed (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
+    # No leading blanks anywhere in the status region (up to the last
+    # status line; the post-merge `install-info` tail, when the host
+    # prints one, lives after it -- see `_POST_EMERGE_INFO_LINES`).
+    assert "" not in out[: out.index(">>> Jobs: 1 of 1 complete")].splitlines()
+
+    out, root = _run(["--quiet"], 1)
+    assert ">>> Jobs:" not in out
+    assert "" not in out[: out.index(">>> Completed (1 of 1)")].splitlines()
+    assert f">>> Emerging (1 of 1) dev-libs/schedleaf-a-1.0::testrepo for {root}" in out
+    assert (
+        f">>> Completed (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
+
+
+def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
+    emerge_binary, tmp_path
+):
+    """Backlog #197 fix round 1 (review Important 2): one failed build
+    fires each failure event exactly once. Real `_build_exit`'s failure
+    arm assigns absolutely (`3rdparty/portage`
+    `lib/_emerge/Scheduler.py:1641-1658`, `failed = len(_failed_pkgs)`
+    -- 1 for a single failure) before the freed build slot (`running`)
+    drops, so real prints exactly two `>>> Jobs:` lines: the failed-set
+    line, then the running-drop line. Both the `--quiet-build=y`
+    serial-captured split (`run_source_merge`'s captured branch) and
+    the `-j2` scheduler are pinned: a single `schedbad` under `-j2`
+    would take real's one-package serial reset (no Jobs lines at all),
+    so the parallel leg pairs it with `schedslow` (still asleep in
+    `src_compile` when `schedbad`'s `src_install` dies -- the same
+    pairing the kill-in-flight test uses). `, 2 failed` is the pre-fix
+    double-fire regressing. The run exits 1 naming the failed package;
+    real's `>>> Failed to emerge` tail is binary-path-only, so the
+    source failure surfaces on stderr instead."""
+    import shutil
+
+    def _run(args, pkgs, n):
+        root = tmp_path / f"failroot{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"failpt{n}")
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", *pkgs],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 1, (r.stdout, r.stderr)
+        assert "dev-libs/schedbad-1.0" in r.stderr, (r.stdout, r.stderr)
+        return r.stdout
+
+    # Serial-captured split: dispatch, failed-set, running-drop -- real's
+    # exact lines with real's padding (68-column field, no `Load avg:`
+    # trailer: B14).
+    out = _run(["--quiet-build=y"], ["dev-libs/schedbad"], 0)
+    assert ">>> Jobs: 0 of 1 complete, 1 running" + " " * 36 in out
+    assert ">>> Jobs: 0 of 1 complete, 1 running, 1 failed" + " " * 26 in out
+    assert ">>> Jobs: 0 of 1 complete, 1 failed" + " " * 37 in out
+    assert ", 2 failed" not in out
+    assert "Load avg:" not in out
+
+    # `-j2` scheduler: both leaves dispatch before either finishes, so
+    # the failed-set line still shows both build slots occupied.
+    out = _run(["-j2"], ["dev-libs/schedbad", "dev-libs/schedslow"], 1)
+    assert ">>> Jobs: 0 of 2 complete, 1 running" + " " * 36 in out
+    assert ">>> Jobs: 0 of 2 complete, 2 running" + " " * 36 in out
+    assert ">>> Jobs: 0 of 2 complete, 2 running, 1 failed" + " " * 26 in out
+    assert ">>> Jobs: 0 of 2 complete, 1 running, 1 failed" + " " * 26 in out
+    assert ", 2 failed" not in out
+    assert "Load avg:" not in out
 
 
 def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
@@ -6164,6 +6878,140 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     )
     assert r.returncode == 0, r.stderr
     assert mtimedb.read_bytes() == before
+
+
+def _nothing_to_merge_env(root):
+    """Backlog #225 shared harness: the #179 stale-list pattern -- a
+    copied fixture `var` tree as ROOT plus a stale two-item resume list
+    (one the `resume_backup` rotation would also rewrite), returning the
+    env and the mtimedb path with its pre-run bytes."""
+    import json
+    import shutil
+
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
+    # test starts from no resume list whatever earlier runs left there.
+    (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
+    mtimedb = root / "var/cache/edb/mtimedb"
+    mtimedb.parent.mkdir(parents=True, exist_ok=True)
+    stale = {
+        "resume": {
+            "favorites": ["dev-libs/stale-a"],
+            "mergelist": [
+                ["ebuild", "/", "dev-libs/stale-a-1.0", "merge"],
+                ["ebuild", "/", "dev-libs/stale-b-1.0", "merge"],
+            ],
+            "myopts": {},
+        }
+    }
+    mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    return env, mtimedb, mtimedb.read_bytes()
+
+
+def test_emerge_verbose_nothing_to_merge_leaves_the_resume_list_alone(
+    emerge_binary, tmp_path
+):
+    """Backlog #225: real `_emerge/actions.py:496-521` (`action_build`)
+    -- with a display flag (`--ask`/`--tree`/`--verbose`,
+    `actions.py:464-469`) and `mergecount == 0`, real prints `Nothing to
+    merge; quitting.` on stdout and returns `EX_OK` before the
+    `resume_backup` rotation (`:664-672`) and before `Scheduler`, so the
+    resume list and its backup stay untouched -- while the merge list and
+    `Total:` are shown first (`:485` plus the verbose counters). The
+    all-noop plan is `emerge --oneshot -u dev-libs/samepkg` (`samepkg`
+    is installed at the only visible version; the `-u` matters -- a bare
+    `--oneshot` reinstalls a top-level installed package, real's own
+    `is_top_level and not selective` bare `R` -- and `--oneshot` keeps
+    the selective-deferral arm at bay, `actions.py:514-516`)."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "--oneshot", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Nothing to merge" not in r.stderr
+    assert r.stdout.index("Total:") < r.stdout.index("Nothing to merge; quitting.")
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+
+
+def test_emerge_tree_nothing_to_merge_leaves_the_resume_list_alone(
+    emerge_binary, tmp_path
+):
+    """Backlog #225 (`_emerge/actions.py:496-521`), the `--tree` display
+    flag: same early return as the `--verbose` pin -- `Nothing to merge;
+    quitting.` on stdout, exit 0, stale two-item resume list
+    byte-identical with no `resume_backup` key. Same all-noop plan
+    (`--oneshot -u dev-libs/samepkg`; see the `--verbose` pin for why
+    both flags are needed)."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--tree", "--oneshot", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Nothing to merge" not in r.stderr
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+
+
+def test_emerge_ask_nothing_to_merge_never_prompts(emerge_binary, tmp_path):
+    """Backlog #225 (`_emerge/actions.py:496-521`), the `--ask` display
+    flag: real returns before `UserQuery`, so no prompt is ever shown --
+    the `No` answer piped on the pty goes unread. Same assertions as the
+    `--verbose`/`--tree` pins, plus `Would you like to merge` absent.
+    Same all-noop plan (`--oneshot -u dev-libs/samepkg`)."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    r = _run_with_ask_pty(
+        emerge_binary,
+        ["--ask", "--oneshot", "-u", "dev-libs/samepkg"],
+        "n\n",
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Would you like to merge" not in r.stdout
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+
+
+def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
+    emerge_binary, tmp_path
+):
+    """Backlog #225 negative: with no display flag real never enters the
+    `actions.py:464-469` branch, so `mergecount` stays `None`,
+    `Scheduler` runs, and `_save_resume_list` commits the (empty) list
+    (#179) -- after the `resume_backup` rotation (`:664-672`), which
+    fires here because the stale list holds two items. Same all-noop
+    plan (`--oneshot -u dev-libs/samepkg`); no `Nothing to merge`
+    anywhere."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--oneshot", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    saved = json.loads(mtimedb.read_text())
+    assert saved["resume"]["mergelist"] == []
+    assert saved["resume"]["favorites"] == ["dev-libs/samepkg"]
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
 
 
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
