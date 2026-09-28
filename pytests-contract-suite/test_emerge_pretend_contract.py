@@ -954,7 +954,7 @@ CASES = [
         1,
     ),
     (
-        "recursion: a USE-conditional-only || group that reduces to empty fails at EAPI 7+ (#238: rc 1 like real)",
+        "use-conditional: a USE-conditional-only || group that reduces to empty fails at EAPI 7+ (#238: rc 1 like real)",
         ["--pretend", "dev-libs/condanyof"],
         1,
     ),
