@@ -20640,6 +20640,106 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     ], result.stdout
 
 
+def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209: `--backtrack=0` must not skip the reverse-dependency
+    feed loop. Real `_resolve_conflicts` (`_emerge/depgraph.py:9444`)
+    calls `_complete_graph()` (`:8562`) with no `_allow_backtracking`
+    gate, so an installed world consumer's satisfiable pin enforces
+    in-pass even with backtracking off.
+
+    Hermetic r25 shape (#25 S0, the `FX_WORLD_EXTRA=dev-libs/r25consumer`
+    bed cell in `l0-fixture-oracle-r25.txt`): installed `r25consumer-1.0`
+    pins `<dev-libs/r25lib-2.0:=` (recorded `:0/1=` bound form) against
+    the `r25lib` 1.0->2.0 update pulled through installed `r25mid`'s
+    `:=` dep. Expected from real (`differential-test-bed/findings/l0.md`
+    "## #25 S0", default flags there: two merge rows, no warning,
+    `backtrack: 0/20` -- the selection path that withholds has no
+    backtracking gate anywhere in its chain, so `--backtrack=0` answers
+    the same; the coordinator's bed oracles the new bt0 cell directly):
+    `r25up-2.0 [U]` + `r25target-1.0 [N]`, rc 0, no skipped-update block,
+    no rebuild block (real's slot-op trigger is backtracking-gated), and
+    `--json` `restarts` 0. Before the fix portuale settled the root pass
+    without the pin and merged `r25lib-2.0` here."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "dev-libs/r25target",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/r25up-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/r25target-1.0 ",
+    ]
+    out = rust.stdout + rust.stderr
+    assert "have been skipped" not in out
+    assert "causing rebuilds" not in out
+    rj = _run([str(emerge_binary)], ["--pretend", "--json", *args[1:]], env)
+    assert rj.returncode == 0
+    assert json.loads(rj.stdout)["backtrack"] == {"restarts": 0, "max": 0}
+
+
+def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209 S0: a pin that cannot be satisfied when backtracking
+    is off is reported, not skipped and not warned away. Same r25 world
+    as above, but the hard requirement is an explicit `=r25lib-2.0`
+    argument the consumer's `<2.0` pin cannot hold alongside, so the scan
+    drops the pin and the residual conflict reports it.
+
+    Expected from real (g209 S0 container probe: real 3.0.81.3 staged
+    like the bed with `FX_WORLD_EXTRA=dev-libs/r25consumer`, argv
+    `emerge -p --backtrack=0 --update --deep --newuse --oneshot
+    "=dev-libs/r25lib-2.0"`; the reporting chain
+    (`_resolve_conflicts` -> `_complete_graph` -> unsatisfied-dep loop
+    -> `_process_slot_conflicts` -> `_solve_non_slot_operator_slot_conflicts`,
+    `3rdparty/portage` 3.0.82.2) carries no `_allow_backtracking` gate
+    on any link, so the pin lands as a slot-collision report): the 2.0
+    merge row, then the residual block pairing it (the `(Argument)`
+    puller) against installed 1.0 (the consumer pin), rc 1. One display
+    nit vs the probe: real renders the consumer's `:=` bound form
+    first, portuale the normalised `<2.0` form (same two parents, order
+    only; the `(and 1 more ...)` tail agrees)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "=dev-libs/r25lib-2.0",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines()[:1] == [
+        "[ebuild     U  ] dev-libs/r25lib-2.0 [1.0]",
+    ]
+    _assert_residual_slot_conflict_block(
+        rust.stdout,
+        env["ROOT"],
+        "dev-libs/r25lib:0",
+        "dev-libs/r25lib-2.0:0/2::testrepo",
+        [(None, "=dev-libs/r25lib-2.0", False)],
+        "dev-libs/r25lib-1.0:0/1::testrepo",
+        [
+            (
+                "dev-libs/r25consumer-1.0:0/0::testrepo",
+                "<dev-libs/r25lib-2.0",
+                True,
+            ),
+        ],
+    )
+
+
 def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     emerge_binary, fixture_env
 ):

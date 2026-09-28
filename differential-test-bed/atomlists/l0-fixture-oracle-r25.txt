@@ -22,3 +22,10 @@
 # (backlog #227), so this cell only checks the merge rows. The warning
 # and `--json` restarts are pinned by the contract suite instead (#25 S2).
 --update --deep --newuse --oneshot dev-libs/r25target
+# Backlog #209 — the same shape with backtracking off. Real's
+# `_resolve_conflicts` (`_emerge/depgraph.py:9444`) runs
+# `_complete_graph()` (`:8562`) with no `_allow_backtracking` gate, so
+# the consumer pin still withholds `r25lib-2.0` in-pass (`backtrack:
+# 0/0`, silent). Before the fix portuale settled the root pass without
+# the pin and merged `r25lib-2.0` here.
+--backtrack=0 --update --deep --newuse --oneshot dev-libs/r25target
