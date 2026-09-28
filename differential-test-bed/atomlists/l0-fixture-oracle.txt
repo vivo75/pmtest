@@ -156,3 +156,11 @@ dev-libs/blockerpkg dev-libs/graphblockerparent
 # `Change USE: +flip` row, and the qml?-gated consumer chain row with
 # its [qml] qualifier (live `real-rest-1.log` shapes).
 -D --autounmask-use=n dev-libs/r135consumer
+
+# #238 S0 (upstream test_eapi pg1 C-2, EAPI 8): `|| ( emptyanyof? (
+# dev-libs/condanyofdep ) )` with emptyanyof off reduces the || group to
+# empty, which fails at EAPI 7+ (real `use_reduce`
+# dep/__init__.py:864-869 emits `__const__/empty-any-of`). Real rc 1;
+# the EAPI-6 C-1 shape (empty group dropped, bare merge) is not
+# re-fixtured -- all fixture ebuilds are EAPI 8 since #220.
+dev-libs/condanyof
