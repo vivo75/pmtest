@@ -91,6 +91,19 @@
 
 # -- the skipped-update warning block (compared since backlog #227).
 
+- id: g210-world-installed-arg-hard-edge
+  categories: [exit, error]
+  slugs:
+    - "--changed-slot_--update_--deep_--newuse__world"
+  reason: >
+    With the #210 consumers in @world, portuale's forward walk treats an
+    installed world member's recorded `:0/1=` dependency as a hard edge,
+    pulls a second instance of dev-libs/reinstslottarget and aborts
+    (rc 1, "no ebuilds to satisfy dev-libs/reinstslottarget:0/1=") before
+    the reverse-dependency scan runs; real merges the unrelated world
+    updates and withholds the reinstall (rc 0). Backlog #233.
+  owner: portuale-bug
+
 - id: skipped-updates-installed-consumer-residue
   category: skipped-updates
   slugs:
