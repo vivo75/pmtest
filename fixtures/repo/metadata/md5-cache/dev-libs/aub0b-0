@@ -1,7 +1,7 @@
-EAPI=5
+EAPI=8
 DESCRIPTION=fixture package: upstream test_autounmask_use_breakage pg0 app-misc/B-0 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 RDEPEND=dev-libs/aub0d[foo]
 DEFINED_PHASES=-
-_md5_=14aaca3fb00b922a0a5f3ad0463c6d07
+_md5_=2ca9d2f90b445aef3ba42f4b8f8c0638

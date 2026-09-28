@@ -1,4 +1,4 @@
-EAPI=2
+EAPI=8
 DESCRIPTION="fixture package: upstream test_autounmask_use_slot_conflict pg0 sci-libs/L-1 (bulk #50)"
 SLOT="0"
 KEYWORDS="amd64"

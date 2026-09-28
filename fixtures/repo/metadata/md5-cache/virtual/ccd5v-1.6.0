@@ -1,7 +1,7 @@
-EAPI=0
+EAPI=8
 DESCRIPTION=fixture package: upstream test_circular_choices.py pg5 virtual/jdk-1.6.0 (bulk #50)
 KEYWORDS=amd64
 SLOT=1.6
 RDEPEND=|| ( dev-libs/ccd5b =dev-libs/ccd5a-6* )
 DEFINED_PHASES=-
-_md5_=607b49958035be8e096537e7db032ad2
+_md5_=4faf2126d6b2319a545a566c45300750

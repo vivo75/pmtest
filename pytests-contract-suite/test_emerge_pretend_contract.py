@@ -170,6 +170,8 @@ CASES = [
     ("-a bundled with -p", ["-pa", "dev-libs/newpkg"], 0),
     ("-a bundled deep in a short-flag run", ["-pauvDN", "dev-libs/newpkg"], 0),
     ("--ask=n inline form", ["--pretend", "--ask=n", "dev-libs/newpkg"], 0),
+    ("--ask=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
+    ("--read-news=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
     (
@@ -514,6 +516,11 @@ CASES = [
     (
         "recursion: unbreakable build-time cycle is a fatal error",
         ["--pretend", "dev-libs/hardcyclea"],
+        1,
+    ),
+    (
+        "circular dep: mixed-priority unserializable cycle prints per-edge labels (#228)",
+        ["--pretend", "dev-libs/slopcyca"],
         1,
     ),
     (
@@ -929,111 +936,6 @@ CASES = [
     (
         "eapi: upstream test_eapi pg0 =epi0b-1.0 merges like real (rc 0; BDEPEND pulls A-1.0 first, pinned below)",
         ["--pretend", "=dev-libs/epi0b-1.0"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.1 merges like real (rc 0; EAPI 1 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.1"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.2 merges like real (rc 0; EAPI 2 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.3 merges like real (rc 0; EAPI 3 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-1.4 merges like real (rc 0; EAPI 4 IUSE default +foo, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-1.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.1 merges like real (rc 0; EAPI 1 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.1"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.2 merges like real (rc 0; EAPI 2 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.3 merges like real (rc 0; EAPI 3 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-2.4 merges like real (rc 0; EAPI 4 slot dep B:0, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-2.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-3.2 merges like real (rc 0; EAPI 2 use dep B[foo], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-3.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-3.3 merges like real (rc 0; EAPI 3 use dep B[foo], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-3.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-3.4 merges like real (rc 0; EAPI 4 use dep B[foo], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-3.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-4.2 merges like real (rc 0; EAPI 2 strong block !!B unmatched, merges alone, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-4.2"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-4.3 merges like real (rc 0; EAPI 3 strong block !!B unmatched, merges alone, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-4.3"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-4.4 merges like real (rc 0; EAPI 4 strong block !!B unmatched, merges alone, pinned below)",
-        ["--pretend", "=dev-libs/epi1a-4.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.0 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.0"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.1 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.1"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.2 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.2"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-5.3 fails like real (rc 1; no such ebuild)",
-        ["--pretend", "=dev-libs/epi1a-5.3"],
-        1,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-6.4 merges like real (rc 0; EAPI 4 use-dep default B[bar(+)], pinned below)",
-        ["--pretend", "=dev-libs/epi1a-6.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1a-7.4 merges like real (rc 0; EAPI 4 REQUIRED_USE satisfied; USE renders profile-shifted, not pinned)",
-        ["--pretend", "=dev-libs/epi1a-7.4"],
-        0,
-    ),
-    (
-        "eapi: upstream test_eapi pg1 =epi1c-1 merges like real (rc 0; profile USE=foo pulls B-1 where real's empty profile merges C alone, not pinned)",
-        ["--pretend", "=dev-libs/epi1c-1"],
         0,
     ),
     (
@@ -2368,6 +2270,110 @@ CASES = [
         0,
     ),
     (
+        "--onlydeps-with-rdeps=y keeps runtime deps under --onlydeps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=y", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps alone keeps runtime deps: with-rdeps defaults to y (#194)",
+        ["--pretend", "--onlydeps", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n keeps only build-time deps under --onlydeps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n --onlydeps-with-ideps=y restores IDEPEND (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=y",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n --onlydeps-with-ideps=n drops IDEPEND too (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=n",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "bare --onlydeps-with-ideps enables IDEPEND like =y (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps is inert without --onlydeps-with-rdeps=n (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-ideps=n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "an EAPI 7 root drops IDEPEND even with runtime deps kept (#194)",
+        ["--pretend", "--onlydeps", "dev-libs/odw0g"],
+        0,
+    ),
+    (
+        "an EAPI 7 root drops IDEPEND on a plain run too (#194)",
+        ["--pretend", "dev-libs/odw0g"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=foo is an invalid choice, rc 2 (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=foo", "dev-libs/odw0a"],
+        2,
+    ),
+    (
+        "--onlydeps-with-rdeps=True keeps runtime deps like =y (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=True", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps=True restores IDEPEND like =y (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=True",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "space-separated --onlydeps-with-rdeps n blanks runtime deps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps", "n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "both flags are inert without --onlydeps: a plain merge (#194)",
+        [
+            "--pretend",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=y",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps=foo is an invalid choice, rc 2 (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-ideps=foo", "dev-libs/odw0a"],
+        2,
+    ),
+    (
         "--update threads through dependency recursion, not just top-level",
         ["--pretend", "--update", "dev-libs/withdeps"],
         0,
@@ -3585,6 +3591,57 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
         "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_mixed_priority_cycle_prints_each_edge_real_label(
+    emerge_binary, fixture_env
+):
+    """Backlog #228: `dev-libs/slopcyca -RDEPEND:=-> dev-libs/slopcycb
+    -DEPEND-> dev-libs/slopcyca` is unserializable -- the `RDEPEND` `:=`
+    edge is an unsatisfied `runtime_slot_op` priority, which no real
+    `ignore_priority` rung relaxes (real `_emerge/DepPriority.py`
+    `__str__`, `_emerge/DepPriorityNormalRange.py`, `_emerge/
+    DepPrioritySatisfiedRange.py`). Each stderr cycle line carries its
+    own edge's `priorities[-1]` label (real `_prepare_circular_dep_-
+    message`, `resolver/circular_dependency.py`), not the hardcoded
+    `(buildtime)` every earlier pin shows.
+
+    Grounded on one live-real probe (`localhost/test-portuale:latest`,
+    real 3.0.81.3; the label paths -- `DepPriority.__str__`, the
+    circular message and suggestions, `DepPrioritySatisfiedRange` -- are
+    byte-identical to 3rdparty 3.0.82.2, the display path per the n206
+    probe): real exits 1 with `slopcycb depends on / slopcyca
+    (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
+    (unconditional atoms give `_find_suggestions` nothing). Portuale
+    rotates to the requested atom (lowest entries index -- the #208
+    family, left for that item), so the pin records `slopcyca depends
+    on / slopcycb (runtime_slot_op) / slopcyca (buildtime)` with the
+    same per-edge labels; stdout is portuale's own forced verbose-tree
+    stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
+    the rendered merge rows) with real's decorations, exactly like the
+    `hardcyclea` pin above. Full probe outputs:
+    `/tmp/opencode/n228probe/out/slopcyc[a|b].{stdout,stderr}.txt`."""
+    base = ["--pretend", "dev-libs/slopcyca"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/slopcyca-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/slopcycb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/slopcyca-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) (runtime_slot_op)\n"
+        "  (dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -6995,7 +7052,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
         # BUILD_ID 2 has the highest BUILD_TIME -> it is the one picked.
         for bid, bt in ((1, 100), (2, 300), (3, 200))
     )
-    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nPACKAGES: 3\n\n{entries}")
+    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n{entries}")
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     # Default: the newer ebuild wins.
@@ -7257,7 +7314,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     bh2 = tmp_path / "binhost2"
     bh2.mkdir()
     (bh2 / "Packages").write_text(
-        "TIMESTAMP: 0\nPACKAGES: 1\n\n"
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
         "BUILD_ID: 1\nCPV: dev-libs/dirbinhostonly-1.0\nDEFINED_PHASES: -\n"
         "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nREPO: gentoo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
     )
@@ -9323,43 +9380,147 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
         ]
 
 
-def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
-    """Upstream `test_eapi.py::testBdepend` (pg0), `::testEAPI` (pg1) and
-    `::testIdepend` (pg2), bulk-translated for #50 batch 6
-    (`dev-libs/epi0{a,b}`, `dev-libs/epi1{a,b,c}`, `dev-libs/epi2{a,b}`;
-    oracle `/tmp/opencode/o50d/perfile/eapi.json`, captured from the real
-    `ResolverPlayground`, not the source literal).
+def test_onlydeps_with_rdeps_ideps_pins_mergelists(emerge_binary, fixture_env):
+    """Backlog #194: `--onlydeps-with-rdeps` / `--onlydeps-with-ideps`
+    (real `_emerge/depgraph.py::_add_pkg_deps`, `main.py` parsing,
+    `man/emerge.1`). Fixtures are #194's own EAPI-8 namespace
+    (`dev-libs/odw0{a,b,c,d,e,f}`, root A carrying DEPEND B, BDEPEND F,
+    RDEPEND C, PDEPEND D, IDEPEND E; plus an EAPI-7 root
+    `dev-libs/odw0g-1` whose ebuild declares DEPEND/RDEPEND/PDEPEND/IDEPEND
+    on B/C/D/E while its md5-cache entry carries no IDEPEND line -- what
+    real `egencache` emits, since `bin/ebuild.sh` unsets IDEPEND below
+    EAPI 8)
+    instead of the upstream `odm0*`/`odi*` cells, which #220 owns. The
+    oracle (`/tmp/opencode/n194/oracle_odw.log`, captured from the real
+    `ResolverPlayground` on the same A/B/C/D/E/F + G shapes, not the
+    source literal) merges, all `success=True`: default/`=y`/`=True`
+    `[B, C, D, E, F]`; `=n` `[B, F]` (build-time only -- BDEPEND
+    survives); `=n` + ideps `=y`/bare/`=True` `[B, E, F]`; `=n` + ideps
+    `=n` `[B, F]`; EAPI-7 root default `[B, C, D]` and `=n` `[B]` (no E
+    -- real `bin/ebuild.sh` unsets IDEPEND below EAPI 8). The playground
+    `True` cells are the bare-flag shape (real `default_arg_opts`
+    inserts `"True"`); the literal `=True` argv form is the same real
+    code path (`_add_pkg_deps` only tests for `"n"`/`None`, and
+    `"True"` is in real `main.py`'s `choices: true_y_or_n`), pinned to
+    the same rows. The space-separated `n` form is what real
+    `insert_optional_args` consumes; both flags without `--onlydeps`
+    are inert (consulted only behind `pkg.onlydeps`), so that cell pins
+    the plain-merge rows including the root; `=foo` is a real argparse
+    invalid choice (rc 2, CASES-only).
 
-    The 17 cells below are clean today: portuale merges the oracle's
-    exact set in the oracle's exact order with no warnings and empty
-    stderr, so the exact rows are pinned. The `USE="foo"` renders are
-    what real prints too: B-1 carries `IUSE=+foo` and every A-1.x
-    `IUSE=+foo`, so foo is default-on under real's empty profile as
-    well as the fixture profile. Two rc-matching cells are CASES but
-    deliberately not pinned: =epi1a-7.4 renders the profile-shifted
-    `USE="foo -bar"` where real merges via the +bar default alone, and
-    =epi1c-1 pulls B-1 under the profile's USE=foo where real's empty
-    profile merges C alone (batch 5's rqu precedent).
+    All cells are clean today: portuale merges the oracle's exact set
+    with no warnings and empty stderr, so the exact rows are pinned.
+    Row order is portuale's own discovery order (the oracle marks these
+    cells `ambiguous_merge_order`); the ideps-without-rdeps-n and
+    `=foo` cells are CASES-only (same rows as the default cell, and rc
+    2 respectively).
     """
     env = dict(fixture_env)
-    b = "dev-libs/epi1b-1  USE=\"foo\""
+    n = "[ebuild  N     ] dev-libs/odw0"
+    cases = [
+        (
+            ["--pretend", "--onlydeps", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=y", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=n", "dev-libs/odw0a"],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=y",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=n",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "dev-libs/odw0g"],
+            [f"{n}c-1 ", f"{n}d-1 ", f"{n}b-1 "],
+        ),
+        (
+            ["--pretend", "dev-libs/odw0g"],
+            [f"{n}c-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}g-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=True", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=True",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps", "n", "dev-libs/odw0a"],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=y",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 ", f"{n}a-1 "],
+        ),
+    ]
+    for argv, rows in cases:
+        got = _run([str(emerge_binary)], argv, env)
+        assert got.returncode == 0, argv
+        assert got.stderr == "", argv
+        assert got.stdout.splitlines() == rows, argv
+
+
+def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_eapi.py::testBdepend` (pg0) and `::testIdepend`
+    (pg2), bulk-translated for #50 batch 6 (`dev-libs/epi0{a,b}`,
+    `dev-libs/epi2{a,b}`; oracle `/tmp/opencode/o50d/perfile/eapi.json`,
+    captured from the real `ResolverPlayground`, not the source literal).
+
+    Backlog #220 dropped pg1 (`::testEAPI`, `dev-libs/epi1{a,b,c}`):
+    every pg1 cell's point is EAPI gating below EAPI 7 (withdrawn #204;
+    the EAPI-4 empty groups are withdrawn #200), and the re-run oracle
+    with all EAPIs raised to 8 confirms the gating is gone, so the
+    cases and their fixtures go together. The 2 cells below are clean
+    today: portuale merges the oracle's exact set in the oracle's exact
+    order with no warnings and empty stderr, so the exact rows are
+    pinned.
+    """
+    env = dict(fixture_env)
     cases = [
         ("=dev-libs/epi0b-1.0", ["[ebuild  N     ] dev-libs/epi0a-1.0 ", "[ebuild  N     ] dev-libs/epi0b-1.0 "]),
-        ("=dev-libs/epi1a-1.1", ['[ebuild  N     ] dev-libs/epi1a-1.1  USE="foo"']),
-        ("=dev-libs/epi1a-1.2", ['[ebuild  N     ] dev-libs/epi1a-1.2  USE="foo"']),
-        ("=dev-libs/epi1a-1.3", ['[ebuild  N     ] dev-libs/epi1a-1.3  USE="foo"']),
-        ("=dev-libs/epi1a-1.4", ['[ebuild  N     ] dev-libs/epi1a-1.4  USE="foo"']),
-        ("=dev-libs/epi1a-2.1", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.1 "]),
-        ("=dev-libs/epi1a-2.2", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.2 "]),
-        ("=dev-libs/epi1a-2.3", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.3 "]),
-        ("=dev-libs/epi1a-2.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-2.4 "]),
-        ("=dev-libs/epi1a-3.2", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.2 "]),
-        ("=dev-libs/epi1a-3.3", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.3 "]),
-        ("=dev-libs/epi1a-3.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-3.4 "]),
-        ("=dev-libs/epi1a-4.2", ["[ebuild  N     ] dev-libs/epi1a-4.2 "]),
-        ("=dev-libs/epi1a-4.3", ["[ebuild  N     ] dev-libs/epi1a-4.3 "]),
-        ("=dev-libs/epi1a-4.4", ["[ebuild  N     ] dev-libs/epi1a-4.4 "]),
-        ("=dev-libs/epi1a-6.4", [f"[ebuild  N     ] {b}", "[ebuild  N     ] dev-libs/epi1a-6.4 "]),
         ("=dev-libs/epi2b-1.0", ["[ebuild  N     ] dev-libs/epi2a-1.0 ", "[ebuild  N     ] dev-libs/epi2b-1.0 "]),
     ]
     for atom, rows in cases:
@@ -12016,6 +12177,8 @@ Dependency and target selection:
       --selective[=y|n]      same as --noreplace; =n cancels it
   -1, --oneshot              merge without recording the target in world / world_sets
   -o, --onlydeps             merge the targets' dependencies but not the targets themselves
+      --onlydeps-with-rdeps[=y|n]  include runtime deps under --onlydeps (default y)
+      --onlydeps-with-ideps[=y|n]  include install-time deps under --onlydeps --onlydeps-with-rdeps=n (default n)
   -O, --nodeps               ignore dependencies entirely
   -X, --exclude ATOMS        never act on a matching package (repeatable, space separated)
       --newrepo              reinstall if the package would now come from a different repo
@@ -12061,6 +12224,7 @@ Build scheduling:
   -l, --load-average N       hold new builds while the load average exceeds N
   -a, --ask[=y|n]            prompt for confirmation before a real merge or removal
       --ask-enter-invalid    with --ask: a bare Enter is not accepted as Yes
+      --read-news[=y|n]      with --ask: offer to read unread news via eselect
       --ignore-default-opts  ignore the EMERGE_DEFAULT_OPTS variable for this run
       --keep-going           on a build failure, drop that package's dependents and carry on
       --quiet-build[=y|n]    redirect a build's phase output to ${T}/build.log (implied by -j >1 and -q)
@@ -18552,8 +18716,13 @@ def test_oracle_slotop_conflict_mass_rebuild(
     abandoned slot even with an empty world (walked, not merely
     reachable). Ported through the `slot_operator_rebuild_scan`, so the
     leaves merge as walked `rR` nodes with the `causing rebuilds` block
-    (verified against the vendored portage's Playground mergelist)."""
-    installed = [("app-misc", "somassb", "1", "1", {})]
+    (verified against the vendored portage's Playground mergelist, and
+    against live real 3.0.82.2 in the #211 R2 container probe: the
+    rebuilds need EAPI-bearing vdb -- real's `FakeVartree` overlay
+    refuses EAPI-less records, so without the `EAPI` files below live
+    real merges no leaves while the Playground's EAPI-5 records do).
+    The `EAPI` files keep this pin's staging faithful to that oracle."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
     installed += [
         (
             "app-misc",
@@ -18561,6 +18730,7 @@ def test_oracle_slotop_conflict_mass_rebuild(
             "1",
             "0",
             {
+                "EAPI": "8",
                 "DEPEND": "app-misc/somassb:1/1=",
                 "RDEPEND": "app-misc/somassb:1/1=",
             },
@@ -18582,6 +18752,160 @@ def test_oracle_slotop_conflict_mass_rebuild(
         ("app-misc/somassc2c", "1"),
         ("app-misc/somassc3c", "1"),
         ("app-misc/somassc4c", "1"),
+    }
+
+
+def test_oracle_slotop_update_probe_refusal(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Real `_slot_operator_check_reverse_dependencies`
+    (`3rdparty/portage/lib/_emerge/depgraph.py:2472`, gates `:2622` and
+    `:2738`): the conflict-mass shape (bug 486580, `somassa
+    --backtrack 3 -uD`) plus an installed world parent
+    (`app-misc/somassveto-1`, recorded `<app-misc/somassb-2`) whose atom
+    the fresh `somassb-2` child violates. Real refuses the whole
+    replacement: the probe's candidate-child gate fails, so no leaf
+    rebuild is scheduled, while     `somassa-1` + `somassb-2` still merge
+    (verified against real 3.0.82.2 in the one container probe the
+    #211 R2 slice ran: control merges the 5 leaves at `backtrack: 1/3`,
+    the veto run merges only `somassa-1` + `somassb-2` at `0/3`; log in
+    the report). MATCHES real since #211 R2: the rebuild scan checks the
+    fresh candidate against every other in-scope installed parent (built
+    `:S/SS=` relaxed to `:=`) and withholds the edge on mismatch. The
+    veto parent rides the world file (complete-mode reachability, the
+    `FX_WORLD_EXTRA` staging pattern); its live ebuild carries the veto
+    atom itself (real only sees parent pins through the walked depstring
+    + the built-`:=` overlay, never raw vdb), and the `EAPI` files keep
+    the probe registration faithful (see the control pin above)."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
+    installed += [
+        (
+            "app-misc",
+            f"somassc{i}c",
+            "1",
+            "0",
+            {
+                "EAPI": "8",
+                "DEPEND": "app-misc/somassb:1/1=",
+                "RDEPEND": "app-misc/somassb:1/1=",
+            },
+        )
+        for i in range(5)
+    ]
+    installed.append(
+        (
+            "app-misc",
+            "somassveto",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "<app-misc/somassb-2"},
+        )
+    )
+    root = _b1_root(tmp_path, ["app-misc/somassveto"], installed)
+    rust = _b1_run(
+        ["--pretend", "--backtrack", "3", "--update", "--deep", "app-misc/somassa"],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/somass")}
+    assert got == {
+        ("app-misc/somassa", "1"),
+        ("app-misc/somassb", "2"),
+    }
+
+
+def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 item 2: the new-child-slot arm also probes
+    `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
+    mismatch. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and an
+    installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
+    form; the live ebuild carries bare `:=`); the run upgrades slot 1
+    to `mmprov-3` (`1/2`). Real's candidate loop
+    (`_iter_similar_available`, `depgraph.py:2660-2695`) ranges over
+    every available package, not only fresh-slot merges, so the probe
+    fires for the slot-1 upgrade against the slot-0-bound consumer and
+    the consumer rebuilds. MATCHES real since #211 item 2 (code-grounded:
+    the loop text has no entry-kind restriction; the direction follows
+    the R2-probe-validated new-slot arm). The `EAPI` files keep the
+    probe registration faithful (see the conflict-mass pin)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+
+
+def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 I1: the `--solver=` bridge threads the request's
+    `update`/top-level atoms into its rebuild fixpoint, so the
+    new-child-slot arm (both the fresh-slot and the item-2
+    bound-slot-mismatch halves, plus the R2 refusal) runs there exactly
+    as on the default path. On the `mmprov` shape the pubgrub walk
+    produces the same slot-1 `Upgrade` entry, and the bridge schedules
+    the same consumer rebuild. (`resolvo` does not resolve the direct
+    upgrade arg at all here -- an engine-side gap below this layer,
+    reported for filing; the conflict-mass shape likewise resolves
+    walked `:=` deps to installed inside both engines, so scan-level
+    agreement cannot reach it without engine-side probe scheduling.)"""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "--solver=pubgrub",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
     }
 
 
@@ -20632,6 +20956,106 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
         "soft blocking dev-libs/whblocker-2.0)",
         "[ebuild     U  ] dev-libs/whpuller-2.0 [1.0]",
     ], result.stdout
+
+
+def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209: `--backtrack=0` must not skip the reverse-dependency
+    feed loop. Real `_resolve_conflicts` (`_emerge/depgraph.py:9444`)
+    calls `_complete_graph()` (`:8562`) with no `_allow_backtracking`
+    gate, so an installed world consumer's satisfiable pin enforces
+    in-pass even with backtracking off.
+
+    Hermetic r25 shape (#25 S0, the `FX_WORLD_EXTRA=dev-libs/r25consumer`
+    bed cell in `l0-fixture-oracle-r25.txt`): installed `r25consumer-1.0`
+    pins `<dev-libs/r25lib-2.0:=` (recorded `:0/1=` bound form) against
+    the `r25lib` 1.0->2.0 update pulled through installed `r25mid`'s
+    `:=` dep. Expected from real (`differential-test-bed/findings/l0.md`
+    "## #25 S0", default flags there: two merge rows, no warning,
+    `backtrack: 0/20` -- the selection path that withholds has no
+    backtracking gate anywhere in its chain, so `--backtrack=0` answers
+    the same; the coordinator's bed oracles the new bt0 cell directly):
+    `r25up-2.0 [U]` + `r25target-1.0 [N]`, rc 0, no skipped-update block,
+    no rebuild block (real's slot-op trigger is backtracking-gated), and
+    `--json` `restarts` 0. Before the fix portuale settled the root pass
+    without the pin and merged `r25lib-2.0` here."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "dev-libs/r25target",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/r25up-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/r25target-1.0 ",
+    ]
+    out = rust.stdout + rust.stderr
+    assert "have been skipped" not in out
+    assert "causing rebuilds" not in out
+    rj = _run([str(emerge_binary)], ["--pretend", "--json", *args[1:]], env)
+    assert rj.returncode == 0
+    assert json.loads(rj.stdout)["backtrack"] == {"restarts": 0, "max": 0}
+
+
+def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209 S0: a pin that cannot be satisfied when backtracking
+    is off is reported, not skipped and not warned away. Same r25 world
+    as above, but the hard requirement is an explicit `=r25lib-2.0`
+    argument the consumer's `<2.0` pin cannot hold alongside, so the scan
+    drops the pin and the residual conflict reports it.
+
+    Expected from real (g209 S0 container probe: real 3.0.81.3 staged
+    like the bed with `FX_WORLD_EXTRA=dev-libs/r25consumer`, argv
+    `emerge -p --backtrack=0 --update --deep --newuse --oneshot
+    "=dev-libs/r25lib-2.0"`; the reporting chain
+    (`_resolve_conflicts` -> `_complete_graph` -> unsatisfied-dep loop
+    -> `_process_slot_conflicts` -> `_solve_non_slot_operator_slot_conflicts`,
+    `3rdparty/portage` 3.0.82.2) carries no `_allow_backtracking` gate
+    on any link, so the pin lands as a slot-collision report): the 2.0
+    merge row, then the residual block pairing it (the `(Argument)`
+    puller) against installed 1.0 (the consumer pin), rc 1. One display
+    nit vs the probe: real renders the consumer's `:=` bound form
+    first, portuale the normalised `<2.0` form (same two parents, order
+    only; the `(and 1 more ...)` tail agrees)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "=dev-libs/r25lib-2.0",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines()[:1] == [
+        "[ebuild     U  ] dev-libs/r25lib-2.0 [1.0]",
+    ]
+    _assert_residual_slot_conflict_block(
+        rust.stdout,
+        env["ROOT"],
+        "dev-libs/r25lib:0",
+        "dev-libs/r25lib-2.0:0/2::testrepo",
+        [(None, "=dev-libs/r25lib-2.0", False)],
+        "dev-libs/r25lib-1.0:0/1::testrepo",
+        [
+            (
+                "dev-libs/r25consumer-1.0:0/0::testrepo",
+                "<dev-libs/r25lib-2.0",
+                True,
+            ),
+        ],
+    )
 
 
 def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
