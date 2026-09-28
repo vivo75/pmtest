@@ -7244,6 +7244,147 @@ def test_emerge_selective_noop_without_oneshot_buildpkgonly_rotates_without_reco
     ]
 
 
+def _non_candidate_set_configroot(tmp_path, tag, world_candidate):
+    """Backlog #232 review (Important-2): a private copy of the fixture
+    configroot plus a `@noworldset` file set naming the installed
+    `dev-libs/samepkg`. With `world_candidate=False` a `sets.conf`
+    flips the `[usersets]` default to `world-candidate = false` --
+    real's documented override shape (man portage.5 `sets.conf`;
+    same-named sections merge across files with later wins, and
+    `_sets/__init__.py` marks every file set the multiset builds with
+    that flag). Per-test copies only: no committed fixture churn."""
+    import shutil
+
+    root = tmp_path / f"configroot{tag}"
+    shutil.copytree(Path(FIXTURES_ROOT) / "etc", root / "etc", symlinks=True)
+    for entry in Path(FIXTURES_ROOT).iterdir():
+        if entry.name != "etc":
+            (root / entry.name).symlink_to(entry)
+    (root / "etc/portage/sets/noworldset").write_text("dev-libs/samepkg\n")
+    if not world_candidate:
+        (root / "etc/portage/sets.conf").write_text(
+            "[usersets]\nworld-candidate = false\n"
+        )
+    return root
+
+
+def _non_candidate_set_env(root, configroot):
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    env["PORTAGE_CONFIGROOT"] = str(configroot)
+    return env, mtimedb, before
+
+
+def test_emerge_non_candidate_set_selective_noop_is_not_deferred(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Important-2): real filters sets with
+    `world-candidate = false` out of `world_candidates`
+    (`_emerge/actions.py:500-512`), and the deferral arm tests the
+    filtered list (`:514`). With the default config `-u @noworldset`
+    (all members installed) defers -- rotation, world_sets record, no
+    message; with `[usersets] world-candidate = false` the same run is
+    the #225 shape -- `Nothing to merge; quitting.`, stale two-item
+    resume list byte-identical with no `resume_backup` key, world and
+    world_sets untouched."""
+    import json
+
+    cfg_true = _non_candidate_set_configroot(tmp_path, "wc", True)
+    root = tmp_path / "root-wc"
+    env, mtimedb, _ = _non_candidate_set_env(root, cfg_true)
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert '>>> Recording @noworldset in "world_sets" favorites file...' in r.stdout
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+    cfg_false = _non_candidate_set_configroot(tmp_path, "nwc", False)
+    root = tmp_path / "root-nwc"
+    env, mtimedb, before = _non_candidate_set_env(root, cfg_false)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    sets_before = (root / "var/lib/portage/world_sets").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Recording" not in r.stdout
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+    assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
+
+
+def test_emerge_non_candidate_set_is_not_recorded_on_the_deferral_arm(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Important-2), the record half on the arm:
+    real's `saveNomergeFavorites` skips non-candidate sets
+    (`depgraph.py:11366`). A mixed run (`-u dev-libs/samepkg
+    @noworldset`, all noop) still defers via the plain atom -- rotation
+    plus the `samepkg` world record -- but `@noworldset` is never
+    recorded in world_sets under `[usersets] world-candidate =
+    false`."""
+    import json
+
+    cfg = _non_candidate_set_configroot(tmp_path, "mix", False)
+    root = tmp_path / "root"
+    env, mtimedb, _ = _non_candidate_set_env(root, cfg)
+    sets_before = (root / "var/lib/portage/world_sets").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "dev-libs/samepkg", "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert '>>> Recording dev-libs/samepkg in "world" favorites file...' in r.stdout
+    assert "@noworldset" not in r.stdout
+    assert "dev-libs/samepkg" in (root / "var/lib/portage/world").read_text().splitlines()
+    assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
+def test_emerge_non_candidate_set_is_not_recorded_on_success_path(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Important-2), the wider standing cut: the
+    success path shares the same unfiltered `world_sets` record, so
+    `emerge @noworldset` (members already installed) must not record
+    `@noworldset` under `[usersets] world-candidate = false` -- no
+    `Recording` line, `world_sets` byte-identical, rc 0."""
+    import shutil
+
+    cfg = _non_candidate_set_configroot(tmp_path, "succ", False)
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    sets_before = (root / "var/lib/portage/world_sets").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Recording" not in r.stdout
+    assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
+
+
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
     """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
     `["binary", root, cpv, "merge"]` resume item from the bintree, so the
