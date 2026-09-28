@@ -170,6 +170,8 @@ CASES = [
     ("-a bundled with -p", ["-pa", "dev-libs/newpkg"], 0),
     ("-a bundled deep in a short-flag run", ["-pauvDN", "dev-libs/newpkg"], 0),
     ("--ask=n inline form", ["--pretend", "--ask=n", "dev-libs/newpkg"], 0),
+    ("--ask=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
+    ("--read-news=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
     (
