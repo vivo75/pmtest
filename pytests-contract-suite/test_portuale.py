@@ -777,6 +777,7 @@ def _write_tmp_binhost(tmp_path):
     size = (binhost / "dev-libs/binpkgrmpkg-1.0.tbz2").stat().st_size
     (binhost / "Packages").write_text(
         "TIMESTAMP: 0\n"
+        "VERSION: 0\n"
         "PACKAGES: 1\n"
         "\n"
         "BUILD_ID: 1\n"
@@ -995,7 +996,7 @@ def _write_tmp_keep_binhost(tmp_path):
         )
         records.append(record)
     (binhost / "Packages").write_text(
-        "TIMESTAMP: 0\nPACKAGES: 3\n\n" + "\n".join(records)
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n" + "\n".join(records)
     )
     return binhost
 
@@ -2573,7 +2574,7 @@ def _signed_binhost_env(tmp_path, home):
     shutil.copy(src, binhost / "dev-libs/gpgsignedpkg-1.0.gpkg.tar")
     body = (binhost / "dev-libs/gpgsignedpkg-1.0.gpkg.tar").read_bytes()
     (binhost / "Packages").write_text(
-        "TIMESTAMP: 0\n\n"
+        "TIMESTAMP: 0\nVERSION: 0\n\n"
         "CPV: dev-libs/gpgsignedpkg-1.0\n"
         "DEFINED_PHASES: -\n"
         "DESCRIPTION: signed test package\n"
