@@ -517,6 +517,11 @@ CASES = [
         1,
     ),
     (
+        "circular dep: mixed-priority unserializable cycle prints per-edge labels (#228)",
+        ["--pretend", "dev-libs/slopcyca"],
+        1,
+    ),
+    (
         "circular dep: USE-flag suggestion (_find_suggestions)",
         ["--pretend", "dev-libs/usecyclea"],
         1,
@@ -3570,6 +3575,57 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
         "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_mixed_priority_cycle_prints_each_edge_real_label(
+    emerge_binary, fixture_env
+):
+    """Backlog #228: `dev-libs/slopcyca -RDEPEND:=-> dev-libs/slopcycb
+    -DEPEND-> dev-libs/slopcyca` is unserializable -- the `RDEPEND` `:=`
+    edge is an unsatisfied `runtime_slot_op` priority, which no real
+    `ignore_priority` rung relaxes (real `_emerge/DepPriority.py`
+    `__str__`, `_emerge/DepPriorityNormalRange.py`, `_emerge/
+    DepPrioritySatisfiedRange.py`). Each stderr cycle line carries its
+    own edge's `priorities[-1]` label (real `_prepare_circular_dep_-
+    message`, `resolver/circular_dependency.py`), not the hardcoded
+    `(buildtime)` every earlier pin shows.
+
+    Grounded on one live-real probe (`localhost/test-portuale:latest`,
+    real 3.0.81.3; the label paths -- `DepPriority.__str__`, the
+    circular message and suggestions, `DepPrioritySatisfiedRange` -- are
+    byte-identical to 3rdparty 3.0.82.2, the display path per the n206
+    probe): real exits 1 with `slopcycb depends on / slopcyca
+    (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
+    (unconditional atoms give `_find_suggestions` nothing). Portuale
+    rotates to the requested atom (lowest entries index -- the #208
+    family, left for that item), so the pin records `slopcyca depends
+    on / slopcycb (runtime_slot_op) / slopcyca (buildtime)` with the
+    same per-edge labels; stdout is portuale's own forced verbose-tree
+    stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
+    the rendered merge rows) with real's decorations, exactly like the
+    `hardcyclea` pin above. Full probe outputs:
+    `/tmp/opencode/n228probe/out/slopcyc[a|b].{stdout,stderr}.txt`."""
+    base = ["--pretend", "dev-libs/slopcyca"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/slopcyca-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/slopcycb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/slopcyca-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) (runtime_slot_op)\n"
+        "  (dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
