@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/sbrA
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: hard build-time cycle arm closing the softened ring
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=0fdb1962b1a5e51377bd632b7666cb41

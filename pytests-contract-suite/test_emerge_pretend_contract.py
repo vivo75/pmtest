@@ -565,6 +565,21 @@ CASES = [
         1,
     ),
     (
+        "circular dep: softened build-time ring reports the persisting cycle with backtracking on (#221 I3)",
+        ["--pretend", "dev-libs/sbrA"],
+        1,
+    ),
+    (
+        "circular dep: slot-pinned || build dep takes -bin over the older self slot like real (rc 0; g221c L0 rust, pinned below)",
+        ["--pretend", "dev-libs/slcirc"],
+        0,
+    ),
+    (
+        "circular dep: slot-pinned || build dep --backtrack=0 reports the self cycle like real (rc 1; g221c L0 rust, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/slcirc"],
+        1,
+    ),
+    (
         "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-1"],
         1,
@@ -695,6 +710,11 @@ CASES = [
         1,
     ),
     (
+        "circular: upstream test_circular_choices pg1 cmake backtracks to bootstrap like real (rc 0; bug 703440, pinned below)",
+        ["--pretend", "dev-libs/ccd1c"],
+        0,
+    ),
+    (
         "or-pick: in-graph || self branch re-resolves to bootstrap like real (rc 0; #216, pinned below)",
         ["--pretend", "app-misc/g216top"],
         0,
@@ -720,9 +740,29 @@ CASES = [
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg5 icedtea merges like real (rc 0; real pulls -bin first, not pinned)",
+        "circular: upstream test_circular_choices pg4 pypy backtracks to -bin like real (rc 0; bug 705986, pinned below)",
+        ["--pretend", "dev-libs/ccd4a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg4 requesting the exe prints the tree under the cycle-breaking branch (rc 0; #221 M3, pinned below)",
+        ["--pretend", "--tree", "dev-libs/ccd4b"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg4 pypy --backtrack=0 fails like real (rc 1; bug 705986 circular, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd4a"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea pulls -bin like real (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd5a"],
         0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea --backtrack=0 fails like real (rc 1; runtime-closing ring, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd5a"],
+        1,
     ),
     (
         "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like real (rc 0; pinned below)",
@@ -3635,6 +3675,82 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
         "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_ccd4b_tree_follows_the_cycle_breaking_branch(
+    emerge_binary, fixture_env
+):
+    """Backlog #221 (M3): `--tree` map-awareness on a post-backtrack
+    cell. Requesting `dev-libs/ccd4b` (the exe) re-resolves past the
+    pg4 ring to `[ccd4c, ccd4a, ccd4b]` (real's own answer for the
+    direct request -- g221 S0 `ResolverPlayground` probe: requesting
+    `pypy-exe` merges `[exe-bin, pypy, exe]`), and the tree nests each
+    package under its requirer (exe -> pypy -> exe-bin) instead of
+    re-closing the broken ring with a phantom edge (the pre-#221 shape
+    merged `[ccd4c, ccd4b, ccd4a]`, the exe ahead of its own buildtime
+    dep). The merge order is covered by the Rust fixture test; this
+    pins the tree rendering, which re-derives the kept branch through
+    the map-aware suppression (`pretend.rs` tree walk). The
+    `USE="-low-memory"` flag display is the generic USE renderer, not
+    circular logic."""
+    rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/ccd4b"], fixture_env)
+
+    assert rust.returncode == 0
+    assert rust.stdout == (
+        '[ebuild  N     ] dev-libs/ccd4b-7.3.0  USE="-low-memory"\n'
+        "[ebuild  N     ]  dev-libs/ccd4a-7.3.0 \n"
+        "[ebuild  N     ]   dev-libs/ccd4c-7.3.0 \n"
+    )
+    assert rust.stderr == ""
+
+
+def test_softened_build_time_cycle_reports_the_persisting_ring(
+    emerge_binary, fixture_env
+):
+    """Backlog #221 (I3): `dev-libs/sbrA` BDEPENDs+RDEPENDs on
+    `dev-libs/sbrB` while `sbrB` BDEPENDs back. The dual edge softens
+    the hard reporter's arm (`(true, true)` in the walk's edge-kind
+    map) so `find_hard_cycles` stays empty, but the walk still strands
+    and the restart trigger still fires: the retry re-strands
+    identically (no `||` branch for the demotion to switch to), the
+    ring is unsolved, and the settled pass reports it through
+    `assemble_result`'s persisting-ring leg instead of settling
+    `Complete` -- rc 1 WITH backtracking on (contrast the bt0-only
+    legs, which never retry).
+
+    Grounded in real runs (`/tmp/opencode/g221b/probe_sbr.py`,
+    3rdparty portage 3.0.82.2 `ResolverPlayground`, debug
+    `backtracking try` count): backtracking on fails after exactly 1
+    retry, `--backtrack=0` fails with none. The message shape is real
+    `_prepare_circular_dep_message`
+    (`resolver/circular_dependency.py`: one `priorities[-1]` label per
+    edge; priorities are `bisect.insort`-sorted so `[-1]` is the
+    hardest -- `DepPriority.__int__` ranks buildtime (-1) above runtime
+    (-3), hence `(buildtime)` on the dual edge, matching portuale's own
+    `cycle_edge_labels` max); stdout is the forced verbose-tree stuck
+    remainder with real's decorations and the `Total:` counters line,
+    exactly like the `hardcyclea` pin above."""
+    base = ["--pretend", "dev-libs/sbrA"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/sbrA-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/sbrB-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/sbrA-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/sbrB-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -9991,12 +10107,11 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned. Not pinned: pg1's
     `--backtrack=0` cell (rc 1 matches real but the circular-error
-    text is unverified vs real), pg1's default-backtrack cell and
-    pg4 (portuale reports a circular error where real adjusts the
-    `||` preference — findings, no CASES), pg5 (rc 0 matches but
-    portuale merges [ccd5v, ccd5a] where real pulls ccd5b/-bin
-    first — finding, CASES only), and the pg2 `--depclean` cell
-    (needs a shared world entry).
+    text is unverified vs real) and the pg2 `--depclean` cell (needs
+    a shared world entry). pg1's default-backtrack cell, pg4 and pg5
+    are pinned in `test_upstream_circular_choices_pg145_pins_mergelists`
+    since #221 (backtracking switches to the cycle-breaking `||`
+    branch like real).
     """
     env = dict(fixture_env)
     cases = [
@@ -10022,6 +10137,83 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_pg145_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_circular_choices.py` pg1
+    (`::testCircularJsoncppCmakeBootstrapOrDeps`, bug 703440), pg4
+    (`::testCircularPypyExe`, bug 705986) and pg5
+    (`::testDirectVirtualCircularDependency`), bulk-translated for #50
+    batch 7 (`dev-libs/ccd1{a,b,c}`, `dev-libs/ccd4{a,b,c}`,
+    `dev-libs/ccd5{a,b}` + `virtual/ccd5v`; oracle
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    Each cell's first pass picks the in-graph `||` branch and strands
+    the merge-order walk on a cycle; since #221 portuale records the
+    cycle and backtracks to the branch that breaks it, merging the
+    oracle's exact set in the oracle's exact order with no warnings
+    and empty stderr, so the exact rows are pinned: pg1
+    `[ccd1b, ccd1a, ccd1c]` (real `[cmake-bootstrap, jsoncpp,
+    cmake]`), pg4 `[ccd4c, ccd4a]` (real `[pypy-exe-bin, pypy]`, no
+    `+low-memory` suggestion), pg5 `[ccd5b, ccd5v, ccd5a]` (real
+    `[icedtea6-bin, jdk, icedtea]`).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["dev-libs/ccd1c"],
+            [
+                "[ebuild  N     ] dev-libs/ccd1b-3.16.2 ",
+                "[ebuild  N     ] dev-libs/ccd1a-1.9.2 ",
+                "[ebuild  N     ] dev-libs/ccd1c-3.16.2 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd4a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd4c-7.3.0 ",
+                "[ebuild  N     ] dev-libs/ccd4a-7.3.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd5a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd5b-1.10.3 ",
+                "[ebuild  N     ] virtual/ccd5v-1.6.0 ",
+                "[ebuild  N     ] dev-libs/ccd5a-6.1.10.3 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_slcirc_slot_pinned_branch_prefers_bin_over_older_slot(
+    emerge_binary, fixture_env
+):
+    """g221c (L0 `dev-lang/rust` regression): a slot-pinned `||` build
+    dep over an older slot of the package itself vs the `-bin` package,
+    the older slot carrying its own self buildtime edge. The first pass
+    self-picks and strands; the retry demotes the recorded self branch
+    and takes `-bin` -- real's exact set in real's exact order with no
+    warnings and empty stderr, so the exact rows are pinned:
+    `[slcirc-bin-2.0, slcirc-2.0]` (real `[rust-bin-1.96.1,
+    rust-1.96.1]`, one backtrack on both sides; oracle
+    `/tmp/opencode/g221c/probe_slcirc.py`, captured from the real
+    `ResolverPlayground`, not the source literal).
+    """
+    env = dict(fixture_env)
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/slcirc"], env)
+    assert got.returncode == 0
+    assert got.stderr == ""
+    assert got.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/slcirc-bin-2.0 ",
+        "[ebuild  N     ] dev-libs/slcirc-2.0 ",
+    ]
 
 
 def test_upstream_circular_choices_rust_pg0_pins_mergelists(

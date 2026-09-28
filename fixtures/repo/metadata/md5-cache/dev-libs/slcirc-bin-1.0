@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: g221c bootstrap binary for the older slot (mirrors dev-lang/rust-bin-1.95.0)
+EAPI=8
+KEYWORDS=amd64
+SLOT=1.0
+_md5_=0cfdb12d0af150e10171796c564f2f44
