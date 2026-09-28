@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: mixed-priority unbreakable cycle, runtime slot-operator edge (#228)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/slopcycb:=
+SLOT=0
+_md5_=1da7617dcb443775d61e91e8a79d68ca
