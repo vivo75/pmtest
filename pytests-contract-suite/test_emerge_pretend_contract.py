@@ -18568,6 +18568,53 @@ def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     }
 
 
+def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 I1: the `--solver=` bridge threads the request's
+    `update`/top-level atoms into its rebuild fixpoint, so the
+    new-child-slot arm (both the fresh-slot and the item-2
+    bound-slot-mismatch halves, plus the R2 refusal) runs there exactly
+    as on the default path. On the `mmprov` shape the pubgrub walk
+    produces the same slot-1 `Upgrade` entry, and the bridge schedules
+    the same consumer rebuild. (`resolvo` does not resolve the direct
+    upgrade arg at all here -- an engine-side gap below this layer,
+    reported for filing; the conflict-mass shape likewise resolves
+    walked `:=` deps to installed inside both engines, so scan-level
+    agreement cannot reach it without engine-side probe scheduling.)"""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "--solver=pubgrub",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+
+
 def test_oracle_slotop_required_use(
     emerge_binary, fixture_env, tmp_path
 ):
