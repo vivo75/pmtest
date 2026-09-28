@@ -18520,6 +18520,54 @@ def test_oracle_slotop_update_probe_refusal(
     }
 
 
+def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 item 2: the new-child-slot arm also probes
+    `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
+    mismatch. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and an
+    installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
+    form; the live ebuild carries bare `:=`); the run upgrades slot 1
+    to `mmprov-3` (`1/2`). Real's candidate loop
+    (`_iter_similar_available`, `depgraph.py:2660-2695`) ranges over
+    every available package, not only fresh-slot merges, so the probe
+    fires for the slot-1 upgrade against the slot-0-bound consumer and
+    the consumer rebuilds. MATCHES real since #211 item 2 (code-grounded:
+    the loop text has no entry-kind restriction; the direction follows
+    the R2-probe-validated new-slot arm). The `EAPI` files keep the
+    probe registration faithful (see the conflict-mass pin)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+
+
 def test_oracle_slotop_required_use(
     emerge_binary, fixture_env, tmp_path
 ):
