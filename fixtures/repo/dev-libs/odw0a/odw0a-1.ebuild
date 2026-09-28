@@ -1,0 +1,9 @@
+EAPI=8
+DESCRIPTION="fixture package: --onlydeps-with-rdeps/--onlydeps-with-ideps EAPI 8 root (backlog #194)"
+SLOT="0"
+KEYWORDS="amd64"
+DEPEND="dev-libs/odw0b"
+BDEPEND="dev-libs/odw0f"
+RDEPEND="dev-libs/odw0c"
+PDEPEND="dev-libs/odw0d"
+IDEPEND="dev-libs/odw0e"
