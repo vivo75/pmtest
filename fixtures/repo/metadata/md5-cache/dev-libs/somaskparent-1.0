@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=212 oracle fixture: parent with an unbuilt := dep on the slot-moved child
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/somaskchild:=
+SLOT=0
+_md5_=83aecb84a9e299762d6f3d07c2ed3ffb

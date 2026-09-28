@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=212 oracle fixture: child whose tree SLOT moved 0/1 -> 0/2 without a revbump; the binhost binary below was built at 0/1
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=f33a766d21b203838d0e22cc23bebcd9
