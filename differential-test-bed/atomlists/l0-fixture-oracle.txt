@@ -161,3 +161,11 @@ dev-libs/blockerpkg dev-libs/graphblockerparent
 # own self buildtime edge. Both PMs retry once and merge [-bin-2.0,
 # slcirc-2.0].
 dev-libs/slcirc
+
+# #238 S0 (upstream test_eapi pg1 C-2, EAPI 8): `|| ( emptyanyof? (
+# dev-libs/condanyofdep ) )` with emptyanyof off reduces the || group to
+# empty, which fails at EAPI 7+ (real `use_reduce`
+# dep/__init__.py:864-869 emits `__const__/empty-any-of`). Real rc 1;
+# the EAPI-6 C-1 shape (empty group dropped, bare merge) is not
+# re-fixtured -- all fixture ebuilds are EAPI 8 since #220.
+dev-libs/condanyof

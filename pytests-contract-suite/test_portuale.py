@@ -5108,6 +5108,61 @@ def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n", flags=None):
     )
 
 
+def _ask_pty_with_sigint(emerge_binary, args, env, prompt_marker, timeout=300):
+    """Run `emerge ...` under `script(1)` (pty stdin, satisfying real's
+    `--ask` TTY gate) and deliver SIGINT as a `^C` byte *after* the
+    prompt is up: the byte is written to script's stdin only once
+    `prompt_marker` is observed on the child's output, so the signal
+    cannot strike during startup or the resolve (where SIGINT must
+    keep killing the process as today). This models a terminal user's
+    Ctrl-C at the prompt -- the pty line discipline raises a real
+    SIGINT, which real `_emerge/UserQuery.query`
+    (`_emerge/UserQuery.py:74-76`) catches out of `input()`
+    (backlog #240). Returns the completed process; stdout carries the
+    pty output, as in `_read_news_pty_run`."""
+    import select as _select
+    import shlex as _shlex
+    import shutil as _shutil
+    import time as _time
+
+    script = _shutil.which("script") or "/usr/bin/script"
+    cmd = " ".join(_shlex.quote(a) for a in [str(emerge_binary), *args])
+    proc = subprocess.Popen(
+        [script, "-qec", cmd, "/dev/null"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    out = b""
+    marker = prompt_marker.encode()
+    deadline = _time.monotonic() + timeout
+    while marker not in out:
+        remaining = deadline - _time.monotonic()
+        if remaining <= 0:
+            proc.kill()
+            raise AssertionError(
+                f"timed out waiting for {prompt_marker!r}; got so far: "
+                f"{out.decode(errors='replace')}"
+            )
+        ready, _, _ = _select.select([proc.stdout], [], [], remaining)
+        if not ready:
+            continue
+        chunk = os.read(proc.stdout.fileno(), 65536)
+        if not chunk:
+            break
+        out += chunk
+    proc.stdin.write(b"\x03")
+    proc.stdin.flush()
+    rest, err = proc.communicate(timeout=timeout)
+    return subprocess.CompletedProcess(
+        [str(emerge_binary), *args],
+        proc.returncode,
+        (out + rest).decode(errors="replace"),
+        (err or b"").decode(errors="replace"),
+    )
+
+
 def test_emerge_ask_read_news_spawns_eselect_like_real(emerge_binary, tmp_path):
     """Backlog #231 (c): real `_emerge/actions.py:4266-4281` -- once
     the pre-resolution notice printed, `--ask --read-news` prompts
@@ -5169,6 +5224,102 @@ def test_emerge_ask_read_news_eof_exits_before_resolve_like_real(emerge_binary, 
     assert "Interrupted." in r.stdout
     assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
     assert "Calculating dependencies" not in r.stdout
+
+
+def test_emerge_ask_read_news_sigint_exits_before_resolve_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240: real `_emerge/UserQuery.query`
+    (`_emerge/UserQuery.py:74-76`) catches `KeyboardInterrupt` out of
+    `input()`, prints `Interrupted.`, and exits `128 + SIGINT` from
+    inside `query` -- the news prompt's `sys.exit` fires before
+    `action_build`. A `^C` byte delivered through the pty *after* the
+    prompt is up (see `_ask_pty_with_sigint`) is the terminal user's
+    Ctrl-C (the line discipline raises a real SIGINT): the run must
+    print `Interrupted.` (and no `Quitting.` -- real's `== "Yes"`
+    comparison never runs), exit 130, and never reach the resolve
+    (`Calculating dependencies` stays absent). Before the fix the
+    process died by signal with no `Interrupted.` line."""
+    root, env = _news_env(tmp_path, "root-ask-read-news-sigint")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--read-news", "--oneshot", "dev-libs/schedok"],
+        env,
+        "Would you like to read the news items while calculating dependencies?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert "Interrupted." in r.stdout
+    assert "Quitting." not in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert "Calculating dependencies" not in r.stdout
+
+
+def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240: the same Ctrl-C at the merge prompt (real
+    `_emerge/actions.py:527-536` through
+    `_emerge/UserQuery.py:74-76`). EOF there used to print a spurious
+    `Quitting.` after `Interrupted.`; a `^C` died by signal with
+    neither line. Now: `Interrupted.` exactly once, no `Quitting.`,
+    exit 130 -- real exits from inside `query`, so its `Quitting.`
+    never runs either."""
+    import shutil
+
+    root = tmp_path / "root-ask-merge-sigint"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--oneshot", "dev-libs/schedok"],
+        env,
+        "Would you like to merge these packages?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    # (No `[Yes/No]` suffix: under `script` the child's stdout is a
+    # tty, so the choices print colorized with the escapes between
+    # `?` and `[` -- the question itself stays contiguous.)
+    assert "Would you like to merge these packages?" in r.stdout
+    assert r.stdout.count("Interrupted.") == 1, (r.stdout, r.stderr)
+    assert "Quitting." not in r.stdout
+    assert not (root / "var/db/pkg/dev-libs/schedok-1.0").exists()
+
+
+def test_emerge_config_select_sigint_prints_interrupted_without_quitting_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240 follow-up: the config `Selection?` menu goes
+    through the same `UserQuery.query` in real
+    (`_emerge/actions.py:746` through
+    `_emerge/UserQuery.py:74-76`), so Ctrl-C there prints
+    `Interrupted.` and exits `128 + SIGINT` -- `X`'s own `Quitting.`
+    (`actions.py:747-748`) never runs. Two stub vdb entries make
+    `dev-libs/seltest` match twice, reaching the menu with no ebuild
+    work; the `^C` delivery is the same prompt-synchronized pty byte
+    as the merge-prompt pin above."""
+    root = tmp_path / "root-config-select-sigint"
+    for v in ("1.0", "2.0"):
+        (root / f"var/db/pkg/dev-libs/seltest-{v}").mkdir(parents=True)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--config", "dev-libs/seltest"],
+        env,
+        "Selection?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Please select a package to configure:" in r.stdout
+    assert r.stdout.count("Interrupted.") == 1, (r.stdout, r.stderr)
+    assert "Quitting." not in r.stdout
 
 
 def test_emerge_ask_read_news_true_spellings_prompt_like_real(emerge_binary, tmp_path):
@@ -7075,6 +7226,314 @@ def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
         "dev-libs/stale-a-1.0",
         "dev-libs/stale-b-1.0",
     ]
+
+
+def test_emerge_selective_noop_without_oneshot_rotates_and_records(
+    emerge_binary, tmp_path
+):
+    """Backlog #232: real's selective-without-`--oneshot` deferral arm
+    (`_emerge/actions.py:514-516`) does not return early -- it falls
+    through to the `resume_backup` rotation (`:664-672`) and
+    `saveNomergeFavorites` (the world-file record), skipping only
+    `Scheduler`. The all-noop plan is `emerge --verbose -u
+    dev-libs/samepkg` (no `--oneshot`; `samepkg` is installed at the
+    only visible version, so `mergecount == 0`): exit 0 with no
+    `Nothing to merge` anywhere, the stale two-item list rotated into
+    `resume_backup` (and no fresh `resume` section -- no `Scheduler`
+    write), and `dev-libs/samepkg` recorded in the world file with the
+    real `>>> Recording ...` line on stdout."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Total:" in r.stdout
+    assert '>>> Recording dev-libs/samepkg in "world" favorites file...' in r.stdout
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+    world_lines = (root / "var/lib/portage/world").read_text().splitlines()
+    assert "dev-libs/samepkg" in world_lines
+    assert "dev-libs/newpkg" in world_lines
+    assert "dev-libs/withdeps" in world_lines
+
+
+def test_emerge_selective_noop_without_oneshot_ask_prompts_for_world(
+    emerge_binary, tmp_path
+):
+    """Backlog #232, the `--ask` half of the deferral arm
+    (`_emerge/actions.py:514-516` plus `depgraph.py:11376-11386`): with
+    `--ask` real asks `Would you like to add these packages to your
+    world favorites?` inside `saveNomergeFavorites` instead of the merge
+    prompt -- so `Would you like to merge` stays absent while the stale
+    list still rotates. Same all-noop plan (`-u dev-libs/samepkg`, no
+    `--oneshot`); the `y` answer records the world atom."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    r = _run_with_ask_pty(
+        emerge_binary,
+        ["--ask", "-u", "dev-libs/samepkg"],
+        "y\n",
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Would you like to add these packages to your world favorites?" in r.stdout
+    assert "Would you like to merge" not in r.stdout
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+    assert "dev-libs/samepkg" in (
+        (root / "var/lib/portage/world").read_text().splitlines()
+    )
+
+
+def test_emerge_onlydeps_selective_noop_keeps_the_resume_list_alone(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Critical-1): real folds `--onlydeps` into the
+    gate variable (`_emerge/actions.py:257`: `oneshot = "--oneshot" in
+    myopts or "--onlydeps" in myopts`), and the deferral arm tests that
+    folded value (`:499`, `:514`). So `-u --onlydeps` on an
+    already-installed package is the #225 shape -- `Nothing to merge;
+    quitting.` on stdout, exit 0, stale two-item resume list
+    byte-identical with no `resume_backup` key -- never the #232
+    rotation, and nothing recorded in the world file."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "--onlydeps", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Nothing to merge" not in r.stderr
+    assert "Recording" not in r.stdout
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+
+
+def test_emerge_selective_noop_without_oneshot_ask_decline_records_nothing(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Minor-6): the `--ask n`/EOF decline half of
+    the deferral arm (`depgraph.py:11376-11386` -- the `No` answer sets
+    `skip`, so nothing is recorded, while the run still succeeds). The
+    `n` answer shows the world prompt (and never the merge prompt),
+    records nothing in the world file, yet still rotates the stale
+    two-item list into `resume_backup`, rc 0. Same all-noop plan (`-u
+    dev-libs/samepkg`, no `--oneshot`)."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    r = _run_with_ask_pty(
+        emerge_binary,
+        ["--ask", "-u", "dev-libs/samepkg"],
+        "n\n",
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Would you like to add these packages to your world favorites?" in r.stdout
+    assert "Would you like to merge" not in r.stdout
+    assert "Recording" not in r.stdout
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
+def test_emerge_selective_noop_without_oneshot_buildpkgonly_rotates_without_record(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Minor-6): `--buildpkgonly` defers (it is not
+    part of real's gate fold at `_emerge/actions.py:257`, so the `:514`
+    arm still fires) but records nothing (it is in real's
+    `saveNomergeFavorites` suppression set, `depgraph.py:11308`). Same
+    all-noop plan (`--verbose -u dev-libs/samepkg`, no `--oneshot`):
+    exit 0 with no `Nothing to merge` anywhere, the stale two-item list
+    rotated into `resume_backup`, and the world file byte-identical with
+    no `Recording` line."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "--buildpkgonly", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Recording" not in r.stdout
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
+def _non_candidate_set_configroot(tmp_path, tag, world_candidate):
+    """Backlog #232 review (Important-2): a private copy of the fixture
+    configroot plus a `@noworldset` file set naming the installed
+    `dev-libs/samepkg`. With `world_candidate=False` a `sets.conf`
+    flips the `[usersets]` default to `world-candidate = false` --
+    real's documented override shape (man portage.5 `sets.conf`;
+    same-named sections merge across files with later wins, and
+    `_sets/__init__.py` marks every file set the multiset builds with
+    that flag). Per-test copies only: no committed fixture churn."""
+    import shutil
+
+    root = tmp_path / f"configroot{tag}"
+    shutil.copytree(Path(FIXTURES_ROOT) / "etc", root / "etc", symlinks=True)
+    for entry in Path(FIXTURES_ROOT).iterdir():
+        if entry.name != "etc":
+            (root / entry.name).symlink_to(entry)
+    (root / "etc/portage/sets/noworldset").write_text("dev-libs/samepkg\n")
+    if not world_candidate:
+        (root / "etc/portage/sets.conf").write_text(
+            "[usersets]\nworld-candidate = false\n"
+        )
+    return root
+
+
+def _non_candidate_set_env(root, configroot):
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    env["PORTAGE_CONFIGROOT"] = str(configroot)
+    return env, mtimedb, before
+
+
+def test_emerge_non_candidate_set_selective_noop_is_not_deferred(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Important-2): real filters sets with
+    `world-candidate = false` out of `world_candidates`
+    (`_emerge/actions.py:500-512`), and the deferral arm tests the
+    filtered list (`:514`). With the default config `-u @noworldset`
+    (all members installed) defers -- rotation, world_sets record, no
+    message; with `[usersets] world-candidate = false` the same run is
+    the #225 shape -- `Nothing to merge; quitting.`, stale two-item
+    resume list byte-identical with no `resume_backup` key, world and
+    world_sets untouched."""
+    import json
+
+    cfg_true = _non_candidate_set_configroot(tmp_path, "wc", True)
+    root = tmp_path / "root-wc"
+    env, mtimedb, _ = _non_candidate_set_env(root, cfg_true)
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert '>>> Recording @noworldset in "world_sets" favorites file...' in r.stdout
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+    cfg_false = _non_candidate_set_configroot(tmp_path, "nwc", False)
+    root = tmp_path / "root-nwc"
+    env, mtimedb, before = _non_candidate_set_env(root, cfg_false)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    sets_before = (root / "var/lib/portage/world_sets").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Recording" not in r.stdout
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+    assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
+
+
+def test_emerge_non_candidate_set_is_not_recorded_on_the_deferral_arm(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Important-2), the record half on the arm:
+    real's `saveNomergeFavorites` skips non-candidate sets
+    (`depgraph.py:11366`). A mixed run (`-u dev-libs/samepkg
+    @noworldset`, all noop) still defers via the plain atom -- rotation
+    plus the `samepkg` world record -- but `@noworldset` is never
+    recorded in world_sets under `[usersets] world-candidate =
+    false`."""
+    import json
+
+    cfg = _non_candidate_set_configroot(tmp_path, "mix", False)
+    root = tmp_path / "root"
+    env, mtimedb, _ = _non_candidate_set_env(root, cfg)
+    sets_before = (root / "var/lib/portage/world_sets").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "dev-libs/samepkg", "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert '>>> Recording dev-libs/samepkg in "world" favorites file...' in r.stdout
+    assert "@noworldset" not in r.stdout
+    assert "dev-libs/samepkg" in (root / "var/lib/portage/world").read_text().splitlines()
+    assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
+def test_emerge_non_candidate_set_is_not_recorded_on_success_path(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Important-2), the wider standing cut: the
+    success path shares the same unfiltered `world_sets` record, so
+    `emerge @noworldset` (members already installed) must not record
+    `@noworldset` under `[usersets] world-candidate = false` -- no
+    `Recording` line, `world_sets` byte-identical, rc 0."""
+    import shutil
+
+    cfg = _non_candidate_set_configroot(tmp_path, "succ", False)
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    sets_before = (root / "var/lib/portage/world_sets").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "@noworldset"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Recording" not in r.stdout
+    assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
 
 
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
