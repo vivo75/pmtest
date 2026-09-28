@@ -4990,6 +4990,185 @@ def test_emerge_unmerge_prints_news_count_notice_like_real(
     assert len(unread) == 5
 
 
+def test_emerge_resume_prints_news_notices_like_real(emerge_binary, tmp_path):
+    """Backlog #231 (a): real `run_action` prints the pre-resolution
+    news-count notice before `action_build` -- and the resume handling
+    lives inside `action_build` (real `_emerge/actions.py:220-4289`)
+    -- so a resumed build prints it too; real `post_emerge`
+    (`post_emerge.py:155`, called unconditionally at
+    `actions.py:4289-4297`) prints the post notice once the resumed
+    merge changed the vdb. `dev-libs/schedbad`'s src_install dies, so
+    the seed run (`schedbad` first: nothing merges) prints the notice
+    exactly once; `--resume --pretend` prints it exactly once (the
+    `post_emerge.py:112-117` pretend arm -- the pre notice is itself
+    `--pretend`-gated); `--resume --skipfirst` merges `schedok` and
+    prints it twice, pre before `>>> Resuming...` and post after the
+    last `>>>` line."""
+    import json
+
+    root, env = _news_env(tmp_path, "root-resume-news")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-libs/schedbad", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    mtimedb = root / "var/cache/edb/mtimedb"
+    saved = json.loads(mtimedb.read_text())
+    assert [x[2] for x in saved["resume"]["mergelist"]] == [
+        "dev-libs/schedbad-1.0", "dev-libs/schedok-1.0",
+    ]
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--pretend"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--skipfirst"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
+    assert r.stdout.count("Use eselect news read to view new items.") == 2
+    assert r.stdout.index("need reading") < r.stdout.index(">>> Resuming")
+    assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
+    assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
+    assert not mtimedb.exists()  # resume list cleared on success
+
+
+def test_mrg_remote_success_prints_no_post_merge_notice_like_real(
+    mrg_binary, fixture_env, tmp_path
+):
+    """Backlog #231 (b): the remote-execution early return skips
+    `post_emerge`'s tail -- correctly so. The remote plan merges onto
+    the remote host; the local `${ROOT}/var/db/pkg` is never touched,
+    so real's `_pkgs_changed` gate (real
+    `_emerge/post_emerge.py:112-117`) evaluates false and -- the run
+    being non-`--pretend` -- the tail would print nothing. Same
+    local-transport setup as
+    `test_mrg_remote_resolve_merges_a_binhost_binary` but with
+    `FEATURES="news"` and a fixture-`var` client ROOT (the hermetic
+    5-count vdb): the pre-resolution notice prints exactly once,
+    before `Calculating...`, and no post-merge notice follows the
+    remote merge."""
+    import shutil as _shutil
+
+    binhost = _write_tmp_binhost(tmp_path)
+    clientetc = _write_tmp_clientetc(tmp_path, binhost)
+    root = tmp_path / "root-remote-news"
+    _shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = _remote_resolve_env(fixture_env, root, clientetc)
+    env["FEATURES"] = "news"
+    result = subprocess.run(
+        [str(mrg_binary),
+         "--getbinpkgonly",
+         "--remote-hostname", "localtest",
+         "--remote-transport", "local",
+         "--remote-root", str(root),
+         "--remote-workdir", str(tmp_path / "work-news"),
+         "--remote-etc-portage", f"server:{clientetc}",
+         "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert ">>> Remote merged dev-libs/binpkgrmpkg-1.0" in result.stdout
+    assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0/CONTENTS").is_file()
+    assert result.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert result.stdout.index("need reading") < result.stdout.index("Calculating")
+
+
+def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n"):
+    """Run `emerge --ask --read-news --oneshot dev-libs/schedok` with
+    stdin on a pty (real `actions.py:3920-3926` rejects `--ask` on a
+    non-terminal). `script(1)` provides the pty -- resolved absolutely
+    so a test can empty `PATH` -- and its own stdin (a pipe here) feeds
+    the child's answers. Returns the completed process."""
+    import shlex as _shlex
+    import shutil as _shutil
+
+    script = _shutil.which("script") or "/usr/bin/script"
+    argv = [
+        str(emerge_binary),
+        "--ask", "--read-news", "--oneshot", "dev-libs/schedok",
+    ]
+    cmd = " ".join(_shlex.quote(a) for a in argv)
+    return subprocess.run(
+        [script, "-qec", cmd, "/dev/null"],
+        input=answers,
+        capture_output=True, text=True, check=False, env=env,
+    )
+
+
+def test_emerge_ask_read_news_spawns_eselect_like_real(emerge_binary, tmp_path):
+    """Backlog #231 (c): real `_emerge/actions.py:4266-4281` -- once
+    the pre-resolution notice printed, `--ask --read-news` prompts
+    "Would you like to read the news items while calculating
+    dependencies?" and spawns `eselect news read` on "Yes", then
+    continues into the resolve. The stub on `PATH` records its argv;
+    the declined merge prompt still exits 130 with `Quitting.`."""
+    root, env = _news_env(tmp_path, "root-ask-read-news")
+    stubdir = tmp_path / "stubs"
+    stubdir.mkdir()
+    marker = stubdir / "eselect.log"
+    (stubdir / "eselect").write_text(
+        f'#!/bin/sh\necho "$@" >> {marker}\n'
+    )
+    (stubdir / "eselect").chmod(0o755)
+    env["PATH"] = f"{stubdir}{os.pathsep}{env.get('PATH', '')}"
+
+    r = _read_news_pty_run(emerge_binary, env)
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert "Quitting." in r.stdout
+    assert marker.read_text() == "news read\n"
+
+
+def test_emerge_ask_read_news_no_skips_eselect_like_real(emerge_binary, tmp_path):
+    """Backlog #231 (c), the "No" arm: real's `== "Yes"` check fails,
+    so no spawn happens and the run continues -- the stub marker never
+    appears, while the notice still printed once and the declined merge
+    prompt still exits 130."""
+    root, env = _news_env(tmp_path, "root-ask-read-news-no")
+    stubdir = tmp_path / "stubs-no"
+    stubdir.mkdir()
+    marker = stubdir / "eselect.log"
+    (stubdir / "eselect").write_text(
+        f'#!/bin/sh\necho "$@" >> {marker}\n'
+    )
+    (stubdir / "eselect").chmod(0o755)
+    env["PATH"] = f"{stubdir}{os.pathsep}{env.get('PATH', '')}"
+    r = _read_news_pty_run(emerge_binary, env, answers="No\nNo\n")
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert not marker.exists()
+
+
+def test_emerge_ask_read_news_without_eselect_prints_real_hint(
+    emerge_binary, tmp_path
+):
+    """Backlog #231 (c): real catches the spawn's `OSError` (eselect
+    missing) and prints `Please install eselect to use this feature.`
+    (real `_emerge/actions.py:4284-4287`). `PATH` is emptied so the
+    spawn must fail; the "Yes" is still consumed and the declined merge
+    prompt still exits 130. (`script` merges the child's stderr into
+    the pty, so the message is asserted on stdout here; the dedicated
+    Rust test pins the stderr stream with separate pipes.)"""
+    root, env = _news_env(tmp_path, "root-ask-read-news-missing")
+    empty = tmp_path / "empty-path"
+    empty.mkdir()
+    env["PATH"] = str(empty)
+    r = _read_news_pty_run(emerge_binary, env)
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Please install eselect to use this feature." in r.stdout
+
+
 def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
     emerge_binary, tmp_path
 ):

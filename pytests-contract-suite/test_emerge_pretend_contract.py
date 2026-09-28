@@ -11931,6 +11931,7 @@ Build scheduling:
   -l, --load-average N       hold new builds while the load average exceeds N
   -a, --ask[=y|n]            prompt for confirmation before a real merge or removal
       --ask-enter-invalid    with --ask: a bare Enter is not accepted as Yes
+      --read-news[=y|n]      with --ask: offer to read unread news via eselect
       --ignore-default-opts  ignore the EMERGE_DEFAULT_OPTS variable for this run
       --keep-going           on a build failure, drop that package's dependents and carry on
       --quiet-build[=y|n]    redirect a build's phase output to ${T}/build.log (implied by -j >1 and -q)
