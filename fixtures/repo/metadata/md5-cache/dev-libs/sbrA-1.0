@@ -1,0 +1,8 @@
+BDEPEND=dev-libs/sbrB
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: softened build-time cycle arm (BDEPEND+RDEPEND on the same target makes the edge breakable for the hard reporter but not for the restart trigger)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/sbrB
+SLOT=0
+_md5_=b9d5213b2bf4f4117bbacfc187f1e815

@@ -565,6 +565,21 @@ CASES = [
         1,
     ),
     (
+        "circular dep: softened build-time ring reports the persisting cycle with backtracking on (#221 I3)",
+        ["--pretend", "dev-libs/sbrA"],
+        1,
+    ),
+    (
+        "circular dep: slot-pinned || build dep takes -bin over the older self slot like real (rc 0; g221c L0 rust, pinned below)",
+        ["--pretend", "dev-libs/slcirc"],
+        0,
+    ),
+    (
+        "circular dep: slot-pinned || build dep --backtrack=0 reports the self cycle like real (rc 1; g221c L0 rust, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/slcirc"],
+        1,
+    ),
+    (
         "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-1"],
         1,
@@ -695,6 +710,11 @@ CASES = [
         1,
     ),
     (
+        "circular: upstream test_circular_choices pg1 cmake backtracks to bootstrap like real (rc 0; bug 703440, pinned below)",
+        ["--pretend", "dev-libs/ccd1c"],
+        0,
+    ),
+    (
         "or-pick: in-graph || self branch re-resolves to bootstrap like real (rc 0; #216, pinned below)",
         ["--pretend", "app-misc/g216top"],
         0,
@@ -720,9 +740,29 @@ CASES = [
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg5 icedtea merges like real (rc 0; real pulls -bin first, not pinned)",
+        "circular: upstream test_circular_choices pg4 pypy backtracks to -bin like real (rc 0; bug 705986, pinned below)",
+        ["--pretend", "dev-libs/ccd4a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg4 requesting the exe prints the tree under the cycle-breaking branch (rc 0; #221 M3, pinned below)",
+        ["--pretend", "--tree", "dev-libs/ccd4b"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg4 pypy --backtrack=0 fails like real (rc 1; bug 705986 circular, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd4a"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea pulls -bin like real (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd5a"],
         0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea --backtrack=0 fails like real (rc 1; runtime-closing ring, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd5a"],
+        1,
     ),
     (
         "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like real (rc 0; pinned below)",
@@ -1214,32 +1254,32 @@ CASES = [
         1,
     ),
     (
-        "--autounmask-use: an opt= dep whose child flag is masked flips the parent instead, exit 1",
+        "--autounmask-use: an opt= dep whose child flag is masked is a bare miss like real (rc 1; untouchable child, no parent flip: #195)",
         ["--pretend", "dev-libs/parentflipeqpkg"],
         1,
     ),
     (
-        "--autounmask-use=n: the masked-child opt= dep stays unresolvable (top-level still merges)",
+        "--autounmask-use=n: the masked-child opt= dep stays unresolvable (rc 1, no merge list: #195)",
         ["--pretend", "--autounmask-use=n", "dev-libs/parentflipeqpkg"],
         1,
     ),
     (
-        "--autounmask-use parent flip, default: single-dep re-resolve, pf? dep stays",
+        "--autounmask-use parent flip, default: masked-child opt= dep is a bare miss like real (rc 1; untouchable child, no parent flip: #195)",
         ["--pretend", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, --autounmask-backtrack=y: whole-graph, pf? dep drops",
+        "--autounmask-use parent flip, --autounmask-backtrack=y: same bare miss like real (rc 1; no recorded flip, nothing to re-resolve: #195)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, -pv",
+        "--autounmask-use parent flip, -pv: same bare miss like real (rc 1: #195)",
         ["--pretend", "-v", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, --autounmask-use=n",
+        "--autounmask-use parent flip, --autounmask-use=n: same bare miss like real (rc 1: #195)",
         ["--pretend", "--autounmask-use=n", "dev-libs/pfgraphparent"],
         1,
     ),
@@ -3635,6 +3675,82 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
         "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_ccd4b_tree_follows_the_cycle_breaking_branch(
+    emerge_binary, fixture_env
+):
+    """Backlog #221 (M3): `--tree` map-awareness on a post-backtrack
+    cell. Requesting `dev-libs/ccd4b` (the exe) re-resolves past the
+    pg4 ring to `[ccd4c, ccd4a, ccd4b]` (real's own answer for the
+    direct request -- g221 S0 `ResolverPlayground` probe: requesting
+    `pypy-exe` merges `[exe-bin, pypy, exe]`), and the tree nests each
+    package under its requirer (exe -> pypy -> exe-bin) instead of
+    re-closing the broken ring with a phantom edge (the pre-#221 shape
+    merged `[ccd4c, ccd4b, ccd4a]`, the exe ahead of its own buildtime
+    dep). The merge order is covered by the Rust fixture test; this
+    pins the tree rendering, which re-derives the kept branch through
+    the map-aware suppression (`pretend.rs` tree walk). The
+    `USE="-low-memory"` flag display is the generic USE renderer, not
+    circular logic."""
+    rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/ccd4b"], fixture_env)
+
+    assert rust.returncode == 0
+    assert rust.stdout == (
+        '[ebuild  N     ] dev-libs/ccd4b-7.3.0  USE="-low-memory"\n'
+        "[ebuild  N     ]  dev-libs/ccd4a-7.3.0 \n"
+        "[ebuild  N     ]   dev-libs/ccd4c-7.3.0 \n"
+    )
+    assert rust.stderr == ""
+
+
+def test_softened_build_time_cycle_reports_the_persisting_ring(
+    emerge_binary, fixture_env
+):
+    """Backlog #221 (I3): `dev-libs/sbrA` BDEPENDs+RDEPENDs on
+    `dev-libs/sbrB` while `sbrB` BDEPENDs back. The dual edge softens
+    the hard reporter's arm (`(true, true)` in the walk's edge-kind
+    map) so `find_hard_cycles` stays empty, but the walk still strands
+    and the restart trigger still fires: the retry re-strands
+    identically (no `||` branch for the demotion to switch to), the
+    ring is unsolved, and the settled pass reports it through
+    `assemble_result`'s persisting-ring leg instead of settling
+    `Complete` -- rc 1 WITH backtracking on (contrast the bt0-only
+    legs, which never retry).
+
+    Grounded in real runs (`/tmp/opencode/g221b/probe_sbr.py`,
+    3rdparty portage 3.0.82.2 `ResolverPlayground`, debug
+    `backtracking try` count): backtracking on fails after exactly 1
+    retry, `--backtrack=0` fails with none. The message shape is real
+    `_prepare_circular_dep_message`
+    (`resolver/circular_dependency.py`: one `priorities[-1]` label per
+    edge; priorities are `bisect.insort`-sorted so `[-1]` is the
+    hardest -- `DepPriority.__int__` ranks buildtime (-1) above runtime
+    (-3), hence `(buildtime)` on the dual edge, matching portuale's own
+    `cycle_edge_labels` max); stdout is the forced verbose-tree stuck
+    remainder with real's decorations and the `Total:` counters line,
+    exactly like the `hardcyclea` pin above."""
+    base = ["--pretend", "dev-libs/sbrA"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/sbrA-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/sbrB-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/sbrA-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/sbrB-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -6988,34 +7104,69 @@ def test_autounmask_use_parent_flip_suggestion_is_suppressed_by_autounmask_use_n
     ]
 
 
-def test_autounmask_use_parent_flip_resolves_when_the_child_flag_is_masked(
+def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_masked(
     emerge_binary, fixture_env
 ):
-    """Real --autounmask-use PART B *resolution* (_apply_parent_use_changes
-    -> _show_unsatisfied_dep(collect_use_changes=True)): dev-libs/
-    parentflipeqpkg (IUSE +feat) RDEPENDs parentflipchildpkg[feat=]; the
-    child's own `feat` is use.mask'd, so no package.use flip on the child
-    can enable it. Real portage flips the *parent's* `feat` off instead
-    (dropping the conditional constraint), re-resolves, and prints
-    `>=dev-libs/parentflipeqpkg-1.0 -feat` in the "necessary to proceed"
-    USE block -- exit 1 (an autounmask config change; real `action_build`
-    returns 1). The parent's own USE line reads `-feat`; the freed child
-    resolves as a normal New."""
+    """Live real reports the BARE miss here (no rows, no USE block):
+    dev-libs/parentflipeqpkg (IUSE +feat) RDEPENDs
+    parentflipchildpkg[feat=]; the child's own `feat` is use.mask'd, so
+    real's untouchable-child `continue`
+    (`lib/_emerge/depgraph.py:6732-6736`) skips the parent probe -- no
+    parent flip is ever recorded.
+
+    Live probe (container `localhost/test-portuale:latest`, staged
+    fixtures):
+
+        podman run --rm -v <pmtest>/fixtures:/fixtures:ro \
+          -v <pmtest>/differential-test-bed/layers/l0-fixture-oracle/stage.sh:/stage.sh:ro \
+          -v /tmp/opencode/g195b/in-probe.sh:/in-probe.sh:ro \
+          --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
+
+    (Staged copy of the script and its output:
+    `<portuale>/docs/evidence/2026-09-28-g195/g195b-{in-probe.sh,real-probe.txt}`.)
+
+    cell `emerge --pretend dev-libs/parentflipeqpkg` (identical text with
+    `--autounmask` and with `--autounmask-use=n`; Global-Updates/news
+    noise cut):
+
+        These are the packages that would be merged, in order:
+
+        Calculating dependencies  ... done!
+        Dependency resolution took 0.41 s (backtrack: 0/20).
+
+
+        emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]" for /tmp/fxstage/fixtures/.
+        (dependency required by "dev-libs/parentflipeqpkg-1.0::testrepo" [ebuild])
+        (dependency required by "dev-libs/parentflipeqpkg" [argument])
+        rc=1
+
+    (Portuale omits real's staging `for <root>.` suffix here -- the
+    long-standing `fixture-miss-message-unsuffixed` class, same as the
+    `--autounmask-use=n` half below.)
+
+    Why the old docstring's parity claim was wrong: the
+    resolve+rows+`-feat`-block expectation (commit `53859861`,
+    2026-08-30) was verified as "both sides byte-identical" where both
+    sides were the Rust binary and `python/emerge_pretend_reference.py`
+    -- the second Python copy, since removed, which shared the same
+    flip-then-resolve model. No live `emerge` ever ran for this cell:
+    no container probe (the test bed did not exist yet), the fixture
+    profile USE unexamined, `--autounmask` defaults unexamined (the pin
+    ran bare `--pretend`), no image version recorded. The "Real portage
+    flips ..." sentence was a source-reading inference, never a
+    measurement."""
     args = ["--pretend", "dev-libs/parentflipeqpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/parentflipchildpkg-1.0  USE="(-feat)"',
-        '[ebuild  N     ] dev-libs/parentflipeqpkg-1.0  USE="-feat"',
+    # No merge list: the header/preamble only, like every Slice-4 abort.
+    _assert_abort_preamble(rust.stdout)
+    assert len(rust.stdout.splitlines()) == 5
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]".',
+        '(dependency required by "dev-libs/parentflipeqpkg-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/parentflipeqpkg" [argument])',
     ]
-    assert rust.stderr == (
-        "\nThe following USE changes are necessary to proceed:\n"
-        ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/parentflipeqpkg-1.0::testrepo\n"
-        "# required by dev-libs/parentflipeqpkg (argument)\n"
-        ">=dev-libs/parentflipeqpkg-1.0 -feat\n"
-        + BACKTRACK_TERMINATED_EARLY
-    )
 
     # --autounmask-use=n: the shared gate is off -> the dep stays
     # unresolvable and aborts the resolve (exit 1, no merge list since
@@ -7033,58 +7184,150 @@ def test_autounmask_use_parent_flip_resolves_when_the_child_flag_is_masked(
     assert "no visible ebuild" not in n.stderr
 
 
-def test_autounmask_use_parent_flip_re_resolves_the_whole_graph(
+def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     emerge_binary, fixture_env
 ):
-    """dev-libs/pfgraphparent (IUSE +pf) RDEPENDs pfgraphchild[pf=] AND
+    """Upstream `test_autounmask_parent.py` (`aup0b`): `dev-libs/aup0b`
+    (IUSE `+bar +foo`) DEPENDs `dev-libs/aup0d[foo(-)?,bar(-)?]`; the
+    fixture profile leaves the parent at `{foo}`, so only the `foo(-)?`
+    conditional is parent-active. Live real records `-foo` on the parent
+    and FAILS (no rows): stdout is the merge header only, stderr is the
+    `-foo` USE block plus the "backtracking has terminated early"
+    notice, exit 1. Real `_apply_parent_use_changes`
+    (`lib/_emerge/depgraph.py:5820`) re-probes with
+    `violated_conditionals` (`:6779-6798`) and the
+    `_success_without_autounmask` tail (`:5793`) returns False.
+
+    Live probe (container `localhost/test-portuale:latest`, staged
+    fixtures; Global-Updates/news noise cut):
+
+        emerge --pretend --autounmask =dev-libs/aup0b-1
+
+        These are the packages that would be merged, in order:
+
+        Calculating dependencies  ... done!
+        Dependency resolution took 0.37 s (backtrack: 0/20).
+
+
+        The following USE changes are necessary to proceed:
+         (see "package.use" in the portage(5) man page for more details)
+        # required by =dev-libs/aup0b-1 (argument)
+        >=dev-libs/aup0b-1 -foo
+
+         * In order to avoid wasting time, backtracking has terminated early
+         * due to the above autounmask change(s). The --autounmask-backtrack=y
+         * option can be used to force further backtracking, but there is no
+         * guarantee that it will produce a solution.
+        rc=1"""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--autounmask", "=dev-libs/aup0b-1"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    # No merge list: the header/preamble only, like every Slice-4 abort.
+    _assert_abort_preamble(result.stdout)
+    assert len(result.stdout.splitlines()) == 5
+    assert result.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by =dev-libs/aup0b-1 (argument)\n"
+        ">=dev-libs/aup0b-1 -foo\n" + BACKTRACK_TERMINATED_EARLY
+    )
+
+
+def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_real(
+    emerge_binary, fixture_env
+):
+    """Live real reports the BARE miss here (no rows, no USE block):
+    dev-libs/pfgraphparent (IUSE +pf) RDEPENDs pfgraphchild[pf=] AND
     `pf? ( dev-libs/pfgraphextra )`; pfgraphchild's `pf` is use.mask'd, so
-    the parent's own `pf` is flipped off.
+    real's untouchable-child `continue`
+    (`lib/_emerge/depgraph.py:6732-6736`) skips the parent probe -- no
+    parent flip is ever recorded, and there is nothing to re-resolve.
 
-    Default (real --autounmask-backtrack off): the flip is applied to the
-    freed child and the parent's USE line, but the graph is NOT re-driven
-    -- `pf? ( pfgraphextra )` was walked with pf on, so pfgraphextra stays
-    in the list (matching real).
+    Live probe (container `localhost/test-portuale:latest`, staged
+    fixtures; Global-Updates/news/FEATURES noise cut):
 
-    --autounmask-backtrack=y (Slice 4): the flip is fed back into
-    _needed_use_config_changes and the WHOLE graph re-resolves, so
-    `pf? ( pfgraphextra )` re-evaluates with pf OFF and pfgraphextra is
-    dropped."""
+        podman run --rm -v <pmtest>/fixtures:/fixtures:ro \
+          -v <pmtest>/differential-test-bed/layers/l0-fixture-oracle/stage.sh:/stage.sh:ro \
+          -v /tmp/opencode/g195c/in-probe.sh:/in-probe.sh:ro \
+          --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
+
+    (Staged copy of the script and its output:
+    `<portuale>/docs/evidence/2026-09-28-g195/g195c-{in-probe.sh,real-probe.txt}`.)
+
+    cell `emerge --pretend dev-libs/pfgraphparent` (identical text with
+    `--autounmask-backtrack=y` and with `--autounmask-use=n`):
+
+        These are the packages that would be merged, in order:
+
+        Calculating dependencies  ... done!
+        Dependency resolution took 0.35 s (backtrack: 0/20).
+
+
+        emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]" for /tmp/fxstage/fixtures/.
+        (dependency required by "dev-libs/pfgraphparent-1.0::testrepo" [ebuild])
+        (dependency required by "dev-libs/pfgraphparent" [argument])
+        rc=1
+
+    (Portuale omits real's staging `for <root>.` suffix here -- the
+    long-standing `fixture-miss-message-unsuffixed` class, same as the
+    parentflipeqpkg pin above.)
+
+    Why the old docstring's parity claim was wrong: the
+    resolve+rows+`-pf`-block expectation (Slice 4 backtrack-off arm and
+    whole-graph re-resolve) was a source-reading inference about the
+    parent flip, never a live measurement -- real never records the flip
+    for this cell, so neither the default single-dep re-resolve (which
+    kept `pf? ( pfgraphextra )` in the list) nor the
+    `--autounmask-backtrack=y` whole-graph re-resolve (which dropped it)
+    ever happens. Renamed from
+    `test_autounmask_use_parent_flip_re_resolves_the_whole_graph`, which
+    stated the opposite of what real does (coordinator ruling B20,
+    option (a))."""
     args = ["--pretend", "dev-libs/pfgraphparent"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/pfgraphchild-1.0  USE="(-pf)"',
-        "[ebuild  N     ] dev-libs/pfgraphextra-1.0 ",
-        '[ebuild  N     ] dev-libs/pfgraphparent-1.0  USE="-pf"',
+    # No merge list: the header/preamble only, like every Slice-4 abort.
+    _assert_abort_preamble(rust.stdout)
+    assert len(rust.stdout.splitlines()) == 5
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".',
+        '(dependency required by "dev-libs/pfgraphparent-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/pfgraphparent" [argument])',
     ]
-    assert rust.stderr == (
-        "\nThe following USE changes are necessary to proceed:\n"
-        ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/pfgraphparent-1.0::testrepo\n"
-        "# required by dev-libs/pfgraphparent (argument)\n"
-        ">=dev-libs/pfgraphparent-1.0 -pf\n"
-        + BACKTRACK_TERMINATED_EARLY
-    )
 
-    # --autounmask-backtrack=y: the whole graph re-resolves, pfgraphextra drops
+    # --autounmask-backtrack=y: the same bare miss -- with no recorded
+    # flip there is nothing to re-drive, so pfgraphextra never enters
+    # the picture at all.
     ab = ["--pretend", "--autounmask-backtrack=y", "dev-libs/pfgraphparent"]
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
-    assert rust_ab.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/pfgraphchild-1.0  USE="(-pf)"',
-        '[ebuild  N     ] dev-libs/pfgraphparent-1.0  USE="-pf"',
+    assert rust_ab.returncode == 1
+    _assert_abort_preamble(rust_ab.stdout)
+    assert len(rust_ab.stdout.splitlines()) == 5
+    assert rust_ab.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".',
+        '(dependency required by "dev-libs/pfgraphparent-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/pfgraphparent" [argument])',
     ]
     assert "pfgraphextra" not in rust_ab.stdout
 
-    # --autounmask-use=n: the shared gate is off -> pf stays on,
-    # pfgraphchild[pf] is unresolvable and aborts the resolve (exit 1, no
-    # merge list since Slice 4 -- pfgraphextra goes with it).
+    # --autounmask-use=n: the shared gate is off -> the dep stays
+    # unresolvable and aborts the resolve (exit 1, no merge list since
+    # Slice 4), no change block -- identical to the default cell.
     n = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask-use=n", "dev-libs/pfgraphparent"],
         fixture_env,
     )
+    assert n.returncode == 1
+    _assert_abort_preamble(n.stdout)
+    assert len(n.stdout.splitlines()) == 5
     assert "pfgraphextra" not in n.stdout
-    assert 'there are no ebuilds to satisfy "dev-libs/pfgraphchild' in n.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".' in n.stderr
 
 
 def test_unresolvable_dependency_is_reported_not_silently_dropped(
@@ -9864,12 +10107,11 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned. Not pinned: pg1's
     `--backtrack=0` cell (rc 1 matches real but the circular-error
-    text is unverified vs real), pg1's default-backtrack cell and
-    pg4 (portuale reports a circular error where real adjusts the
-    `||` preference — findings, no CASES), pg5 (rc 0 matches but
-    portuale merges [ccd5v, ccd5a] where real pulls ccd5b/-bin
-    first — finding, CASES only), and the pg2 `--depclean` cell
-    (needs a shared world entry).
+    text is unverified vs real) and the pg2 `--depclean` cell (needs
+    a shared world entry). pg1's default-backtrack cell, pg4 and pg5
+    are pinned in `test_upstream_circular_choices_pg145_pins_mergelists`
+    since #221 (backtracking switches to the cycle-breaking `||`
+    branch like real).
     """
     env = dict(fixture_env)
     cases = [
@@ -9895,6 +10137,83 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_pg145_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_circular_choices.py` pg1
+    (`::testCircularJsoncppCmakeBootstrapOrDeps`, bug 703440), pg4
+    (`::testCircularPypyExe`, bug 705986) and pg5
+    (`::testDirectVirtualCircularDependency`), bulk-translated for #50
+    batch 7 (`dev-libs/ccd1{a,b,c}`, `dev-libs/ccd4{a,b,c}`,
+    `dev-libs/ccd5{a,b}` + `virtual/ccd5v`; oracle
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    Each cell's first pass picks the in-graph `||` branch and strands
+    the merge-order walk on a cycle; since #221 portuale records the
+    cycle and backtracks to the branch that breaks it, merging the
+    oracle's exact set in the oracle's exact order with no warnings
+    and empty stderr, so the exact rows are pinned: pg1
+    `[ccd1b, ccd1a, ccd1c]` (real `[cmake-bootstrap, jsoncpp,
+    cmake]`), pg4 `[ccd4c, ccd4a]` (real `[pypy-exe-bin, pypy]`, no
+    `+low-memory` suggestion), pg5 `[ccd5b, ccd5v, ccd5a]` (real
+    `[icedtea6-bin, jdk, icedtea]`).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["dev-libs/ccd1c"],
+            [
+                "[ebuild  N     ] dev-libs/ccd1b-3.16.2 ",
+                "[ebuild  N     ] dev-libs/ccd1a-1.9.2 ",
+                "[ebuild  N     ] dev-libs/ccd1c-3.16.2 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd4a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd4c-7.3.0 ",
+                "[ebuild  N     ] dev-libs/ccd4a-7.3.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd5a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd5b-1.10.3 ",
+                "[ebuild  N     ] virtual/ccd5v-1.6.0 ",
+                "[ebuild  N     ] dev-libs/ccd5a-6.1.10.3 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_slcirc_slot_pinned_branch_prefers_bin_over_older_slot(
+    emerge_binary, fixture_env
+):
+    """g221c (L0 `dev-lang/rust` regression): a slot-pinned `||` build
+    dep over an older slot of the package itself vs the `-bin` package,
+    the older slot carrying its own self buildtime edge. The first pass
+    self-picks and strands; the retry demotes the recorded self branch
+    and takes `-bin` -- real's exact set in real's exact order with no
+    warnings and empty stderr, so the exact rows are pinned:
+    `[slcirc-bin-2.0, slcirc-2.0]` (real `[rust-bin-1.96.1,
+    rust-1.96.1]`, one backtrack on both sides; oracle
+    `/tmp/opencode/g221c/probe_slcirc.py`, captured from the real
+    `ResolverPlayground`, not the source literal).
+    """
+    env = dict(fixture_env)
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/slcirc"], env)
+    assert got.returncode == 0
+    assert got.stderr == ""
+    assert got.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/slcirc-bin-2.0 ",
+        "[ebuild  N     ] dev-libs/slcirc-2.0 ",
+    ]
 
 
 def test_upstream_circular_choices_rust_pg0_pins_mergelists(
