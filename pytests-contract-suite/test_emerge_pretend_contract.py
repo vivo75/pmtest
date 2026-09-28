@@ -1178,12 +1178,12 @@ CASES = [
         1,
     ),
     (
-        "--autounmask-use: an opt= dep whose child flag is masked flips the parent instead, exit 1",
+        "--autounmask-use: an opt= dep whose child flag is masked is a bare miss like real (rc 1; untouchable child, no parent flip: #195)",
         ["--pretend", "dev-libs/parentflipeqpkg"],
         1,
     ),
     (
-        "--autounmask-use=n: the masked-child opt= dep stays unresolvable (top-level still merges)",
+        "--autounmask-use=n: the masked-child opt= dep stays unresolvable (rc 1, no merge list: #195)",
         ["--pretend", "--autounmask-use=n", "dev-libs/parentflipeqpkg"],
         1,
     ),
@@ -6760,34 +6760,66 @@ def test_autounmask_use_parent_flip_suggestion_is_suppressed_by_autounmask_use_n
     ]
 
 
-def test_autounmask_use_parent_flip_resolves_when_the_child_flag_is_masked(
+def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_masked(
     emerge_binary, fixture_env
 ):
-    """Real --autounmask-use PART B *resolution* (_apply_parent_use_changes
-    -> _show_unsatisfied_dep(collect_use_changes=True)): dev-libs/
-    parentflipeqpkg (IUSE +feat) RDEPENDs parentflipchildpkg[feat=]; the
-    child's own `feat` is use.mask'd, so no package.use flip on the child
-    can enable it. Real portage flips the *parent's* `feat` off instead
-    (dropping the conditional constraint), re-resolves, and prints
-    `>=dev-libs/parentflipeqpkg-1.0 -feat` in the "necessary to proceed"
-    USE block -- exit 1 (an autounmask config change; real `action_build`
-    returns 1). The parent's own USE line reads `-feat`; the freed child
-    resolves as a normal New."""
+    """Live real reports the BARE miss here (no rows, no USE block):
+    dev-libs/parentflipeqpkg (IUSE +feat) RDEPENDs
+    parentflipchildpkg[feat=]; the child's own `feat` is use.mask'd, so
+    real's untouchable-child `continue`
+    (`lib/_emerge/depgraph.py:6732-6736`) skips the parent probe -- no
+    parent flip is ever recorded.
+
+    Live probe (container `localhost/test-portuale:latest`, staged
+    fixtures):
+
+        podman run --rm -v <pmtest>/fixtures:/fixtures:ro \
+          -v <pmtest>/differential-test-bed/layers/l0-fixture-oracle/stage.sh:/stage.sh:ro \
+          -v /tmp/opencode/g195b/in-probe.sh:/in-probe.sh:ro \
+          --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
+
+    cell `emerge --pretend dev-libs/parentflipeqpkg` (identical text with
+    `--autounmask` and with `--autounmask-use=n`; Global-Updates/news
+    noise cut):
+
+        These are the packages that would be merged, in order:
+
+        Calculating dependencies  ... done!
+        Dependency resolution took 0.41 s (backtrack: 0/20).
+
+
+        emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]" for /tmp/fxstage/fixtures/.
+        (dependency required by "dev-libs/parentflipeqpkg-1.0::testrepo" [ebuild])
+        (dependency required by "dev-libs/parentflipeqpkg" [argument])
+        rc=1
+
+    (Portuale omits real's staging `for <root>.` suffix here -- the
+    long-standing `fixture-miss-message-unsuffixed` class, same as the
+    `--autounmask-use=n` half below.)
+
+    Why the old docstring's parity claim was wrong: the
+    resolve+rows+`-feat`-block expectation (commit `53859861`,
+    2026-08-30) was verified as "both sides byte-identical" where both
+    sides were the Rust binary and `python/emerge_pretend_reference.py`
+    -- the second Python copy, since removed, which shared the same
+    flip-then-resolve model. No live `emerge` ever ran for this cell:
+    no container probe (the test bed did not exist yet), the fixture
+    profile USE unexamined, `--autounmask` defaults unexamined (the pin
+    ran bare `--pretend`), no image version recorded. The "Real portage
+    flips ..." sentence was a source-reading inference, never a
+    measurement."""
     args = ["--pretend", "dev-libs/parentflipeqpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/parentflipchildpkg-1.0  USE="(-feat)"',
-        '[ebuild  N     ] dev-libs/parentflipeqpkg-1.0  USE="-feat"',
+    # No merge list: the header/preamble only, like every Slice-4 abort.
+    _assert_abort_preamble(rust.stdout)
+    assert len(rust.stdout.splitlines()) == 5
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]".',
+        '(dependency required by "dev-libs/parentflipeqpkg-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/parentflipeqpkg" [argument])',
     ]
-    assert rust.stderr == (
-        "\nThe following USE changes are necessary to proceed:\n"
-        ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/parentflipeqpkg-1.0::testrepo\n"
-        "# required by dev-libs/parentflipeqpkg (argument)\n"
-        ">=dev-libs/parentflipeqpkg-1.0 -feat\n"
-        + BACKTRACK_TERMINATED_EARLY
-    )
 
     # --autounmask-use=n: the shared gate is off -> the dep stays
     # unresolvable and aborts the resolve (exit 1, no merge list since
@@ -6803,6 +6835,58 @@ def test_autounmask_use_parent_flip_resolves_when_the_child_flag_is_masked(
         'emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]".'
     )
     assert "no visible ebuild" not in n.stderr
+
+
+def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
+    emerge_binary, fixture_env
+):
+    """Upstream `test_autounmask_parent.py` (`aup0b`): `dev-libs/aup0b`
+    (IUSE `+bar +foo`) DEPENDs `dev-libs/aup0d[foo(-)?,bar(-)?]`; the
+    fixture profile leaves the parent at `{foo}`, so only the `foo(-)?`
+    conditional is parent-active. Live real records `-foo` on the parent
+    and FAILS (no rows): stdout is the merge header only, stderr is the
+    `-foo` USE block plus the "backtracking has terminated early"
+    notice, exit 1. Real `_apply_parent_use_changes`
+    (`lib/_emerge/depgraph.py:5820`) re-probes with
+    `violated_conditionals` (`:6779-6798`) and the
+    `_success_without_autounmask` tail (`:5793`) returns False.
+
+    Live probe (container `localhost/test-portuale:latest`, staged
+    fixtures; Global-Updates/news noise cut):
+
+        emerge --pretend --autounmask =dev-libs/aup0b-1
+
+        These are the packages that would be merged, in order:
+
+        Calculating dependencies  ... done!
+        Dependency resolution took 0.37 s (backtrack: 0/20).
+
+
+        The following USE changes are necessary to proceed:
+         (see "package.use" in the portage(5) man page for more details)
+        # required by =dev-libs/aup0b-1 (argument)
+        >=dev-libs/aup0b-1 -foo
+
+         * In order to avoid wasting time, backtracking has terminated early
+         * due to the above autounmask change(s). The --autounmask-backtrack=y
+         * option can be used to force further backtracking, but there is no
+         * guarantee that it will produce a solution.
+        rc=1"""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--autounmask", "=dev-libs/aup0b-1"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    # No merge list: the header/preamble only, like every Slice-4 abort.
+    _assert_abort_preamble(result.stdout)
+    assert len(result.stdout.splitlines()) == 5
+    assert result.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by =dev-libs/aup0b-1 (argument)\n"
+        ">=dev-libs/aup0b-1 -foo\n" + BACKTRACK_TERMINATED_EARLY
+    )
 
 
 def test_autounmask_use_parent_flip_re_resolves_the_whole_graph(
