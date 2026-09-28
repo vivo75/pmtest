@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=#216 fixture: the non-circular bootstrap branch of dev-lang/g216comp's BDEPEND
+EAPI=8
+IUSE=
+KEYWORDS=amd64
+SLOT=0
+_md5_=8ef79b2ec7c5e020d076b8f13de10414

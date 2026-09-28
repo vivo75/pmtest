@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=#216 fixture: top-level target pulling the g216mid/g216comp chain
+EAPI=8
+IUSE=
+KEYWORDS=amd64
+RDEPEND=dev-libs/g216mid
+SLOT=0
+_md5_=dc242189917eccf94c02b474406b675e
