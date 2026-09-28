@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=243 oracle fixture: parent with an unbuilt := dep on the visibility-masked slot-moved child
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/somaskvischild:=
+SLOT=0
+_md5_=3e8205395c8de0e686b24ec09501702f

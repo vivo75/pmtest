@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=243 oracle fixture: child whose tree SLOT moved 0/1 -> 0/2 and went keyword-masked; the binpkg below was built at 0/1
+EAPI=8
+KEYWORDS=~amd64
+SLOT=0/2
+_md5_=4c704d533b53f50ded839f86e9034b7e
