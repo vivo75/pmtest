@@ -5290,6 +5290,38 @@ def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_real(
     assert not (root / "var/db/pkg/dev-libs/schedok-1.0").exists()
 
 
+def test_emerge_config_select_sigint_prints_interrupted_without_quitting_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240 follow-up: the config `Selection?` menu goes
+    through the same `UserQuery.query` in real
+    (`_emerge/actions.py:746` through
+    `_emerge/UserQuery.py:74-76`), so Ctrl-C there prints
+    `Interrupted.` and exits `128 + SIGINT` -- `X`'s own `Quitting.`
+    (`actions.py:747-748`) never runs. Two stub vdb entries make
+    `dev-libs/seltest` match twice, reaching the menu with no ebuild
+    work; the `^C` delivery is the same prompt-synchronized pty byte
+    as the merge-prompt pin above."""
+    root = tmp_path / "root-config-select-sigint"
+    for v in ("1.0", "2.0"):
+        (root / f"var/db/pkg/dev-libs/seltest-{v}").mkdir(parents=True)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--config", "dev-libs/seltest"],
+        env,
+        "Selection?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Please select a package to configure:" in r.stdout
+    assert r.stdout.count("Interrupted.") == 1, (r.stdout, r.stderr)
+    assert "Quitting." not in r.stdout
+
+
 def test_emerge_ask_read_news_true_spellings_prompt_like_real(emerge_binary, tmp_path):
     """Backlog #234 (b): real `true_y_or_n` (`main.py:321-322,625`)
     accepts `--ask=True` / `--read-news=True` (a bare flag inserts
