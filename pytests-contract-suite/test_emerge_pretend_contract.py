@@ -627,7 +627,7 @@ CASES = [
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like real (rc 1; USE changes necessary, bug 632598; merge choice differs, not pinned)",
+        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like real (rc 1; USE changes necessary, bug 632598; pristine-world cell matches real's A-3+x, the world=B fall to A-2 is pinned separately)",
         ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"],
         1,
     ),
@@ -5920,6 +5920,111 @@ def test_autounmask_keep_keywords_n_takes_the_newest_via_unstable_keywords(
         "# required by dev-libs/akk0a-2::testrepo\n"
         "# required by dev-libs/akk0a (argument)\n"
         "=dev-libs/akk0b-1 ~amd64\n"
+    )
+
+
+def _abk0_worldb_root(tmp_path):
+    """A test-local ROOT for backlog #205's upstream shape
+    (`test_autounmask_use_backtrack.py`, bug 632598): installed
+    `abk0a-1` (`RDEPEND=abk0c`), `abk0b-1` (`RDEPEND=<abk0a-3`) and
+    `abk0c-1`, with `abk0b` in `@world` so the installed bound is
+    required-set reachable (real `_complete_graph` re-walks `@world`).
+    Mirrors the fixture vdb files exactly, minus the `repository` file
+    the fixtures omit (so the consumer renders `__unknown__`, like
+    real). `PORTAGE_CONFIGROOT` stays at the shared fixtures so the
+    `abk0*` ebuilds are visible."""
+    for name, files in {
+        "abk0a-1": {"RDEPEND": "dev-libs/abk0c\n"},
+        "abk0b-1": {"RDEPEND": "<dev-libs/abk0a-3\n"},
+        "abk0c-1": {"IUSE": "x y z\n"},
+    }.items():
+        d = tmp_path / "var" / "db" / "pkg" / "dev-libs" / name
+        d.mkdir(parents=True)
+        (d / "CATEGORY").write_text("dev-libs\n")
+        (d / "SLOT").write_text("0\n")
+        for fn, content in files.items():
+            (d / fn).write_text(content)
+    world = tmp_path / "var" / "lib" / "portage" / "world"
+    world.parent.mkdir(parents=True)
+    world.write_text("dev-libs/abk0b\n")
+    return tmp_path
+
+
+def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
+    emerge_binary, fixture_env
+):
+    """Backlog #205, pristine-world cell (the shared fixture world has
+    no `abk0b`, so installed `B-1`'s `<A-3` bound is unreachable):
+    real settles on `A-3` plus the `x` USE change (`backtrack: 0/2`,
+    rc 1) -- one rule-13 probe on 3.0.81.3, mechanism from 3.0.82.2
+    source. The USE block names only the forcing chain
+    (`_get_dep_chain(..., unsatisfied_dependency=True)` picks `abk0d-1`,
+    whose `C[x]` the change satisfies, not `abk0a-3`'s plain `C`).
+    Known delta vs the probe, documented: no `[1]` oldbest bracket on
+    the `R` row (real shows one via the vdb-repo-mismatch disjunct,
+    `output.py:721-727`, which portuale deliberately cuts -- see
+    `resolve_pretend`'s `myoldbest` comment)."""
+    args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/abk0c-1  USE=\"x*\"",
+        "[ebuild     U  ] dev-libs/abk0a-3 [1]",
+        "[ebuild  N     ] dev-libs/abk0d-1 ",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/abk0d-1::testrepo\n"
+        "# required by dev-libs/abk0d (argument)\n"
+        ">=dev-libs/abk0c-1 x\n"
+    )
+
+
+def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #205, upstream shape (bug 632598): with `abk0b` in
+    `@world`, installed `B-1`'s `<A-3` bound breaks the `A-3` pick, so
+    real's `_complete_graph` broken-deep-dep path reports it as a slot
+    collision (`depgraph.py:8756-8770`), backtracking masks `A-3`
+    (`backtrack: 2/2`), and the run settles on `[C-1, A-2, D-1]` with
+    USE changes `x y` (rc 1). The masked `A-3` rides out as a
+    `WARNING` skipped-update row (real `_conflict_missed_update`,
+    `:2085-2106`); the USE block names the forcing chain only
+    (`abk0d-1`, not `abk0a-2`). Expected text is the rule-13 probe on
+    3.0.81.3 verbatim, minus real's `to <root>` / `for <root>` /
+    `in '<root>'` destination suffixes, which no portuale pin carries.
+    Known deltas vs the probe, documented: the skipped row shows
+    `USE=""` without real's `ELIBC="glibc"` (the shared USE-display
+    builder never groups USE_EXPAND values -- pre-existing, affects
+    every skipped-update row), and no `[1]` on the `R` row (same
+    deliberate repo-mismatch cut as the pristine cell)."""
+    env = dict(fixture_env)
+    env["ROOT"] = str(_abk0_worldb_root(tmp_path))
+    env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
+    args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/abk0c-1  USE=\"x* y*\"",
+        "[ebuild     U  ] dev-libs/abk0a-2 [1]",
+        "[ebuild  N     ] dev-libs/abk0d-1 ",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/abk0a:0",
+        "",
+        "  (dev-libs/abk0a-3:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
+        "    <dev-libs/abk0a-3 required by (dev-libs/abk0b-1:0/0::__unknown__, installed) USE=\"\"",
+        "    ^               ^",
+        "",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/abk0d-1::testrepo\n"
+        "# required by dev-libs/abk0d (argument)\n"
+        ">=dev-libs/abk0c-1 x y\n"
     )
 
 
@@ -17775,7 +17880,13 @@ def test_oracle_no_aggressive_downgrade(
     `libvpx` to 1.8.0 must NOT downgrade `firefox` 69.0 -> 60.9.0. Real
     merges nothing; portuale also merges nothing (no `firefox`/`libvpx`/
     `ffmpeg` lines at all). MATCHES real. (The `conflict_downgrade` guards
-    that police finer variants of this live in backlog #35, not #23.)"""
+    that police finer variants of this live in backlog #35, not #23.)
+
+    Backlog #205: the skipped `libvpx-1.8.0` names both of installed
+    firefox's rejecting atoms -- the built `=1.7*:0=` binding and the
+    `[postproc]` USE pin -- exactly like real's "Record missed updates"
+    tail (`depgraph.py:2085-2106` records every kept-instance parent
+    atom the removed version fails)."""
     root = _b1_root(
         tmp_path,
         ["media-video/ffmpeg", "www-client/firefox"],
@@ -17812,6 +17923,9 @@ def test_oracle_no_aggressive_downgrade(
     )
     merges = _b1_merges(rust.stdout)
     assert not [ln for ln in merges if "firefox" in ln or "libvpx" in ln or "ffmpeg" in ln]
+    assert "media-libs/libvpx:0" in rust.stdout
+    assert "=media-libs/libvpx-1.7*:0= required by (www-client/firefox-69.0" in rust.stdout
+    assert "=media-libs/libvpx-1.7*:0=[postproc] required by (www-client/firefox-69.0" in rust.stdout
 
 
 def test_oracle_non_slot_operator_update_selects_new_slot(
