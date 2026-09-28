@@ -6986,7 +6986,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
         # BUILD_ID 2 has the highest BUILD_TIME -> it is the one picked.
         for bid, bt in ((1, 100), (2, 300), (3, 200))
     )
-    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nPACKAGES: 3\n\n{entries}")
+    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n{entries}")
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     # Default: the newer ebuild wins.
@@ -7248,7 +7248,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     bh2 = tmp_path / "binhost2"
     bh2.mkdir()
     (bh2 / "Packages").write_text(
-        "TIMESTAMP: 0\nPACKAGES: 1\n\n"
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
         "BUILD_ID: 1\nCPV: dev-libs/dirbinhostonly-1.0\nDEFINED_PHASES: -\n"
         "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nREPO: gentoo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
     )
