@@ -19418,7 +19418,8 @@ def test_oracle_prune_rebuilds_restart_adds_passes(
     `_eliminate_rebuilds` keeps them), so the merge list is unchanged
     but the run takes two extra passes. MATCHES real since #213: the
     one allowed S0 probe (single `podman run --entrypoint /bin/bash
-    localhost/test-portuale:latest`, portage 3.0.82.2, the staged
+    localhost/test-portuale:latest` [the image's portage is 3.0.81.3; a
+    vendored 3.0.82.2 ResolverPlayground run agrees on the rows], the staged
     fixture tree with `FX_PRUNE_VDB=1`, argv `emerge -p --color=n -uDvN
     app-misc/pprov app-misc/pcons dev-libs/btparent`) prints the same
     six rows (`[ebuild N] bttarget-1.0`, `[ebuild r U] pprov-2`,
