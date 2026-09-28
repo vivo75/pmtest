@@ -2268,6 +2268,110 @@ CASES = [
         0,
     ),
     (
+        "--onlydeps-with-rdeps=y keeps runtime deps under --onlydeps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=y", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps alone keeps runtime deps: with-rdeps defaults to y (#194)",
+        ["--pretend", "--onlydeps", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n keeps only build-time deps under --onlydeps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n --onlydeps-with-ideps=y restores IDEPEND (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=y",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n --onlydeps-with-ideps=n drops IDEPEND too (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=n",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "bare --onlydeps-with-ideps enables IDEPEND like =y (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps is inert without --onlydeps-with-rdeps=n (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-ideps=n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "an EAPI 7 root drops IDEPEND even with runtime deps kept (#194)",
+        ["--pretend", "--onlydeps", "dev-libs/odw0g"],
+        0,
+    ),
+    (
+        "an EAPI 7 root drops IDEPEND on a plain run too (#194)",
+        ["--pretend", "dev-libs/odw0g"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=foo is an invalid choice, rc 2 (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=foo", "dev-libs/odw0a"],
+        2,
+    ),
+    (
+        "--onlydeps-with-rdeps=True keeps runtime deps like =y (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=True", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps=True restores IDEPEND like =y (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=True",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "space-separated --onlydeps-with-rdeps n blanks runtime deps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps", "n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "both flags are inert without --onlydeps: a plain merge (#194)",
+        [
+            "--pretend",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=y",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps=foo is an invalid choice, rc 2 (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-ideps=foo", "dev-libs/odw0a"],
+        2,
+    ),
+    (
         "--update threads through dependency recursion, not just top-level",
         ["--pretend", "--update", "dev-libs/withdeps"],
         0,
@@ -9280,6 +9384,129 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
         ]
 
 
+def test_onlydeps_with_rdeps_ideps_pins_mergelists(emerge_binary, fixture_env):
+    """Backlog #194: `--onlydeps-with-rdeps` / `--onlydeps-with-ideps`
+    (real `_emerge/depgraph.py::_add_pkg_deps`, `main.py` parsing,
+    `man/emerge.1`). Fixtures are #194's own EAPI-8 namespace
+    (`dev-libs/odw0{a,b,c,d,e,f}`, root A carrying DEPEND B, BDEPEND F,
+    RDEPEND C, PDEPEND D, IDEPEND E; plus an EAPI-7 root
+    `dev-libs/odw0g-1` whose ebuild declares DEPEND/RDEPEND/PDEPEND/IDEPEND
+    on B/C/D/E while its md5-cache entry carries no IDEPEND line -- what
+    real `egencache` emits, since `bin/ebuild.sh` unsets IDEPEND below
+    EAPI 8)
+    instead of the upstream `odm0*`/`odi*` cells, which #220 owns. The
+    oracle (`/tmp/opencode/n194/oracle_odw.log`, captured from the real
+    `ResolverPlayground` on the same A/B/C/D/E/F + G shapes, not the
+    source literal) merges, all `success=True`: default/`=y`/`=True`
+    `[B, C, D, E, F]`; `=n` `[B, F]` (build-time only -- BDEPEND
+    survives); `=n` + ideps `=y`/bare/`=True` `[B, E, F]`; `=n` + ideps
+    `=n` `[B, F]`; EAPI-7 root default `[B, C, D]` and `=n` `[B]` (no E
+    -- real `bin/ebuild.sh` unsets IDEPEND below EAPI 8). The playground
+    `True` cells are the bare-flag shape (real `default_arg_opts`
+    inserts `"True"`); the literal `=True` argv form is the same real
+    code path (`_add_pkg_deps` only tests for `"n"`/`None`, and
+    `"True"` is in real `main.py`'s `choices: true_y_or_n`), pinned to
+    the same rows. The space-separated `n` form is what real
+    `insert_optional_args` consumes; both flags without `--onlydeps`
+    are inert (consulted only behind `pkg.onlydeps`), so that cell pins
+    the plain-merge rows including the root; `=foo` is a real argparse
+    invalid choice (rc 2, CASES-only).
+
+    All cells are clean today: portuale merges the oracle's exact set
+    with no warnings and empty stderr, so the exact rows are pinned.
+    Row order is portuale's own discovery order (the oracle marks these
+    cells `ambiguous_merge_order`); the ideps-without-rdeps-n and
+    `=foo` cells are CASES-only (same rows as the default cell, and rc
+    2 respectively).
+    """
+    env = dict(fixture_env)
+    n = "[ebuild  N     ] dev-libs/odw0"
+    cases = [
+        (
+            ["--pretend", "--onlydeps", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=y", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=n", "dev-libs/odw0a"],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=y",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=n",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "dev-libs/odw0g"],
+            [f"{n}c-1 ", f"{n}d-1 ", f"{n}b-1 "],
+        ),
+        (
+            ["--pretend", "dev-libs/odw0g"],
+            [f"{n}c-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}g-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=True", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=True",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps", "n", "dev-libs/odw0a"],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=y",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 ", f"{n}a-1 "],
+        ),
+    ]
+    for argv, rows in cases:
+        got = _run([str(emerge_binary)], argv, env)
+        assert got.returncode == 0, argv
+        assert got.stderr == "", argv
+        assert got.stdout.splitlines() == rows, argv
+
+
 def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
     """Upstream `test_eapi.py::testBdepend` (pg0) and `::testIdepend`
     (pg2), bulk-translated for #50 batch 6 (`dev-libs/epi0{a,b}`,
@@ -11954,6 +12181,8 @@ Dependency and target selection:
       --selective[=y|n]      same as --noreplace; =n cancels it
   -1, --oneshot              merge without recording the target in world / world_sets
   -o, --onlydeps             merge the targets' dependencies but not the targets themselves
+      --onlydeps-with-rdeps[=y|n]  include runtime deps under --onlydeps (default y)
+      --onlydeps-with-ideps[=y|n]  include install-time deps under --onlydeps --onlydeps-with-rdeps=n (default n)
   -O, --nodeps               ignore dependencies entirely
   -X, --exclude ATOMS        never act on a matching package (repeatable, space separated)
       --newrepo              reinstall if the package would now come from a different repo
