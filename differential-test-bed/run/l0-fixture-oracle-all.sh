@@ -30,7 +30,7 @@ LISTS=(
   "l0-fixture-oracle-slotop.txt|FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1"
   "l0-fixture-oracle-whpin.txt|FX_WORLD_EXTRA=dev-libs/whtarget"
   "l0-fixture-oracle-r25.txt|FX_WORLD_EXTRA=dev-libs/r25consumer"
-  "l0-fixture-oracle-g210.txt|FX_WORLD_EXTRA=dev-libs/reinstslotconsumer dev-libs/reinstslotbound"
+  "l0-fixture-oracle-g210.txt|FX_WORLD_EXTRA='dev-libs/reinstslotconsumer dev-libs/reinstslotbound'"
 )
 
 failures=0
@@ -41,7 +41,7 @@ for spec in "${LISTS[@]}"; do
   echo ">>> fixture-oracle-all: $list${knobs:+ ($knobs)}"
   if [ -n "$knobs" ]; then
     # shellcheck disable=SC2086
-    env $knobs "$HERE/l0-fixture-oracle.sh" "$HERE/../atomlists/$list"
+    eval "env $knobs \"\$HERE/l0-fixture-oracle.sh\" \"\$HERE/../atomlists/\$list\""
   else
     "$HERE/l0-fixture-oracle.sh" "$HERE/../atomlists/$list"
   fi
