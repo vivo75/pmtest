@@ -5,6 +5,5 @@ SLOT=0
 DEPEND=dev-libs/odw0b
 RDEPEND=dev-libs/odw0c
 PDEPEND=dev-libs/odw0d
-IDEPEND=dev-libs/odw0e
 DEFINED_PHASES=-
 _md5_=a3f66e9150134fbf1e5d00a7bb72b5ac
