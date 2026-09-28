@@ -108,7 +108,6 @@
   category: skipped-updates
   slugs:
     - "--update_--deep_--newuse_--oneshot_dev-libs_r25target"
-    - "--update_--deep_--newuse_--oneshot_dev-libs_whpuller"
   match: "skipped-update block present for portuale, absent for real"
   reason: >
     Portuale reconciles an installed world consumer's pin after the pass
@@ -125,11 +124,16 @@
     - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0a_dev-libs_blk0c"
     - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0c_dev-libs_blk0a"
     - "--backtrack_0_dev-libs_blk0c_dev-libs_blk0b_dev-libs_blk0a"
+    - "--update_--deep_--newuse_--oneshot_dev-libs_whpuller"
+    - "--changed-slot_dev-libs_reinstslottarget"
+    - "--changed-slot_--update_--deep_dev-libs_reinstslottarget"
   match: "skipped-update explanation differs"
   reason: >
     Same skipped packages on both sides; real renders each package's
     `pkg_use_display` (USE plus USE_EXPAND groups) and ` to '<root>'` on
     the block's lines, portuale prints `USE=""` and no root suffix.
+    The whpuller and #210 reinstslottarget cells were first misread as
+    presence findings (real's ` for <root>` header was not parsed).
     Backlog #230.
   owner: portuale-bug
 

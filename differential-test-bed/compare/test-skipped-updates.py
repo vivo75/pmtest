@@ -211,6 +211,23 @@ def main() -> int:
           and len(groups["dev-libs/blk0x:0"]["rows"]) == 2
           and len(groups["dev-libs/blk0x:0"]["with"]) == 1, repr(groups))
 
+    # 11. real's ` for <root>` header suffix (non-"/" ROOT, #210 g210 cells)
+    real_for_root = (
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:\n"
+        "\n"
+        "dev-libs/reinstslottarget:0 for /tmp/l0-fixture-oracle/fixtures/\n"
+        "\n"
+        "  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge to '/tmp/l0-fixture-oracle/fixtures/') USE=\"\" ELIBC=\"glibc\" conflicts with\n"
+        "    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed in '/tmp/l0-fixture-oracle/fixtures/') USE=\"\"\n"
+        "                             ^^^^\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        p = Path(tmp) / "x.txt"
+        p.write_text(real_for_root)
+        _, _, _, _, _, groups = mod.parse(p)
+    check("a ` for <root>` header still opens a group keyed on the slot atom",
+          list(groups) == ["dev-libs/reinstslottarget:0"], repr(groups))
+
     print("ALL OK" if FAILED == 0 else "FAILURES")
     return 0 if FAILED == 0 else 1
 
