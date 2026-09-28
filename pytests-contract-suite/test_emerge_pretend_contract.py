@@ -570,6 +570,16 @@ CASES = [
         1,
     ),
     (
+        "circular dep: slot-pinned || build dep takes -bin over the older self slot like real (rc 0; g221c L0 rust, pinned below)",
+        ["--pretend", "dev-libs/slcirc"],
+        0,
+    ),
+    (
+        "circular dep: slot-pinned || build dep --backtrack=0 reports the self cycle like real (rc 1; g221c L0 rust, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/slcirc"],
+        1,
+    ),
+    (
         "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-1"],
         1,
@@ -9858,6 +9868,30 @@ def test_upstream_circular_choices_pg145_pins_mergelists(emerge_binary, fixture_
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == rows, args
+
+
+def test_slcirc_slot_pinned_branch_prefers_bin_over_older_slot(
+    emerge_binary, fixture_env
+):
+    """g221c (L0 `dev-lang/rust` regression): a slot-pinned `||` build
+    dep over an older slot of the package itself vs the `-bin` package,
+    the older slot carrying its own self buildtime edge. The first pass
+    self-picks and strands; the retry demotes the recorded self branch
+    and takes `-bin` -- real's exact set in real's exact order with no
+    warnings and empty stderr, so the exact rows are pinned:
+    `[slcirc-bin-2.0, slcirc-2.0]` (real `[rust-bin-1.96.1,
+    rust-1.96.1]`, one backtrack on both sides; oracle
+    `/tmp/opencode/g221c/probe_slcirc.py`, captured from the real
+    `ResolverPlayground`, not the source literal).
+    """
+    env = dict(fixture_env)
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/slcirc"], env)
+    assert got.returncode == 0
+    assert got.stderr == ""
+    assert got.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/slcirc-bin-2.0 ",
+        "[ebuild  N     ] dev-libs/slcirc-2.0 ",
+    ]
 
 
 def test_upstream_circular_choices_rust_pg0_pins_mergelists(

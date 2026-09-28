@@ -156,3 +156,8 @@ dev-libs/blockerpkg dev-libs/graphblockerparent
 # `Change USE: +flip` row, and the qml?-gated consumer chain row with
 # its [qml] qualifier (live `real-rest-1.log` shapes).
 -D --autounmask-use=n dev-libs/r135consumer
+# g221c (L0 dev-lang/rust): slot-pinned || build dep over an older slot
+# of the package itself vs the -bin package; the older slot carries its
+# own self buildtime edge. Both PMs retry once and merge [-bin-2.0,
+# slcirc-2.0].
+dev-libs/slcirc
