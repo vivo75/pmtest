@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=>=app-misc/abiprov-2
+DESCRIPTION=214 oracle fixture: forcer of abiprov-2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=app-misc/abiprov-2
+SLOT=0
+_md5_=5d8d8310b75c792a29412a163715fb48

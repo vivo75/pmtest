@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=app-misc/abiprov:=
+DESCRIPTION=214 oracle fixture: built := consumer of abiprov
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/abiprov:=
+SLOT=0
+_md5_=ff44c9ec6a8c05403f34b943766f802e
