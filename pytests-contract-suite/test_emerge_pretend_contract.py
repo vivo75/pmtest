@@ -517,6 +517,11 @@ CASES = [
         1,
     ),
     (
+        "circular dep: mixed-priority unserializable cycle prints per-edge labels (#228)",
+        ["--pretend", "dev-libs/slopcyca"],
+        1,
+    ),
+    (
         "circular dep: USE-flag suggestion (_find_suggestions)",
         ["--pretend", "dev-libs/usecyclea"],
         1,
@@ -724,6 +729,21 @@ CASES = [
     (
         "complete: upstream test_complete_graph pg1 <x-1 new-ver=n rebuild-if-new-slot=n merges like real (rc 0; pinned below)",
         ["--pretend", "--complete-graph-if-new-ver=n", "--rebuild-if-new-slot=n", "<dev-libs/cgp1x-1"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg0 libxml2 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", "dev-libs/cgp0x"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 >=x-2 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", ">=dev-libs/cgp1x-2"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 <x-1 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", "<dev-libs/cgp1x-1"],
         0,
     ),
     (
@@ -3422,30 +3442,100 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
     """hardcyclea DEPENDs hardcycleb which DEPENDs hardcyclea, both
     unbuilt, empty RDEPEND, no IUSE -- every edge an unsatisfied
     build-time dep with no run-time alternative, so real portage's
-    `_ignore_runtime` scan can't linearize it. Since Slice 4 the merge
-    list is the stuck remainder only (no full list, no separate
-    re-display -- real `_show_circular_deps` shows
-    `display(handler.merge_list)` exactly once); the `* Error: circular
-    dependencies:` block (real `_show_circular_deps`) goes to stderr;
-    exit 1. With no IUSE, `_find_suggestions` finds nothing and the
-    generic advisory prints (the `else` branch) -- see
+    `_ignore_runtime` scan can't linearize it. Since backlog #206 the
+    merge list is the stuck remainder rendered as real's forced
+    `--verbose --tree` display (`_show_circular_deps` pops `--quiet`
+    and forces both before `display(handler.merge_list)`): tree
+    indentation with a `[nomerge]` row, `::repo`, `0 KiB` sizes, the
+    `Total:` counters line. The `* Error: circular dependencies:`
+    block (real `_show_circular_deps`) goes to stderr with real's own
+    three leading newlines and `Package.__str__` node text; exit 1.
+    With no IUSE, `_find_suggestions` finds nothing and the generic
+    advisory prints (the `else` branch) -- see
     test_circular_dep_use_flag_suggestion for the suggestion path. By
     contrast the pure-RDEPEND cycle-a/cycle-b cycle stays exit 0 (a
-    CASES entry)."""
+    CASES entry).
+
+    Row format grounded on live real (n206 container probe,
+    `localhost/test-portuale:latest`, display paths diff-verified
+    identical to 3rdparty 3.0.82.2): real shows the argument as the
+    first merge row with its `to <ROOT>` suffix (a portuale display cut
+    — see `root_suffix` — so no pinned row carries it), then the
+    `[nomerge]` row and the nested repeats, then
+    `Total: 3 packages (3 new), Size of downloads: 0 KiB`. Portuale
+    reuses its own tree renderer for the shape, which nests the
+    argument cycle the other way round (leading `[nomerge]` row), so
+    the pin records portuale's three rows with real's decorations and
+    a `Total:` that counts the rendered merge rows, exactly like
+    real's counters count its own rows."""
     base = ["--pretend", "dev-libs/hardcyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
 
     assert rust.returncode == 1
     assert rust.stdout == (
-        "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
-        "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
+        "[nomerge       ] dev-libs/hardcyclea-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
     )
     assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+        "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/hardcyclea-1.0 depends on\n"
-        " dev-libs/hardcycleb-1.0 (buildtime)\n"
-        "  dev-libs/hardcyclea-1.0 (buildtime)\n"
+        "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_mixed_priority_cycle_prints_each_edge_real_label(
+    emerge_binary, fixture_env
+):
+    """Backlog #228: `dev-libs/slopcyca -RDEPEND:=-> dev-libs/slopcycb
+    -DEPEND-> dev-libs/slopcyca` is unserializable -- the `RDEPEND` `:=`
+    edge is an unsatisfied `runtime_slot_op` priority, which no real
+    `ignore_priority` rung relaxes (real `_emerge/DepPriority.py`
+    `__str__`, `_emerge/DepPriorityNormalRange.py`, `_emerge/
+    DepPrioritySatisfiedRange.py`). Each stderr cycle line carries its
+    own edge's `priorities[-1]` label (real `_prepare_circular_dep_-
+    message`, `resolver/circular_dependency.py`), not the hardcoded
+    `(buildtime)` every earlier pin shows.
+
+    Grounded on one live-real probe (`localhost/test-portuale:latest`,
+    real 3.0.81.3; the label paths -- `DepPriority.__str__`, the
+    circular message and suggestions, `DepPrioritySatisfiedRange` -- are
+    byte-identical to 3rdparty 3.0.82.2, the display path per the n206
+    probe): real exits 1 with `slopcycb depends on / slopcyca
+    (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
+    (unconditional atoms give `_find_suggestions` nothing). Portuale
+    rotates to the requested atom (lowest entries index -- the #208
+    family, left for that item), so the pin records `slopcyca depends
+    on / slopcycb (runtime_slot_op) / slopcyca (buildtime)` with the
+    same per-edge labels; stdout is portuale's own forced verbose-tree
+    stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
+    the rendered merge rows) with real's decorations, exactly like the
+    `hardcyclea` pin above. Full probe outputs:
+    `/tmp/opencode/n228probe/out/slopcyc[a|b].{stdout,stderr}.txt`."""
+    base = ["--pretend", "dev-libs/slopcyca"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/slopcyca-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/slopcycb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/slopcyca-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) (runtime_slot_op)\n"
+        "  (dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3462,16 +3552,31 @@ def test_circular_dep_use_flag_suggestion(
     violating REQUIRED_USE, so real prints `It might be possible to break
     this cycle / by applying the following change: / - dev-libs/
     usecyclea-1.0 (Change USE: -x)` instead of the generic advisory.
-    The `-x` renders blue under --color y."""
+    The `-x` renders blue under --color y.
+
+    Since backlog #206 the stdout list is real's forced `--verbose
+    --tree` stuck-remainder display and the stderr block carries real's
+    three leading newlines plus `Package.__str__` node text — row format
+    grounded on the live n206 probe (`localhost/test-portuale:latest`,
+    display paths diff-verified identical to 3rdparty 3.0.82.2), shape
+    from portuale's own tree renderer (see
+    test_unbreakable_build_time_cycle_prints_the_circular_deps_error)."""
     base = ["--pretend", "dev-libs/usecyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
-    assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/usecyclea-1.0::testrepo USE=\"x\"\n"
+        "[ebuild  N     ]  dev-libs/usecycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/usecyclea-1.0::testrepo  USE=\"x\" 0 KiB\n"
         "\n"
-        "dev-libs/usecyclea-1.0 depends on\n"
-        " dev-libs/usecycleb-1.0 (buildtime)\n"
-        "  dev-libs/usecyclea-1.0 (buildtime)\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -3499,16 +3604,33 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     x off on gpcyclea" fix would violate gpcyclec's own hard requirement,
     so the suggestion is disqualified and dropped -- real prints the
     generic "temporarily disabling USE flags" advisory instead of a
-    `Change USE:` line."""
+    `Change USE:` line.
+
+    Since backlog #206 the stdout list is real's forced `--verbose
+    --tree` stuck-remainder display and the stderr block carries real's
+    three leading newlines plus `Package.__str__` node text. The n206
+    probe shows live real starting this cycle at `gpcycleb-1.0`
+    (`gpcycleb → gpcyclea → gpcycleb`); portuale keeps its own
+    lowest-index rotation (`gpcyclea` first) — a cycle-start difference
+    of the #208 family, left for that item, so only the node format is
+    re-pinned here."""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+    assert rust.stdout == (
+        "[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo  0 KiB\n"
+        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\"\n"
+        "[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo  USE=\"x\" 0 KiB\n"
         "\n"
-        "dev-libs/gpcyclea-1.0 depends on\n"
-        " dev-libs/gpcycleb-1.0 (buildtime)\n"
-        "  dev-libs/gpcyclea-1.0 (buildtime)\n"
+        "Total: 3 packages (3 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3528,15 +3650,22 @@ def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     `USE="x" `; portuale's established convention omits trailing spaces,
     as its merge rows already do, so the pinned row ends `USE="x"`).
     `verbose_size` is merge-gated, so no size suffix follows on this arm.
-    Full stdout pinned; the stderr error block is the flat cell's."""
+    Since backlog #206 the circular display runs forced-verbose whether
+    or not the user passed `--tree`, so these rows carry `::repo`,
+    `0 KiB` on the merge arms, and the `Total:` counters line (all
+    grounded on the live n206 probe); the `to <ROOT>` suffix on real's
+    argument row stays a portuale display cut. Full stdout pinned; the
+    stderr error block is the grandparent cell's."""
     args = ["--pretend", "--tree", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/gpcyclec-1.0 ",
-        "[nomerge       ]  dev-libs/gpcyclea-1.0 USE=\"x\"",
-        "[ebuild  N     ]   dev-libs/gpcycleb-1.0 ",
-        "[ebuild  N     ]    dev-libs/gpcyclea-1.0  USE=\"x\"",
+        "[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo  0 KiB",
+        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\"",
+        "[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo  USE=\"x\" 0 KiB",
+        "",
+        "Total: 3 packages (3 new), Size of downloads: 0 KiB",
     ], rust.stdout
 
 
@@ -3579,29 +3708,42 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     cyc4a→cyc4b edge gated behind USE=x (default on). Real
     `digraph.get_cycles` records one ring per node (rotations count
     separately), so four records trip `large_cycle_count` (verified live
-    against 3.0.82.2 on the same shape). Since Slice 4 the merge list is
-    the stuck remainder only (leaf-drain order -- flat lines, since
-    portuale's tree model dedups shared nodes; no separate re-display,
-    which would duplicate it), then the error block with the `-x`
-    suggestion and the lot-of-cycles trailer. Exit 1. Both streams
-    pinned."""
+    against 3.0.82.2 on the same shape). Since backlog #206 the merge
+    list is the stuck remainder rendered as real's forced `--verbose
+    --tree` display (tree rows with a `[nomerge]` arm, `::repo`,
+    `0 KiB`, the `Total:` counters line), then the error block with
+    real's three leading newlines, `Package.__str__` node text, the
+    `-x` suggestion and the lot-of-cycles trailer. Exit 1. Both streams
+    pinned.
+
+    Row format and counters grounded on the live n206 probe
+    (`localhost/test-portuale:latest`, display paths diff-verified
+    identical to 3rdparty 3.0.82.2); shape from portuale's own tree
+    renderer. Live real starts this ring at `cyc4c-1.0`
+    (`cyc4c → cyc4d → cyc4a → cyc4b → cyc4c`); portuale keeps its own
+    lowest-index rotation (`cyc4a` first) — a cycle-start difference of
+    the #208 family, left for that item, so only the node format is
+    re-pinned here."""
     args = ["--pretend", "dev-libs/cyc4a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/cyc4a-1.0  USE=\"x\"",
-        "[ebuild  N     ] dev-libs/cyc4d-1.0 ",
-        "[ebuild  N     ] dev-libs/cyc4c-1.0 ",
-        "[ebuild  N     ] dev-libs/cyc4b-1.0 ",
+        "[nomerge       ] dev-libs/cyc4a-1.0::testrepo USE=\"x\"",
+        "[ebuild  N     ]  dev-libs/cyc4b-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]   dev-libs/cyc4c-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]    dev-libs/cyc4d-1.0::testrepo  0 KiB",
+        "[ebuild  N     ]     dev-libs/cyc4a-1.0::testrepo  USE=\"x\" 0 KiB",
+        "",
+        "Total: 4 packages (4 new), Size of downloads: 0 KiB",
     ]
     assert rust.stderr == (
-        "\n * Error: circular dependencies:\n"
+        "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "dev-libs/cyc4a-1.0 depends on\n"
-        " dev-libs/cyc4b-1.0 (buildtime)\n"
-        "  dev-libs/cyc4c-1.0 (buildtime)\n"
-        "   dev-libs/cyc4d-1.0 (buildtime)\n"
-        "    dev-libs/cyc4a-1.0 (buildtime)\n"
+        "(dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc4c-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "   (dev-libs/cyc4d-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "    (dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -3745,16 +3887,20 @@ def test_abort_path_cycle_shows_reduced_list_only(
     `docs/abort-path-spec.md`): an unserializable cycle aborts with exit
     1 and the merge list is the stuck remainder only — the unrelated
     leaves (`abort-leaf-a/b`, drained before the give-up) are absent while
-    the top and both cycle arms stay; `Total:` counters are computed over
-    that reduced list (unique packages -- the tree-duplicated row count
-    stays a deliberate G0.2 cut). Mid/last pin that the cycle entry's
+    the top and both cycle arms stay. Mid/last pin that the cycle entry's
     declared position is unobservable in real's output. Slice 4 renders
     the remainder as the only list; the `abort-au-*` fourth-shape order
-    stays xfailed below. Mode-shaped
-    assertions: `--columns` splits the version into `[x.y::repo]`, and
-    `--debug` without `-v` prints no `Total:` line (real: verbosity != 3
-    -- the oracle `--debug` capture shows the remainder with no counters
-    either)."""
+    stays xfailed below. Since backlog #206 the remainder renders as
+    real's forced `--verbose --tree` display with the `Total:` counters
+    line in every mode — including `--debug` without `-v`: real
+    `_show_circular_deps` forces `--verbose` before the display, and the
+    oracle `--debug` capture shows `Total: 4 packages (4 new)` (the old
+    no-`Total:`-under-`--debug` assertion contradicted the capture). The
+    counters count the rendered merge rows, repeats included
+    (`nomerge` excluded), exactly like real's own counters count its
+    rows. The forced display is always the plain tree renderer, never
+    `--columns`-shaped (portuale's tree walk hardcodes the non-columns
+    arms, same as for a user-passed `--tree`)."""
     args = [*mode, atom]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -3765,10 +3911,7 @@ def test_abort_path_cycle_shows_reduced_list_only(
     merge_lines = _merge_lines(rust.stdout)
     assert not any("abort-leaf" in line for line in merge_lines)
     assert any("abort-cycle-a" in line for line in merge_lines)
-    if mode == ["--pretend", "--debug"]:
-        assert "Total:" not in rust.stdout
-    else:
-        assert "Total:" in rust.stdout
+    assert "Total:" in rust.stdout
     assert "circular dependencies" in rust.stderr
 
 
@@ -3972,14 +4115,6 @@ def test_abort_path_gate_off_restores_legacy_exit_code(
     assert rust_on.stderr == rust_off.stderr
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="oracle finding (Slice 3 capture, spec §4e): real prints no "
-    "'backtracking has terminated early' notice when the autounmask change "
-    "is the only problem (_success_without_autounmask short-circuits "
-    "need_config_change before _autounmask_backtrack_disabled is set); "
-    "portuale prints it for every autounmask change with backtrack off",
-)
 def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     emerge_binary, fixture_env
 ):
@@ -3990,7 +4125,9 @@ def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     returns on `_success_without_autounmask` before the notice's flag at
     :11759 is ever set). The notice does appear when another failure
     coincides (`abort-au-cycle`, `aucasctop`). Outside backlog #19's abort
-    path -- pinned here so the divergence has an oracle-backed target."""
+    path -- pinned here so the divergence has an oracle-backed target.
+    Backlog #217: the gate is ported (`GraphResult::
+    autounmask_backtrack_disabled`), so this now passes unmarked."""
     args = ["--pretend", "-v", "dev-libs/abort-au-plain"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4455,8 +4592,12 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
     proposed: `unsatusealt` merges with `USE="unsatuseorflag"` and the
     dead alternative is never enqueued. Before this commit both branches
     ranked `Unsatisfiable`, the group fell back to the literal `||`, and
-    the dead alternative was enqueued and reported (`!!! no visible
-    ebuild for dependency "dev-libs/doesnotexist-unsatuseor"`)."""
+    the     dead alternative was enqueued and reported (`!!! no visible
+    ebuild for dependency "dev-libs/doesnotexist-unsatuseor"`). Backlog
+    #217: no "terminated early" trailer -- the flip lands on the fresh
+    `||`-branch pick, so real reaches the `_success_without_autounmask`
+    tail (depgraph.py:5793) and `need_config_change` returns before the
+    notice's flag is set (:11713-11717)."""
     args = ["--pretend", "dev-libs/unsatuseor"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4471,11 +4612,6 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
         "# required by dev-libs/unsatuseor-1.0::testrepo",
         "# required by dev-libs/unsatuseor (argument)",
         ">=dev-libs/unsatusealt-1.0 unsatuseorflag",
-        "",
-        " * In order to avoid wasting time, backtracking has terminated early",
-        " * due to the above autounmask change(s). The --autounmask-backtrack=y",
-        " * option can be used to force further backtracking, but there is no",
-        " * guarantee that it will produce a solution.",
     ]
     assert "doesnotexist-unsatuseor" not in rust.stderr, (
         "the dead alternative must not be enqueued once the group resolves"
@@ -5318,7 +5454,12 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
     block on stderr carries the real two-line dep chain (`#required by
     <parent cpv>::<repo>` then `#required by <parent atom> (argument)`).
     (--autounmask-use=n keeps the old "no visible ebuild" behavior -- see
-    test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n.)"""
+    test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n.)
+    Backlog #217: no "terminated early" trailer -- the flip lands on the
+    fresh pick (the package is graphed with the flip, so real's
+    `want_restart_for_use_change` stays False), the resolve reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793), and
+    `need_config_change` returns before the notice's flag (:11713-11717)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/usedeprejectedpkg"], fixture_env
     )
@@ -5333,7 +5474,6 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
         "# required by dev-libs/usedeprejectedpkg-1.0::testrepo\n"
         "# required by dev-libs/usedeprejectedpkg (argument)\n"
         ">=dev-libs/useflagpkg-1.0 -foo\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -5506,7 +5646,11 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
 
     Default (keyword suggestions off): the >=2.0 dep just stays
     unresolvable (a non-fatal dependency warning), same as before.
-   """
+
+    Backlog #217: no "terminated early" trailer -- the slot settles on
+    2.0 with a lone keyword change, so real reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793).
+    """
     # default: no keyword suggestions -> >=2.0 unresolvable, top still merges
     d = _run([str(emerge_binary)], ["--pretend", "dev-libs/kwbacktop"], fixture_env)
     assert d.returncode == 1
@@ -5530,7 +5674,6 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
         "# required by dev-libs/kwbacktop-1.0::testrepo\n"
         "# required by dev-libs/kwbacktop (argument)\n"
         "=dev-libs/kwbackmid-2.0 ~amd64\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -5546,7 +5689,10 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
     higher 2.0 -- recording a keyword change AND a license change for the
     same version. Before, portuale's flat `keyword_masked_only` fallback
     dropped 2.0 (it also had a license problem) and settled on 1.0.
-   """
+    Backlog #217: no "terminated early" trailer -- both changes are lone
+    fresh-candidate picks, so real reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793).
+    """
     a = ["--pretend", "--autounmask", "dev-libs/multimaskconsumer"]
     rust = _run([str(emerge_binary)], a, fixture_env)
     assert rust.returncode == 1
@@ -5565,7 +5711,6 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
         "# required by dev-libs/multimaskconsumer-1.0::testrepo\n"
         "# required by dev-libs/multimaskconsumer (argument)\n"
         ">=dev-libs/multimaskdep-2.0 SomeEula\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
     # default (no keyword suggestions): the dep stays unresolvable
@@ -5665,7 +5810,10 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
     "package.use" …)`) goes to stderr, and the run exits **1** -- real
     `action_build`'s `if not success: display_problems(); return 1`
     fires for any autounmask config change, `--pretend` included
-    (verified against a live `emerge -pv www-client/firefox`)."""
+    (verified against a live `emerge -pv www-client/firefox`). Backlog
+    #217: no "terminated early" trailer -- the top-level flip is a
+    fresh-candidate one, so real reaches the
+    `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "-v", "dev-libs/useflagpkg[-foo]"],
@@ -5682,7 +5830,6 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
         "# required by dev-libs/useflagpkg-1.0::testrepo\n"
         "# required by dev-libs/useflagpkg[-foo] (argument)\n"
         ">=dev-libs/useflagpkg-1.0 -foo\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -6062,7 +6209,9 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
     (real _writemsg + _get_dep_chain_as_comment: the `#required by ...`
     dep chain, then `=<cpv> <kw>`), and the run exits **1** -- real
     `action_build` returns 1 for any autounmask change under `--pretend`
-    too. v1 covers the "masked by KEYWORDS alone" case only."""
+    too. v1 covers the "masked by KEYWORDS alone" case only. Backlog
+    #217: no "terminated early" trailer -- a lone keyword change reaches
+    real's `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/autounmaskkeywordpkg"],
@@ -6076,7 +6225,6 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
         "# required by dev-libs/autounmaskkeywordpkg-1.0::testrepo\n"
         "# required by dev-libs/autounmaskkeywordpkg (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -6182,7 +6330,9 @@ def test_autounmask_dependency_gets_a_keyword_suggestion_once_enabled(emerge_bin
     following keyword changes are necessary to proceed:` block on stderr
     carries the real two-line dep chain (`#required by <parent
     cpv>::<repo>` then `#required by <parent atom> (argument)` -- real
-    _get_dep_chain_as_comment)."""
+    _get_dep_chain_as_comment). Backlog #217: no "terminated early"
+    trailer -- a lone keyword change reaches real's
+    `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/autounmaskdepconsumer"],
@@ -6201,7 +6351,6 @@ def test_autounmask_dependency_gets_a_keyword_suggestion_once_enabled(emerge_bin
         "# required by dev-libs/autounmaskdepconsumer-1.0::testrepo\n"
         "# required by dev-libs/autounmaskdepconsumer (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
 
@@ -6243,7 +6392,9 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
     entries -- and the `The following license changes are necessary to
     proceed:` block on stderr carries the two-line dep chain and the
     `>=<cpv> <license>` line (real `check_if_latest(pkg)` -> `>=` since
-    1.0 is the only version). Off without `--autounmask`."""
+    1.0 is the only version). Off without `--autounmask`. Backlog #217:
+    no "terminated early" trailer -- a lone license change reaches
+    real's `_success_without_autounmask` tail (depgraph.py:5793)."""
     off = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/licensemaskedconsumer"], fixture_env
     )
@@ -6278,7 +6429,6 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
         "# required by dev-libs/licensemaskedconsumer-1.0::testrepo\n"
         "# required by dev-libs/licensemaskedconsumer (argument)\n"
         ">=dev-libs/licensemaskedpkg-1.0 SomeEula\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
     # --autounmask-license=y alone enables it; --autounmask-license=n over
@@ -6325,7 +6475,9 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
     it. The `The following mask changes are necessary to proceed:` block
     has the `#required by` dep chain + a bare `=<cpv>` line (no token --
     a mask unmask has no keyword/flag). The `[ebuild N #]` bracket marker
-    reflects the still-`package.mask`'d state."""
+    reflects the still-`package.mask`'d state. Backlog #217: no
+    "terminated early" trailer -- a lone mask change reaches real's
+    `_success_without_autounmask` tail (depgraph.py:5793)."""
     assert (
         _run([str(emerge_binary)], ["--pretend", "dev-libs/hardmaskedpkg"], fixture_env).returncode
         == 1
@@ -6355,7 +6507,6 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
         "# required by dev-libs/maskmaskedconsumer-1.0::testrepo\n"
         "# required by dev-libs/maskmaskedconsumer (argument)\n"
         "=dev-libs/hardmaskedpkg-1.0\n"
-        + BACKTRACK_TERMINATED_EARLY
     )
 
     j = _run(
@@ -6801,7 +6952,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
         # BUILD_ID 2 has the highest BUILD_TIME -> it is the one picked.
         for bid, bt in ((1, 100), (2, 300), (3, 200))
     )
-    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nPACKAGES: 3\n\n{entries}")
+    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n{entries}")
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     # Default: the newer ebuild wins.
@@ -6859,11 +7010,13 @@ def test_quickpkg_direct_injects_source_root_packages(
     assert same.returncode == 1
 
 
-def _binscan_configroot(tmp_path, fixtures_root, binpkg_files):
+def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=None):
     """An ad-hoc PORTAGE_CONFIGROOT whose `PKGDIR` points at a directory
     that holds `binpkg_files` (copied from fixtures) but NO
     `Packages` index -- so `--usepkg`/`--usepkgonly` must fall back to
-    the real `bintree._populate_local` `$PKGDIR` directory scan."""
+    the real `bintree._populate_local` `$PKGDIR` directory scan. With
+    `packages_text` the index is written with that content instead
+    (backlog #199: a staged stale index)."""
     cfg = tmp_path / "cfg"
     repo = tmp_path / "repo"
     pkgdir = tmp_path / "binpkgs"
@@ -6880,7 +7033,10 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files):
         dest = pkgdir / "dev-libs" / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy(fixtures_root / "pkgdir/dev-libs" / name, dest)
-    assert not (pkgdir / "Packages").exists()
+    if packages_text is None:
+        assert not (pkgdir / "Packages").exists()
+    else:
+        (pkgdir / "Packages").write_text(packages_text)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -6928,6 +7084,106 @@ def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
     assert v.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
 
 
+def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #199: with `FEATURES=-pkgdir-index-trusted` the local
+    `$PKGDIR` scan runs real `_populate_local(reindex=True)`
+    (`bintree.py:936-938`): a `Packages` stanza whose file is gone is
+    dropped from the pool (real `bintree.py:1353-1356`), instead of
+    being re-injected like the trusted default (backlog #187). A file
+    whose `_mtime_` changed is re-parsed from disk either way the pool
+    can tell, and a file no stanza covers is picked up in both modes.
+
+    The staged index holds a stale `packagepkg` stanza (genuine
+    metadata, bogus `_mtime_` -- trusted mode vouches it, untrusted
+    mode re-parses the file and lands on the same entry) plus a
+    `gonepkg` stanza whose file is absent (trusted mode re-injects it,
+    untrusted mode drops it); `gpkgreadpkg`'s file is present with no
+    stanza at all. Each binary's own `RDEPEND` is walked far enough to
+    name it, so the abort text tells which pool each mode resolved:
+    `packagepkg -> dev-libs/samepkg`, `gpkgreadpkg -> dev-libs/newpkg`
+    (both modes), `gonepkg -> dev-libs/samepkg` trusted but
+    `dev-libs/gonepkg` itself untrusted (nothing left to satisfy it)."""
+    pkgdir = tmp_path / "binpkgs"
+    size = (fixtures_root / "pkgdir/dev-libs/packagepkg-1.0.tbz2").stat().st_size
+    packages_text = (
+        "TIMESTAMP: 0\n"
+        "\n"
+        "CPV: dev-libs/packagepkg-1.0\n"
+        "DEFINED_PHASES: install\n"
+        'DESCRIPTION: fixture package: real binary-package building (ebuild <file> package)\n'
+        "EAPI: 8\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/samepkg\n"
+        "SLOT: 0\n"
+        "USE: \n"
+        f"SIZE: {size}\n"
+        "_mtime_: 1\n"
+        "PATH: dev-libs/packagepkg-1.0.tbz2\n"
+        "\n"
+        "CPV: dev-libs/gonepkg-1.0\n"
+        "DEFINED_PHASES: -\n"
+        "DESCRIPTION: gone\n"
+        "EAPI: 8\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/samepkg\n"
+        "SLOT: 0\n"
+        "USE: \n"
+        "SIZE: 12345\n"
+        "_mtime_: 1\n"
+        "PATH: dev-libs/gonepkg-1.0.tbz2\n"
+    )
+    env = _binscan_configroot(
+        tmp_path,
+        fixtures_root,
+        ["packagepkg-1.0.tbz2", "gpkgreadpkg-1.0.gpkg.tar"],
+        packages_text,
+    )
+    untrusted = dict(env)
+    untrusted["FEATURES"] = "-pkgdir-index-trusted"
+
+    # The changed file resolves identically either way: trusted vouches
+    # the stale stanza, untrusted re-parses the same bytes from disk.
+    for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
+        rust = _run(
+            [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/packagepkg"], run_env
+        )
+        assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr, label
+
+    # The file no stanza covers resolves in both modes too.
+    for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
+        rust = _run(
+            [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gpkgreadpkg"], run_env
+        )
+        assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in rust.stderr, label
+
+    # The removed file: trusted re-injects the orphan stanza (the
+    # binary resolves and its dep is walked), untrusted drops it (the
+    # top-level atom itself is unsatisfiable).
+    rust = _run(
+        [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], env
+    )
+    assert rust.returncode == 1, rust.stdout + rust.stderr
+    _assert_abort_preamble(rust.stdout)
+    assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
+
+    rust = _run(
+        [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], untrusted
+    )
+    assert rust.returncode == 1, rust.stdout + rust.stderr
+    # No merge-list preamble here: with no candidate at all (no
+    # binary, no ebuild) the top-level atom fails before any
+    # merge-bound parent exists -- like the no-`--quickpkg-direct`
+    # leg of `test_quickpkg_direct_injects_source_root_packages`.
+    assert rust.stdout == "", rust.stdout
+    assert 'there are no ebuilds to satisfy "dev-libs/gonepkg"' in rust.stderr
+
+
 def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     emerge_binary, tmp_path, fixtures_root
 ):
@@ -6958,7 +7214,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     bh2 = tmp_path / "binhost2"
     bh2.mkdir()
     (bh2 / "Packages").write_text(
-        "TIMESTAMP: 0\nPACKAGES: 1\n\n"
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
         "BUILD_ID: 1\nCPV: dev-libs/dirbinhostonly-1.0\nDEFINED_PHASES: -\n"
         "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nREPO: gentoo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
     )
@@ -9216,12 +9472,19 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned (`USE="icu*"` is real's
     changed-USE marker, `UD` the stock downgrade letters — both
-    normal rendering, not warnings). Not pinned: pg0's
+    normal rendering, not warnings). The three `--ignore-world` cells
+    (backlog #223: portuale now drops `@world` from the complete-graph
+    seeds exactly like real `depgraph.py:357-360`, so they merge the
+    oracle's exact rows too) are pinned in the same table — none of
+    the six cells touches an old-EAPI rule on the merged package
+    itself (plain atoms, no conditionals/slots on the merged rows;
+    the `[!icu?]` conditional lives on `cgp0q`, which neither graph
+    walks), so #220's EAPI raise leaves these rows unchanged.
+    Not pinned: pg0's
     `new-use=y` cell (oracle rc 1, portuale rc 0 — finding, no
     CASES), pg1's two `new-ver=y` cells (oracle rc 1, portuale rc
-    0 — findings, no CASES), and the three `--ignore-world` cells
-    (portuale answers rc 2 `not yet implemented` — finding, no
-    CASES). World caveat: upstream worlds (`x11-libs/qt-webkit`,
+    0 — findings, no CASES). World caveat: upstream worlds
+    (`x11-libs/qt-webkit`,
     `sys-apps/a`) are not emitted as shared world entries, so the
     non-`--ignore-world` cells run against the shared world file;
     the three rc-0 pins match real anyway.
@@ -9254,12 +9517,125 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
                 "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
             ],
         ),
+        (
+            ["--ignore-world", "dev-libs/cgp0x"],
+            [
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"',
+            ],
+        ),
+        (
+            ["--ignore-world", ">=dev-libs/cgp1x-2"],
+            [
+                "[ebuild     U  ] dev-libs/cgp1x-2 [1]",
+            ],
+        ),
+        (
+            ["--ignore-world", "<dev-libs/cgp1x-1"],
+            [
+                "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
+            ],
+        ),
     ]
     for args, rows in cases:
         got = _run([str(emerge_binary)], ["--pretend", *args], env)
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == rows, args
+
+
+def test_ignore_world_merges_only_the_arg_on_an_eapi_8_tree(
+    emerge_binary, fixture_env
+):
+    """`--ignore-world` on a modern-EAPI tree (backlog #223;
+    `dev-libs/igw0{x,a}`, EAPI 8).
+
+    Same shape as upstream `test_complete_graph.py::
+    testCompleteGraphVersionChange` pg1 (`dev-libs/cgp1{x,a}`, pinned
+    above), but written at EAPI 8 instead of the bulk-translated EAPI 0
+    the #220 raise has not reached yet: installed `igw0x-1` plus an
+    installed world-shaped consumer `igw0a-1` bounding it
+    (`>=igw0x-1 <igw0x-2`). Oracle: the real `ResolverPlayground` run at
+    EAPI 8 (`/tmp/opencode/n223/oracle_igw.py`, `PYTHONHASHSEED=0`,
+    `world=["dev-libs/igw0a"]`) answers both `--ignore-world` cells rc 0
+    with the requested version alone — EAPI raises nothing here, exactly
+    like the EAPI-0 oracle (`o50e-report.md` §5). Upstream's `world`
+    entry is not emitted as a shared world entry (world reason, same as
+    the `cgp1*` cells), so these run against the shared world file.
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["--ignore-world", ">=dev-libs/igw0x-2"],
+            [
+                "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+            ],
+        ),
+        (
+            ["--ignore-world", "<dev-libs/igw0x-1"],
+            [
+                "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_ignore_world_contrast_against_a_world_bound_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """`--ignore-world` contrast pin (backlog #223 fix round 1): the same
+    argument with and without the flag under a tmp ROOT whose world file
+    contains the bounding consumer `dev-libs/igw0a`.
+
+    Real semantics (`3rdparty/portage` 3.0.82.2): `--ignore-world`
+    empties `_required_set_names` (`lib/_emerge/depgraph.py:357-360`),
+    so `_complete_graph` (`:8677-8731`) no longer walks the world seeds;
+    without the flag the installed world member `igw0a-1`'s own pin
+    (`>=dev-libs/igw0x-1 <dev-libs/igw0x-2`) collides with the requested
+    out-of-range version. Grounded live against the real
+    `ResolverPlayground` at EAPI 8 (`world=["dev-libs/igw0a"]`,
+    `igw0{x,a}` ebuilds/installed as in the fixture): the plain
+    `>=dev-libs/igw0x-2` cell answers `success=False` with empty
+    `slot_collision_solutions`, while the `--ignore-world` cell answers
+    `success=True`, `mergelist=["dev-libs/igw0x-2"]` (same for
+    `<dev-libs/igw0x-1` vs `igw0x-0.1`) — the EAPI-8 mirror of upstream
+    `test_complete_graph.py::testCompleteGraphVersionChange`'s
+    `--complete-graph-if-new-ver=y` (fail) vs `--ignore-world` (pass)
+    cells. The tmp ROOT uses the `_world_extra_env` copied-fixture
+    pattern (shared world plus `dev-libs/igw0a`), so the shared fixture
+    world file stays untouched.
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/igw0a")
+    cases = [
+        (
+            ">=dev-libs/igw0x-2",
+            "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+        ),
+        (
+            "<dev-libs/igw0x-1",
+            "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+        ),
+    ]
+    for atom, row in cases:
+        plain = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert plain.returncode == 1, atom
+        assert plain.stderr == "", atom
+        merges = [
+            ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")
+        ]
+        assert merges == [row], atom
+        assert "slot conflict" in plain.stdout, atom
+        assert "dev-libs/igw0a-1" in plain.stdout, atom
+        flagged = _run(
+            [str(emerge_binary)], ["--pretend", "--ignore-world", atom], env
+        )
+        assert flagged.returncode == 0, atom
+        assert flagged.stderr == "", atom
+        assert flagged.stdout.splitlines() == [row], atom
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
@@ -11590,6 +11966,7 @@ Dependency and target selection:
       --rebuild-if-unbuilt, -new-rev, -new-ver, -new-slot  rebuild an installed package when a build dep is merged
       --rebuild-exclude ATOMS, --rebuild-ignore ATOMS  keep packages out of the rebuild triggers
       --complete-graph[=y|n], --complete-graph-if-new-use, --complete-graph-if-new-ver  force a full deep graph walk
+      --ignore-world[=y|n]  ignore the @world set and its dependencies (complete-graph walks args only)
       --dynamic-deps[=y|n]  walk the ebuild (y, default) or the vdb snapshot (n) during --deep
       --backtrack N         maximum resolver backtracking passes (default 10; 0 disables)
       --package-moves[=y|n]  apply profiles/updates/ package moves (default y)
@@ -11622,6 +11999,7 @@ Build scheduling:
   -l, --load-average N       hold new builds while the load average exceeds N
   -a, --ask[=y|n]            prompt for confirmation before a real merge or removal
       --ask-enter-invalid    with --ask: a bare Enter is not accepted as Yes
+      --read-news[=y|n]      with --ask: offer to read unread news via eselect
       --ignore-default-opts  ignore the EMERGE_DEFAULT_OPTS variable for this run
       --keep-going           on a build failure, drop that package's dependents and carry on
       --quiet-build[=y|n]    redirect a build's phase output to ${T}/build.log (implied by -j >1 and -q)
@@ -14969,13 +15347,12 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     #135 (e) (Phase 5b S2) closes the chain residue: real's bed capture
     (`l0-fx-20260922T192350Z`) qualifies the installed owner
     (`# required by dev-libs/deepusedepparent-1.0::testrepo`) and walks
-    the whole chain to the argument (three rows). Residue kept: real's
-    capture shows **no** `BACKTRACK_TERMINATED_EARLY` trailer on this
-    cell (its `backtrack: 0/20` means `_autounmask_backtrack_disabled`
-    was never set -- real's `depgraph.py:11735-11752` gate requires
-    backtracking to have been *active*), where portuale prints it
-    unconditionally on any autounmask batch. 14 pins depend on the
-    trailer, so the gate is not narrowed here.
+    the whole chain to the argument (three rows). That capture likewise
+    shows **no** `BACKTRACK_TERMINATED_EARLY` trailer on this cell (its
+    `backtrack: 0/20` means `_autounmask_backtrack_disabled` was never
+    set -- real's `depgraph.py:11735-11752` gate requires backtracking
+    to have been *active*); backlog #217 ports the gate, so the pin
+    below records the trailer-free bytes.
     """
     base = ["--pretend", "-D", "dev-libs/deepusedepconsumer"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -14990,7 +15367,7 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
         "# required by dev-libs/deepusedepparent-1.0::testrepo\n"
         "# required by dev-libs/deepusedepconsumer-1.0::testrepo\n"
         "# required by dev-libs/deepusedepconsumer (argument)\n"
-        ">=dev-libs/deepusedepchild-1.0 -flip\n" + BACKTRACK_TERMINATED_EARLY
+        ">=dev-libs/deepusedepchild-1.0 -flip\n"
     )
 
 
@@ -16373,6 +16750,76 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
         f"    sync-uri: file://{binhost}\n"
         "    verify-signature: False\n" in rust.stdout
     )
+
+
+def test_info_shows_the_calling_env_over_make_conf(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """Backlog #219: `emerge --info` prints the calling environment over
+    the config files. Real `action_info` reads `settings.get(k)`
+    (`_emerge/actions.py:2240`), which walks `lookuplist` env-first
+    (real `config.py:3178-3182`; `USE_ORDER "env:pkg:conf:…"` at
+    `:1031-1035`); portuale's dump read `other_vars` first with the
+    process env only as a fallback (`pretend.rs` "Config sources win"),
+    so a key `resolve_config` never env-folds itself showed the file
+    value. Hermetically: a copied configroot whose `make.conf` sets
+    `PORTAGE_BZIP2_COMMAND` / `PORTAGE_BUNZIP2_COMMAND` (both on real's
+    hardcoded `myvars` list, neither in `ENV_SCALAR_VARS`, so both reads
+    were inverted) to file values, with different calling-env values on
+    top -- `--info` must show the env values. `PKGDIR` (same block,
+    already env-folded, so unchanged) is guarded too.
+    `BINPKG_COMPRESS[*]` / `BINPKG_FORMAT` are not pinned: real never
+    prints them (absent from `myvars`, and the fixture profiles ship no
+    `info_vars` that could add them).
+
+    Fix round 1 (review REQUEST_CHANGES, Important 1): `CONFIG_PROTECT`,
+    `CONFIG_PROTECT_MASK`, `ENV_UNSET` are also on real's hardcoded
+    `myvars` list (`_emerge/actions.py:2202-2205`) but took the dedicated
+    `resolved_incremental` arm, which never saw the calling env
+    (`apply_env_layer` only noted `TRACKED_INCREMENTALS` members that are
+    also in `ENV_SCALAR_VARS` -- i.e. only `FEATURES`). Real stacks the
+    env as the final source of every `const.INCREMENTALS` member's fold
+    (`config.regenerate()`: `mydbs = configlist[:-1] + [backupenv]` at
+    `config.py:2735-2736`; all four keys are members, `const.py:125-138`),
+    so the same configroot also sets conflicting `make.conf` values for
+    the three keys with different calling-env values on top -- `--info`
+    must show the stacked, sorted union (env tokens folded in, not env
+    replacing the files)."""
+    configroot = tmp_path / "configroot219"
+    shutil.copytree(fixtures_root / "etc", configroot / "etc", symlinks=True)
+    for entry in fixtures_root.iterdir():
+        if entry.name != "etc":
+            (configroot / entry.name).symlink_to(entry)
+    make_conf = configroot / "etc" / "portage" / "make.conf"
+    make_conf.write_text(
+        make_conf.read_text()
+        + '\nPORTAGE_BZIP2_COMMAND="conf-bzip2-219"\n'
+        + '\nPORTAGE_BUNZIP2_COMMAND="conf-bunzip2-219"\n'
+        + '\nCONFIG_PROTECT="/conf-protect-219"\n'
+        + '\nCONFIG_PROTECT_MASK="/conf-mask-219"\n'
+        + '\nENV_UNSET="CONF_UNSET_219"\n'
+    )
+
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(configroot)
+    env["PORTAGE_BZIP2_COMMAND"] = "env-bzip2-219"
+    env["PORTAGE_BUNZIP2_COMMAND"] = "env-bunzip2-219"
+    env["PKGDIR"] = str(tmp_path / "pkgdir-env-219")
+    env["CONFIG_PROTECT"] = "/env-protect-219"
+    env["CONFIG_PROTECT_MASK"] = "/env-mask-219"
+    env["ENV_UNSET"] = "ENV_UNSET_219"
+
+    rust = _run([str(emerge_binary)], ["--info"], env)
+    assert rust.returncode == 0
+    assert '\nPORTAGE_BZIP2_COMMAND="env-bzip2-219"\n' in rust.stdout
+    assert '\nPORTAGE_BUNZIP2_COMMAND="env-bunzip2-219"\n' in rust.stdout
+    assert f'\nPKGDIR="{tmp_path / "pkgdir-env-219"}"\n' in rust.stdout
+    assert "conf-bzip2-219" not in rust.stdout
+    assert "conf-bunzip2-219" not in rust.stdout
+    # Incremental fold: the calling env stacks onto make.conf, sorted.
+    assert '\nCONFIG_PROTECT="/conf-protect-219 /env-protect-219"\n' in rust.stdout
+    assert '\nCONFIG_PROTECT_MASK="/conf-mask-219 /env-mask-219"\n' in rust.stdout
+    assert '\nENV_UNSET="CONF_UNSET_219 ENV_UNSET_219"\n' in rust.stdout
 
 
 def test_info_atom_that_does_not_exist_errors_with_misspell_suggestions(
@@ -18032,25 +18479,19 @@ def test_oracle_slotop_conflict_rebuild(
     assert not [ln for ln in merges if "app-misc/A-2" in ln or "app-misc/B-0" in ln]
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="bug 486580 needs the v2 `#24b` `_slot_operator_update_probe` "
-    "family: the leaves' recorded built `somassb:1/1=` deps must be "
-    "re-resolved against the graph's `somassb:2/2`. Verified live "
-    "against the vendored portage (ResolverPlayground, "
-    "`_slot_operator_update_backtrack` fires per leaf); S5's "
-    "`_slot_change_probe` only handles *unbuilt* `:=`/`:S=` deps from a "
-    "merge-bound parent, so it does not fire here. The leaves are also "
-    "outside the CLI seeds (named atoms are not seeded -- S3 seeds the "
-    "walk's own graph).",
-)
 def test_oracle_slotop_conflict_mass_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_conflict_rebuild.py::testSlotConflictMassRebuild`
     (bug 486580, `somassa --backtrack 3 -uD`): real merges
     `[somassa-1, somassb-2, 5 leaves]`. Renamed (`somass*`; upstream
-    `app-misc/A-1` carries different deps than the fixture `A-1`)."""
+    `app-misc/A-1` carries different deps than the fixture `A-1`).
+    MATCHES real since #211 C1: the new-child-slot update-probe arm
+    (`depgraph.py:3121-3126`) schedules the installed leaves bound to the
+    abandoned slot even with an empty world (walked, not merely
+    reachable). Ported through the `slot_operator_rebuild_scan`, so the
+    leaves merge as walked `rR` nodes with the `causing rebuilds` block
+    (verified against the vendored portage's Playground mergelist)."""
     installed = [("app-misc", "somassb", "1", "1", {})]
     installed += [
         (
@@ -18350,6 +18791,116 @@ def test_oracle_slotop_rebuild_scan_honours_with_bdeps(
             for ln in _b1_merges(out)
             if "dev-libs/cons" in ln or "dev-libs/provpkg" in ln
         ] == [], name
+
+
+def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #25 S1b-fix contract pin: the slotop `@world` cells with
+    bed-faithful installed metadata (vdb `EAPI=8` on every row).
+
+    Same matrix as `test_oracle_slotop_rebuild_scan_honours_with_bdeps`
+    above (installed `dev-libs/provpkg-1.0` `0/1`, tree `2.0` `0/2`, five
+    installed consumers bound through one key each with real's versioned
+    built atom `>=dev-libs/provpkg-1.0:0/1=`), except every installed row
+    also carries the vdb `EAPI` file the container bed stages
+    (`differential-test-bed/layers/l0-fixture-oracle/slotop-bdeps/vdb`;
+    the cells run with `FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1` per
+    `differential-test-bed/atomlists/l0-fixture-oracle-slotop.txt`).
+    Without that file real reads the installed EAPI as `"0"`
+    (`vdb`/`vartree.py:1054-1055`, no `slot_operator` support) and the
+    dynamic-deps overlay stands down -- which is why the EAPI-less twin
+    above cannot see this regression.
+
+    Real 3.0.82.2 upgrades the provider and rebuilds the consumers in
+    the `@world` shape (Total 9; 7 with `--usepkg`): the overlay's
+    recorded atoms (`FakeVartree._apply_dynamic_deps`,
+    `lib/_emerge/FakeVartree.py:146-191`) do not withhold because the
+    slot-operator update probe relaxes built `:S/SS=` parent atoms to
+    bare `:=` before checking the candidate
+    (`_slot_operator_check_reverse_dependencies`,
+    `lib/_emerge/depgraph.py:2472-2538`, `:2494-2502`). Portuale's S1b
+    overlay (`rust/portage-repo/src/lib.rs::installed_dep_string`)
+    appended the recorded atoms but the joint-satisfiability check kept
+    them raw, so only the installed instance satisfied the whole atom
+    set and the upgrade was withheld (no `provpkg-2.0` row, no consumer
+    `rR` rows, plus the skipped-update warning) -- the `BEDS 62951cd0:
+    STOP` row in `r25s1-progress.md`."""
+    installed = [
+        ("dev-libs", "provpkg", "1.0", "0/1", {"EAPI": "8"}),
+    ] + [
+        (
+            "dev-libs",
+            name,
+            "1.0",
+            "0",
+            {"EAPI": "8", key: ">=dev-libs/provpkg-1.0:0/1="},
+        )
+        for name, key in (
+            ("consrdep", "RDEPEND"),
+            ("consdep", "DEPEND"),
+            ("consbdep", "BDEPEND"),
+            ("conspdep", "PDEPEND"),
+            ("considep", "IDEPEND"),
+        )
+    ]
+    world = [
+        "dev-libs/provpkg",
+        "dev-libs/consrdep",
+        "dev-libs/consdep",
+        "dev-libs/consbdep",
+        "dev-libs/conspdep",
+        "dev-libs/considep",
+    ]
+    root = _b1_root(tmp_path, world, installed)
+    env = _b1_env(fixture_env, root)
+
+    def run(*args):
+        # stdout + stderr: the skipped-update warning goes to stderr.
+        r = _b1_run(["--pretend", *args], env, emerge_binary)
+        return r.stdout + r.stderr
+
+    def rebuilds(stdout):
+        return [
+            ln.split("] ", 1)[1].split(" ")[0]
+            for ln in _b1_merges(stdout)
+            if ln.startswith("[ebuild  rR") and "dev-libs/cons" in ln
+        ]
+
+    provider = "[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0]"
+    # @world: the provider upgrades and every consumer rebuilds.
+    out = run("--update", "--deep", "--newuse", "@world")
+    assert provider in _b1_merges(out)
+    assert rebuilds(out) == [
+        "dev-libs/consrdep-1.0",
+        "dev-libs/consdep-1.0",
+        "dev-libs/consbdep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/considep-1.0",
+    ]
+    assert "have been skipped" not in out
+    # @world --usepkg: bdeps off, runtime/install-time keys only.
+    out = run("--update", "--deep", "--newuse", "--usepkg", "@world")
+    assert provider in _b1_merges(out)
+    assert rebuilds(out) == [
+        "dev-libs/consrdep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/considep-1.0",
+    ]
+    assert "have been skipped" not in out
+    # @world --with-bdeps=y: same as the default.
+    out = run(
+        "--update", "--deep", "--newuse", "--with-bdeps=y", "@world"
+    )
+    assert provider in _b1_merges(out)
+    assert rebuilds(out) == [
+        "dev-libs/consrdep-1.0",
+        "dev-libs/consdep-1.0",
+        "dev-libs/consbdep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/considep-1.0",
+    ]
+    assert "have been skipped" not in out
 
 
 def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
@@ -20022,6 +20573,106 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     ], result.stdout
 
 
+def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209: `--backtrack=0` must not skip the reverse-dependency
+    feed loop. Real `_resolve_conflicts` (`_emerge/depgraph.py:9444`)
+    calls `_complete_graph()` (`:8562`) with no `_allow_backtracking`
+    gate, so an installed world consumer's satisfiable pin enforces
+    in-pass even with backtracking off.
+
+    Hermetic r25 shape (#25 S0, the `FX_WORLD_EXTRA=dev-libs/r25consumer`
+    bed cell in `l0-fixture-oracle-r25.txt`): installed `r25consumer-1.0`
+    pins `<dev-libs/r25lib-2.0:=` (recorded `:0/1=` bound form) against
+    the `r25lib` 1.0->2.0 update pulled through installed `r25mid`'s
+    `:=` dep. Expected from real (`differential-test-bed/findings/l0.md`
+    "## #25 S0", default flags there: two merge rows, no warning,
+    `backtrack: 0/20` -- the selection path that withholds has no
+    backtracking gate anywhere in its chain, so `--backtrack=0` answers
+    the same; the coordinator's bed oracles the new bt0 cell directly):
+    `r25up-2.0 [U]` + `r25target-1.0 [N]`, rc 0, no skipped-update block,
+    no rebuild block (real's slot-op trigger is backtracking-gated), and
+    `--json` `restarts` 0. Before the fix portuale settled the root pass
+    without the pin and merged `r25lib-2.0` here."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "dev-libs/r25target",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/r25up-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/r25target-1.0 ",
+    ]
+    out = rust.stdout + rust.stderr
+    assert "have been skipped" not in out
+    assert "causing rebuilds" not in out
+    rj = _run([str(emerge_binary)], ["--pretend", "--json", *args[1:]], env)
+    assert rj.returncode == 0
+    assert json.loads(rj.stdout)["backtrack"] == {"restarts": 0, "max": 0}
+
+
+def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #209 S0: a pin that cannot be satisfied when backtracking
+    is off is reported, not skipped and not warned away. Same r25 world
+    as above, but the hard requirement is an explicit `=r25lib-2.0`
+    argument the consumer's `<2.0` pin cannot hold alongside, so the scan
+    drops the pin and the residual conflict reports it.
+
+    Expected from real (g209 S0 container probe: real 3.0.81.3 staged
+    like the bed with `FX_WORLD_EXTRA=dev-libs/r25consumer`, argv
+    `emerge -p --backtrack=0 --update --deep --newuse --oneshot
+    "=dev-libs/r25lib-2.0"`; the reporting chain
+    (`_resolve_conflicts` -> `_complete_graph` -> unsatisfied-dep loop
+    -> `_process_slot_conflicts` -> `_solve_non_slot_operator_slot_conflicts`,
+    `3rdparty/portage` 3.0.82.2) carries no `_allow_backtracking` gate
+    on any link, so the pin lands as a slot-collision report): the 2.0
+    merge row, then the residual block pairing it (the `(Argument)`
+    puller) against installed 1.0 (the consumer pin), rc 1. One display
+    nit vs the probe: real renders the consumer's `:=` bound form
+    first, portuale the normalised `<2.0` form (same two parents, order
+    only; the `(and 1 more ...)` tail agrees)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = [
+        "--pretend",
+        "--backtrack=0",
+        "--update",
+        "--deep",
+        "--newuse",
+        "--oneshot",
+        "=dev-libs/r25lib-2.0",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines()[:1] == [
+        "[ebuild     U  ] dev-libs/r25lib-2.0 [1.0]",
+    ]
+    _assert_residual_slot_conflict_block(
+        rust.stdout,
+        env["ROOT"],
+        "dev-libs/r25lib:0",
+        "dev-libs/r25lib-2.0:0/2::testrepo",
+        [(None, "=dev-libs/r25lib-2.0", False)],
+        "dev-libs/r25lib-1.0:0/1::testrepo",
+        [
+            (
+                "dev-libs/r25consumer-1.0:0/0::testrepo",
+                "<dev-libs/r25lib-2.0",
+                True,
+            ),
+        ],
+    )
+
+
 def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     emerge_binary, fixture_env
 ):
@@ -20068,6 +20719,93 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
         ], (extra, result.stdout)
 
 
+@pytest.mark.parametrize(
+    "extra_args", [[], ["--update", "--deep"]], ids=["changed-slot", "changed-slot-update-deep"]
+)
+def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
+    emerge_binary, fixture_env, tmp_path, fixtures_root, extra_args
+):
+    """Backlog #210 round 2: a same-version sub-slot change without a
+    revbump counts as a version change -- the reinstall is withheld, not
+    merged, when world-reachable installed consumers pin the old slot.
+
+    `dev-libs/reinstslottarget` is installed at 1.0 (`SLOT="0/1"`) with
+    1.0 visible at `SLOT="0/2"`; the copied world adds the installed
+    consumers `dev-libs/reinstslotconsumer`
+    (`RDEPEND="dev-libs/reinstslottarget:0/1"`) and
+    `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`), leaving the
+    shared fixture world untouched (the #54 K2/K3 copy pattern). Real
+    3.0.82.2 on the staged hermetic tree (coordinator probe
+    `differential-test-bed/logs/_g210-probe.txt`, run dir
+    `logs/l0-fx-20260927T225534Z`, `FX_WORLD_EXTRA` with both consumers)
+    merges NOTHING on either argv and prints the skipped-update warning
+    for `dev-libs/reinstslottarget:0` listing BOTH consumers' atoms, rc 0.
+
+    The pinned bytes are portuale's own rendering of that shape (one
+    block, bare `USE=""`, no `^` operator markers or root suffixes --
+    the #227 explanation-rendering gap, shared with the blk0 cells -- not
+    real's); the invariant (withhold, rc 0, both atoms named) is real's.
+    """
+    env = _world_extra_env(
+        fixture_env,
+        tmp_path,
+        fixtures_root,
+        "dev-libs/reinstslotconsumer",
+        "dev-libs/reinstslotbound",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--changed-slot", *extra_args, "dev-libs/reinstslottarget"],
+        env,
+    )
+    assert result.returncode == 0, (extra_args, result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/reinstslottarget:0",
+        "",
+        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed) USE=""',
+        "    ",
+        '    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed) USE=""',
+        "    ",
+        "",
+    ], (extra_args, result.stdout)
+    assert result.stderr == "", (extra_args, result.stderr)
+
+
+def test_oracle_210_slot_change_reinstall_ignores_a_noop_argument_consumer(
+    emerge_binary, fixture_env
+):
+    """Backlog #210 round 2 (Q2a): a top-level argument that settles
+    `AlreadyInstalled` is a no-op request, not a digraph node in real, so
+    its recorded pin never constrains the reinstall.
+
+    Same target shape as above but the consumer stays out of `@world`
+    and is passed as an argument instead. Real 3.0.82.2 reinstalls the
+    target silently here (`[ebuild R]`, rc 0 -- the round-1 probe in
+    `g210-report.md` §S0, all three `T C` shapes byte-identical); the
+    constraint only fires once the required-set walk reaches the
+    consumer (the withhold cell above). Before the #210 fix portuale
+    matched real here only because the reinstall filled no constraint
+    source at all; the pin gates this shape stays silent.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--changed-slot",
+            "dev-libs/reinstslottarget",
+            "dev-libs/reinstslotconsumer",
+        ],
+        fixture_env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/reinstslottarget-1.0 [1.0]",
+    ], result.stdout
+
+
 # Backlog #181: live real `emerge -p` text for the upstream
 # test_circular_dependencies pg0 cases (#50 batch 2). The batch-2 CASES
 # check only the exit code; their labels cite the ResolverPlayground
@@ -20111,17 +20849,37 @@ _CYC0_REAL_BLOCKS = {
 
 @pytest.mark.xfail(
     strict=True,
-    reason="backlog #206/#207/#208: live real prints package nodes, blames "
-    "a different package or finds a different suggestion",
+    reason="backlog #207/#208: live real blames a different package or "
+    "finds a different suggestion (#206's node text already ships)",
 )
-@pytest.mark.parametrize("atom", sorted(_CYC0_REAL_BLOCKS))
+@pytest.mark.parametrize(
+    "atom", sorted(a for a in _CYC0_REAL_BLOCKS if a != "=dev-libs/cyc0b-1")
+)
 def test_circular_dependencies_upstream_pg0_real_text(
     emerge_binary, fixture_env, atom
 ):
-    """Real's `_show_circular_deps` block for three of the eight #50
+    """Real's `_show_circular_deps` block for two of the eight #50
     batch-2 circular cases, verbatim from live `emerge -p --color=n`
-    (real depgraph.py:10425; nodes via digraph.debug_print ->
+    (real depgraph.py:10425; nodes via
+    `circular_dependency_handler._prepare_circular_dep_message` ->
     Package.__str__). Exit code 1 already agrees on both sides."""
+    rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    assert rust.returncode == 1
+    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+
+
+def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
+    emerge_binary, fixture_env
+):
+    """Backlog #206: the `=dev-libs/cyc0b-1` third of the block above,
+    now passing — portuale prints real's package-node text
+    (`Package.__str__`: `(cpv:slot/sub::repo, ebuild scheduled for
+    merge)`, no `to '<ROOT>'` suffix under a staged ROOT) for the same
+    cycle and suggestion. Grounded on the #181 evidence captures plus
+    the n206 container probe (stock `localhost/test-portuale:latest`,
+    whose `_show_circular_deps` / node-text / display paths are
+    diff-verified identical to 3rdparty 3.0.82.2)."""
+    atom = "=dev-libs/cyc0b-1"
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr

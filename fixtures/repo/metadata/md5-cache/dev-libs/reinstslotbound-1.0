@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #210 installed consumer with a built slot-operator binding
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/reinstslottarget:=
+SLOT=0
+_md5_=41b596459c68762a3eb8898418b0c152
