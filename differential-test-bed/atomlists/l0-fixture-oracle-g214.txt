@@ -1,0 +1,41 @@
+# #214 — `_slot_conflict_backtrack_abi` (v2 #24e, real
+# `_slot_conflict_backtrack_abi`, depgraph.py:2282): a merge-merge slot
+# conflict whose built, rebuildable parent real rebuilds instead of
+# reporting.
+#
+# Run with
+# `FX_WORLD_EXTRA="app-misc/abicons app-misc/abiforce"`, which appends
+# the two world members to the staged world file (the consumers must
+# stay out of the committed world file, which every other fixture-ROOT
+# test shares -- the same staging pattern as the `whpin`/`r25`/`g210`
+# cells):
+#
+#   FX_WORLD_EXTRA="app-misc/abicons app-misc/abiforce" \
+#     differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g214.txt
+#
+# Shape (S0 probe, this branch -- the single real-Portage probe common
+# rule 13 allows, `podman run ... localhost/test-portuale:latest
+# /probe.sh`, pasted verbatim): `app-misc/abiprov-1` (`SLOT="0/1"`) and
+# `app-misc/abiprov-2` (`SLOT="0/2"`) both merge-bound -- `-1` through
+# installed world member `app-misc/abicons-1`'s recorded
+# `RDEPEND="app-misc/abiprov:0/1="` (its live ebuild carries bare
+# `app-misc/abiprov:=`), `-2` through `app-misc/abiforce-1`'s
+# `RDEPEND=">=app-misc/abiprov-2"` -- while no `abiprov` instance is
+# installed (the committed fixture vdb carries `abicons-1` only). Real's
+# slot-conflict pass finds the built parent's `:=` conflict atom
+# resolvable by the update probe
+# (`_slot_operator_update_probe_slot_conflict`) and rebuilds it
+# (`backtrack: 1/4`, rc 0):
+#
+#   [ebuild  N     ] app-misc/abiprov-2
+#   [ebuild  rR    ] app-misc/abicons-1
+#   [ebuild  N     ] app-misc/abiforce-1
+#
+# plus the `causing rebuilds` block
+# (`(app-misc/abiprov-2:0/2::testrepo, ...) causes rebuilds for:
+# (app-misc/abicons-1:0/0::testrepo, ...)`). No `abiprov-1` row, no
+# slot-conflict notice. (The `to <ROOT>/` suffix on some rows is the
+# bed's ROOT display, normalised by the comparator.)
+# Pre-#214 portuale reports the `app-misc/abiprov:0` slot conflict
+# (rc 1).
+--update --deep --backtrack 4 @world
