@@ -1,0 +1,23 @@
+# #213 — `prune_rebuilds` (v2 #24d): a slot-operator replace set meeting
+# missed updates restarts with `config["prune_rebuilds"]`
+# (real `_resolve`, depgraph.py:5763-5780).
+# Run with FX_PRUNE_VDB=1 (stage.sh installs the fragment: installed
+# pprov-1 0/1 + pcons-1 bound to `>=app-misc/pprov-1:0/1=`, real's own
+# versioned built-atom shape; tree pprov-2 0/2 is the subslot-bump
+# target, both ebuilds EAPI 8).
+#
+# Shape (S0 probe, this branch): `emerge -uD` over the provider, the
+# consumer and the dev-libs/btparent conflict trio. Real's same-slot
+# update probe (`_slot_operator_update_probe`, depgraph.py:2576)
+# schedules the pcons-1 rebuild (`slot_operator_replace_installed`),
+# while the solved bttarget slot conflict leaves backtrack masks behind
+# (`_get_missed_updates`, depgraph.py:1529 non-empty). The prune restart
+# then clears the replace set and re-resolves: the rebuilds come back
+# (genuine ABI rebuilds — the re-walk re-schedules them and
+# `_eliminate_rebuilds` keeps them), so the merge list is unchanged but
+# the run takes two extra passes (exact `backtrack: N/M` counts in the
+# S0 probe, pasted in the g213 report). The bed comparator does not
+# read the backtrack-count line, so this cell locks the rows/warnings
+# while the contract pin (`test_oracle_prune_rebuilds_restart_adds_passes`)
+# pins the count.
+-uDvN app-misc/pprov app-misc/pcons dev-libs/btparent
