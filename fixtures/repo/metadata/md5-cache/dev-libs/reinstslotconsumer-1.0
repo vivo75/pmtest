@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #210 installed consumer pinning the old sub-slot
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/reinstslottarget:0/1
+SLOT=0
+_md5_=1a8732926df07f444b6ebf678d4cd54a

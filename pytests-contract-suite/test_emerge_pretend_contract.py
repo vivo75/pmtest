@@ -20686,6 +20686,93 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
         ], (extra, result.stdout)
 
 
+@pytest.mark.parametrize(
+    "extra_args", [[], ["--update", "--deep"]], ids=["changed-slot", "changed-slot-update-deep"]
+)
+def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
+    emerge_binary, fixture_env, tmp_path, fixtures_root, extra_args
+):
+    """Backlog #210 round 2: a same-version sub-slot change without a
+    revbump counts as a version change -- the reinstall is withheld, not
+    merged, when world-reachable installed consumers pin the old slot.
+
+    `dev-libs/reinstslottarget` is installed at 1.0 (`SLOT="0/1"`) with
+    1.0 visible at `SLOT="0/2"`; the copied world adds the installed
+    consumers `dev-libs/reinstslotconsumer`
+    (`RDEPEND="dev-libs/reinstslottarget:0/1"`) and
+    `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`), leaving the
+    shared fixture world untouched (the #54 K2/K3 copy pattern). Real
+    3.0.82.2 on the staged hermetic tree (coordinator probe
+    `differential-test-bed/logs/_g210-probe.txt`, run dir
+    `logs/l0-fx-20260927T225534Z`, `FX_WORLD_EXTRA` with both consumers)
+    merges NOTHING on either argv and prints the skipped-update warning
+    for `dev-libs/reinstslottarget:0` listing BOTH consumers' atoms, rc 0.
+
+    The pinned bytes are portuale's own rendering of that shape (one
+    block, bare `USE=""`, no `^` operator markers or root suffixes --
+    the #227 explanation-rendering gap, shared with the blk0 cells -- not
+    real's); the invariant (withhold, rc 0, both atoms named) is real's.
+    """
+    env = _world_extra_env(
+        fixture_env,
+        tmp_path,
+        fixtures_root,
+        "dev-libs/reinstslotconsumer",
+        "dev-libs/reinstslotbound",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--changed-slot", *extra_args, "dev-libs/reinstslottarget"],
+        env,
+    )
+    assert result.returncode == 0, (extra_args, result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/reinstslottarget:0",
+        "",
+        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed) USE=""',
+        "    ",
+        '    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed) USE=""',
+        "    ",
+        "",
+    ], (extra_args, result.stdout)
+    assert result.stderr == "", (extra_args, result.stderr)
+
+
+def test_oracle_210_slot_change_reinstall_ignores_a_noop_argument_consumer(
+    emerge_binary, fixture_env
+):
+    """Backlog #210 round 2 (Q2a): a top-level argument that settles
+    `AlreadyInstalled` is a no-op request, not a digraph node in real, so
+    its recorded pin never constrains the reinstall.
+
+    Same target shape as above but the consumer stays out of `@world`
+    and is passed as an argument instead. Real 3.0.82.2 reinstalls the
+    target silently here (`[ebuild R]`, rc 0 -- the round-1 probe in
+    `g210-report.md` §S0, all three `T C` shapes byte-identical); the
+    constraint only fires once the required-set walk reaches the
+    consumer (the withhold cell above). Before the #210 fix portuale
+    matched real here only because the reinstall filled no constraint
+    source at all; the pin gates this shape stays silent.
+    """
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--changed-slot",
+            "dev-libs/reinstslottarget",
+            "dev-libs/reinstslotconsumer",
+        ],
+        fixture_env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/reinstslottarget-1.0 [1.0]",
+    ], result.stdout
+
+
 # Backlog #181: live real `emerge -p` text for the upstream
 # test_circular_dependencies pg0 cases (#50 batch 2). The batch-2 CASES
 # check only the exit code; their labels cite the ResolverPlayground
