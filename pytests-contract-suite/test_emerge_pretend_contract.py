@@ -985,6 +985,11 @@ CASES = [
         1,
     ),
     (
+        "use-conditional: a USE-conditional-only || group that reduces to empty fails at EAPI 7+ (#238: rc 1 like real)",
+        ["--pretend", "dev-libs/condanyof"],
+        1,
+    ),
+    (
         "recursion: || ( foo:1 foo:2 ) ties at the Installed bin -- in-bin ordering promotes the upgrade slot over the first-listed one",
         ["--pretend", "-D", "dev-libs/orupgrade"],
         0,
@@ -21600,6 +21605,39 @@ def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+
+
+def test_or_group_emptied_by_use_conditionals_fails_at_eapi7(
+    emerge_binary, fixture_env
+):
+    """Backlog #238 (upstream `test_eapi` pg1 `=dev-libs/C-2`, EAPI 8):
+    `dev-libs/condanyof` carries `IUSE="emptyanyof"` with
+    `RDEPEND="|| ( emptyanyof? ( dev-libs/condanyofdep ) )"`, and no
+    profile enables `emptyanyof`, so the `||` group reduces to empty.
+    Real `use_reduce` (`lib/portage/dep/__init__.py:864-869`,
+    `empty_groups_always_true` false at EAPI 7+, `eapi.py:295`)
+    substitutes the unsatisfiable atom `__const__/empty-any-of`, and
+    real 3.0.82.2 on the staged fixture tree (S0 probe, `probe.log`:
+    `emerge -p --color=n dev-libs/condanyof`) exits 1 with
+    `emerge: there are no ebuilds to satisfy "__const__/empty-any-of"
+    for <ROOT>.` plus the `condanyof-1.0::testrepo` [ebuild] and
+    `condanyof` [argument] required-by lines. Before the fix portuale's
+    resolver path (`use_reduce_flat_disjunctive`) ranked the emptied
+    alternative vacuously satisfiable and merged the package bare
+    (rc 0, the 2026-09-28 probe in the entry); now the placeholder
+    flows through as an ordinary unsatisfiable dep and aborts like
+    real. The staging `for <root>.` suffix stays portuale-absent (the
+    fixture-miss-message-unsuffixed convention); everything else is
+    real's text byte-for-byte."""
+    args = ["--pretend", "dev-libs/condanyof"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    assert rust.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "__const__/empty-any-of".',
+        '(dependency required by "dev-libs/condanyof-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/condanyof" [argument])',
+    ]
 
 
 _G216_SELF_BLOCK = (

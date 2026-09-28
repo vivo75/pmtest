@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: a USE-conditional-only || group that reduces to empty must fail at EAPI 7+ (backlog #238)
+EAPI=8
+IUSE=emptyanyof
+KEYWORDS=amd64
+RDEPEND=|| ( emptyanyof? ( dev-libs/condanyofdep ) )
+SLOT=0
+_md5_=5ba01a6d019d095cc849f5591bd8d476

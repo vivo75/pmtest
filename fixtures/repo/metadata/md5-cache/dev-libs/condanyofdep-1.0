@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: the dep inside #238's emptied USE-conditional || group
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=52a0888ee7c0465972a7e2814ccdff06
