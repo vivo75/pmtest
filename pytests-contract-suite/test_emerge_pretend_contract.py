@@ -19514,6 +19514,55 @@ def test_oracle_slotop_conflict_rebuild(
     assert not [ln for ln in merges if "app-misc/A-2" in ln or "app-misc/B-0" in ln]
 
 
+def test_oracle_slot_conflict_abi_rebuilds_the_built_parent(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #214 (v2 #24e): real `_slot_conflict_backtrack_abi`
+    (`3rdparty/portage/lib/_emerge/depgraph.py:2282`) rebuilds a built
+    parent whose soname/`:=` conflict atom the update probe can resolve,
+    instead of reporting the slot conflict. Shape: `abiprov-1` (`0/1`)
+    and `abiprov-2` (`0/2`) both merge-bound -- `-1` through installed
+    world member `abicons-1`'s recorded `RDEPEND="app-misc/abiprov:0/1="`
+    (its live ebuild carries bare `app-misc/abiprov:=`), `-2` through
+    `abiforce-1`'s `RDEPEND=">=app-misc/abiprov-2"` -- while no `abiprov`
+    instance is installed. Real merges `[abiprov-2, abicons-1, abiforce-1]`
+    with `abicons-1` as `rR` plus the `causing rebuilds` block
+    (`backtrack: 1/4`, rc 0; verified in the one fixture-oracle-container
+    probe the #214 S0 slice ran, oracled from now on by
+    `l0-fixture-oracle-g214.txt`). MATCHES real since #214 S1: the
+    conflict-fired probe schedules the installed `:=` parent for rebuild
+    (same `slot_operator_replace_installed` scheduling as #211) and the
+    conflict record dissolves on the re-resolve. The `EAPI` file keeps
+    the probe registration faithful (see the conflict-mass pin)."""
+    root = _b1_root(
+        tmp_path,
+        ["app-misc/abicons", "app-misc/abiforce"],
+        [
+            (
+                "app-misc",
+                "abicons",
+                "1",
+                "0",
+                {"EAPI": "8", "RDEPEND": "app-misc/abiprov:0/1="},
+            ),
+        ],
+    )
+    rust = _b1_run(
+        ["--pretend", "--update", "--deep", "--backtrack", "4", "@world"],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    merges = _b1_merges(rust.stdout)
+    assert [
+        ln for ln in merges if "app-misc/abiprov" in ln or "app-misc/abicons" in ln or "app-misc/abiforce" in ln
+    ] == [
+        "[ebuild  N     ] app-misc/abiprov-2 ",
+        "[ebuild  rR    ] app-misc/abicons-1 ",
+        "[ebuild  N     ] app-misc/abiforce-1 ",
+    ]
+    assert "The following packages are causing rebuilds:" in rust.stdout
+
+
 def test_oracle_slotop_conflict_mass_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
