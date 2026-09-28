@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=213 prune_rebuilds fixture: installed consumer bound to the provider's 0/1
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/pprov:=
+SLOT=0
+_md5_=b4eb0b887be76b7b3e01b553f8715d8b

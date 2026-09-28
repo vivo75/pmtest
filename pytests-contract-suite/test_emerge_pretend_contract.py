@@ -19719,6 +19719,91 @@ def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     }
 
 
+def test_oracle_prune_rebuilds_restart_adds_passes(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#213 (v2 #24d): a slot-operator replace set meeting missed updates
+    restarts with `config["prune_rebuilds"]` (real `_resolve`,
+    `depgraph.py:5763-5780`). Installed `pprov-1` (`0/1`) + `pcons-1`
+    bound `>=app-misc/pprov-1:0/1=` (real's recorded form; the live
+    ebuild carries bare `:=`); the tree holds `pprov-2` (`0/2`, the
+    subslot-bump target). Real's same-slot update probe
+    (`_slot_operator_update_probe`, `depgraph.py:2576`) schedules the
+    `pcons-1` rebuild, while the solved `dev-libs/btparent` trio
+    (backtracking masks `bttarget-2.0`) leaves missed updates behind
+    (`_get_missed_updates`, `depgraph.py:1529`). The prune restart
+    clears the replace set and re-resolves: both rebuilds come back
+    (genuine ABI rebuilds -- the re-walk re-schedules them and
+    `_eliminate_rebuilds` keeps them), so the merge list is unchanged
+    but the run takes two extra passes. MATCHES real since #213: the
+    one allowed S0 probe (single `podman run --entrypoint /bin/bash
+    localhost/test-portuale:latest` [the image's portage is 3.0.81.3; a
+    vendored 3.0.82.2 ResolverPlayground run agrees on the rows], the staged
+    fixture tree with `FX_PRUNE_VDB=1`, argv `emerge -p --color=n -uDvN
+    app-misc/pprov app-misc/pcons dev-libs/btparent`) prints the same
+    six rows (`[ebuild N] bttarget-1.0`, `[ebuild r U] pprov-2`,
+    `[ebuild N] btconsumer-1.0`, `[ebuild N] btpin-1.0`, `[ebuild rR]
+    pcons-1`, `[ebuild N] btparent-1.0`), the same skipped-update
+    `WARNING` + `!!!` tail, the same `causing rebuilds` block
+    (`pprov-2` rebuilds `pcons-1`), rc 0 -- and `Dependency resolution
+    took 0.41 s (backtrack: 7/20).` Portuale prints no timing line
+    under `--pretend`, so the count is pinned through `--json`
+    (`backtrack.restarts == 7`); without the prune the same run
+    settles after 5 restarts. The `EAPI` files keep the probe
+    registration faithful (see the conflict-mass pin)."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    args = [
+        "--pretend",
+        "--backtrack",
+        "20",
+        "--update",
+        "--deep",
+        "app-misc/pprov",
+        "app-misc/pcons",
+        "dev-libs/btparent",
+    ]
+    rust = _b1_run(args, _b1_env(fixture_env, root), emerge_binary)
+    assert _b1_merges(rust.stdout) == [
+        "[ebuild  N     ] dev-libs/bttarget-1.0 ",
+        "[ebuild  r  U  ] app-misc/pprov-2 [1]",
+        "[ebuild  N     ] dev-libs/btconsumer-1.0 ",
+        "[ebuild  N     ] dev-libs/btpin-1.0 ",
+        "[ebuild  rR    ] app-misc/pcons-1 ",
+        "[ebuild  N     ] dev-libs/btparent-1.0 ",
+    ]
+    assert "WARNING: One or more updates/rebuilds have been skipped" in rust.stdout
+    assert "dev-libs/btconsumer:0" in rust.stdout
+    assert (
+        f"(app-misc/pprov-2:0/2::testrepo, ebuild scheduled for merge to '{root}')"
+        in rust.stdout
+    )
+    assert (
+        f"(app-misc/pcons-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+        in rust.stdout
+    )
+    js = _b1_run(
+        ["--pretend", "--json", *args[1:]],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    report = json.loads(js.stdout)
+    assert report["backtrack"] == {"restarts": 7, "max": 20}
+    by_cp = {(e["category"], e["package"]): e for e in report["entries"]}
+    assert by_cp[("app-misc", "pcons")]["outcome"] == "reinstall"
+    assert by_cp[("app-misc", "pcons")]["slot_operator_rebuild"] is True
+    assert by_cp[("app-misc", "pprov")]["outcome"] == "upgrade"
+
+
 def test_oracle_slotop_required_use(
     emerge_binary, fixture_env, tmp_path
 ):
