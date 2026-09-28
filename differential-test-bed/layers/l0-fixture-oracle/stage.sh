@@ -181,6 +181,17 @@ if [ "${FX_SLOTOP_BDEP:-}" = 1 ]; then
   cat "$HERE/slotop-bdeps/world" >> "$FX/var/lib/portage/world"
 fi
 
+# 13. FX_PRUNE_VDB=1 (#213 S0): install the prune_rebuilds pair --
+#     pprov-1.0 (sub-slot 0/1, upgraded to 2.0/0/2 in the tree) plus the
+#     installed consumer pcons-1.0 bound to `>=app-misc/pprov-1:0/1=`
+#     (real's own versioned built-atom shape, as in §12). The fragment
+#     lives outside the shared fixture vdb so the standard runs are
+#     untouched. No world change: the g213 cell passes explicit atoms.
+if [ "${FX_PRUNE_VDB:-}" = 1 ]; then
+  HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  cp -r "$HERE/g213prune/vdb/." "$FX/var/db/pkg/"
+fi
+
 # 4. one EBUILD record per staged ebuild (all versions in one Manifest)
 python3 - "$FX" <<'PY'
 import hashlib

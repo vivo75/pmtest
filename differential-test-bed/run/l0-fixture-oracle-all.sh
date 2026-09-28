@@ -1,13 +1,13 @@
 #!/bin/bash
-# L0 fixture-oracle bed, all ten atomlists in sequence (backlog #87).
+# L0 fixture-oracle bed, all eleven atomlists in sequence (backlog #87).
 #
-# There are ten lists today (`atomlists/l0-fixture-oracle{,-host,-rdcpin,
-# -slotop,-whpin,-r25,-g210,-g212,-g214,-g216}.txt`) and three env knobs (`FX_SLOTOP_BDEP`, `FX_WORLD_EXTRA`,
-# `FX_HOST_ROOTS`, declared at `run/l0-fixture-oracle.sh`'s call site and
+# There are eleven lists today (`atomlists/l0-fixture-oracle{,-host,-rdcpin,
+# -slotop,-whpin,-r25,-g210,-g212,-g213,-g214,-g216}.txt`) and four env knobs (`FX_SLOTOP_BDEP`, `FX_WORLD_EXTRA`,
+# `FX_HOST_ROOTS`, `FX_PRUNE_VDB`, declared at `run/l0-fixture-oracle.sh`'s call site and
 # `layers/l0-fixture-oracle/in-container.sh:84`), and only the first list
 # runs by default -- so #76 B3's and #79 D1's permanent cells are
 # exercised only when a human remembers the exact `FX_*` invocation.
-# This runner closes that gap: it runs all ten lists with their
+# This runner closes that gap: it runs all eleven lists with their
 # documented knobs, one after the other, and reports a combined rc.
 # Everything after #87 in the Tier 2 close-out uses this as the standard
 # bed step.
@@ -32,6 +32,7 @@ LISTS=(
   "l0-fixture-oracle-r25.txt|FX_WORLD_EXTRA=dev-libs/r25consumer"
   "l0-fixture-oracle-g210.txt|FX_WORLD_EXTRA='dev-libs/reinstslotconsumer dev-libs/reinstslotbound'"
   "l0-fixture-oracle-g212.txt|"
+  "l0-fixture-oracle-g213.txt|FX_PRUNE_VDB=1"
   "l0-fixture-oracle-g214.txt|FX_WORLD_EXTRA='app-misc/abicons app-misc/abiforce'"
   "l0-fixture-oracle-g216.txt|FX_HOST_ROOTS=1"
 )

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=213 prune_rebuilds fixture: provider, slot 0/2 (subslot-bump target)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=938988943c8a6c90aae96dd9424a29f2
