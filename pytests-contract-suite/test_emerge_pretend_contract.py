@@ -5962,8 +5962,8 @@ def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
     whose `C[x]` the change satisfies, not `abk0a-3`'s plain `C`).
     Known delta vs the probe, documented: no `[1]` oldbest bracket on
     the `R` row (real shows one via the vdb-repo-mismatch disjunct,
-    `output.py:721-727`, which portuale deliberately cuts -- see
-    `resolve_pretend`'s `myoldbest` comment)."""
+    `lib/_emerge/resolver/output.py:720-731`, which portuale
+    deliberately cuts -- see `resolve_pretend`'s `myoldbest` comment)."""
     args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -17844,8 +17844,10 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     real's deterministic miss mapping from that mask state (slot mask
     -> `WARNING` row for `btra-2` with `btrd-1`'s bound; missing-dep
     mask whose `>=btra-2` still names the backtrack-masked `btra-2` ->
-    abbreviated tail for `btrc:0`); their verbatim text beyond the
-    oracle is recorded as observed. (Before #198 portuale upgraded
+    abbreviated tail for `btrc:0`); the notice block is pinned
+    verbatim below. Merge lines stay filtered (not verbatim): they
+    track the shared fixture world file, so an unrelated world change
+    must not break this cell. (Before #198 portuale upgraded
     both and reported the residual slot conflict, rc 1.)"""
     root = _b1_root(
         tmp_path,
@@ -17866,10 +17868,26 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     merges = _b1_merges(rust.stdout)
     assert not any("dev-libs/btra" in ln for ln in merges), merges
     assert not any("dev-libs/btrc" in ln for ln in merges), merges
-    assert "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:" in rust.stdout
-    assert "dev-libs/btra:0" in rust.stdout
-    assert "!!! The following update(s) have been skipped due to unsatisfied dependencies" in rust.stdout
-    assert "dev-libs/btrc:0" in rust.stdout
+    lines = rust.stdout.splitlines()
+    at = lines.index(
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:"
+    )
+    assert lines[at:] == [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/btra:0",
+        "",
+        '  (dev-libs/btra-2:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
+        '    <dev-libs/btra-2 required by (dev-libs/btrd-1:0/0::testrepo, installed) USE=""',
+        "    ^              ^",
+        "",
+        "",
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies",
+        "!!! triggered by backtracking:",
+        "",
+        "dev-libs/btrc:0",
+    ]
+    assert rust.stderr == ""
 
 
 def test_oracle_no_aggressive_downgrade(
