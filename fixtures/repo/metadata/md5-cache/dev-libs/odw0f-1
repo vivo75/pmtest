@@ -1,0 +1,6 @@
+EAPI=8
+DESCRIPTION=fixture package: #194 BDEPEND leaf
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=751833ba5a6cd5cc9f44b83dd07fa6bb
