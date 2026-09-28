@@ -4954,7 +4954,12 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
     masked version higher than the chosen one -- the 42 script's
     row-only filter never captured this block, but the mergelist it
     verifies proves the mask this notice reads). No abbreviated tail:
-    no missing-dependency mask survives on this path."""
+    no missing-dependency mask survives on this path.
+
+    Backlog #230: both lines render real's full `pkg_use_display`
+    (`_emerge/UseFlagDisplay.py:55`) -- orbttool/orbtblocked are EAPI 8
+    with no IUSE, so the profile globals mask out and only the implicit
+    `ELIBC="glibc"` group survives (`USE="" ELIBC="glibc"`)."""
     ok = _run([str(emerge_binary)], ["--pretend", "dev-libs/orbtblocked"], fixture_env)
     assert ok.returncode == 0
     assert ok.stdout.splitlines() == [
@@ -4965,8 +4970,8 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
         "",
         "dev-libs/orbttool:0",
         "",
-        '  (dev-libs/orbttool-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    =dev-libs/orbttool-1.0 required by (dev-libs/orbtblocked-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/orbttool-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    =dev-libs/orbttool-1.0 required by (dev-libs/orbtblocked-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^                  ^^^",
         "",
     ]
@@ -9606,9 +9611,22 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     with both parents (`<dev-libs/blk0x-2`/blk0b,
     `<dev-libs/blk0x-3`/blk0c) inside it — real's one-entry-per-slot
     rule (`_get_missed_updates`), pinned here by #129 (which resolves
-    #142's divergence for this order). The expectation below matches
-    real's shape modulo the established `USE=""` / missing-ROOT-suffix
-    normalisation this pin already applies.
+    #142's divergence for this order).
+
+    Backlog #230: every line renders real's full `pkg_use_display`
+    (`_emerge/UseFlagDisplay.py:55`). The blk0 ebuilds are pre-EAPI-5
+    with no IUSE, so the profile globals mask out and the forced flags
+    survive: `USE="(globalforceflag) (stableforceflag)"` (fixture
+    `use.force` + stable `use.stable.force`, both enabled). The bed's
+    own real lines show the same `(globalforceflag)` wrap on the
+    parents; real's missed line instead shows the container running-root
+    profile (`USE="(test-rust)" ABI_X86="(64)" ...`) because pre-EAPI-7
+    `DEPEND` resolves against the host-config `/` tree
+    (`depgraph.py:4224-4226`) -- a second config portuale deliberately
+    does not model, so the missed line's fixture-tree display is the
+    pinned shape. Merge-scheduled nodes and headers stay bare (no
+    `to '<root>'` / `for <root>`), following the slot-collision notice
+    per #230's directive.
     """
     env = dict(fixture_env)
     uninstall_rows = [
@@ -9620,8 +9638,8 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
         return [
             "dev-libs/blk0x:0",
             "",
-            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
-            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"\"",
+            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"(globalforceflag) (stableforceflag)\" conflicts with",
+            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"(globalforceflag) (stableforceflag)\"",
             "    ^               ^",
             "",
         ]
@@ -9639,10 +9657,10 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     warn_x3_bc = [
         "dev-libs/blk0x:0",
         "",
-        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="(globalforceflag) (stableforceflag)" conflicts with',
+        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE="(globalforceflag) (stableforceflag)"',
         "    ^               ^",
-        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE="(globalforceflag) (stableforceflag)"',
         "    ^               ^",
         "",
     ]
@@ -10882,7 +10900,12 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
     (`bttarget-2.0` vs `<bttarget-2.0`/`btpin-1.0`) plus the abbreviated
     unsatisfied-dependencies tail (`btconsumer:0`, whose
     `>=bttarget-2.0` still matches the backtrack-masked `bttarget-2.0`
-    at settle time -- real's `check_backtrack` probe raises)."""
+    at settle time -- real's `check_backtrack` probe raises).
+
+    Backlog #230: the `WARNING` lines render real's full
+    `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- bttarget/btpin
+    are EAPI 8 with no IUSE, so the globals mask out and only the
+    implicit `ELIBC="glibc"` group survives."""
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     assert r.returncode == 0
@@ -10895,8 +10918,8 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         "",
         "dev-libs/bttarget:0",
         "",
-        '  (dev-libs/bttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    <dev-libs/bttarget-2.0 required by (dev-libs/btpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/bttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    <dev-libs/bttarget-2.0 required by (dev-libs/btpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^                  ^^^",
         "",
         "",
@@ -17524,9 +17547,16 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
     settled backtrack trial state (`GraphResult::skipped_updates`),
     plus the abbreviated unsatisfied-dependencies tail (`mgxb:0`,
     `mgfb:0`). Full stdout pinned (rc 0). Modulo portuale's
-    established display cuts (no `to '<ROOT>'` suffixes, bare `USE=""`
-    where real shows the profile `ELIBC="glibc"`/`ABI_X86="(64)"`
-    USE_EXPAND groups -- same cut as the #90 skip pin)."""
+    established display cuts (no `to '<ROOT>'` suffixes; the missed
+    lines show the fixture-tree USE display where the bed's real shows
+    the container running-root profile's `ABI_X86="(64)"` group -- the
+    unmodelled second config, same cut as the #90 skip pin -- while the
+    parent lines match real byte-for-byte at `USE="" ELIBC="glibc"`).
+
+    Backlog #230: the `WARNING` lines render real's full
+    `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- mgxc/mgxa and
+    mgfc/mgfa are EAPI 8 with no IUSE, so the globals mask out and only
+    the implicit `ELIBC="glibc"` group survives."""
     rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/mg2top"], fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
@@ -17543,14 +17573,14 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
         "",
         "dev-libs/mgxc:0",
         "",
-        '  (dev-libs/mgxc-2:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    =dev-libs/mgxc-1 required by (dev-libs/mgxa-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/mgxc-2:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    =dev-libs/mgxc-1 required by (dev-libs/mgxa-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^              ^",
         "",
         "dev-libs/mgfc:0",
         "",
-        '  (dev-libs/mgfc-3.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    =dev-libs/mgfc-1 required by (dev-libs/mgfa-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/mgfc-3.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    =dev-libs/mgfc-1 required by (dev-libs/mgfa-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^              ^",
         "",
         "",
@@ -20458,6 +20488,13 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     the operator + version `^` spans. The forward order stays silent
     (S1 reuse, pinned by the CASES entry above); the unsolvable twin
     keeps its block + rc 1.
+
+    Backlog #230: the `WARNING` lines render real's full
+    `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- target and
+    oldconsumer are EAPI 8 with no IUSE, so the globals mask out and
+    only the implicit `ELIBC="glibc"` group survives (this revises the
+    older "ELIBC omitted" cut note above: the parent and missed lines
+    both show it now; only the `ROOT=$FX` suffixes stay cut).
     """
     for extra in ([], ["--backtrack=0"]):
         result = _run(
@@ -20479,8 +20516,8 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
             "",
             "dev-libs/slotconflicttarget:0",
             "",
-            "  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
-            "    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\"",
+            "  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with",
+            "    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\"",
             "    ^                            ^^^",
             "",
         ], (extra, result.stdout)

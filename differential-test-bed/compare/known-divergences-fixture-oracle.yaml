@@ -105,21 +105,6 @@
     the slot-operator update probe #211; batch-2026-09-27 B13).
   owner: portuale-bug
 
-- id: skipped-updates-use-display
-  category: skipped-updates
-  slugs:
-    - "--backtrack_0_dev-libs_blk0a_dev-libs_blk0b_dev-libs_blk0c"
-    - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0a_dev-libs_blk0c"
-    - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0c_dev-libs_blk0a"
-    - "--backtrack_0_dev-libs_blk0c_dev-libs_blk0b_dev-libs_blk0a"
-  match: "skipped-update explanation differs"
-  reason: >
-    Same skipped packages on both sides; real renders each package's
-    `pkg_use_display` (USE plus USE_EXPAND groups) and ` to '<root>'` on
-    the block's lines, portuale prints `USE=""` and no root suffix.
-    Backlog #230.
-  owner: portuale-bug
-
 - id: slotop-world-complete-graph-order
   category: order
   slugs:
