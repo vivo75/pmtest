@@ -684,14 +684,34 @@ CASES = [
         1,
     ),
     (
+        "circular: upstream test_circular_choices pg1 cmake backtracks to bootstrap like real (rc 0; bug 703440, pinned below)",
+        ["--pretend", "dev-libs/ccd1c"],
+        0,
+    ),
+    (
         "circular: upstream test_circular_choices pg3 cmake via virtual USE pulls bootstrap like real (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd3c"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg5 icedtea merges like real (rc 0; real pulls -bin first, not pinned)",
+        "circular: upstream test_circular_choices pg4 pypy backtracks to -bin like real (rc 0; bug 705986, pinned below)",
+        ["--pretend", "dev-libs/ccd4a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg4 pypy --backtrack=0 fails like real (rc 1; bug 705986 circular, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd4a"],
+        1,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea pulls -bin like real (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd5a"],
         0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg5 icedtea --backtrack=0 fails like real (rc 1; runtime-closing ring, not pinned)",
+        ["--pretend", "--backtrack=0", "dev-libs/ccd5a"],
+        1,
     ),
     (
         "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like real (rc 0; pinned below)",
@@ -9613,12 +9633,11 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned. Not pinned: pg1's
     `--backtrack=0` cell (rc 1 matches real but the circular-error
-    text is unverified vs real), pg1's default-backtrack cell and
-    pg4 (portuale reports a circular error where real adjusts the
-    `||` preference — findings, no CASES), pg5 (rc 0 matches but
-    portuale merges [ccd5v, ccd5a] where real pulls ccd5b/-bin
-    first — finding, CASES only), and the pg2 `--depclean` cell
-    (needs a shared world entry).
+    text is unverified vs real) and the pg2 `--depclean` cell (needs
+    a shared world entry). pg1's default-backtrack cell, pg4 and pg5
+    are pinned in `test_upstream_circular_choices_pg145_pins_mergelists`
+    since #221 (backtracking switches to the cycle-breaking `||`
+    branch like real).
     """
     env = dict(fixture_env)
     cases = [
@@ -9636,6 +9655,59 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
                 '[ebuild  N     ] virtual/ccd3v-0  USE="bootstrap"',
                 "[ebuild  N     ] dev-libs/ccd3a-1.9.2 ",
                 "[ebuild  N     ] dev-libs/ccd3c-3.16.2 ",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_upstream_circular_choices_pg145_pins_mergelists(emerge_binary, fixture_env):
+    """Upstream `test_circular_choices.py` pg1
+    (`::testCircularJsoncppCmakeBootstrapOrDeps`, bug 703440), pg4
+    (`::testCircularPypyExe`, bug 705986) and pg5
+    (`::testDirectVirtualCircularDependency`), bulk-translated for #50
+    batch 7 (`dev-libs/ccd1{a,b,c}`, `dev-libs/ccd4{a,b,c}`,
+    `dev-libs/ccd5{a,b}` + `virtual/ccd5v`; oracle
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `ResolverPlayground`, not the source literal).
+
+    Each cell's first pass picks the in-graph `||` branch and strands
+    the merge-order walk on a cycle; since #221 portuale records the
+    cycle and backtracks to the branch that breaks it, merging the
+    oracle's exact set in the oracle's exact order with no warnings
+    and empty stderr, so the exact rows are pinned: pg1
+    `[ccd1b, ccd1a, ccd1c]` (real `[cmake-bootstrap, jsoncpp,
+    cmake]`), pg4 `[ccd4c, ccd4a]` (real `[pypy-exe-bin, pypy]`, no
+    `+low-memory` suggestion), pg5 `[ccd5b, ccd5v, ccd5a]` (real
+    `[icedtea6-bin, jdk, icedtea]`).
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["dev-libs/ccd1c"],
+            [
+                "[ebuild  N     ] dev-libs/ccd1b-3.16.2 ",
+                "[ebuild  N     ] dev-libs/ccd1a-1.9.2 ",
+                "[ebuild  N     ] dev-libs/ccd1c-3.16.2 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd4a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd4c-7.3.0 ",
+                "[ebuild  N     ] dev-libs/ccd4a-7.3.0 ",
+            ],
+        ),
+        (
+            ["dev-libs/ccd5a"],
+            [
+                "[ebuild  N     ] dev-libs/ccd5b-1.10.3 ",
+                "[ebuild  N     ] virtual/ccd5v-1.6.0 ",
+                "[ebuild  N     ] dev-libs/ccd5a-6.1.10.3 ",
             ],
         ),
     ]
