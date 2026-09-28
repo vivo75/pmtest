@@ -1,4 +1,4 @@
-EAPI=4
+EAPI=8
 DESCRIPTION="fixture package: upstream test_circular_dependencies pg0 app-misc/A-2 (bulk #50)"
 SLOT="0"
 KEYWORDS="amd64"

@@ -1,4 +1,4 @@
-EAPI=5
+EAPI=8
 DESCRIPTION="fixture package: upstream test_autounmask_use_breakage pg0 app-misc/B-0 (bulk #50)"
 SLOT="0"
 KEYWORDS="amd64"

@@ -1,7 +1,0 @@
-EAPI=0
-DESCRIPTION=fixture package: upstream test_eapi.py pg1 dev-libs/A-3.0 (bulk #50)
-KEYWORDS=amd64
-SLOT=0
-DEPEND=dev-libs/epi1b[foo]
-DEFINED_PHASES=-
-_md5_=913d46afd3385853a4f47b7a5292b220
