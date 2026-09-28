@@ -695,6 +695,26 @@ CASES = [
         1,
     ),
     (
+        "or-pick: in-graph || self branch re-resolves to bootstrap like real (rc 0; #216, pinned below)",
+        ["--pretend", "app-misc/g216top"],
+        0,
+    ),
+    (
+        "or-pick: in-graph || self branch re-resolves to bootstrap like real, direct target (rc 0; #216, pinned below)",
+        ["--pretend", "dev-lang/g216comp"],
+        0,
+    ),
+    (
+        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like real (rc 1; #216, pinned below)",
+        ["--pretend", "--backtrack=0", "app-misc/g216top"],
+        1,
+    ),
+    (
+        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like real, direct target (rc 1; #216, pinned below)",
+        ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
+        1,
+    ),
+    (
         "circular: upstream test_circular_choices pg3 cmake via virtual USE pulls bootstrap like real (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd3c"],
         0,
@@ -21529,3 +21549,93 @@ def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+
+
+_G216_SELF_BLOCK = (
+    "(dev-lang/g216comp-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+    " (dev-lang/g216comp-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+)
+
+
+def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
+    emerge_binary, fixture_env
+):
+    """Backlog #216: `app-misc/g216top` merges
+    `[g216boot, g216comp, g216mid, g216top]`, rc 0. Real's pass 1 keeps
+    the in-graph `>=dev-lang/g216comp-1.0` branch of `g216comp`'s
+    `BDEPEND=|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )` live
+    (`dep_zapdeps` `preferred_in_graph`, `dep_check.py`), dead-ends on
+    the self cycle (`_serialize_tasks`, `depgraph.py:10262`), and
+    re-resolves with the `circular_dependency` map to `g216boot`
+    (`backtrack: 1/20`, rc 0) -- the S0 container probe
+    (`/tmp/opencode/g216/probe.log`, real 3.0.81.3) shows exactly this
+    merge list. MATCHES real since #216: the `circular_self` bolt-on
+    now only fires when the self atom matches nothing in-graph, and the
+    serialize dead-end feeds a `circular_dependency` retry."""
+    rust = _run([str(emerge_binary)], ["--pretend", "app-misc/g216top"], fixture_env)
+    assert rust.returncode == 0
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+    assert rows == [
+        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        "[ebuild  N     ] dev-lang/g216comp-1.0 ",
+        "[ebuild  N     ] dev-libs/g216mid-1.0 ",
+        "[ebuild  N     ] app-misc/g216top-1.0 ",
+    ]
+
+
+def test_or_pick_backtrack0_reports_the_self_cycle(
+    emerge_binary, fixture_env
+):
+    """Backlog #216: `app-misc/g216top --backtrack=0` fails with real's
+    pass-1 self-cycle block, rc 1, verbatim from the S0 container probe
+    (real 3.0.81.3 `emerge -p --color=n --backtrack=0 app-misc/g216top`;
+    the block text is staging-independent). With no backtracking real
+    displays the pass-1 graph -- the `* Error: circular dependencies:`
+    self ring -- instead of re-resolving."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "app-misc/g216top"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert _G216_SELF_BLOCK in rust.stderr
+
+
+def test_or_pick_direct_target_resolves_to_bootstrap(
+    emerge_binary, fixture_env
+):
+    """Backlog #216 (review M3): `dev-lang/g216comp` merges
+    `[g216boot, g216comp]`, rc 0 -- the direct-target mirror of the
+    `g216top` default pin above. Same real grounding (pass-1
+    `preferred_in_graph` self pick, `_serialize_tasks` dead-end,
+    `circular_dependency` retry to `g216boot`, `backtrack: 1/20`):
+    the S0 container probe (`/tmp/opencode/g216/probe.log`, real
+    3.0.81.3) shows rc 0 with the bootstrap merge, and the L0 oracle
+    single-root capture shows exactly these two rows. Single-root
+    `fixture_env` (`RUNNING_ROOT == ROOT`) carries no `to <ROOT>`
+    suffix and no dual-root `g216comp` row."""
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-lang/g216comp"], fixture_env)
+    assert rust.returncode == 0
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+    assert rows == [
+        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        "[ebuild  N     ] dev-lang/g216comp-1.0 ",
+    ]
+
+
+def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
+    emerge_binary, fixture_env
+):
+    """Backlog #216 (review M3): `dev-lang/g216comp --backtrack=0`
+    fails with real's pass-1 self-cycle block, rc 1 -- the
+    direct-target mirror of the `g216top` b0 pin above. Same verbatim
+    block (`_G216_SELF_BLOCK`, staging-independent); the L0 oracle
+    single-root capture shows the one-row `[ebuild] g216comp` merge
+    list under it (`Total: 1`)."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert _G216_SELF_BLOCK in rust.stderr

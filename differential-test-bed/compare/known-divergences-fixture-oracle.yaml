@@ -91,6 +91,18 @@
 
 # -- the skipped-update warning block (compared since backlog #227).
 
+- id: g216-b0-cycle-abort-tree-ancestors
+  categories: [extra, order]
+  slugs: ["--backtrack_0_app-misc_g216top"]
+  reason: >
+    Under --backtrack=0 both sides abort on the g216 self-cycle with rc 1,
+    the same cycle block and Total: 3; only the forced --tree display of
+    the abort partial differs: portuale drains [top, mid, comp] and the
+    tree walk adds app-misc/g216top and dev-libs/g216mid as [nomerge]
+    ancestors, real prints three ordered rows. Backlog #245 (needs real's
+    --debug digraph for the cell).
+  owner: portuale-bug
+
 - id: skipped-updates-installed-consumer-residue
   category: skipped-updates
   slugs:
