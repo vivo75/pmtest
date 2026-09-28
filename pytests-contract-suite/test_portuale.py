@@ -7077,6 +7077,79 @@ def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
     ]
 
 
+def test_emerge_selective_noop_without_oneshot_rotates_and_records(
+    emerge_binary, tmp_path
+):
+    """Backlog #232: real's selective-without-`--oneshot` deferral arm
+    (`_emerge/actions.py:514-516`) does not return early -- it falls
+    through to the `resume_backup` rotation (`:664-672`) and
+    `saveNomergeFavorites` (the world-file record), skipping only
+    `Scheduler`. The all-noop plan is `emerge --verbose -u
+    dev-libs/samepkg` (no `--oneshot`; `samepkg` is installed at the
+    only visible version, so `mergecount == 0`): exit 0 with no
+    `Nothing to merge` anywhere, the stale two-item list rotated into
+    `resume_backup` (and no fresh `resume` section -- no `Scheduler`
+    write), and `dev-libs/samepkg` recorded in the world file with the
+    real `>>> Recording ...` line on stdout."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Total:" in r.stdout
+    assert '>>> Recording dev-libs/samepkg in "world" favorites file...' in r.stdout
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+    world_lines = (root / "var/lib/portage/world").read_text().splitlines()
+    assert "dev-libs/samepkg" in world_lines
+    assert "dev-libs/newpkg" in world_lines
+    assert "dev-libs/withdeps" in world_lines
+
+
+def test_emerge_selective_noop_without_oneshot_ask_prompts_for_world(
+    emerge_binary, tmp_path
+):
+    """Backlog #232, the `--ask` half of the deferral arm
+    (`_emerge/actions.py:514-516` plus `depgraph.py:11376-11386`): with
+    `--ask` real asks `Would you like to add these packages to your
+    world favorites?` inside `saveNomergeFavorites` instead of the merge
+    prompt -- so `Would you like to merge` stays absent while the stale
+    list still rotates. Same all-noop plan (`-u dev-libs/samepkg`, no
+    `--oneshot`); the `y` answer records the world atom."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    r = _run_with_ask_pty(
+        emerge_binary,
+        ["--ask", "-u", "dev-libs/samepkg"],
+        "y\n",
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Would you like to add these packages to your world favorites?" in r.stdout
+    assert "Would you like to merge" not in r.stdout
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+    assert "dev-libs/samepkg" in (
+        (root / "var/lib/portage/world").read_text().splitlines()
+    )
+
+
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
     """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
     `["binary", root, cpv, "merge"]` resume item from the bintree, so the
