@@ -228,6 +228,37 @@ def main() -> int:
     check("a ` for <root>` header still opens a group keyed on the slot atom",
           list(groups) == ["dev-libs/reinstslottarget:0"], repr(groups))
 
+    # 12. backlog #230 fix round 1: a merge parent with real's
+    # `to '<root>'` suffix equals portuale's bare one. USE content is
+    # identical on both sides here (post-#220 both render
+    # `USE="" ELIBC="glibc"` on the parents); the live blk0 cells keep
+    # an explanation finding only through the missed line's
+    # running-root `ABI_X86` group, which is deliberately NOT
+    # normalised.
+    real_to_suffix = MERGE + (
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:\n"
+        "\n"
+        "dev-libs/blk0x:0\n"
+        "\n"
+        "  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with\n"
+        "    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge to '/tmp/l0-fixture-oracle/fixtures/') USE=\"\" ELIBC=\"glibc\"\n"
+        "    ^               ^\n"
+        "\n"
+    )
+    ptl_bare = real_to_suffix.replace("ebuild scheduled for merge to '/tmp/l0-fixture-oracle/fixtures/'",
+                                      "ebuild scheduled for merge")
+    pr = run_case(real_to_suffix, ptl_bare)
+    check("merge-parent `to '<root>'` suffix is not an explanation finding",
+          pr.findings == [], repr(pr.findings))
+    # ... but USE content still is: restoring a USE delta on the same
+    # pair must fire again (no USE normalisation).
+    pr = run_case(real_to_suffix.replace('USE="" ELIBC="glibc" conflicts',
+                                        'USE="" ABI_X86="(64)" conflicts'),
+                  ptl_bare)
+    s = skipped(pr.findings)
+    check("missed-line USE content still reports an explanation finding",
+          len(s) == 1 and "explanation differs" in s[0]["detail"], repr(pr.findings))
+
     print("ALL OK" if FAILED == 0 else "FAILURES")
     return 0 if FAILED == 0 else 1
 

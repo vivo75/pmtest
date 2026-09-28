@@ -29,3 +29,12 @@
 # 0/0`, silent). Before the fix portuale settled the root pass without
 # the pin and merged `r25lib-2.0` here.
 --backtrack=0 --update --deep --newuse --oneshot dev-libs/r25target
+# Backlog #237 — the same world, but the hard requirement is an explicit
+# `=dev-libs/r25lib-2.0` argument the consumer's `<2.0` pin cannot hold
+# alongside. Real's reporting chain (`_resolve_conflicts` ->
+# `_complete_graph` -> unsatisfied-dep loop -> `_process_slot_conflicts`
+# -> `_solve_non_slot_operator_slot_conflicts`, `3rdparty/portage`
+# 3.0.82.2) carries no `_allow_backtracking` gate on any link, so the pin
+# lands as a residual slot-collision report (rc 1), not a skipped-update
+# warning (g209 S0 probe on 3.0.81.3; this cell oracles 3.0.82.2).
+--backtrack=0 --update --deep --newuse --oneshot =dev-libs/r25lib-2.0

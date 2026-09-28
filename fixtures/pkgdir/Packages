@@ -89,3 +89,16 @@ SIZE: 20480
 SLOT: 0/1
 USE:
 
+BUILD_ID: 1
+BUILD_TIME: 1790594659
+CPV: dev-libs/somaskvischild-1.0
+DEFINED_PHASES: -
+DESCRIPTION: 243 oracle fixture: genuine binpkg built at SLOT 0/1 (real ebuild package); the tree ebuild moved to 0/2 and went keyword-masked -- S0 shape for the slot_operator probe visibility gate (depgraph.py:2347)
+EAPI: 8
+IUSE:
+KEYWORDS: amd64
+REPO: testrepo
+SIZE: 20480
+SLOT: 0/1
+USE:
+

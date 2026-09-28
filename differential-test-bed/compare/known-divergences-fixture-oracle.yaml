@@ -91,6 +91,34 @@
 
 # -- the skipped-update warning block (compared since backlog #227).
 
+- id: skipped-updates-cross-root-missed-line
+  category: skipped-updates
+  slugs: ["--backtrack_0_dev-libs_blk0*"]
+  match: 'ABI_X86="(64)" conflicts with | portuale-only (1): (dev-libs/blk0x-'
+  reason: >
+    The skipped-update block's missed line (the `conflicts with` header,
+    not its parent lines): real resolves the blk0 build deps against the
+    running root `/` because the bed stages ROOT=$FX, so the missed
+    dev-libs/blk0x instance sits in `/` and renders the host profile's
+    USE_EXPAND (`ABI_X86="(64)"`); portuale resolves in the one target
+    root and renders the fixture profile's (`ELIBC="glibc"`). Package
+    lists and every parent line match. Cross-root resolution is backlog
+    #242 (owner decision B17, batch-2026-09-27); #230 shipped the block's
+    rendering.
+  owner: portuale-bug
+
+- id: g216-b0-cycle-abort-tree-ancestors
+  categories: [extra, order]
+  slugs: ["--backtrack_0_app-misc_g216top"]
+  reason: >
+    Under --backtrack=0 both sides abort on the g216 self-cycle with rc 1,
+    the same cycle block and Total: 3; only the forced --tree display of
+    the abort partial differs: portuale drains [top, mid, comp] and the
+    tree walk adds app-misc/g216top and dev-libs/g216mid as [nomerge]
+    ancestors, real prints three ordered rows. Backlog #245 (needs real's
+    --debug digraph for the cell).
+  owner: portuale-bug
+
 - id: skipped-updates-installed-consumer-residue
   category: skipped-updates
   slugs:
@@ -102,26 +130,6 @@
     complete-graph nomerge node, settles in pass 1 and prints nothing.
     This is backlog #25's residue (S1c, `_minimize_children`, waits for
     the slot-operator update probe #211; batch-2026-09-27 B13).
-  owner: portuale-bug
-
-- id: skipped-updates-use-display
-  category: skipped-updates
-  slugs:
-    - "--backtrack_0_dev-libs_blk0a_dev-libs_blk0b_dev-libs_blk0c"
-    - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0a_dev-libs_blk0c"
-    - "--backtrack_0_dev-libs_blk0b_dev-libs_blk0c_dev-libs_blk0a"
-    - "--backtrack_0_dev-libs_blk0c_dev-libs_blk0b_dev-libs_blk0a"
-    - "--update_--deep_--newuse_--oneshot_dev-libs_whpuller"
-    - "--changed-slot_dev-libs_reinstslottarget"
-    - "--changed-slot_--update_--deep_dev-libs_reinstslottarget"
-  match: "skipped-update explanation differs"
-  reason: >
-    Same skipped packages on both sides; real renders each package's
-    `pkg_use_display` (USE plus USE_EXPAND groups) and ` to '<root>'` on
-    the block's lines, portuale prints `USE=""` and no root suffix.
-    The whpuller and #210 reinstslottarget cells were first misread as
-    presence findings (real's ` for <root>` header was not parsed).
-    Backlog #230.
   owner: portuale-bug
 
 - id: slotop-world-complete-graph-order
