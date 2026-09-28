@@ -136,9 +136,22 @@ def _norm_skipped_detail(s: str) -> str:
     staged path varies per run dir, so only its presence is signal --
     the path itself becomes a placeholder (same treatment as
     `<builddir>` for error lines).
+
+    Backlog #230 fix round 1: portuale's bare merge-parent rendering
+    is a deliberate cut (the #206 tmp-ROOT rule, same as the
+    slot-collision notice) -- real appends `to '<ROOT>'` for merge
+    parents whenever `ROOT != "/"` (`Package.__str__`,
+    `3rdparty/portage/lib/_emerge/Package.py:599-602`), so the suffix
+    is stripped on both sides (portuale never emits it) and a
+    suffixed real parent equals a bare portuale one. This covers any
+    target-rooted detail line, including a `to`-suffixed missed line;
+    installed `in '<root>'` lines are NOT stripped (portuale renders
+    those with the real path). USE content is deliberately NOT
+    normalised here.
     """
     s = re.sub(r"/var/tmp/portage/\S+", "<builddir>", s)
     s = re.sub(r"'[^']*'", "'<root>'", s)
+    s = re.sub(r"\s+to\s+'<root>'", "", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
@@ -563,7 +576,9 @@ def add_skipped_findings(pr: Probe, rskip: dict, pskip: dict) -> None:
             add(f"{h}: skipped package list differs: {' | '.join(bits)}")
         elif rskip[h]["expl"] != pskip[h]["expl"]:
             # Same packages, different explanation text (USE/USE_EXPAND
-            # displays, `^` markers, `to '<root>'` suffixes). Cap the
+            # displays, `^` markers -- merge-parent `to '<root>'`
+            # suffixes normalise away in `_norm_skipped_detail`, backlog
+            # #230 fix round 1). Cap the
             # quoted lines so one noisy block cannot flood the report.
             bits = []
             r_only = _only_in(rskip[h]["expl"], pskip[h]["expl"])

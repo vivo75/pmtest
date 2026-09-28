@@ -5083,25 +5083,83 @@ def test_mrg_remote_success_prints_no_post_merge_notice_like_real(
     assert result.stdout.index("need reading") < result.stdout.index("Calculating")
 
 
-def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n"):
+def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n", flags=None):
     """Run `emerge --ask --read-news --oneshot dev-libs/schedok` with
     stdin on a pty (real `actions.py:3920-3926` rejects `--ask` on a
     non-terminal). `script(1)` provides the pty -- resolved absolutely
     so a test can empty `PATH` -- and its own stdin (a pipe here) feeds
-    the child's answers. Returns the completed process."""
+    the child's answers. `flags` overrides the two prompt flags (backlog
+    #234 pins the `--ask=True` / `--read-news=True` spellings through
+    it). Returns the completed process."""
     import shlex as _shlex
     import shutil as _shutil
 
     script = _shutil.which("script") or "/usr/bin/script"
     argv = [
         str(emerge_binary),
-        "--ask", "--read-news", "--oneshot", "dev-libs/schedok",
+        *(flags if flags is not None else ["--ask", "--read-news"]),
+        "--oneshot", "dev-libs/schedok",
     ]
     cmd = " ".join(_shlex.quote(a) for a in argv)
     return subprocess.run(
         [script, "-qec", cmd, "/dev/null"],
         input=answers,
         capture_output=True, text=True, check=False, env=env,
+    )
+
+
+def _ask_pty_with_sigint(emerge_binary, args, env, prompt_marker, timeout=300):
+    """Run `emerge ...` under `script(1)` (pty stdin, satisfying real's
+    `--ask` TTY gate) and deliver SIGINT as a `^C` byte *after* the
+    prompt is up: the byte is written to script's stdin only once
+    `prompt_marker` is observed on the child's output, so the signal
+    cannot strike during startup or the resolve (where SIGINT must
+    keep killing the process as today). This models a terminal user's
+    Ctrl-C at the prompt -- the pty line discipline raises a real
+    SIGINT, which real `_emerge/UserQuery.query`
+    (`_emerge/UserQuery.py:74-76`) catches out of `input()`
+    (backlog #240). Returns the completed process; stdout carries the
+    pty output, as in `_read_news_pty_run`."""
+    import select as _select
+    import shlex as _shlex
+    import shutil as _shutil
+    import time as _time
+
+    script = _shutil.which("script") or "/usr/bin/script"
+    cmd = " ".join(_shlex.quote(a) for a in [str(emerge_binary), *args])
+    proc = subprocess.Popen(
+        [script, "-qec", cmd, "/dev/null"],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    out = b""
+    marker = prompt_marker.encode()
+    deadline = _time.monotonic() + timeout
+    while marker not in out:
+        remaining = deadline - _time.monotonic()
+        if remaining <= 0:
+            proc.kill()
+            raise AssertionError(
+                f"timed out waiting for {prompt_marker!r}; got so far: "
+                f"{out.decode(errors='replace')}"
+            )
+        ready, _, _ = _select.select([proc.stdout], [], [], remaining)
+        if not ready:
+            continue
+        chunk = os.read(proc.stdout.fileno(), 65536)
+        if not chunk:
+            break
+        out += chunk
+    proc.stdin.write(b"\x03")
+    proc.stdin.flush()
+    rest, err = proc.communicate(timeout=timeout)
+    return subprocess.CompletedProcess(
+        [str(emerge_binary), *args],
+        proc.returncode,
+        (out + rest).decode(errors="replace"),
+        (err or b"").decode(errors="replace"),
     )
 
 
@@ -5149,6 +5207,162 @@ def test_emerge_ask_read_news_no_skips_eselect_like_real(emerge_binary, tmp_path
     assert "Would you like to read the news items while calculating dependencies?" in r.stdout
     assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
     assert not marker.exists()
+
+
+def test_emerge_ask_read_news_eof_exits_before_resolve_like_real(emerge_binary, tmp_path):
+    """Backlog #234 (a): real `_emerge/UserQuery.query`
+    (`_emerge/UserQuery.py:74-76`) prints `Interrupted.` and exits
+    `128 + SIGINT` on EOF -- the news prompt's `sys.exit` fires before
+    `action_build`. A VEOF byte (`Ctrl-D`) on the pty is the terminal
+    user's EOF (real's `input()` raises `EOFError` on it): the run must
+    print `Interrupted.`, exit 130, and never reach the resolve
+    (`Calculating dependencies` stays absent)."""
+    root, env = _news_env(tmp_path, "root-ask-read-news-eof")
+    r = _read_news_pty_run(emerge_binary, env, answers="\x04")
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert "Interrupted." in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert "Calculating dependencies" not in r.stdout
+
+
+def test_emerge_ask_read_news_sigint_exits_before_resolve_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240: real `_emerge/UserQuery.query`
+    (`_emerge/UserQuery.py:74-76`) catches `KeyboardInterrupt` out of
+    `input()`, prints `Interrupted.`, and exits `128 + SIGINT` from
+    inside `query` -- the news prompt's `sys.exit` fires before
+    `action_build`. A `^C` byte delivered through the pty *after* the
+    prompt is up (see `_ask_pty_with_sigint`) is the terminal user's
+    Ctrl-C (the line discipline raises a real SIGINT): the run must
+    print `Interrupted.` (and no `Quitting.` -- real's `== "Yes"`
+    comparison never runs), exit 130, and never reach the resolve
+    (`Calculating dependencies` stays absent). Before the fix the
+    process died by signal with no `Interrupted.` line."""
+    root, env = _news_env(tmp_path, "root-ask-read-news-sigint")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--read-news", "--oneshot", "dev-libs/schedok"],
+        env,
+        "Would you like to read the news items while calculating dependencies?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert "Interrupted." in r.stdout
+    assert "Quitting." not in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert "Calculating dependencies" not in r.stdout
+
+
+def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240: the same Ctrl-C at the merge prompt (real
+    `_emerge/actions.py:527-536` through
+    `_emerge/UserQuery.py:74-76`). EOF there used to print a spurious
+    `Quitting.` after `Interrupted.`; a `^C` died by signal with
+    neither line. Now: `Interrupted.` exactly once, no `Quitting.`,
+    exit 130 -- real exits from inside `query`, so its `Quitting.`
+    never runs either."""
+    import shutil
+
+    root = tmp_path / "root-ask-merge-sigint"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--oneshot", "dev-libs/schedok"],
+        env,
+        "Would you like to merge these packages?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    # (No `[Yes/No]` suffix: under `script` the child's stdout is a
+    # tty, so the choices print colorized with the escapes between
+    # `?` and `[` -- the question itself stays contiguous.)
+    assert "Would you like to merge these packages?" in r.stdout
+    assert r.stdout.count("Interrupted.") == 1, (r.stdout, r.stderr)
+    assert "Quitting." not in r.stdout
+    assert not (root / "var/db/pkg/dev-libs/schedok-1.0").exists()
+
+
+def test_emerge_config_select_sigint_prints_interrupted_without_quitting_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #240 follow-up: the config `Selection?` menu goes
+    through the same `UserQuery.query` in real
+    (`_emerge/actions.py:746` through
+    `_emerge/UserQuery.py:74-76`), so Ctrl-C there prints
+    `Interrupted.` and exits `128 + SIGINT` -- `X`'s own `Quitting.`
+    (`actions.py:747-748`) never runs. Two stub vdb entries make
+    `dev-libs/seltest` match twice, reaching the menu with no ebuild
+    work; the `^C` delivery is the same prompt-synchronized pty byte
+    as the merge-prompt pin above."""
+    root = tmp_path / "root-config-select-sigint"
+    for v in ("1.0", "2.0"):
+        (root / f"var/db/pkg/dev-libs/seltest-{v}").mkdir(parents=True)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(root / "pt")
+    r = _ask_pty_with_sigint(
+        emerge_binary,
+        ["--ask", "--config", "dev-libs/seltest"],
+        env,
+        "Selection?",
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Please select a package to configure:" in r.stdout
+    assert r.stdout.count("Interrupted.") == 1, (r.stdout, r.stderr)
+    assert "Quitting." not in r.stdout
+
+
+def test_emerge_ask_read_news_true_spellings_prompt_like_real(emerge_binary, tmp_path):
+    """Backlog #234 (b): real `true_y_or_n` (`main.py:321-322,625`)
+    accepts `--ask=True` / `--read-news=True` (a bare flag inserts
+    `"True"` via `insert_optional_args`, the choices admit it, and `in
+    true_y` normalizes it at `main.py:802-805,950-953`). The `=True`
+    pair prompts exactly like the bare flags: "No" to the news prompt
+    skips eselect, "No" to the merge prompt exits 130 with `Quitting.`."""
+    root, env = _news_env(tmp_path, "root-ask-read-news-true")
+    stubdir = tmp_path / "stubs-true"
+    stubdir.mkdir()
+    marker = stubdir / "eselect.log"
+    (stubdir / "eselect").write_text(
+        f'#!/bin/sh\necho "$@" >> {marker}\n'
+    )
+    (stubdir / "eselect").chmod(0o755)
+    env["PATH"] = f"{stubdir}{os.pathsep}{env.get('PATH', '')}"
+    r = _read_news_pty_run(
+        emerge_binary, env, answers="No\nNo\n",
+        flags=["--ask=True", "--read-news=True"],
+    )
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "Would you like to read the news items while calculating dependencies?" in r.stdout
+    assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 1
+    assert "Quitting." in r.stdout
+    assert not marker.exists()
+
+
+def test_emerge_ask_true_spelling_hits_the_tty_gate_like_real(emerge_binary, tmp_path):
+    """Backlog #234 (b): `--ask=True` parses as ask-on (real
+    `true_y_or_n` choices + `in true_y` normalization,
+    `main.py:321-322,802-805`), so a non-terminal stdin hits real
+    `actions.py:3920-3926`'s gate exactly like a bare `--ask` (before
+    the fix `--ask=True` died as an unrecognized option)."""
+    root, env = _news_env(tmp_path, "root-ask-true-gate")
+    r = subprocess.run(
+        [str(emerge_binary), "--ask=True", "--oneshot", "dev-libs/schedok"],
+        stdin=subprocess.DEVNULL,
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert '"--ask" should only be used in a terminal' in r.stderr
 
 
 def test_emerge_ask_read_news_without_eselect_prints_real_hint(
