@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=#216 fixture: mid-graph consumer pulling dev-lang/g216comp in-graph
+EAPI=8
+IUSE=
+KEYWORDS=amd64
+RDEPEND=dev-lang/g216comp
+SLOT=0
+_md5_=e16ff298f4f0806673fa125065701d4d

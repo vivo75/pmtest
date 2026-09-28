@@ -19,3 +19,33 @@
 # ROOT display, normalised by the comparator). Pre-#212 portuale merges
 # the stale `[binary N] somaskchild-1.0-1` instead.
 --usepkg dev-libs/somaskparent
+# #243 — the probe honours ebuild visibility (real `_slot_change_probe`,
+# `depgraph.py:2347`): genuine `dev-libs/somaskvischild-1.0` binpkg built
+# at `SLOT="0/1"` (real `ebuild package`, committed under
+# `fixtures/pkgdir/dev-libs/`) while the tree ebuild moved to `SLOT="0/2"`
+# without a revbump AND went keyword-masked (`~amd64`);
+# `dev-libs/somaskvisparent-1.0` carries the unbuilt
+# `RDEPEND="dev-libs/somaskvischild:="` (both ebuilds EAPI 8); the parent
+# is ebuild-only (no binpkg), so the probe's unbuilt-parent gate is met.
+# S0 finding (see g243 report): the entry's literal `--usepkgonly` flag
+# cannot reach the probe — the parent resolves built there, so real's
+# `not dep.parent.built` gate (`depgraph.py:2322-2325`) and portuale's
+# ebuild-parent gate both skip, and both sides keep the binaries (rc 0).
+# Under plain `--usepkg` (this cell) BOTH sides fail alike (rc 1, masked
+# by ~amd64 — real probed verbatim on this branch): real rejects the
+# binary at selection and its probe returns None (`:2347`, level None),
+# while pre-#243 portuale selects it and then probe-masks it, restarts
+# (`backtrack: 1/10`) and dead-ends. Same output, different path — this
+# cell locks the agreement. Round 2 (see g243 report): real probed verbatim
+# under `--usepkg --useoldpkg-atoms 'dev-libs/somaskvischild'` too and does
+# NOT select the binary there either (rc 1, same masked-by-`~amd64` text,
+# `backtrack: 1/20`) — the S0 source-derived rc-0 prediction was wrong, so
+# there is no runnable `--useoldpkg-atoms` divergence line: the pool-side
+# rejector fires with the whole `built and not useoldpkg` block
+# (`depgraph.py:8233-8288`, incl. the `_reinstall_for_flags`/`myeb=None`
+# candidate) skipped, and the probe gate (`:2347`) never fires in real on
+# this shape. Landing the probe gate alone still regresses this cell
+# (rc 1 -> rc 0 vs real rc 1), so it stays held until the pool half is
+# identified. RDEPEND-only, so no staged-ROOT cross-root split (#242) is
+# involved.
+--usepkg dev-libs/somaskvisparent
