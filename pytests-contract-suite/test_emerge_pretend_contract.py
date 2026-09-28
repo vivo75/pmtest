@@ -6778,6 +6778,9 @@ def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_maske
           -v /tmp/opencode/g195b/in-probe.sh:/in-probe.sh:ro \
           --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
 
+    (Staged copy of the script and its output:
+    `<portuale>/docs/evidence/2026-09-28-g195/g195b-{in-probe.sh,real-probe.txt}`.)
+
     cell `emerge --pretend dev-libs/parentflipeqpkg` (identical text with
     `--autounmask` and with `--autounmask-use=n`; Global-Updates/news
     noise cut):
@@ -6906,6 +6909,9 @@ def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_real(
           -v <pmtest>/differential-test-bed/layers/l0-fixture-oracle/stage.sh:/stage.sh:ro \
           -v /tmp/opencode/g195c/in-probe.sh:/in-probe.sh:ro \
           --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
+
+    (Staged copy of the script and its output:
+    `<portuale>/docs/evidence/2026-09-28-g195/g195c-{in-probe.sh,real-probe.txt}`.)
 
     cell `emerge --pretend dev-libs/pfgraphparent` (identical text with
     `--autounmask-backtrack=y` and with `--autounmask-use=n`):
