@@ -565,6 +565,11 @@ CASES = [
         1,
     ),
     (
+        "circular dep: softened build-time ring reports the persisting cycle with backtracking on (#221 I3)",
+        ["--pretend", "dev-libs/sbrA"],
+        1,
+    ),
+    (
         "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-1"],
         1,
@@ -727,6 +732,11 @@ CASES = [
     (
         "circular: upstream test_circular_choices pg4 pypy backtracks to -bin like real (rc 0; bug 705986, pinned below)",
         ["--pretend", "dev-libs/ccd4a"],
+        0,
+    ),
+    (
+        "circular: upstream test_circular_choices pg4 requesting the exe prints the tree under the cycle-breaking branch (rc 0; #221 M3, pinned below)",
+        ["--pretend", "--tree", "dev-libs/ccd4b"],
         0,
     ),
     (
@@ -3650,6 +3660,82 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
         "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_ccd4b_tree_follows_the_cycle_breaking_branch(
+    emerge_binary, fixture_env
+):
+    """Backlog #221 (M3): `--tree` map-awareness on a post-backtrack
+    cell. Requesting `dev-libs/ccd4b` (the exe) re-resolves past the
+    pg4 ring to `[ccd4c, ccd4a, ccd4b]` (real's own answer for the
+    direct request -- g221 S0 `ResolverPlayground` probe: requesting
+    `pypy-exe` merges `[exe-bin, pypy, exe]`), and the tree nests each
+    package under its requirer (exe -> pypy -> exe-bin) instead of
+    re-closing the broken ring with a phantom edge (the pre-#221 shape
+    merged `[ccd4c, ccd4b, ccd4a]`, the exe ahead of its own buildtime
+    dep). The merge order is covered by the Rust fixture test; this
+    pins the tree rendering, which re-derives the kept branch through
+    the map-aware suppression (`pretend.rs` tree walk). The
+    `USE="-low-memory"` flag display is the generic USE renderer, not
+    circular logic."""
+    rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/ccd4b"], fixture_env)
+
+    assert rust.returncode == 0
+    assert rust.stdout == (
+        '[ebuild  N     ] dev-libs/ccd4b-7.3.0  USE="-low-memory"\n'
+        "[ebuild  N     ]  dev-libs/ccd4a-7.3.0 \n"
+        "[ebuild  N     ]   dev-libs/ccd4c-7.3.0 \n"
+    )
+    assert rust.stderr == ""
+
+
+def test_softened_build_time_cycle_reports_the_persisting_ring(
+    emerge_binary, fixture_env
+):
+    """Backlog #221 (I3): `dev-libs/sbrA` BDEPENDs+RDEPENDs on
+    `dev-libs/sbrB` while `sbrB` BDEPENDs back. The dual edge softens
+    the hard reporter's arm (`(true, true)` in the walk's edge-kind
+    map) so `find_hard_cycles` stays empty, but the walk still strands
+    and the restart trigger still fires: the retry re-strands
+    identically (no `||` branch for the demotion to switch to), the
+    ring is unsolved, and the settled pass reports it through
+    `assemble_result`'s persisting-ring leg instead of settling
+    `Complete` -- rc 1 WITH backtracking on (contrast the bt0-only
+    legs, which never retry).
+
+    Grounded in real runs (`/tmp/opencode/g221b/probe_sbr.py`,
+    3rdparty portage 3.0.82.2 `ResolverPlayground`, debug
+    `backtracking try` count): backtracking on fails after exactly 1
+    retry, `--backtrack=0` fails with none. The message shape is real
+    `_prepare_circular_dep_message`
+    (`resolver/circular_dependency.py`: one `priorities[-1]` label per
+    edge; priorities are `bisect.insort`-sorted so `[-1]` is the
+    hardest -- `DepPriority.__int__` ranks buildtime (-1) above runtime
+    (-3), hence `(buildtime)` on the dual edge, matching portuale's own
+    `cycle_edge_labels` max); stdout is the forced verbose-tree stuck
+    remainder with real's decorations and the `Total:` counters line,
+    exactly like the `hardcyclea` pin above."""
+    base = ["--pretend", "dev-libs/sbrA"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "[nomerge       ] dev-libs/sbrA-1.0::testrepo\n"
+        "[ebuild  N     ]  dev-libs/sbrB-1.0::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-libs/sbrA-1.0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/sbrB-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
