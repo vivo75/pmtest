@@ -167,7 +167,21 @@ for repo in overlay independentoverlay layoutmasteroverlay; do
   fi
 done
 
-# 12. FX_SLOTOP_BDEP=1 (#65 S0/S3): install the slot-operator build-time
+# 12. FX_SOUSAT_UNSAT=1 (#215 S0): install the unsatisfied-probe
+#     fragment -- installed `app-misc/sousatpar-1` bound to the
+#     abandoned provider slot (`RDEPEND=">=app-misc/sousatprov-1:0/1="`,
+#     EAPI-bearing vdb so real's `FakeVartree` overlay registers the
+#     built dep), in world. The tree holds only `sousatprov-2`
+#     (`SLOT="2/2"`) plus the parent's own live ebuild. The fragment
+#     lives outside the shared fixture vdb so the standard runs are
+#     untouched (same pattern as the slotop-bdeps fragment above).
+if [ "${FX_SOUSAT_UNSAT:-}" = 1 ]; then
+  HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  cp -r "$HERE/sousat-unsat/vdb/." "$FX/var/db/pkg/"
+  mkdir -p "$FX/var/lib/portage"
+  cat "$HERE/sousat-unsat/world" >> "$FX/var/lib/portage/world"
+fi
+# 13. FX_SLOTOP_BDEP=1 (#65 S0/S3): install the slot-operator build-time
 #     deps matrix -- provpkg-1.0 (sub-slot 0/1, upgraded to 2.0/0/2 in the
 #     tree) plus five installed consumers, one per dep key, each bound to
 #     `>=dev-libs/provpkg-1.0:0/1=` (real's own versioned built-atom shape;
@@ -181,10 +195,10 @@ if [ "${FX_SLOTOP_BDEP:-}" = 1 ]; then
   cat "$HERE/slotop-bdeps/world" >> "$FX/var/lib/portage/world"
 fi
 
-# 13. FX_PRUNE_VDB=1 (#213 S0): install the prune_rebuilds pair --
+# 14. FX_PRUNE_VDB=1 (#213 S0): install the prune_rebuilds pair --
 #     pprov-1.0 (sub-slot 0/1, upgraded to 2.0/0/2 in the tree) plus the
 #     installed consumer pcons-1.0 bound to `>=app-misc/pprov-1:0/1=`
-#     (real's own versioned built-atom shape, as in §12). The fragment
+#     (real's own versioned built-atom shape, as in §13). The fragment
 #     lives outside the shared fixture vdb so the standard runs are
 #     untouched. No world change: the g213 cell passes explicit atoms.
 if [ "${FX_PRUNE_VDB:-}" = 1 ]; then

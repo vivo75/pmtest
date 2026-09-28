@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=215 oracle fixture: installed parent bound to the abandoned provider slot (v2 #24f)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/sousatprov:=
+SLOT=0
+_md5_=de286b9260730a556cdd4803a7832264

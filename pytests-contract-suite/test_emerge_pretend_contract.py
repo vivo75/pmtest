@@ -19721,6 +19721,73 @@ def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     }
 
 
+def test_oracle_slotop_unsatisfied_probe_heals_through_parent_reinstall(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #215 (v2 #24f): real `_slot_operator_unsatisfied_probe`
+    (`3rdparty/portage/lib/_emerge/depgraph.py:2817`, fired at
+    `:3447-3458`). Installed `app-misc/sousatpar-1` records a built
+    `:=` dep on the abandoned provider slot
+    (`RDEPEND=">=app-misc/sousatprov-1:0/1="`, EAPI-bearing vdb so
+    real's `FakeVartree` overlay registers it) while the tree holds
+    only `app-misc/sousatprov-2` (`SLOT="2/2"`) and the parent's own
+    live ebuild (`RDEPEND="app-misc/sousatprov:="`, satisfiable). Real
+    heals through the probe's restart
+    (`slot_operator_replace_installed` + reinstall the parent against
+    the new child): the vendored-3.0.82.2 Playground mergelist is
+    `[sousatprov-2, sousatpar-1]`, and its `--debug` fires
+    `slot_operator_unsatisfied_probe` + `backtracking due to
+    unsatisfied built slot-operator dep` verbatim (see the g215
+    report; the bed cell carries the live display). MATCHES real since
+    #215: the dead-end pass seeds the installed owner and re-resolves
+    instead of aborting. Unlike the #211 update probe there is no
+    `check_reverse_dependencies` refusal and no `--update` gate --
+    the probe fires in-walk, so the plain-argument shape heals on both
+    sides without it. The `--backtrack=0` shape is the agreement lock:
+    the probe is backtrack-gated (`_allow_backtracking`, `:3447`), so
+    real fails it (`emerge: there are no ebuilds to satisfy
+    ">=app-misc/sousatprov-1:0/1="`, rc 1 -- Playground-established,
+    bed-confirmed) and so does this port."""
+    root = _b1_root(
+        tmp_path,
+        ["app-misc/sousatpar"],
+        [
+            (
+                "app-misc",
+                "sousatpar",
+                "1",
+                "0",
+                {
+                    "EAPI": "8",
+                    "RDEPEND": ">=app-misc/sousatprov-1:0/1=",
+                },
+            ),
+        ],
+    )
+    env = _b1_env(fixture_env, root)
+    for args in (
+        ["--pretend", "--backtrack", "3", "--update", "--deep", "app-misc/sousatpar"],
+        ["--pretend", "--update", "--deep", "@world"],
+        ["--pretend", "app-misc/sousatpar"],
+    ):
+        rust = _b1_run(args, env, emerge_binary)
+        got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/sousat")}
+        assert got == {
+            ("app-misc/sousatpar", "1"),
+            ("app-misc/sousatprov", "2"),
+        }, args
+    bt0 = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack", "0", "--update", "--deep", "app-misc/sousatpar"],
+        env,
+    )
+    assert bt0.returncode == 1
+    assert (
+        'emerge: there are no ebuilds to satisfy ">=app-misc/sousatprov-1:0/1=".'
+        in bt0.stderr
+    )
+
+
 def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     emerge_binary, fixture_env, tmp_path
 ):

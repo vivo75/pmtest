@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=215 oracle fixture: slot-moved provider, new slot only (v2 #24f)
+EAPI=8
+KEYWORDS=amd64
+SLOT=2/2
+_md5_=eb8df3d7f7c54c7232d183d873fba586

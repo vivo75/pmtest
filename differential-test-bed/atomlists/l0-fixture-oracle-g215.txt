@@ -1,0 +1,33 @@
+# #215 — the in-walk unsatisfied slot-operator probe (v2 #24f, real
+# `_slot_operator_unsatisfied_probe`, `depgraph.py:2817`, +
+# `_slot_operator_unsatisfied_backtrack`, `:2881`, fired at `:3447-3458`).
+# Run with FX_SOUSAT_UNSAT=1 FX_HOST_ROOTS=1 (stage.sh installs the fragment:
+# installed `app-misc/sousatpar-1` bound to the abandoned provider slot
+# (`RDEPEND=">=app-misc/sousatprov-1:0/1="`, EAPI-bearing vdb so real's
+# `FakeVartree` overlay registers the built dep) while the tree holds
+# only `app-misc/sousatprov-2` (`SLOT="2/2"`) and the parent's own live
+# `app-misc/sousatpar-1` ebuild (`RDEPEND="app-misc/sousatprov:="`); the
+# parent rides the world file). RDEPEND-only on both sides; FX_HOST_ROOTS=1
+# keeps the host-exact single-root shape the S0 probes ran (the slotop
+# matrix's own knob, `findings/l0.md` "#71 S0").
+#
+# Shape (S0 probes, this branch): the installed parent's built `:=` dep
+# matches nothing (old provider slot abandoned AND uninstalled), while
+# the replacement parent (here the parent's own live ebuild) carries a
+# satisfiable live `:=` on the same child cp. Real heals through the
+# probe's restart (`slot_operator_replace_installed` + reinstall the
+# parent against the new child): it merges `app-misc/sousatprov-2` and
+# reinstalls `app-misc/sousatpar-1` (rc 0; the vendored-3.0.82.2
+# Playground mergelist is `[sousatprov-2, sousatpar-1]`, and its
+# `--debug` fires `slot_operator_unsatisfied_probe` +
+# `backtracking due to unsatisfied built slot-operator dep` verbatim —
+# see the g215 report; the exact pretend display letters come from the
+# bed comparison itself).
+# Pre-#215 portuale aborts the `-uD` shapes instead (`rc 1`, "no ebuilds
+# to satisfy >=app-misc/sousatprov-1:0/1="). The `--backtrack=0` shape
+# is the agreement lock: the probe is backtrack-gated
+# (`_allow_backtracking`, `:3447`), so both sides abort there (rc 1).
+--update --deep app-misc/sousatpar
+-uD @world
+--backtrack 0 --update --deep app-misc/sousatpar
+app-misc/sousatpar
