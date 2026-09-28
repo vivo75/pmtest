@@ -21315,8 +21315,10 @@ _CYC0_REAL_BLOCKS = {
 
 @pytest.mark.xfail(
     strict=True,
-    reason="backlog #207/#208: live real blames a different package or "
-    "finds a different suggestion (#206's node text already ships)",
+    reason="backlog #242 (ex-#207/#208(a)): live real builds the cycle "
+    "over its cross-root graph (EAPI >= 7 DEPEND against ESYSROOT=/), "
+    "so the start node differs (#206's node text already ships; "
+    "#208(b)'s -foo suggestion now matches)",
 )
 @pytest.mark.parametrize(
     "atom", sorted(a for a in _CYC0_REAL_BLOCKS if a != "=dev-libs/cyc0b-1")
