@@ -2082,6 +2082,8 @@ CASES = [
     ("merge order: --json for the slot-qualified sibling-slot fixture", ["--pretend", "--json", "dev-libs/slotorderroot"], 0),
     ("virtual: resolved directly", ["--pretend", "virtual/texteditor"], 0),
     ("virtual: resolved as a dependency", ["--pretend", "dev-libs/virtualconsumerpkg"], 0),
+    ("virtual cycle: a virtual satisfied by an ebuild that depends on itself fails (#193: rc 1 like real)", ["--pretend", "app-misc/bar"], 1),
+    ("virtual cycle: a virtual ring through virtual providers fails (#193: rc 1 like real)", ["--pretend", "app-misc/foo"], 1),
     ("multi-atom: two independent new packages", ["--pretend", "dev-libs/newpkg", "dev-libs/withdeps"], 0),
     ("multi-atom: literal duplicate atom dedupes silently", ["--pretend", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("multi-atom: dependency shared between two targets dedupes", ["--pretend", "dev-libs/shared-a", "dev-libs/shared-b"], 0),
@@ -16297,6 +16299,52 @@ def test_virtual_is_resolved_as_a_dependency(emerge_binary, fixture_env):
         '[ebuild  N     ] virtual/texteditor-0 ',
         '[ebuild  N     ] dev-libs/virtualconsumerpkg-1.0 ',
     ]
+
+
+@pytest.mark.parametrize(
+    "atom,expected",
+    [
+        ("app-misc/bar", ["virtual/gzip-1::testrepo"]),
+        (
+            "app-misc/foo",
+            [
+                "virtual/A-1::testrepo",
+                "virtual/B-1::testrepo",
+                "virtual/C-1::testrepo",
+            ],
+        ),
+    ],
+    ids=["self-cycle", "ring"],
+)
+def test_virtual_cycle_detected_like_real(atom, expected, emerge_binary, fixture_env):
+    """Backlog #193, upstream `test_virtual_cycle.py` (bug 965570) as
+    emitted by pmtest `89d17e0` (fixtures `app-misc/{foo,bar}`,
+    `virtual/{A,B,C,gzip}`, all EAPI 8): real's `ResolverPlayground`
+    fails both cells (`success=False`, `virtual_cycle={gzip-1}` /
+    `{A-1,B-1,C-1}`), and live real fails too -- one
+    `podman run --entrypoint /bin/bash localhost/test-portuale:latest`
+    probe (portage 3.0.81.3; the `!!! virtual cycle detected:` shape is
+    identical in 3.0.82.2 by source read of
+    `lib/_emerge/depgraph.py:5002-5013`, `select_files` catching
+    `_virtual_cycle_error` from `_virt_deps_visible:6215-6216`),
+    `emerge -p --color=n app-misc/{bar,foo}` on the staged tree, rc 1
+    both, stdout `These are the packages that would be merged, in
+    order:` + `Calculating dependencies ... done!` + the
+    `Dependency resolution took ... (backtrack: 0/20).` timing line with
+    no merge rows, stderr exactly `\n\n!!! virtual cycle
+    detected:\n\n` + one `  {cpv}::{repo}` line per member (sorted) +
+    `\n`. Portuale used to merge both as ordinary rings (rc 0). The
+    pin asserts real's block byte-for-byte on stderr (uncoloured, like
+    real's own `writemsg`), an empty merge list, and rc 1."""
+    result = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    assert result.returncode == 1
+    assert _merge_lines(result.stdout) == []
+    assert "Total:" not in result.stdout
+    assert result.stderr == (
+        "\n\n!!! virtual cycle detected:\n\n"
+        + "".join(f"  {member}\n" for member in expected)
+        + "\n"
+    )
 
 
 def test_real_option_not_implemented_message_names_the_option(emerge_binary, fixture_env):
