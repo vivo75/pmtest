@@ -9681,19 +9681,21 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     #142's divergence for this order).
 
     Backlog #230: every line renders real's full `pkg_use_display`
-    (`_emerge/UseFlagDisplay.py:55`). The blk0 ebuilds are pre-EAPI-5
-    with no IUSE, so the profile globals mask out and the forced flags
-    survive: `USE="(globalforceflag) (stableforceflag)"` (fixture
-    `use.force` + stable `use.stable.force`, both enabled). The bed's
-    own real lines show the same `(globalforceflag)` wrap on the
-    parents; real's missed line instead shows the container running-root
-    profile (`USE="(test-rust)" ABI_X86="(64)" ...`) because pre-EAPI-7
-    `DEPEND` resolves against the host-config `/` tree
-    (`depgraph.py:4224-4226`) -- a second config portuale deliberately
-    does not model, so the missed line's fixture-tree display is the
-    pinned shape. Merge-scheduled nodes and headers stay bare (no
-    `to '<root>'` / `for <root>`), following the slot-collision notice
-    per #230's directive.
+    (`_emerge/UseFlagDisplay.py:55`). Post-#220 the blk0 ebuilds are
+    EAPI 8 (fixture profiles `eapi` = 5) with no IUSE, so the globals
+    mask out and only the implicit `ELIBC="glibc"` group survives:
+    `USE="" ELIBC="glibc"`. The parent lines are real's own text (fix
+    round 1 probe, one `podman run localhost/test-portuale:latest`
+    over the four blk0 cells: every parent renders `USE=""
+    ELIBC="glibc"`). The missed line keeps portuale's fixture-tree
+    display (`USE="" ELIBC="glibc"`); real renders `USE=""
+    ABI_X86="(64)"` there because the missed instance resolves against
+    the running-root `/` tree -- cross-root resolution is backlog #242
+    (owner decision B17), covered on the bed side by the narrowed
+    allowlist entry `skipped-updates-cross-root-missed-line`.
+    Merge-scheduled nodes and headers stay bare (no `to '<root>'` /
+    `for <root>`), following the slot-collision notice per #230's
+    directive.
     """
     env = dict(fixture_env)
     uninstall_rows = [
@@ -9705,8 +9707,8 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
         return [
             "dev-libs/blk0x:0",
             "",
-            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"(globalforceflag) (stableforceflag)\" conflicts with",
-            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"(globalforceflag) (stableforceflag)\"",
+            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with",
+            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\"",
             "    ^               ^",
             "",
         ]
@@ -9724,10 +9726,10 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     warn_x3_bc = [
         "dev-libs/blk0x:0",
         "",
-        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="(globalforceflag) (stableforceflag)" conflicts with',
-        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE="(globalforceflag) (stableforceflag)"',
+        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^               ^",
-        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE="(globalforceflag) (stableforceflag)"',
+        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^               ^",
         "",
     ]
@@ -20938,10 +20940,21 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
     merges NOTHING on either argv and prints the skipped-update warning
     for `dev-libs/reinstslottarget:0` listing BOTH consumers' atoms, rc 0.
 
-    The pinned bytes are portuale's own rendering of that shape (one
-    block, bare `USE=""`, no `^` operator markers or root suffixes --
-    the #227 explanation-rendering gap, shared with the blk0 cells -- not
-    real's); the invariant (withhold, rc 0, both atoms named) is real's.
+    The pinned bytes are portuale's rendering of that shape, which is
+    real's own explanation modulo the #206 cuts: the missed line shows
+    `USE="" ELIBC="glibc"` on both sides (bed capture
+    `differential-test-bed/logs/l0-fx-20260928T100830Z`, coordinator
+    run 2026-09-28 on this branch -- both argument cells clean there);
+    the installed consumers render `(cpv, installed in '<root>')`
+    with bare `USE=""` and slot-span `^` markers on both sides too
+    (real's `Package.__str__` appends ` in '<ROOT>'` iff `ROOT != "/"`,
+    `3rdparty/portage/lib/_emerge/Package.py:568-608`). Portuale's cuts
+    stay: the header is bare (no `for <root>`) and the merge line is
+    bare (no `to '<root>'`), like the blk0 cells; the parent order is
+    portuale's (consumer `:0/1` before bound `:0/1=`, real lists them
+    reversed -- the comparator sorts explanation lines, so the cells
+    still compare clean). The invariant (withhold, rc 0, both atoms
+    named) is real's.
     """
     env = _world_extra_env(
         fixture_env,
@@ -20950,6 +20963,7 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
         "dev-libs/reinstslotconsumer",
         "dev-libs/reinstslotbound",
     )
+    root = str(tmp_path / "fixtures")
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--changed-slot", *extra_args, "dev-libs/reinstslottarget"],
@@ -20961,11 +20975,11 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
         "",
         "dev-libs/reinstslottarget:0",
         "",
-        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed) USE=""',
-        "    ",
-        '    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed) USE=""',
-        "    ",
+        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        f"    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "                             ^^^^",
+        f"    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "                             ^^^^^",
         "",
     ], (extra_args, result.stdout)
     assert result.stderr == "", (extra_args, result.stderr)
