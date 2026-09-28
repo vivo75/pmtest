@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=214 oracle fixture: ABI provider new sub-slot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=58e247850208de73f3743296605eb25c
