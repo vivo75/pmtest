@@ -37,6 +37,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import atexit
 import os
 import re
 import shutil
@@ -75,7 +76,24 @@ def _bootstrap() -> None:
     shutil.copytree(PORTAGE_LIB / "portage" / "tests" / ".gnupg", gpg, dirs_exist_ok=True)
     os.chmod(gpg, 0o700)
     os.environ["PORTAGE_GNUPGHOME"] = gpg
+    atexit.register(_drop_gnupg_home, gpg)
     os.environ["PATH"] = portage.const.PORTAGE_BIN_PATH + ":" + os.environ.get("PATH", "")  # type: ignore[attr-defined]
+
+
+def _drop_gnupg_home(gpg: str) -> None:
+    """Stop the gpg-agent the playground's signing started in `gpg`, then
+    remove the directory. Without this every run leaves one daemon
+    (`gpg-agent --homedir /tmp/portuale-upstream-gpg-* --daemon`) behind.
+    """
+    gpgconf = shutil.which("gpgconf")
+    if gpgconf:
+        subprocess.run(
+            [gpgconf, "--homedir", gpg, "--kill", "gpg-agent"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    shutil.rmtree(gpg, ignore_errors=True)
 
 
 def _jsonable(value):
