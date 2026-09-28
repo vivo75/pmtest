@@ -4185,14 +4185,6 @@ def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     assert "terminated early" not in rust.stderr
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="oracle finding (Slice 3 capture, spec §4e): real's DFS applies "
-    "aucasclate's [cascade] flip before it walks aucascmid's own deps, so "
-    "aucascleaf is in the list; portuale's backward-cascade re-check leaves "
-    "the flag?-gated dep out (pinned the other way in "
-    "test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot)",
-)
 def test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf(
     emerge_binary, fixture_env
 ):
@@ -4204,12 +4196,13 @@ def test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf(
     (`_pkg_use_enabled`, :7795), so when `aucascmid` pops its `cascade?`
     dep is live and `aucascleaf` lands in the graph -- full 4-package list
     with the USE-changes block and the "terminated early" notice, exit 1.
-    Outside backlog #19; pinned so the shipped cascade pin has an
-    oracle-backed target."""
+    Outside backlog #19. Backlog #218: the in-graph ordering is ported
+    (the already-resolved-slot re-check re-expands the flipped package's
+    newly-gated deps in-walk), so this now passes unmarked."""
     args = ["--pretend", "dev-libs/aucasctop"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert [line.split()[2] for line in _merge_lines(rust.stdout)] == [
+    assert [line.split()[3] for line in _merge_lines(rust.stdout)] == [
         "dev-libs/aucascleaf-1.0",
         "dev-libs/aucascmid-1.0",
         "dev-libs/aucasclate-1.0",
@@ -5536,17 +5529,17 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     autounmask_use_config (real _needed_use_config_changes).
 
     Default (real --autounmask-backtrack off, depgraph.py:11736): the
-    graph is NOT re-driven -- aucascmid's own USE line is re-rendered to
-    `USE="cascade"` (real _pkg_use_enabled), but its cascade?-gated
-    aucascleaf does NOT appear. The change is still reported in the
-    standard "USE changes are necessary" block.
-
-    NOTE (oracle, 2026-09-11, Slice 3 of backlog #19): real 3.0.81.3 DOES
-    list aucascleaf here (`fixtures/abort-captures/dev-libs_aucasctop.*`),
-    because its DFS flips the still-unwalked aucascmid before walking its
-    deps. The pin below records portuale's current behaviour; the
-    oracle-backed target is the strict xfail
-    test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf.
+    graph is NOT re-driven -- and needs no re-drive, because real's DFS
+    applies the flip before the flipped node's walk (`_add_dep` only
+    pushes onto `_dep_stack`, depgraph.py:3254-3271, so `aucasclate` pops
+    first and flips the still-unwalked `aucascmid`): `aucascleaf` IS
+    listed here (live-captured in
+    `fixtures/abort-captures/dev-libs_aucasctop.*`, real 3.0.81.3,
+    `backtrack: 0/20`), alongside the standard "USE changes are
+    necessary" block and the "terminated early" notice, exit 1.
+    Backlog #218: the in-walk delta re-expansion ports that ordering, so
+    the default list below carries the leaf (it used to record only the
+    3-package list -- see the pre-#218 history of this pin).
 
     --autounmask-backtrack=y: the loop re-runs the whole walk with the
     flip applied, so aucascleaf now appears too."""
@@ -5554,11 +5547,11 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/aucascleaf-1.0 ",
         '[ebuild  N     ] dev-libs/aucascmid-1.0  USE="cascade"',
         "[ebuild  N     ] dev-libs/aucasclate-1.0 ",
         "[ebuild  N     ] dev-libs/aucasctop-1.0 ",
     ]
-    assert "aucascleaf" not in rust.stdout
     assert rust.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
@@ -5579,7 +5572,7 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         "[ebuild  N     ] dev-libs/aucasctop-1.0 ",
     ]
 
-    # --json (default) carries the same change, without aucascleaf
+    # --json (default) carries the same change, with aucascleaf
     j = _run([str(emerge_binary)], base + ["--json"], fixture_env)
     payload = json.loads(j.stdout)
     assert payload["autounmask_use_changes"] == [
@@ -5597,6 +5590,7 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         "aucasctop",
         "aucasclate",
         "aucascmid",
+        "aucascleaf",
     }
 
     # --autounmask-use=n: no flip, aucascmid[cascade] is unresolvable
