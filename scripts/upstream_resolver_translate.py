@@ -130,6 +130,18 @@ def _result_record(result) -> dict:
     return record
 
 
+def _opt_floor(value: int) -> int | None:
+    """Fold a parsed `--eapi-floor` back to the optional floor: `0` is
+    the verbatim opt-out (no `or None` round-trip through `"0"`)."""
+    return None if value == 0 else value
+
+
+def _floor_cli_value(floor: int | None) -> str:
+    """Render an optional floor for a child `--eapi-floor` argv: `None`
+    (verbatim capture) is spelled `"0"`, the flag's own opt-out."""
+    return "0" if floor is None else str(floor)
+
+
 class Capture:
     """Wrap `ResolverPlayground` so both constructor inputs and every
     `run()` result are recorded. Tests that call `run()` directly (not
@@ -236,32 +248,24 @@ def capture_module(module: str, eapi_floor: int | None = 8,
     capture = Capture(eapi_floor=eapi_floor)
     capture.install()
     if no_assert:
-        # Run every test_case to completion even when the floored EAPI
-        # breaks the source literal's expectations (backlog #220: the
-        # literal asserts old-EAPI behaviour, so the first mismatch
-        # would abort the method and truncate the oracle). The recorded
-        # results are still the real resolver's.
+        # Narrow (backlog #239): neutralise only the equality asserts a
+        # raised EAPI floor can legitimately move -- the recorded-result
+        # comparisons (mergelists, slot solutions; upstream uses
+        # assertEqual for all of them, the container aliases are covered
+        # for future files). Every other assertion stays real, in
+        # particular assertRaises: a floored playground that is
+        # genuinely broken (failed setup, unexpected exception) must
+        # abort loudly instead of recording a truncated oracle.
         def _pass(self, *args, **kwargs):
             return None
 
-        @classmethod
-        def _pass_cm(cls, *args, **kwargs):
-            class _Ctx:
-                def __enter__(self):
-                    return None
-
-                def __exit__(self, *exc):
-                    return True
-
-            return _Ctx()
-
         unittest.TestCase.assertEqual = _pass
-        unittest.TestCase.assertTrue = _pass
-        unittest.TestCase.assertIn = _pass
-        unittest.TestCase.assertNotIn = _pass
-        unittest.TestCase.assertIs = _pass
-        unittest.TestCase.assertIsNotNone = _pass
-        unittest.TestCase.assertRaises = _pass_cm
+        unittest.TestCase.assertListEqual = _pass
+        unittest.TestCase.assertTupleEqual = _pass
+        unittest.TestCase.assertDictEqual = _pass
+        unittest.TestCase.assertSetEqual = _pass
+        unittest.TestCase.assertSequenceEqual = _pass
+        unittest.TestCase.assertCountEqual = _pass
     started = time.time()
     status: dict = {"module": module, "cases": 0, "playgrounds": 0, "errors": [], "failures": 0}
     try:
@@ -377,6 +381,8 @@ def emit_fixtures(capture: Capture, out: Path) -> dict:
             "world": len(world),
             "notes": notes,
         })
+    report["playground_count"] = len(report["playgrounds"])
+    report["case_count"] = len(report["cases"])
     (out / "cases.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     return report
 
@@ -385,14 +391,15 @@ def run_all(stats: bool, eapi_floor: int | None = 8,
             no_assert: bool = False) -> dict:
     files = sorted(RESOLVER_TESTS.glob("test_*.py"))
     summary: dict = {"files": len(files), "captured": 0, "with_cases": 0,
-                     "errors": 0, "import_errors": 0, "cases": 0, "crashes": 0,
+                     "errors": 0, "import_errors": 0, "cases": 0,
+                     "playgrounds": 0, "crashes": 0,
                      "eapi_floor": eapi_floor, "per_file": {}}
     with tempfile.TemporaryDirectory(prefix="portuale-upstream-") as tmp:
         for path in files:
             out = Path(tmp) / f"{path.stem}.json"
             cmd = [sys.executable, __file__, "--file", str(path),
-                   "--json", str(out),
-                   "--eapi-floor", str(eapi_floor or 0)]
+                    "--json", str(out),
+                    "--eapi-floor", _floor_cli_value(eapi_floor)]
             if no_assert:
                 cmd.append("--no-assert")
             proc = subprocess.run(
@@ -419,10 +426,12 @@ def run_all(stats: bool, eapi_floor: int | None = 8,
                 if status.get("cases"):
                     summary["with_cases"] += 1
                     summary["cases"] += status["cases"]
+                summary["playgrounds"] += status.get("playgrounds", 0)
                 summary["errors"] += len(status.get("errors", []))
     if stats:
         print(f"{summary['files']} upstream files: {summary['captured']} captured, "
               f"{summary['with_cases']} with cases, {summary['cases']} cases, "
+              f"{summary['playgrounds']} playgrounds, "
               f"{summary['errors']} upstream test errors, "
               f"{summary['import_errors']} import errors, {summary['crashes']} crashes")
         for name, entry in sorted(summary["per_file"].items()):
@@ -445,14 +454,16 @@ def main() -> int:
                              "default: 8, the supported range floor). "
                              "Use --eapi-floor=0 to keep upstream's EAPIs verbatim.")
     parser.add_argument("--no-assert", action="store_true",
-                        help="neutralise unittest assertions while capturing, so "
-                             "every test_case runs to completion even when the "
-                             "EAPI floor breaks the source literal's old-EAPI "
-                             "expectations (backlog #220 oracle re-runs).")
+                        help="neutralise the equality assertions while "
+                             "capturing, so every test_case runs to "
+                             "completion even when the EAPI floor moves the "
+                             "source literal's old-EAPI expectations "
+                             "(backlog #220 oracle re-runs). All other "
+                             "assertions, including assertRaises, stay real.")
     args = parser.parse_args()
 
     if args.all:
-        summary = run_all(args.stats, eapi_floor=args.eapi_floor or None,
+        summary = run_all(args.stats, eapi_floor=_opt_floor(args.eapi_floor),
                           no_assert=args.no_assert)
         if args.json:
             Path(args.json).write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
@@ -471,7 +482,7 @@ def main() -> int:
     documents = []
     failed = False
     for module in modules:
-        status = capture_module(module, eapi_floor=args.eapi_floor or None,
+        status = capture_module(module, eapi_floor=_opt_floor(args.eapi_floor),
                                 no_assert=args.no_assert)
         capture = status.pop("captured")
         document = {"module": module, "status": status,

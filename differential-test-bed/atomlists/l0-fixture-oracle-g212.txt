@@ -1,0 +1,21 @@
+# #212 — `slot_operator_mask_built` for a non-installed binary (v2 #24c),
+# the slot-change arm (real `_slot_change_backtrack`, depgraph.py:2383).
+# No knobs: the stale binary rides the committed local PKGDIR
+# (`fixtures/pkgdir`, `PKGDIR=${PORTAGE_CONFIGROOT}/pkgdir`), and the
+# default ROOT=$FX shape suffices (no installed packages involved).
+#
+# Shape (S0 probe, this branch): genuine `dev-libs/somaskchild-1.0`
+# binpkg built at `SLOT="0/1"` (real `ebuild package`, committed under
+# `fixtures/pkgdir/dev-libs/`) while the tree ebuild moved to `SLOT="0/2"`
+# without a revbump; `dev-libs/somaskparent-1.0` carries the unbuilt
+# `RDEPEND="dev-libs/somaskchild:="` (both ebuilds EAPI 8). Real masks
+# the stale binary (`slot_operator_mask_built`) through the
+# backtrack-config restart and merges the ebuild instead:
+#
+#   [ebuild  N     ] dev-libs/somaskchild-1.0
+#   [ebuild  N     ] dev-libs/somaskparent-1.0
+#
+# (rc 0, `backtrack: 0/20`; the `to <ROOT>/` suffix is the bed's
+# ROOT display, normalised by the comparator). Pre-#212 portuale merges
+# the stale `[binary N] somaskchild-1.0-1` instead.
+--usepkg dev-libs/somaskparent
