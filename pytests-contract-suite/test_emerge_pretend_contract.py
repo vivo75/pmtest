@@ -9652,6 +9652,60 @@ def test_ignore_world_merges_only_the_arg_on_an_eapi_8_tree(
         assert got.stdout.splitlines() == rows, args
 
 
+def test_ignore_world_contrast_against_a_world_bound_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """`--ignore-world` contrast pin (backlog #223 fix round 1): the same
+    argument with and without the flag under a tmp ROOT whose world file
+    contains the bounding consumer `dev-libs/igw0a`.
+
+    Real semantics (`3rdparty/portage` 3.0.82.2): `--ignore-world`
+    empties `_required_set_names` (`lib/_emerge/depgraph.py:357-360`),
+    so `_complete_graph` (`:8677-8731`) no longer walks the world seeds;
+    without the flag the installed world member `igw0a-1`'s own pin
+    (`>=dev-libs/igw0x-1 <dev-libs/igw0x-2`) collides with the requested
+    out-of-range version. Grounded live against the real
+    `ResolverPlayground` at EAPI 8 (`world=["dev-libs/igw0a"]`,
+    `igw0{x,a}` ebuilds/installed as in the fixture): the plain
+    `>=dev-libs/igw0x-2` cell answers `success=False` with empty
+    `slot_collision_solutions`, while the `--ignore-world` cell answers
+    `success=True`, `mergelist=["dev-libs/igw0x-2"]` (same for
+    `<dev-libs/igw0x-1` vs `igw0x-0.1`) — the EAPI-8 mirror of upstream
+    `test_complete_graph.py::testCompleteGraphVersionChange`'s
+    `--complete-graph-if-new-ver=y` (fail) vs `--ignore-world` (pass)
+    cells. The tmp ROOT uses the `_world_extra_env` copied-fixture
+    pattern (shared world plus `dev-libs/igw0a`), so the shared fixture
+    world file stays untouched.
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/igw0a")
+    cases = [
+        (
+            ">=dev-libs/igw0x-2",
+            "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+        ),
+        (
+            "<dev-libs/igw0x-1",
+            "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+        ),
+    ]
+    for atom, row in cases:
+        plain = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert plain.returncode == 1, atom
+        assert plain.stderr == "", atom
+        merges = [
+            ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")
+        ]
+        assert merges == [row], atom
+        assert "slot conflict" in plain.stdout, atom
+        assert "dev-libs/igw0a-1" in plain.stdout, atom
+        flagged = _run(
+            [str(emerge_binary)], ["--pretend", "--ignore-world", atom], env
+        )
+        assert flagged.returncode == 0, atom
+        assert flagged.stderr == "", atom
+        assert flagged.stdout.splitlines() == [row], atom
+
+
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     emerge_binary, fixture_env
 ):
