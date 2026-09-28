@@ -757,9 +757,9 @@ CASES = [
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y fails like real (rc 1; real prefers A-1 plus a foo use change)",
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y merges like real (rc 0; missing-dep backtrack masks A-2, A-1 merges, foo already on)",
         ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"],
-        1,
+        0,
     ),
     (
         "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-1 fails like real (rc 1; B[foo?] unsatisfiable, B lacks foo)",
@@ -5847,6 +5847,80 @@ def test_autounmask_levels_prefer_license_over_a_higher_keyword_masked_version(
     assert "license changes are necessary" in rust.stderr
     assert "=dev-libs/levelpkg-1.0 SomeEula" in rust.stderr
     assert "keyword changes are necessary" not in rust.stderr
+
+
+def test_autounmask_keep_keywords_y_falls_back_to_the_older_stable_version(
+    emerge_binary, fixture_env
+):
+    """Backlog #198: upstream `test_autounmask_keep_keywords.py` (`akk0`,
+    `3rdparty/portage` `lib/_emerge/depgraph.py::_add_dep`'s
+    "missing dependency" backtrack + `resolver/backtracking.py`'s
+    `_feedback_missing_dep`). With `--autounmask-keep-keywords=y` no
+    allowed `_autounmask_levels` step unmasks `~amd64` `akk0b-1`, so the
+    `akk0b` dep of the newest `akk0a-2` is unsatisfiable even USE-free;
+    real records the missing dependency, restarts, and masks the parent
+    (`akk0a-2`), falling back to `akk0a-1` (`backtrack: 1/20` on the
+    fixture cell). `foo` is globally on in the fixture profile, so no
+    USE change is needed and the run succeeds (rc 0); the masked `A-2`
+    is reported through real `_show_missed_update_unsatisfied_dep`'s
+    full form (`depgraph.py:1592`), not the abbreviated backtracking
+    tail. Expected text is real 3.0.81.3 `emerge -p` on the staged
+    fixtures verbatim (one rule-13 probe; the mechanism is 3.0.82.2
+    source), minus real's `to <root>` / `for <root>` destination
+    suffixes, which no portuale pin carries."""
+    args = ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 0
+    # Portuale prints real's missed-update notices on stdout after the
+    # merge rows (the orbtblocked `WARNING` precedent); real prints
+    # them on stderr. The masked-`akk0b` disclosure rides inside the
+    # notice unit, so it is stdout here too.
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/akk0c-1  USE=\"foo\"",
+        "[ebuild  N     ] dev-libs/akk0a-1 ",
+        "",
+        "!!! The following update has been skipped due to unsatisfied dependencies:",
+        "",
+        "dev-libs/akk0a:0",
+        "",
+        "  selected: (dev-libs/akk0a-1:0/0::testrepo, ebuild scheduled for merge)",
+        "  skipped: (dev-libs/akk0a-2:0/0::testrepo, ebuild scheduled for merge) (see unsatisfied dependency below)",
+        "",
+        '!!! All ebuilds that could satisfy "dev-libs/akk0b" have been masked.',
+        "!!! One of the following masked packages is required to complete your request:",
+        "- dev-libs/akk0b-1::testrepo (masked by: ~amd64 keyword)",
+        "",
+        '(dependency required by "dev-libs/akk0a-2::testrepo" [ebuild])',
+        "For more information, see the MASKED PACKAGES section in the emerge",
+        "man page or refer to the Gentoo Handbook.",
+        "",
+    ]
+    assert rust.stderr == ""
+
+
+def test_autounmask_keep_keywords_n_takes_the_newest_via_unstable_keywords(
+    emerge_binary, fixture_env
+):
+    """Backlog #198 contrast cell: upstream `test_autounmask_keep_keywords.py`
+    with `--autounmask-keep-keywords=n`. The `+~arch` level is allowed,
+    so `akk0b-1` is keyword-autounmasked and the newest `akk0a-2` merges
+    (rc 1, keyword change). Expected text is real 3.0.81.3 `emerge -p`
+    on the staged fixtures verbatim (same rule-13 probe as the `=y`
+    twin), minus the `to <root>` destination suffixes."""
+    args = ["--pretend", "--autounmask-keep-keywords=n", "dev-libs/akk0a"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N    ~] dev-libs/akk0b-1 ",
+        "[ebuild  N     ] dev-libs/akk0a-2 ",
+    ]
+    assert rust.stderr == (
+        "\nThe following keyword changes are necessary to proceed:\n"
+        ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/akk0a-2::testrepo\n"
+        "# required by dev-libs/akk0a (argument)\n"
+        "=dev-libs/akk0b-1 ~amd64\n"
+    )
 
 
 def test_use_dep_enforcement_plain_flag_declared_and_enabled_matches(
@@ -17649,17 +17723,25 @@ def test_oracle_virtual_subslot_upgrade_avoids_missed_update(
 def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     emerge_binary, fixture_env, tmp_path
 ):
-    """023 oracle, case btnr -- oracle-DIVERGENT, see `docs/history/023-oracle.md`
-    (upstream `test_backtracking.py::testBacktrackNoWrongRebuilds`,
-    `--backtrack 6`): `btrd` needs `<btra-2`, `btrc-2` needs `>=btra-2`.
-    Real explores several mask nodes, discards masks whose reason got
-    masked itself (bug 375573 `_check_runtime_pkg_mask`), and merges
-    NOTHING. Portuale's single bundled trial cannot explore that search:
-    it upgrades `btra` + `btrc` and reports the residual slot conflict.
-    Pinned to portuale's current output; the Phase C driver for the node
-    stack. Since #62 the residual report exits 1 (real's rc-1 rule for a
-    recorded conflict, even though real records none here -- the rc is
-    part of the documented divergence, like the merge list itself)."""
+    """023 oracle, case btnr (upstream
+    `test_backtracking.py::testBacktrackNoWrongRebuilds`, `--backtrack 6`):
+    `btrd` needs `<btra-2`, `btrc-2` needs `>=btra-2`. Real explores
+    several mask nodes, discards masks whose reason got masked itself
+    (bug 375573 `_check_runtime_pkg_mask`), and merges NOTHING
+    (`mergelist=[]`, `success=True`).
+
+    Backlog #198: portuale now mirrors that search -- the bound conflict
+    masks `btra-2`, so `btrc-2`'s `>=btra-2` dies and the
+    missing-dependency backtrack (no top-level exemption, real
+    `depgraph.py:3493-3503`) masks the world-selected `btrc-2` too. The
+    run settles with no `btra`/`btrc` upgrade and rc 0, matching the
+    upstream oracle's merge list and success. The two notices follow
+    real's deterministic miss mapping from that mask state (slot mask
+    -> `WARNING` row for `btra-2` with `btrd-1`'s bound; missing-dep
+    mask whose `>=btra-2` still names the backtrack-masked `btra-2` ->
+    abbreviated tail for `btrc:0`); their verbatim text beyond the
+    oracle is recorded as observed. (Before #198 portuale upgraded
+    both and reported the residual slot conflict, rc 1.)"""
     root = _b1_root(
         tmp_path,
         ["dev-libs/btrb", "dev-libs/btrc"],
@@ -17675,11 +17757,14 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
         ["--pretend", "--backtrack", "6", "--deep", "--selective", "--update", "@world"],
         _b1_env(fixture_env, root),
     )
-    assert rust.returncode == 1
+    assert rust.returncode == 0
     merges = _b1_merges(rust.stdout)
-    assert "[ebuild     U  ] dev-libs/btra-2 [1]" in merges
-    assert "[ebuild     U  ] dev-libs/btrc-2 [1]" in merges
-    assert "!!! Multiple package instances within a single package slot" in rust.stdout
+    assert not any("dev-libs/btra" in ln for ln in merges), merges
+    assert not any("dev-libs/btrc" in ln for ln in merges), merges
+    assert "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:" in rust.stdout
+    assert "dev-libs/btra:0" in rust.stdout
+    assert "!!! The following update(s) have been skipped due to unsatisfied dependencies" in rust.stdout
+    assert "dev-libs/btrc:0" in rust.stdout
 
 
 def test_oracle_no_aggressive_downgrade(
