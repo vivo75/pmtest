@@ -1836,6 +1836,12 @@ CASES = [
         0,
     ),
     (
+        "--usepkg: slot_operator_mask_built masks a binary built at a stale slot, "
+        "the tree ebuild merges instead (#212)",
+        ["--pretend", "--usepkg", "dev-libs/somaskparent"],
+        0,
+    ),
+    (
         "--getbinpkg: _equiv_ebuild_visible rejects a binary whose ebuild left the tree",
         ["--pretend", "--getbinpkg", "dev-libs/eqebvispkg"],
         0,
@@ -7841,6 +7847,29 @@ def test_getbinpkg_binpkg_changed_deps_rejects_a_stale_binary(
         "[ebuild  N     ] dev-libs/bcdepnew-1.0 ",
     }
     assert "bcdepold" not in rust.stdout
+
+
+def test_usepkg_slot_operator_mask_built_rejects_a_stale_slot_binary(
+    emerge_binary, fixture_env
+):
+    """Real `_slot_change_backtrack` (`3rdparty/portage/lib/_emerge/
+    depgraph.py:2383`) masks a non-installed binary whose built
+    slot-operator dep cannot be satisfied the way it was built, and the
+    backtrack-config restart (`:5703-5712`) resolves the dep to the tree
+    ebuild instead. dev-libs/somaskchild-1.0's local-PKGDIR binary was
+    built at SLOT="0/1" while the tree ebuild moved to SLOT="0/2"
+    without a revbump; dev-libs/somaskparent-1.0 carries the unbuilt
+    RDEPEND="dev-libs/somaskchild:=". Expected value from real Portage
+    3.0.82.2: the S0 probe on this branch merges `[ebuild N]
+    somaskchild-1.0` + `[ebuild N] somaskparent-1.0` (rc 0); pre-#212
+    portuale merged the stale `[binary N] somaskchild-1.0-1` instead."""
+    args = ["--pretend", "--usepkg", "dev-libs/somaskparent"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/somaskchild-1.0 ",
+        "[ebuild  N     ] dev-libs/somaskparent-1.0 ",
+    ]
 
 
 def test_binpkg_changed_deps_explicit_override(
