@@ -21237,3 +21237,43 @@ def test_or_pick_backtrack0_reports_the_self_cycle(
     )
     assert rust.returncode == 1
     assert _G216_SELF_BLOCK in rust.stderr
+
+
+def test_or_pick_direct_target_resolves_to_bootstrap(
+    emerge_binary, fixture_env
+):
+    """Backlog #216 (review M3): `dev-lang/g216comp` merges
+    `[g216boot, g216comp]`, rc 0 -- the direct-target mirror of the
+    `g216top` default pin above. Same real grounding (pass-1
+    `preferred_in_graph` self pick, `_serialize_tasks` dead-end,
+    `circular_dependency` retry to `g216boot`, `backtrack: 1/20`):
+    the S0 container probe (`/tmp/opencode/g216/probe.log`, real
+    3.0.81.3) shows rc 0 with the bootstrap merge, and the L0 oracle
+    single-root capture shows exactly these two rows. Single-root
+    `fixture_env` (`RUNNING_ROOT == ROOT`) carries no `to <ROOT>`
+    suffix and no dual-root `g216comp` row."""
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-lang/g216comp"], fixture_env)
+    assert rust.returncode == 0
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+    assert rows == [
+        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        "[ebuild  N     ] dev-lang/g216comp-1.0 ",
+    ]
+
+
+def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
+    emerge_binary, fixture_env
+):
+    """Backlog #216 (review M3): `dev-lang/g216comp --backtrack=0`
+    fails with real's pass-1 self-cycle block, rc 1 -- the
+    direct-target mirror of the `g216top` b0 pin above. Same verbatim
+    block (`_G216_SELF_BLOCK`, staging-independent); the L0 oracle
+    single-root capture shows the one-row `[ebuild] g216comp` merge
+    list under it (`Total: 1`)."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert _G216_SELF_BLOCK in rust.stderr
