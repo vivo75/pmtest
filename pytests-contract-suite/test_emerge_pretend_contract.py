@@ -172,6 +172,17 @@ CASES = [
     ("--ask=n inline form", ["--pretend", "--ask=n", "dev-libs/newpkg"], 0),
     ("--ask=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
     ("--read-news=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
+    ("--verbose=True spelling (real true_y_or_n, same as bare --verbose)", ["--pretend", "--verbose=True", "dev-libs/newpkg"], 0),
+    ("--quiet=True spelling (real true_y_or_n, same as bare --quiet)", ["--pretend", "--quiet=True", "dev-libs/newpkg"], 0),
+    ("--deselect=True spelling (real true_y_or_n, same as bare --deselect)", ["--pretend", "--deselect=True", "dev-libs/foo"], 0),
+    ("--changed-deps=True spelling (real true_y_or_n, same as bare --changed-deps)", ["--pretend", "--changed-deps=True", "dev-libs/changeddepspkg"], 0),
+    ("--changed-deps-report=True spelling (real true_y_or_n, same as bare --changed-deps-report)", ["--pretend", "--changed-deps-report=True", "dev-libs/changeddepspkg"], 0),
+    ("--selective=True spelling (real true_y_or_n, same as bare --selective)", ["--pretend", "--selective=True", "dev-libs/samepkg"], 0),
+    ("--changed-slot=True spelling (real true_y_or_n, same as bare --changed-slot)", ["--pretend", "--changed-slot=True", "dev-libs/changedslotpkg"], 0),
+    ("--quiet-build=True spelling (real true_y_or_n, same as bare --quiet-build)", ["--pretend", "--quiet-build=True", "dev-libs/newpkg"], 0),
+    ("--with-test-deps=True spelling (real true_y_or_n, same as bare --with-test-deps)", ["--pretend", "--with-test-deps=True", "dev-libs/withtestdeppkg"], 0),
+    ("--autounmask-keep-keywords=True spelling (real true_y_or_n, same as bare, rc 0 like =y)", ["--pretend", "--autounmask-keep-keywords=True", "dev-libs/akk0a"], 0),
+    ("--autounmask-keep-masks=True spelling (real true_y_or_n, mask kept so fatal like the default)", ["--pretend", "--autounmask-keep-masks=True", "dev-libs/hardmaskedpkg"], 1),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
     (
@@ -629,7 +640,7 @@ CASES = [
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like real (rc 1; USE changes necessary, bug 632598; merge choice differs, not pinned)",
+        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like real (rc 1; USE changes necessary, bug 632598; pristine-world cell matches real's A-3+x, the world=B fall to A-2 is pinned separately)",
         ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"],
         1,
     ),
@@ -681,6 +692,26 @@ CASES = [
     (
         "circular: upstream test_circular_choices pg1 cmake --backtrack=0 fails like real (rc 1; bug 703440 circular, not pinned)",
         ["--pretend", "--backtrack=0", "dev-libs/ccd1c"],
+        1,
+    ),
+    (
+        "or-pick: in-graph || self branch re-resolves to bootstrap like real (rc 0; #216, pinned below)",
+        ["--pretend", "app-misc/g216top"],
+        0,
+    ),
+    (
+        "or-pick: in-graph || self branch re-resolves to bootstrap like real, direct target (rc 0; #216, pinned below)",
+        ["--pretend", "dev-lang/g216comp"],
+        0,
+    ),
+    (
+        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like real (rc 1; #216, pinned below)",
+        ["--pretend", "--backtrack=0", "app-misc/g216top"],
+        1,
+    ),
+    (
+        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like real, direct target (rc 1; #216, pinned below)",
+        ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
         1,
     ),
     (
@@ -759,9 +790,9 @@ CASES = [
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y fails like real (rc 1; real prefers A-1 plus a foo use change)",
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y merges like real (rc 0; missing-dep backtrack masks A-2, A-1 merges, foo already on)",
         ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"],
-        1,
+        0,
     ),
     (
         "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-1 fails like real (rc 1; B[foo?] unsatisfiable, B lacks foo)",
@@ -951,6 +982,11 @@ CASES = [
     (
         "recursion: any-of group falls back to every alternative when none is satisfiable",
         ["--pretend", "dev-libs/anyofunresolvable"],
+        1,
+    ),
+    (
+        "use-conditional: a USE-conditional-only || group that reduces to empty fails at EAPI 7+ (#238: rc 1 like real)",
+        ["--pretend", "dev-libs/condanyof"],
         1,
     ),
     (
@@ -2082,6 +2118,8 @@ CASES = [
     ("merge order: --json for the slot-qualified sibling-slot fixture", ["--pretend", "--json", "dev-libs/slotorderroot"], 0),
     ("virtual: resolved directly", ["--pretend", "virtual/texteditor"], 0),
     ("virtual: resolved as a dependency", ["--pretend", "dev-libs/virtualconsumerpkg"], 0),
+    ("virtual cycle: a virtual satisfied by an ebuild that depends on itself fails (#193: rc 1 like real)", ["--pretend", "app-misc/bar"], 1),
+    ("virtual cycle: a virtual ring through virtual providers fails (#193: rc 1 like real)", ["--pretend", "app-misc/foo"], 1),
     ("multi-atom: two independent new packages", ["--pretend", "dev-libs/newpkg", "dev-libs/withdeps"], 0),
     ("multi-atom: literal duplicate atom dedupes silently", ["--pretend", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("multi-atom: dependency shared between two targets dedupes", ["--pretend", "dev-libs/shared-a", "dev-libs/shared-b"], 0),
@@ -5025,7 +5063,12 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
     masked version higher than the chosen one -- the 42 script's
     row-only filter never captured this block, but the mergelist it
     verifies proves the mask this notice reads). No abbreviated tail:
-    no missing-dependency mask survives on this path."""
+    no missing-dependency mask survives on this path.
+
+    Backlog #230: both lines render real's full `pkg_use_display`
+    (`_emerge/UseFlagDisplay.py:55`) -- orbttool/orbtblocked are EAPI 8
+    with no IUSE, so the profile globals mask out and only the implicit
+    `ELIBC="glibc"` group survives (`USE="" ELIBC="glibc"`)."""
     ok = _run([str(emerge_binary)], ["--pretend", "dev-libs/orbtblocked"], fixture_env)
     assert ok.returncode == 0
     assert ok.stdout.splitlines() == [
@@ -5036,8 +5079,8 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
         "",
         "dev-libs/orbttool:0",
         "",
-        '  (dev-libs/orbttool-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    =dev-libs/orbttool-1.0 required by (dev-libs/orbtblocked-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/orbttool-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    =dev-libs/orbttool-1.0 required by (dev-libs/orbtblocked-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^                  ^^^",
         "",
     ]
@@ -5849,6 +5892,191 @@ def test_autounmask_levels_prefer_license_over_a_higher_keyword_masked_version(
     assert "license changes are necessary" in rust.stderr
     assert "=dev-libs/levelpkg-1.0 SomeEula" in rust.stderr
     assert "keyword changes are necessary" not in rust.stderr
+
+
+def test_autounmask_keep_keywords_y_falls_back_to_the_older_stable_version(
+    emerge_binary, fixture_env
+):
+    """Backlog #198: upstream `test_autounmask_keep_keywords.py` (`akk0`,
+    `3rdparty/portage` `lib/_emerge/depgraph.py::_add_dep`'s
+    "missing dependency" backtrack + `resolver/backtracking.py`'s
+    `_feedback_missing_dep`). With `--autounmask-keep-keywords=y` no
+    allowed `_autounmask_levels` step unmasks `~amd64` `akk0b-1`, so the
+    `akk0b` dep of the newest `akk0a-2` is unsatisfiable even USE-free;
+    real records the missing dependency, restarts, and masks the parent
+    (`akk0a-2`), falling back to `akk0a-1` (`backtrack: 1/20` on the
+    fixture cell). `foo` is globally on in the fixture profile, so no
+    USE change is needed and the run succeeds (rc 0); the masked `A-2`
+    is reported through real `_show_missed_update_unsatisfied_dep`'s
+    full form (`depgraph.py:1592`), not the abbreviated backtracking
+    tail. Expected text is real 3.0.81.3 `emerge -p` on the staged
+    fixtures verbatim (one rule-13 probe; the mechanism is 3.0.82.2
+    source), minus real's `to <root>` / `for <root>` destination
+    suffixes, which no portuale pin carries."""
+    args = ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 0
+    # Portuale prints real's missed-update notices on stdout after the
+    # merge rows (the orbtblocked `WARNING` precedent); real prints
+    # them on stderr. The masked-`akk0b` disclosure rides inside the
+    # notice unit, so it is stdout here too.
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/akk0c-1  USE=\"foo\"",
+        "[ebuild  N     ] dev-libs/akk0a-1 ",
+        "",
+        "!!! The following update has been skipped due to unsatisfied dependencies:",
+        "",
+        "dev-libs/akk0a:0",
+        "",
+        "  selected: (dev-libs/akk0a-1:0/0::testrepo, ebuild scheduled for merge)",
+        "  skipped: (dev-libs/akk0a-2:0/0::testrepo, ebuild scheduled for merge) (see unsatisfied dependency below)",
+        "",
+        '!!! All ebuilds that could satisfy "dev-libs/akk0b" have been masked.',
+        "!!! One of the following masked packages is required to complete your request:",
+        "- dev-libs/akk0b-1::testrepo (masked by: ~amd64 keyword)",
+        "",
+        '(dependency required by "dev-libs/akk0a-2::testrepo" [ebuild])',
+        "For more information, see the MASKED PACKAGES section in the emerge",
+        "man page or refer to the Gentoo Handbook.",
+        "",
+    ]
+    assert rust.stderr == ""
+
+
+def test_autounmask_keep_keywords_n_takes_the_newest_via_unstable_keywords(
+    emerge_binary, fixture_env
+):
+    """Backlog #198 contrast cell: upstream `test_autounmask_keep_keywords.py`
+    with `--autounmask-keep-keywords=n`. The `+~arch` level is allowed,
+    so `akk0b-1` is keyword-autounmasked and the newest `akk0a-2` merges
+    (rc 1, keyword change). Expected text is real 3.0.81.3 `emerge -p`
+    on the staged fixtures verbatim (same rule-13 probe as the `=y`
+    twin), minus the `to <root>` destination suffixes."""
+    args = ["--pretend", "--autounmask-keep-keywords=n", "dev-libs/akk0a"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N    ~] dev-libs/akk0b-1 ",
+        "[ebuild  N     ] dev-libs/akk0a-2 ",
+    ]
+    assert rust.stderr == (
+        "\nThe following keyword changes are necessary to proceed:\n"
+        ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/akk0a-2::testrepo\n"
+        "# required by dev-libs/akk0a (argument)\n"
+        "=dev-libs/akk0b-1 ~amd64\n"
+    )
+
+
+def _abk0_worldb_root(tmp_path):
+    """A test-local ROOT for backlog #205's upstream shape
+    (`test_autounmask_use_backtrack.py`, bug 632598): installed
+    `abk0a-1` (`RDEPEND=abk0c`), `abk0b-1` (`RDEPEND=<abk0a-3`) and
+    `abk0c-1`, with `abk0b` in `@world` so the installed bound is
+    required-set reachable (real `_complete_graph` re-walks `@world`).
+    Mirrors the fixture vdb files exactly, minus the `repository` file
+    the fixtures omit (so the consumer renders `__unknown__`, like
+    real). `PORTAGE_CONFIGROOT` stays at the shared fixtures so the
+    `abk0*` ebuilds are visible."""
+    for name, files in {
+        "abk0a-1": {"RDEPEND": "dev-libs/abk0c\n"},
+        "abk0b-1": {"RDEPEND": "<dev-libs/abk0a-3\n"},
+        "abk0c-1": {"IUSE": "x y z\n"},
+    }.items():
+        d = tmp_path / "var" / "db" / "pkg" / "dev-libs" / name
+        d.mkdir(parents=True)
+        (d / "CATEGORY").write_text("dev-libs\n")
+        (d / "SLOT").write_text("0\n")
+        for fn, content in files.items():
+            (d / fn).write_text(content)
+    world = tmp_path / "var" / "lib" / "portage" / "world"
+    world.parent.mkdir(parents=True)
+    world.write_text("dev-libs/abk0b\n")
+    return tmp_path
+
+
+def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
+    emerge_binary, fixture_env
+):
+    """Backlog #205, pristine-world cell (the shared fixture world has
+    no `abk0b`, so installed `B-1`'s `<A-3` bound is unreachable):
+    real settles on `A-3` plus the `x` USE change (`backtrack: 0/2`,
+    rc 1) -- one rule-13 probe on 3.0.81.3, mechanism from 3.0.82.2
+    source. The USE block names only the forcing chain
+    (`_get_dep_chain(..., unsatisfied_dependency=True)` picks `abk0d-1`,
+    whose `C[x]` the change satisfies, not `abk0a-3`'s plain `C`).
+    Known delta vs the probe, documented: no `[1]` oldbest bracket on
+    the `R` row (real shows one via the vdb-repo-mismatch disjunct,
+    `lib/_emerge/resolver/output.py:720-731`, which portuale
+    deliberately cuts -- backlog #247; see `resolve_pretend`'s
+    `myoldbest` comment)."""
+    args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/abk0c-1  USE=\"x*\"",
+        "[ebuild     U  ] dev-libs/abk0a-3 [1]",
+        "[ebuild  N     ] dev-libs/abk0d-1 ",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/abk0d-1::testrepo\n"
+        "# required by dev-libs/abk0d (argument)\n"
+        ">=dev-libs/abk0c-1 x\n"
+    )
+
+
+def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #205, upstream shape (bug 632598): with `abk0b` in
+    `@world`, installed `B-1`'s `<A-3` bound breaks the `A-3` pick, so
+    real's `_complete_graph` broken-deep-dep path reports it as a slot
+    collision (`depgraph.py:8756-8770`), backtracking masks `A-3`
+    (`backtrack: 2/2`), and the run settles on `[C-1, A-2, D-1]` with
+    USE changes `x y` (rc 1). The masked `A-3` rides out as a
+    `WARNING` skipped-update row (real `_conflict_missed_update`,
+    `:2085-2106`); the USE block names the forcing chain only
+    (`abk0d-1`, not `abk0a-2`). Expected text is the rule-13 probe on
+    3.0.81.3 verbatim, minus real's `to <root>` / `for <root>`
+    destination suffixes, which no portuale pin carries (the merge line
+    stays bare, the header stays bare). The installed consumer carries
+    real's ` in '<root>'` suffix (real's `Package.__str__` appends it
+    iff `ROOT != "/"`), interpolated from the test ROOT. Known delta
+    vs the probe, documented: no `[1]` on the `R` row (backlog #247's
+    deliberate repo-mismatch cut, same as the pristine cell). The
+    skipped row carries real's `ELIBC="glibc"` group while the
+    installed consumer stays bare `USE=""`, both byte-for-byte from
+    the probe (the staged vdb has no USE file, so real shows no expand
+    group there either)."""
+    env = dict(fixture_env)
+    env["ROOT"] = str(_abk0_worldb_root(tmp_path))
+    env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
+    root = env["ROOT"]
+    args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        "[ebuild   R    ] dev-libs/abk0c-1  USE=\"x* y*\"",
+        "[ebuild     U  ] dev-libs/abk0a-2 [1]",
+        "[ebuild  N     ] dev-libs/abk0d-1 ",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/abk0a:0",
+        "",
+        "  (dev-libs/abk0a-3:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with",
+        f"    <dev-libs/abk0a-3 required by (dev-libs/abk0b-1:0/0::__unknown__, installed in '{root}') USE=\"\"",
+        "    ^               ^",
+        "",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/abk0d-1::testrepo\n"
+        "# required by dev-libs/abk0d (argument)\n"
+        ">=dev-libs/abk0c-1 x y\n"
+    )
 
 
 def test_use_dep_enforcement_plain_flag_declared_and_enabled_matches(
@@ -9859,10 +10087,14 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     itself (plain atoms, no conditionals/slots on the merged rows;
     the `[!icu?]` conditional lives on `cgp0q`, which neither graph
     walks), so #220's EAPI raise leaves these rows unchanged.
-    Not pinned: pg0's
-    `new-use=y` cell (oracle rc 1, portuale rc 0 — finding, no
-    CASES), pg1's two `new-ver=y` cells (oracle rc 1, portuale rc
-    0 — findings, no CASES). World caveat: upstream worlds
+    Not pinned here: pg0's `new-use=y` cell and pg1's two `new-ver=y`
+    cells (oracle rc 1 with the consumer in world; the shared world
+    file has no such consumer, so these exact argvs stay rc 0 here --
+    like real with that world). The failing shape is pinned instead by
+    the world-carrying twins below (backlog #222:
+    `test_complete_graph_use_break_fails_with_world_consumer`,
+    `test_complete_graph_ver_break_fails_with_world_consumer`).
+    World caveat: upstream worlds
     (`x11-libs/qt-webkit`,
     `sys-apps/a`) are not emitted as shared world entries, so the
     non-`--ignore-world` cells run against the shared world file;
@@ -10017,6 +10249,121 @@ def test_ignore_world_contrast_against_a_world_bound_consumer(
         assert flagged.stdout.splitlines() == [row], atom
 
 
+def test_complete_graph_use_break_fails_with_world_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """A USE change that breaks an installed bound fails the run
+    (backlog #222; upstream `test_complete_graph.py::
+    testCompleteGraphUseChange` pg0, `dev-libs/cgp0{x,q}`).
+
+    The tmp ROOT uses the `_world_extra_env` copied-fixture pattern
+    (shared world plus `dev-libs/cgp0q`), standing in for upstream's
+    `world=["x11-libs/qt-webkit"]`: the bulk translation emits no
+    world entries, so the shared-world cells can never see the
+    consumer. Grounded live against the real `ResolverPlayground`
+    (`3rdparty/portage` 3.0.82.2, EAPI-8 ebuilds mirroring the
+    fixtures, `world=["dev-libs/cgp0q"]`, `PYTHONHASHSEED=0`): the
+    `new-use=y` cell answers `success=False`,
+    `mergelist=["dev-libs/cgp0x-2.8.0"]` with empty
+    `slot_collision_solutions`, while the `new-use=n` and
+    `--ignore-world` cells answer `success=True` with the same
+    mergelist. Real mechanism: `_complete_graph` auto-enables on the
+    USE change (`lib/_emerge/depgraph.py:8592-8648`,
+    `complete_if_new_use` via the node-vs-installed USE diff) and its
+    end-of-walk loop fails the newly-unsatisfied dep the vdb still
+    matches (`:8751-8791`, installed `cgp0x` pulled in as a nomerge
+    node). Portuale renders the evaluated parent atom
+    (`dev-libs/cgp0x:2[-icu]` -- real stores the edge-time
+    `evaluate_conditionals` form) with the `("use", "icu")` reason
+    (`lib/_emerge/resolver/slot_collision.py:331-389`) plus the bare
+    `(Argument)` line (the `("AtomArg", None)` key, `:391-397`).
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp0q")
+    row = '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"'
+    plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/cgp0x"], env)
+    assert plain.returncode == 1, plain.stdout
+    assert plain.stderr == "", plain.stdout
+    merges = [ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert merges == [row], plain.stdout
+    assert "slot conflict" in plain.stdout, plain.stdout
+    assert "dev-libs/cgp0q-4.8.2" in plain.stdout, plain.stdout
+    assert "dev-libs/cgp0x:2[-icu]" in plain.stdout, plain.stdout
+    for args in (
+        ["--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
+        ["--ignore-world", "dev-libs/cgp0x"],
+    ):
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == [row], args
+
+
+def test_complete_graph_ver_break_fails_with_world_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """A version change that breaks an installed bound fails the run
+    (backlog #222; upstream `test_complete_graph.py::
+    testCompleteGraphVersionChange` pg1, `dev-libs/cgp1{x,a}`) --
+    the committed-fixture twin of the `igw0a` contrast above.
+
+    Same `_world_extra_env` pattern (shared world plus
+    `dev-libs/cgp1a`) for upstream's `world=["sys-apps/a"]`. Grounded
+    live against the real `ResolverPlayground` (`3rdparty/portage`
+    3.0.82.2, EAPI-8 ebuilds mirroring the fixtures,
+    `world=["dev-libs/cgp1a"]`, `PYTHONHASHSEED=0`): both `new-ver=y`
+    cells (`>=dev-libs/cgp1x-2`, `<dev-libs/cgp1x-1`) answer
+    `success=False` with the requested version alone in the mergelist
+    and empty `slot_collision_solutions`, while the `new-ver=n` (with
+    `--rebuild-if-new-slot=n`) and `--ignore-world` cells answer
+    `success=True` with the same mergelists. No product change was
+    needed for this shape (the #223-era reverse-dep pins already fail
+    it once the consumer is world-reachable); these cells pin the
+    committed fixtures to the oracle.
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp1a")
+    cases = [
+        (
+            ">=dev-libs/cgp1x-2",
+            "[ebuild     U  ] dev-libs/cgp1x-2 [1]",
+            "dev-libs/cgp1a-1",
+        ),
+        (
+            "<dev-libs/cgp1x-1",
+            "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
+            "dev-libs/cgp1a-1",
+        ),
+    ]
+    for atom, row, consumer in cases:
+        plain = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert plain.returncode == 1, atom
+        assert plain.stderr == "", atom
+        merges = [
+            ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")
+        ]
+        assert merges == [row], atom
+        assert "slot conflict" in plain.stdout, atom
+        assert consumer in plain.stdout, atom
+        flagged = _run(
+            [str(emerge_binary)], ["--pretend", "--ignore-world", atom], env
+        )
+        assert flagged.returncode == 0, atom
+        assert flagged.stderr == "", atom
+        assert flagged.stdout.splitlines() == [row], atom
+        opted_out = _run(
+            [str(emerge_binary)],
+            [
+                "--pretend",
+                "--complete-graph-if-new-ver=n",
+                "--rebuild-if-new-slot=n",
+                atom,
+            ],
+            env,
+        )
+        assert opted_out.returncode == 0, atom
+        assert opted_out.stderr == "", atom
+        assert opted_out.stdout.splitlines() == [row], atom
+
+
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     emerge_binary, fixture_env
 ):
@@ -10052,9 +10399,24 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     with both parents (`<dev-libs/blk0x-2`/blk0b,
     `<dev-libs/blk0x-3`/blk0c) inside it — real's one-entry-per-slot
     rule (`_get_missed_updates`), pinned here by #129 (which resolves
-    #142's divergence for this order). The expectation below matches
-    real's shape modulo the established `USE=""` / missing-ROOT-suffix
-    normalisation this pin already applies.
+    #142's divergence for this order).
+
+    Backlog #230: every line renders real's full `pkg_use_display`
+    (`_emerge/UseFlagDisplay.py:55`). Post-#220 the blk0 ebuilds are
+    EAPI 8 (fixture profiles `eapi` = 5) with no IUSE, so the globals
+    mask out and only the implicit `ELIBC="glibc"` group survives:
+    `USE="" ELIBC="glibc"`. The parent lines are real's own text (fix
+    round 1 probe, one `podman run localhost/test-portuale:latest`
+    over the four blk0 cells: every parent renders `USE=""
+    ELIBC="glibc"`). The missed line keeps portuale's fixture-tree
+    display (`USE="" ELIBC="glibc"`); real renders `USE=""
+    ABI_X86="(64)"` there because the missed instance resolves against
+    the running-root `/` tree -- cross-root resolution is backlog #242
+    (owner decision B17), covered on the bed side by the narrowed
+    allowlist entry `skipped-updates-cross-root-missed-line`.
+    Merge-scheduled nodes and headers stay bare (no `to '<root>'` /
+    `for <root>`), following the slot-collision notice per #230's
+    directive.
     """
     env = dict(fixture_env)
     uninstall_rows = [
@@ -10066,8 +10428,8 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
         return [
             "dev-libs/blk0x:0",
             "",
-            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
-            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"\"",
+            f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with",
+            f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\"",
             "    ^               ^",
             "",
         ]
@@ -10085,10 +10447,10 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     warn_x3_bc = [
         "dev-libs/blk0x:0",
         "",
-        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^               ^",
-        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '    <dev-libs/blk0x-3 required by (dev-libs/blk0c-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^               ^",
         "",
     ]
@@ -11328,7 +11690,12 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
     (`bttarget-2.0` vs `<bttarget-2.0`/`btpin-1.0`) plus the abbreviated
     unsatisfied-dependencies tail (`btconsumer:0`, whose
     `>=bttarget-2.0` still matches the backtrack-masked `bttarget-2.0`
-    at settle time -- real's `check_backtrack` probe raises)."""
+    at settle time -- real's `check_backtrack` probe raises).
+
+    Backlog #230: the `WARNING` lines render real's full
+    `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- bttarget/btpin
+    are EAPI 8 with no IUSE, so the globals mask out and only the
+    implicit `ELIBC="glibc"` group survives."""
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/btparent"], fixture_env)
     assert r.returncode == 0
@@ -11341,8 +11708,8 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         "",
         "dev-libs/bttarget:0",
         "",
-        '  (dev-libs/bttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    <dev-libs/bttarget-2.0 required by (dev-libs/btpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/bttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    <dev-libs/bttarget-2.0 required by (dev-libs/btpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^                  ^^^",
         "",
         "",
@@ -16426,6 +16793,52 @@ def test_virtual_is_resolved_as_a_dependency(emerge_binary, fixture_env):
     ]
 
 
+@pytest.mark.parametrize(
+    "atom,expected",
+    [
+        ("app-misc/bar", ["virtual/gzip-1::testrepo"]),
+        (
+            "app-misc/foo",
+            [
+                "virtual/A-1::testrepo",
+                "virtual/B-1::testrepo",
+                "virtual/C-1::testrepo",
+            ],
+        ),
+    ],
+    ids=["self-cycle", "ring"],
+)
+def test_virtual_cycle_detected_like_real(atom, expected, emerge_binary, fixture_env):
+    """Backlog #193, upstream `test_virtual_cycle.py` (bug 965570) as
+    emitted by pmtest `89d17e0` (fixtures `app-misc/{foo,bar}`,
+    `virtual/{A,B,C,gzip}`, all EAPI 8): real's `ResolverPlayground`
+    fails both cells (`success=False`, `virtual_cycle={gzip-1}` /
+    `{A-1,B-1,C-1}`), and live real fails too -- one
+    `podman run --entrypoint /bin/bash localhost/test-portuale:latest`
+    probe (portage 3.0.81.3; the `!!! virtual cycle detected:` shape is
+    identical in 3.0.82.2 by source read of
+    `lib/_emerge/depgraph.py:5002-5013`, `select_files` catching
+    `_virtual_cycle_error` from `_virt_deps_visible:6215-6216`),
+    `emerge -p --color=n app-misc/{bar,foo}` on the staged tree, rc 1
+    both, stdout `These are the packages that would be merged, in
+    order:` + `Calculating dependencies ... done!` + the
+    `Dependency resolution took ... (backtrack: 0/20).` timing line with
+    no merge rows, stderr exactly `\n\n!!! virtual cycle
+    detected:\n\n` + one `  {cpv}::{repo}` line per member (sorted) +
+    `\n`. Portuale used to merge both as ordinary rings (rc 0). The
+    pin asserts real's block byte-for-byte on stderr (uncoloured, like
+    real's own `writemsg`), an empty merge list, and rc 1."""
+    result = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    assert result.returncode == 1
+    assert _merge_lines(result.stdout) == []
+    assert "Total:" not in result.stdout
+    assert result.stderr == (
+        "\n\n!!! virtual cycle detected:\n\n"
+        + "".join(f"  {member}\n" for member in expected)
+        + "\n"
+    )
+
+
 def test_real_option_not_implemented_message_names_the_option(emerge_binary, fixture_env):
     """--accept-properties is a real emerge option (see lib/_emerge/main.py's
     argument_options) portuale doesn't implement -- the error must
@@ -17801,17 +18214,31 @@ def test_oracle_virtual_subslot_upgrade_avoids_missed_update(
 def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     emerge_binary, fixture_env, tmp_path
 ):
-    """023 oracle, case btnr -- oracle-DIVERGENT, see `docs/history/023-oracle.md`
-    (upstream `test_backtracking.py::testBacktrackNoWrongRebuilds`,
-    `--backtrack 6`): `btrd` needs `<btra-2`, `btrc-2` needs `>=btra-2`.
-    Real explores several mask nodes, discards masks whose reason got
-    masked itself (bug 375573 `_check_runtime_pkg_mask`), and merges
-    NOTHING. Portuale's single bundled trial cannot explore that search:
-    it upgrades `btra` + `btrc` and reports the residual slot conflict.
-    Pinned to portuale's current output; the Phase C driver for the node
-    stack. Since #62 the residual report exits 1 (real's rc-1 rule for a
-    recorded conflict, even though real records none here -- the rc is
-    part of the documented divergence, like the merge list itself)."""
+    """023 oracle, case btnr (upstream
+    `test_backtracking.py::testBacktrackNoWrongRebuilds`, `--backtrack 6`):
+    `btrd` needs `<btra-2`, `btrc-2` needs `>=btra-2`. Real explores
+    several mask nodes, discards masks whose reason got masked itself
+    (bug 375573 `_check_runtime_pkg_mask`), and merges NOTHING
+    (`mergelist=[]`, `success=True`).
+
+    Backlog #198: portuale now mirrors that search -- the bound conflict
+    masks `btra-2`, so `btrc-2`'s `>=btra-2` dies and the
+    missing-dependency backtrack (no top-level exemption, real
+    `depgraph.py:3493-3503`) masks the world-selected `btrc-2` too. The
+    run settles with no `btra`/`btrc` upgrade and rc 0, matching the
+    upstream oracle's merge list and success. The two notices follow
+    real's deterministic miss mapping from that mask state (slot mask
+    -> `WARNING` row for `btra-2` with `btrd-1`'s bound; missing-dep
+    mask whose `>=btra-2` still names the backtrack-masked `btra-2` ->
+    abbreviated tail for `btrc:0`); the notice block is pinned
+    verbatim below. The skipped line carries real's `ELIBC="glibc"`
+    group (backlog #230's `pkg_use_display`, same as the blk0 cells)
+    and the installed consumer its ` in '<root>'` suffix with bare
+    `USE=""` (the b1root vdb has no USE file, like the abk0 probe).
+    Merge lines stay filtered (not verbatim): they
+    track the shared fixture world file, so an unrelated world change
+    must not break this cell. (Before #198 portuale upgraded
+    both and reported the residual slot conflict, rc 1.)"""
     root = _b1_root(
         tmp_path,
         ["dev-libs/btrb", "dev-libs/btrc"],
@@ -17827,11 +18254,30 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
         ["--pretend", "--backtrack", "6", "--deep", "--selective", "--update", "@world"],
         _b1_env(fixture_env, root),
     )
-    assert rust.returncode == 1
+    assert rust.returncode == 0
     merges = _b1_merges(rust.stdout)
-    assert "[ebuild     U  ] dev-libs/btra-2 [1]" in merges
-    assert "[ebuild     U  ] dev-libs/btrc-2 [1]" in merges
-    assert "!!! Multiple package instances within a single package slot" in rust.stdout
+    assert not any("dev-libs/btra" in ln for ln in merges), merges
+    assert not any("dev-libs/btrc" in ln for ln in merges), merges
+    lines = rust.stdout.splitlines()
+    at = lines.index(
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:"
+    )
+    assert lines[at:] == [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/btra:0",
+        "",
+        '  (dev-libs/btra-2:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        f"    <dev-libs/btra-2 required by (dev-libs/btrd-1:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "    ^              ^",
+        "",
+        "",
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies",
+        "!!! triggered by backtracking:",
+        "",
+        "dev-libs/btrc:0",
+    ]
+    assert rust.stderr == ""
 
 
 def test_oracle_no_aggressive_downgrade(
@@ -17842,7 +18288,13 @@ def test_oracle_no_aggressive_downgrade(
     `libvpx` to 1.8.0 must NOT downgrade `firefox` 69.0 -> 60.9.0. Real
     merges nothing; portuale also merges nothing (no `firefox`/`libvpx`/
     `ffmpeg` lines at all). MATCHES real. (The `conflict_downgrade` guards
-    that police finer variants of this live in backlog #35, not #23.)"""
+    that police finer variants of this live in backlog #35, not #23.)
+
+    Backlog #205: the skipped `libvpx-1.8.0` names both of installed
+    firefox's rejecting atoms -- the built `=1.7*:0=` binding and the
+    `[postproc]` USE pin -- exactly like real's "Record missed updates"
+    tail (`depgraph.py:2085-2106` records every kept-instance parent
+    atom the removed version fails)."""
     root = _b1_root(
         tmp_path,
         ["media-video/ffmpeg", "www-client/firefox"],
@@ -17879,6 +18331,9 @@ def test_oracle_no_aggressive_downgrade(
     )
     merges = _b1_merges(rust.stdout)
     assert not [ln for ln in merges if "firefox" in ln or "libvpx" in ln or "ffmpeg" in ln]
+    assert "media-libs/libvpx:0" in rust.stdout
+    assert "=media-libs/libvpx-1.7*:0= required by (www-client/firefox-69.0" in rust.stdout
+    assert "=media-libs/libvpx-1.7*:0=[postproc] required by (www-client/firefox-69.0" in rust.stdout
 
 
 def test_oracle_non_slot_operator_update_selects_new_slot(
@@ -18044,9 +18499,16 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
     settled backtrack trial state (`GraphResult::skipped_updates`),
     plus the abbreviated unsatisfied-dependencies tail (`mgxb:0`,
     `mgfb:0`). Full stdout pinned (rc 0). Modulo portuale's
-    established display cuts (no `to '<ROOT>'` suffixes, bare `USE=""`
-    where real shows the profile `ELIBC="glibc"`/`ABI_X86="(64)"`
-    USE_EXPAND groups -- same cut as the #90 skip pin)."""
+    established display cuts (no `to '<ROOT>'` suffixes; the missed
+    lines show the fixture-tree USE display where the bed's real shows
+    the container running-root profile's `ABI_X86="(64)"` group -- the
+    unmodelled second config, same cut as the #90 skip pin -- while the
+    parent lines match real byte-for-byte at `USE="" ELIBC="glibc"`).
+
+    Backlog #230: the `WARNING` lines render real's full
+    `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- mgxc/mgxa and
+    mgfc/mgfa are EAPI 8 with no IUSE, so the globals mask out and only
+    the implicit `ELIBC="glibc"` group survives."""
     rust = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/mg2top"], fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
@@ -18063,14 +18525,14 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
         "",
         "dev-libs/mgxc:0",
         "",
-        '  (dev-libs/mgxc-2:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    =dev-libs/mgxc-1 required by (dev-libs/mgxa-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/mgxc-2:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    =dev-libs/mgxc-1 required by (dev-libs/mgxa-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^              ^",
         "",
         "dev-libs/mgfc:0",
         "",
-        '  (dev-libs/mgfc-3.0:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    =dev-libs/mgfc-1 required by (dev-libs/mgfa-1:0/0::testrepo, ebuild scheduled for merge) USE=""',
+        '  (dev-libs/mgfc-3.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        '    =dev-libs/mgfc-1 required by (dev-libs/mgfa-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
         "    ^              ^",
         "",
         "",
@@ -21232,6 +21694,13 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     the operator + version `^` spans. The forward order stays silent
     (S1 reuse, pinned by the CASES entry above); the unsolvable twin
     keeps its block + rc 1.
+
+    Backlog #230: the `WARNING` lines render real's full
+    `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- target and
+    oldconsumer are EAPI 8 with no IUSE, so the globals mask out and
+    only the implicit `ELIBC="glibc"` group survives (this revises the
+    older "ELIBC omitted" cut note above: the parent and missed lines
+    both show it now; only the `ROOT=$FX` suffixes stay cut).
     """
     for extra in ([], ["--backtrack=0"]):
         result = _run(
@@ -21253,8 +21722,8 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
             "",
             "dev-libs/slotconflicttarget:0",
             "",
-            "  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
-            "    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\"",
+            "  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with",
+            "    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\"",
             "    ^                            ^^^",
             "",
         ], (extra, result.stdout)
@@ -21282,10 +21751,21 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
     merges NOTHING on either argv and prints the skipped-update warning
     for `dev-libs/reinstslottarget:0` listing BOTH consumers' atoms, rc 0.
 
-    The pinned bytes are portuale's own rendering of that shape (one
-    block, bare `USE=""`, no `^` operator markers or root suffixes --
-    the #227 explanation-rendering gap, shared with the blk0 cells -- not
-    real's); the invariant (withhold, rc 0, both atoms named) is real's.
+    The pinned bytes are portuale's rendering of that shape, which is
+    real's own explanation modulo the #206 cuts: the missed line shows
+    `USE="" ELIBC="glibc"` on both sides (bed capture
+    `differential-test-bed/logs/l0-fx-20260928T100830Z`, coordinator
+    run 2026-09-28 on this branch -- both argument cells clean there);
+    the installed consumers render `(cpv, installed in '<root>')`
+    with bare `USE=""` and slot-span `^` markers on both sides too
+    (real's `Package.__str__` appends ` in '<ROOT>'` iff `ROOT != "/"`,
+    `3rdparty/portage/lib/_emerge/Package.py:568-608`). Portuale's cuts
+    stay: the header is bare (no `for <root>`) and the merge line is
+    bare (no `to '<root>'`), like the blk0 cells; the parent order is
+    portuale's (consumer `:0/1` before bound `:0/1=`, real lists them
+    reversed -- the comparator sorts explanation lines, so the cells
+    still compare clean). The invariant (withhold, rc 0, both atoms
+    named) is real's.
     """
     env = _world_extra_env(
         fixture_env,
@@ -21294,6 +21774,7 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
         "dev-libs/reinstslotconsumer",
         "dev-libs/reinstslotbound",
     )
+    root = str(tmp_path / "fixtures")
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--changed-slot", *extra_args, "dev-libs/reinstslottarget"],
@@ -21305,11 +21786,11 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
         "",
         "dev-libs/reinstslottarget:0",
         "",
-        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed) USE=""',
-        "    ",
-        '    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed) USE=""',
-        "    ",
+        '  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        f"    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "                             ^^^^",
+        f"    dev-libs/reinstslottarget:0/1= required by (dev-libs/reinstslotbound-1.0:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "                             ^^^^^",
         "",
     ], (extra_args, result.stdout)
     assert result.stderr == "", (extra_args, result.stderr)
@@ -21478,3 +21959,126 @@ def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+
+
+def test_or_group_emptied_by_use_conditionals_fails_at_eapi7(
+    emerge_binary, fixture_env
+):
+    """Backlog #238 (upstream `test_eapi` pg1 `=dev-libs/C-2`, EAPI 8):
+    `dev-libs/condanyof` carries `IUSE="emptyanyof"` with
+    `RDEPEND="|| ( emptyanyof? ( dev-libs/condanyofdep ) )"`, and no
+    profile enables `emptyanyof`, so the `||` group reduces to empty.
+    Real `use_reduce` (`lib/portage/dep/__init__.py:864-869`,
+    `empty_groups_always_true` false at EAPI 7+, `eapi.py:295`)
+    substitutes the unsatisfiable atom `__const__/empty-any-of`, and
+    real 3.0.82.2 on the staged fixture tree (S0 probe, `probe.log`:
+    `emerge -p --color=n dev-libs/condanyof`) exits 1 with
+    `emerge: there are no ebuilds to satisfy "__const__/empty-any-of"
+    for <ROOT>.` plus the `condanyof-1.0::testrepo` [ebuild] and
+    `condanyof` [argument] required-by lines. Before the fix portuale's
+    resolver path (`use_reduce_flat_disjunctive`) ranked the emptied
+    alternative vacuously satisfiable and merged the package bare
+    (rc 0, the 2026-09-28 probe in the entry); now the placeholder
+    flows through as an ordinary unsatisfiable dep and aborts like
+    real. The staging `for <root>.` suffix stays portuale-absent (the
+    fixture-miss-message-unsuffixed convention); everything else is
+    real's text byte-for-byte."""
+    args = ["--pretend", "dev-libs/condanyof"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    assert rust.stderr.strip().splitlines() == [
+        'emerge: there are no ebuilds to satisfy "__const__/empty-any-of".',
+        '(dependency required by "dev-libs/condanyof-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/condanyof" [argument])',
+    ]
+
+
+_G216_SELF_BLOCK = (
+    "(dev-lang/g216comp-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+    " (dev-lang/g216comp-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+)
+
+
+def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
+    emerge_binary, fixture_env
+):
+    """Backlog #216: `app-misc/g216top` merges
+    `[g216boot, g216comp, g216mid, g216top]`, rc 0. Real's pass 1 keeps
+    the in-graph `>=dev-lang/g216comp-1.0` branch of `g216comp`'s
+    `BDEPEND=|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )` live
+    (`dep_zapdeps` `preferred_in_graph`, `dep_check.py`), dead-ends on
+    the self cycle (`_serialize_tasks`, `depgraph.py:10262`), and
+    re-resolves with the `circular_dependency` map to `g216boot`
+    (`backtrack: 1/20`, rc 0) -- the S0 container probe
+    (`/tmp/opencode/g216/probe.log`, real 3.0.81.3) shows exactly this
+    merge list. MATCHES real since #216: the `circular_self` bolt-on
+    now only fires when the self atom matches nothing in-graph, and the
+    serialize dead-end feeds a `circular_dependency` retry."""
+    rust = _run([str(emerge_binary)], ["--pretend", "app-misc/g216top"], fixture_env)
+    assert rust.returncode == 0
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+    assert rows == [
+        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        "[ebuild  N     ] dev-lang/g216comp-1.0 ",
+        "[ebuild  N     ] dev-libs/g216mid-1.0 ",
+        "[ebuild  N     ] app-misc/g216top-1.0 ",
+    ]
+
+
+def test_or_pick_backtrack0_reports_the_self_cycle(
+    emerge_binary, fixture_env
+):
+    """Backlog #216: `app-misc/g216top --backtrack=0` fails with real's
+    pass-1 self-cycle block, rc 1, verbatim from the S0 container probe
+    (real 3.0.81.3 `emerge -p --color=n --backtrack=0 app-misc/g216top`;
+    the block text is staging-independent). With no backtracking real
+    displays the pass-1 graph -- the `* Error: circular dependencies:`
+    self ring -- instead of re-resolving."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "app-misc/g216top"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert _G216_SELF_BLOCK in rust.stderr
+
+
+def test_or_pick_direct_target_resolves_to_bootstrap(
+    emerge_binary, fixture_env
+):
+    """Backlog #216 (review M3): `dev-lang/g216comp` merges
+    `[g216boot, g216comp]`, rc 0 -- the direct-target mirror of the
+    `g216top` default pin above. Same real grounding (pass-1
+    `preferred_in_graph` self pick, `_serialize_tasks` dead-end,
+    `circular_dependency` retry to `g216boot`, `backtrack: 1/20`):
+    the S0 container probe (`/tmp/opencode/g216/probe.log`, real
+    3.0.81.3) shows rc 0 with the bootstrap merge, and the L0 oracle
+    single-root capture shows exactly these two rows. Single-root
+    `fixture_env` (`RUNNING_ROOT == ROOT`) carries no `to <ROOT>`
+    suffix and no dual-root `g216comp` row."""
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-lang/g216comp"], fixture_env)
+    assert rust.returncode == 0
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+    assert rows == [
+        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        "[ebuild  N     ] dev-lang/g216comp-1.0 ",
+    ]
+
+
+def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
+    emerge_binary, fixture_env
+):
+    """Backlog #216 (review M3): `dev-lang/g216comp --backtrack=0`
+    fails with real's pass-1 self-cycle block, rc 1 -- the
+    direct-target mirror of the `g216top` b0 pin above. Same verbatim
+    block (`_G216_SELF_BLOCK`, staging-independent); the L0 oracle
+    single-root capture shows the one-row `[ebuild] g216comp` merge
+    list under it (`Total: 1`)."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert _G216_SELF_BLOCK in rust.stderr
