@@ -1,6 +1,6 @@
-EAPI=0
+EAPI=8
 DESCRIPTION=fixture package: upstream test_onlydeps_minimal pg0 dev-libs/D-1 (bulk #50)
 KEYWORDS=amd64
 SLOT=0
 DEFINED_PHASES=-
-_md5_=c2d13836ee170ffde0159f07164bc4fd
+_md5_=ca272264b92928abf3180ae00b9a2eec

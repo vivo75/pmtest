@@ -1,7 +1,7 @@
-EAPI=2
+EAPI=8
 DESCRIPTION=fixture package: upstream test_complete_graph.py pg0 dev-libs/libxml2-2.8.0 (bulk #50)
 KEYWORDS=amd64
 SLOT=2
 IUSE=+icu
 DEFINED_PHASES=-
-_md5_=7a128139b5312a787da6c15e30bffab5
+_md5_=29b84b3294dfcbb4ae6ecc048523d04b

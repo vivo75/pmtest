@@ -27,6 +27,10 @@ Usage:
     scripts/upstream_resolver_translate.py test_disjunctive_depend_order
     scripts/upstream_resolver_translate.py --file 3rdparty/.../test_x.py --json /tmp/x.json
 
+Playground ebuild/installed EAPIs below 7 are raised to 8 by default
+(backlog #220: the supported range floor); `--eapi-floor=0` keeps
+upstream's EAPIs verbatim for a before/after comparison.
+
 Determinism: `PYTHONHASHSEED=0` and `CLEAN_DELAY=0` are pinned for the
 run (the same pins `differential-test-bed/layers/l0/in-container.sh` uses).
 """
@@ -129,12 +133,61 @@ def _result_record(result) -> dict:
 class Capture:
     """Wrap `ResolverPlayground` so both constructor inputs and every
     `run()` result are recorded. Tests that call `run()` directly (not
-    through `run_TestCase`) are captured too."""
+    through `run_TestCase`) are captured too.
 
-    def __init__(self) -> None:
+    `eapi_floor` (backlog #220): when set, every playground ebuild and
+    installed entry whose EAPI is below the floor is raised to the floor
+    before the playground is constructed, so the recorded oracle is what
+    real's resolver does at the supported EAPI range (portuale never
+    sees an ebuild below EAPI 7; owner rule 2026-09-27). The recorded
+    playground inputs carry the raised EAPIs, and the per-module
+    document notes how many entries were raised."""
+
+    def __init__(self, eapi_floor: int | None = 8) -> None:
         self.playgrounds: list[dict] = []
         self.cases: list[dict] = []
         self._current: dict | None = None
+        self.eapi_floor = eapi_floor
+        self.raised = 0
+
+    @staticmethod
+    def _floor_eapi(value, floor: int):
+        """Raise a bare-numeric EAPI below `floor` to `floor` (as a
+        string); returns (new_value, changed). Non-numeric/suffixed
+        EAPIs (e.g. "7-hdepend") are left alone. Upstream passes both
+        ints (`"EAPI": 0`) and strings (`"EAPI": "4"`)."""
+        if isinstance(value, int) and not isinstance(value, bool):
+            return (str(floor), True) if value < floor else (value, False)
+        if not isinstance(value, str):
+            return value, False
+        if not re.fullmatch(r"[0-9]+", value):
+            return value, False
+        if int(value) < floor:
+            return str(floor), True
+        return value, False
+
+    def _apply_floor(self, kwargs: dict) -> None:
+        floor = self.eapi_floor
+        if not floor:
+            return
+        for key in ("ebuilds", "installed"):
+            entries = kwargs.get(key)
+            if not isinstance(entries, dict):
+                continue
+            for cpv, meta in entries.items():
+                if not isinstance(meta, dict):
+                    continue
+                if "EAPI" not in meta:
+                    # Upstream omits EAPI (= its default 0, which the
+                    # fixture translator also renders as an explicit
+                    # EAPI=0 line): record the floored default.
+                    meta["EAPI"] = str(floor)
+                    self.raised += 1
+                    continue
+                new_eapi, changed = self._floor_eapi(meta["EAPI"], floor)
+                if changed:
+                    meta["EAPI"] = new_eapi
+                    self.raised += 1
 
     def begin_playground(self, kwargs: dict) -> None:
         self._current = {key: _jsonable(kwargs.get(key)) for key in INPUT_KEYS}
@@ -161,6 +214,7 @@ class Capture:
         orig_run = RP.ResolverPlayground.run
 
         def init(inner_self, **kwargs):
+            capture._apply_floor(kwargs)
             capture.begin_playground(kwargs)
             orig_init(inner_self, **kwargs)
 
@@ -177,9 +231,37 @@ def module_name_for(path: Path) -> str:
     return f"portage.tests.resolver.{path.stem}"
 
 
-def capture_module(module: str) -> dict:
-    capture = Capture()
+def capture_module(module: str, eapi_floor: int | None = 8,
+                   no_assert: bool = False) -> dict:
+    capture = Capture(eapi_floor=eapi_floor)
     capture.install()
+    if no_assert:
+        # Run every test_case to completion even when the floored EAPI
+        # breaks the source literal's expectations (backlog #220: the
+        # literal asserts old-EAPI behaviour, so the first mismatch
+        # would abort the method and truncate the oracle). The recorded
+        # results are still the real resolver's.
+        def _pass(self, *args, **kwargs):
+            return None
+
+        @classmethod
+        def _pass_cm(cls, *args, **kwargs):
+            class _Ctx:
+                def __enter__(self):
+                    return None
+
+                def __exit__(self, *exc):
+                    return True
+
+            return _Ctx()
+
+        unittest.TestCase.assertEqual = _pass
+        unittest.TestCase.assertTrue = _pass
+        unittest.TestCase.assertIn = _pass
+        unittest.TestCase.assertNotIn = _pass
+        unittest.TestCase.assertIs = _pass
+        unittest.TestCase.assertIsNotNone = _pass
+        unittest.TestCase.assertRaises = _pass_cm
     started = time.time()
     status: dict = {"module": module, "cases": 0, "playgrounds": 0, "errors": [], "failures": 0}
     try:
@@ -201,6 +283,8 @@ def capture_module(module: str) -> dict:
                         for case, tb in result.errors]
     status["playgrounds"] = len(capture.playgrounds)
     status["cases"] = len(capture.cases)
+    status["eapi_floor"] = capture.eapi_floor
+    status["eapi_raised"] = capture.raised
     status["seconds"] = round(time.time() - started, 1)
     status["captured"] = capture
     return status
@@ -297,16 +381,22 @@ def emit_fixtures(capture: Capture, out: Path) -> dict:
     return report
 
 
-def run_all(stats: bool) -> dict:
+def run_all(stats: bool, eapi_floor: int | None = 8,
+            no_assert: bool = False) -> dict:
     files = sorted(RESOLVER_TESTS.glob("test_*.py"))
     summary: dict = {"files": len(files), "captured": 0, "with_cases": 0,
                      "errors": 0, "import_errors": 0, "cases": 0, "crashes": 0,
-                     "per_file": {}}
+                     "eapi_floor": eapi_floor, "per_file": {}}
     with tempfile.TemporaryDirectory(prefix="portuale-upstream-") as tmp:
         for path in files:
             out = Path(tmp) / f"{path.stem}.json"
+            cmd = [sys.executable, __file__, "--file", str(path),
+                   "--json", str(out),
+                   "--eapi-floor", str(eapi_floor or 0)]
+            if no_assert:
+                cmd.append("--no-assert")
             proc = subprocess.run(
-                [sys.executable, __file__, "--file", str(path), "--json", str(out)],
+                cmd,
                 capture_output=True, text=True, timeout=1800,
             )
             if out.exists():
@@ -319,7 +409,8 @@ def run_all(stats: bool) -> dict:
             summary["per_file"][path.name] = {
                 k: v for k, v in status.items()
                 if k in ("cases", "playgrounds", "tests", "failures", "skipped",
-                         "errors", "import_error", "seconds", "fatal")
+                         "errors", "import_error", "seconds", "fatal",
+                         "eapi_floor", "eapi_raised")
             }
             if status.get("fatal") or status.get("import_error"):
                 summary["crashes" if status.get("fatal") else "import_errors"] += 1
@@ -348,10 +439,21 @@ def main() -> int:
     parser.add_argument("--emit-fixtures", metavar="DIR",
                         help="also emit a fixtures-shaped tree + cases.json")
     parser.add_argument("--stats", action="store_true", help="print a per-file summary")
+    parser.add_argument("--eapi-floor", type=int, default=8, metavar="N",
+                        help="raise playground ebuild/installed EAPIs below N to N "
+                             "before constructing the oracle (backlog #220; "
+                             "default: 8, the supported range floor). "
+                             "Use --eapi-floor=0 to keep upstream's EAPIs verbatim.")
+    parser.add_argument("--no-assert", action="store_true",
+                        help="neutralise unittest assertions while capturing, so "
+                             "every test_case runs to completion even when the "
+                             "EAPI floor breaks the source literal's old-EAPI "
+                             "expectations (backlog #220 oracle re-runs).")
     args = parser.parse_args()
 
     if args.all:
-        summary = run_all(args.stats)
+        summary = run_all(args.stats, eapi_floor=args.eapi_floor or None,
+                          no_assert=args.no_assert)
         if args.json:
             Path(args.json).write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n")
         return 0 if summary["captured"] else 1
@@ -369,7 +471,8 @@ def main() -> int:
     documents = []
     failed = False
     for module in modules:
-        status = capture_module(module)
+        status = capture_module(module, eapi_floor=args.eapi_floor or None,
+                                no_assert=args.no_assert)
         capture = status.pop("captured")
         document = {"module": module, "status": status,
                     "playgrounds": capture.playgrounds, "cases": capture.cases}
