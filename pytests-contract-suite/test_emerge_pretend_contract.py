@@ -181,7 +181,7 @@ CASES = [
     ("--changed-slot=True spelling (real true_y_or_n, same as bare --changed-slot)", ["--pretend", "--changed-slot=True", "dev-libs/changedslotpkg"], 0),
     ("--quiet-build=True spelling (real true_y_or_n, same as bare --quiet-build)", ["--pretend", "--quiet-build=True", "dev-libs/newpkg"], 0),
     ("--with-test-deps=True spelling (real true_y_or_n, same as bare --with-test-deps)", ["--pretend", "--with-test-deps=True", "dev-libs/withtestdeppkg"], 0),
-    ("--autounmask-keep-keywords=True spelling (real true_y_or_n, same as bare, rc 1 like =y)", ["--pretend", "--autounmask-keep-keywords=True", "dev-libs/akk0a"], 1),
+    ("--autounmask-keep-keywords=True spelling (real true_y_or_n, same as bare, rc 0 like =y)", ["--pretend", "--autounmask-keep-keywords=True", "dev-libs/akk0a"], 0),
     ("--autounmask-keep-masks=True spelling (real true_y_or_n, mask kept so fatal like the default)", ["--pretend", "--autounmask-keep-masks=True", "dev-libs/hardmaskedpkg"], 1),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
@@ -6003,7 +6003,8 @@ def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
     Known delta vs the probe, documented: no `[1]` oldbest bracket on
     the `R` row (real shows one via the vdb-repo-mismatch disjunct,
     `lib/_emerge/resolver/output.py:720-731`, which portuale
-    deliberately cuts -- see `resolve_pretend`'s `myoldbest` comment)."""
+    deliberately cuts -- backlog #247; see `resolve_pretend`'s
+    `myoldbest` comment)."""
     args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -6033,16 +6034,21 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
     `WARNING` skipped-update row (real `_conflict_missed_update`,
     `:2085-2106`); the USE block names the forcing chain only
     (`abk0d-1`, not `abk0a-2`). Expected text is the rule-13 probe on
-    3.0.81.3 verbatim, minus real's `to <root>` / `for <root>` /
-    `in '<root>'` destination suffixes, which no portuale pin carries.
-    Known deltas vs the probe, documented: the skipped row shows
-    `USE=""` without real's `ELIBC="glibc"` (the shared USE-display
-    builder never groups USE_EXPAND values -- pre-existing, affects
-    every skipped-update row), and no `[1]` on the `R` row (same
-    deliberate repo-mismatch cut as the pristine cell)."""
+    3.0.81.3 verbatim, minus real's `to <root>` / `for <root>`
+    destination suffixes, which no portuale pin carries (the merge line
+    stays bare, the header stays bare). The installed consumer carries
+    real's ` in '<root>'` suffix (real's `Package.__str__` appends it
+    iff `ROOT != "/"`), interpolated from the test ROOT. Known delta
+    vs the probe, documented: no `[1]` on the `R` row (backlog #247's
+    deliberate repo-mismatch cut, same as the pristine cell). The
+    skipped row carries real's `ELIBC="glibc"` group while the
+    installed consumer stays bare `USE=""`, both byte-for-byte from
+    the probe (the staged vdb has no USE file, so real shows no expand
+    group there either)."""
     env = dict(fixture_env)
     env["ROOT"] = str(_abk0_worldb_root(tmp_path))
     env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
+    root = env["ROOT"]
     args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
@@ -6054,8 +6060,8 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
         "",
         "dev-libs/abk0a:0",
         "",
-        "  (dev-libs/abk0a-3:0/0::testrepo, ebuild scheduled for merge) USE=\"\" conflicts with",
-        "    <dev-libs/abk0a-3 required by (dev-libs/abk0b-1:0/0::__unknown__, installed) USE=\"\"",
+        "  (dev-libs/abk0a-3:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\" conflicts with",
+        f"    <dev-libs/abk0a-3 required by (dev-libs/abk0b-1:0/0::__unknown__, installed in '{root}') USE=\"\"",
         "    ^               ^",
         "",
     ]
@@ -18093,7 +18099,11 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     -> `WARNING` row for `btra-2` with `btrd-1`'s bound; missing-dep
     mask whose `>=btra-2` still names the backtrack-masked `btra-2` ->
     abbreviated tail for `btrc:0`); the notice block is pinned
-    verbatim below. Merge lines stay filtered (not verbatim): they
+    verbatim below. The skipped line carries real's `ELIBC="glibc"`
+    group (backlog #230's `pkg_use_display`, same as the blk0 cells)
+    and the installed consumer its ` in '<root>'` suffix with bare
+    `USE=""` (the b1root vdb has no USE file, like the abk0 probe).
+    Merge lines stay filtered (not verbatim): they
     track the shared fixture world file, so an unrelated world change
     must not break this cell. (Before #198 portuale upgraded
     both and reported the residual slot conflict, rc 1.)"""
@@ -18125,8 +18135,8 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
         "",
         "dev-libs/btra:0",
         "",
-        '  (dev-libs/btra-2:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with',
-        '    <dev-libs/btra-2 required by (dev-libs/btrd-1:0/0::testrepo, installed) USE=""',
+        '  (dev-libs/btra-2:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" conflicts with',
+        f"    <dev-libs/btra-2 required by (dev-libs/btrd-1:0/0::testrepo, installed in '{root}') USE=\"\"",
         "    ^              ^",
         "",
         "",
