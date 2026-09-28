@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=211 item-2 fixture: multi-slot provider, slot 0 (bound slot)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/1
+_md5_=63538413d1e15766d8913a2123c27b56

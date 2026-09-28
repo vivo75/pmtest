@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=211 item-2 fixture: multi-slot provider, slot 1 (upgrade target)
+EAPI=8
+KEYWORDS=amd64
+SLOT=1/2
+_md5_=f56fda8645caf645ea603c47130c1ada

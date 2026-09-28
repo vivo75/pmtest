@@ -1,4 +1,4 @@
-EAPI=0
+EAPI=8
 DESCRIPTION="fixture package: upstream test_required_use pg1 app-misc/p-1 (bulk #50)"
 SLOT="0"
 KEYWORDS="amd64"

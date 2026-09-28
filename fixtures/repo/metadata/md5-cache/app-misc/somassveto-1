@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=211 R2 fixture: installed world parent vetoing the slot-moving provider (bug 486580 shape)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=<app-misc/somassb-2
+SLOT=0
+_md5_=0efaeaaa2b2f99ec970fbf7b2ed46615

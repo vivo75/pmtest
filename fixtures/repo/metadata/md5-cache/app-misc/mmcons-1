@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=211 item-2 fixture: installed consumer bound to the provider's slot 0
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/mmprov:=
+SLOT=0
+_md5_=a2a21940eb0230035b2044f77b0f0fa6
