@@ -1188,22 +1188,22 @@ CASES = [
         1,
     ),
     (
-        "--autounmask-use parent flip, default: single-dep re-resolve, pf? dep stays",
+        "--autounmask-use parent flip, default: masked-child opt= dep is a bare miss like real (rc 1; untouchable child, no parent flip: #195)",
         ["--pretend", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, --autounmask-backtrack=y: whole-graph, pf? dep drops",
+        "--autounmask-use parent flip, --autounmask-backtrack=y: same bare miss like real (rc 1; no recorded flip, nothing to re-resolve: #195)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, -pv",
+        "--autounmask-use parent flip, -pv: same bare miss like real (rc 1: #195)",
         ["--pretend", "-v", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, --autounmask-use=n",
+        "--autounmask-use parent flip, --autounmask-use=n: same bare miss like real (rc 1: #195)",
         ["--pretend", "--autounmask-use=n", "dev-libs/pfgraphparent"],
         1,
     ),
@@ -6889,58 +6889,95 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     )
 
 
-def test_autounmask_use_parent_flip_re_resolves_the_whole_graph(
+def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_real(
     emerge_binary, fixture_env
 ):
-    """dev-libs/pfgraphparent (IUSE +pf) RDEPENDs pfgraphchild[pf=] AND
+    """Live real reports the BARE miss here (no rows, no USE block):
+    dev-libs/pfgraphparent (IUSE +pf) RDEPENDs pfgraphchild[pf=] AND
     `pf? ( dev-libs/pfgraphextra )`; pfgraphchild's `pf` is use.mask'd, so
-    the parent's own `pf` is flipped off.
+    real's untouchable-child `continue`
+    (`lib/_emerge/depgraph.py:6732-6736`) skips the parent probe -- no
+    parent flip is ever recorded, and there is nothing to re-resolve.
 
-    Default (real --autounmask-backtrack off): the flip is applied to the
-    freed child and the parent's USE line, but the graph is NOT re-driven
-    -- `pf? ( pfgraphextra )` was walked with pf on, so pfgraphextra stays
-    in the list (matching real).
+    Live probe (container `localhost/test-portuale:latest`, staged
+    fixtures; Global-Updates/news/FEATURES noise cut):
 
-    --autounmask-backtrack=y (Slice 4): the flip is fed back into
-    _needed_use_config_changes and the WHOLE graph re-resolves, so
-    `pf? ( pfgraphextra )` re-evaluates with pf OFF and pfgraphextra is
-    dropped."""
+        podman run --rm -v <pmtest>/fixtures:/fixtures:ro \
+          -v <pmtest>/differential-test-bed/layers/l0-fixture-oracle/stage.sh:/stage.sh:ro \
+          -v /tmp/opencode/g195c/in-probe.sh:/in-probe.sh:ro \
+          --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
+
+    cell `emerge --pretend dev-libs/pfgraphparent` (identical text with
+    `--autounmask-backtrack=y` and with `--autounmask-use=n`):
+
+        These are the packages that would be merged, in order:
+
+        Calculating dependencies  ... done!
+        Dependency resolution took 0.35 s (backtrack: 0/20).
+
+
+        emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]" for /tmp/fxstage/fixtures/.
+        (dependency required by "dev-libs/pfgraphparent-1.0::testrepo" [ebuild])
+        (dependency required by "dev-libs/pfgraphparent" [argument])
+        rc=1
+
+    (Portuale omits real's staging `for <root>.` suffix here -- the
+    long-standing `fixture-miss-message-unsuffixed` class, same as the
+    parentflipeqpkg pin above.)
+
+    Why the old docstring's parity claim was wrong: the
+    resolve+rows+`-pf`-block expectation (Slice 4 backtrack-off arm and
+    whole-graph re-resolve) was a source-reading inference about the
+    parent flip, never a live measurement -- real never records the flip
+    for this cell, so neither the default single-dep re-resolve (which
+    kept `pf? ( pfgraphextra )` in the list) nor the
+    `--autounmask-backtrack=y` whole-graph re-resolve (which dropped it)
+    ever happens. Renamed from
+    `test_autounmask_use_parent_flip_re_resolves_the_whole_graph`, which
+    stated the opposite of what real does (coordinator ruling B20,
+    option (a))."""
     args = ["--pretend", "dev-libs/pfgraphparent"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/pfgraphchild-1.0  USE="(-pf)"',
-        "[ebuild  N     ] dev-libs/pfgraphextra-1.0 ",
-        '[ebuild  N     ] dev-libs/pfgraphparent-1.0  USE="-pf"',
+    # No merge list: the header/preamble only, like every Slice-4 abort.
+    _assert_abort_preamble(rust.stdout)
+    assert len(rust.stdout.splitlines()) == 5
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".',
+        '(dependency required by "dev-libs/pfgraphparent-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/pfgraphparent" [argument])',
     ]
-    assert rust.stderr == (
-        "\nThe following USE changes are necessary to proceed:\n"
-        ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/pfgraphparent-1.0::testrepo\n"
-        "# required by dev-libs/pfgraphparent (argument)\n"
-        ">=dev-libs/pfgraphparent-1.0 -pf\n"
-        + BACKTRACK_TERMINATED_EARLY
-    )
 
-    # --autounmask-backtrack=y: the whole graph re-resolves, pfgraphextra drops
+    # --autounmask-backtrack=y: the same bare miss -- with no recorded
+    # flip there is nothing to re-drive, so pfgraphextra never enters
+    # the picture at all.
     ab = ["--pretend", "--autounmask-backtrack=y", "dev-libs/pfgraphparent"]
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
-    assert rust_ab.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/pfgraphchild-1.0  USE="(-pf)"',
-        '[ebuild  N     ] dev-libs/pfgraphparent-1.0  USE="-pf"',
+    assert rust_ab.returncode == 1
+    _assert_abort_preamble(rust_ab.stdout)
+    assert len(rust_ab.stdout.splitlines()) == 5
+    assert rust_ab.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".',
+        '(dependency required by "dev-libs/pfgraphparent-1.0::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/pfgraphparent" [argument])',
     ]
     assert "pfgraphextra" not in rust_ab.stdout
 
-    # --autounmask-use=n: the shared gate is off -> pf stays on,
-    # pfgraphchild[pf] is unresolvable and aborts the resolve (exit 1, no
-    # merge list since Slice 4 -- pfgraphextra goes with it).
+    # --autounmask-use=n: the shared gate is off -> the dep stays
+    # unresolvable and aborts the resolve (exit 1, no merge list since
+    # Slice 4), no change block -- identical to the default cell.
     n = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask-use=n", "dev-libs/pfgraphparent"],
         fixture_env,
     )
+    assert n.returncode == 1
+    _assert_abort_preamble(n.stdout)
+    assert len(n.stdout.splitlines()) == 5
     assert "pfgraphextra" not in n.stdout
-    assert 'there are no ebuilds to satisfy "dev-libs/pfgraphchild' in n.stderr
+    assert 'there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".' in n.stderr
 
 
 def test_unresolvable_dependency_is_reported_not_silently_dropped(
