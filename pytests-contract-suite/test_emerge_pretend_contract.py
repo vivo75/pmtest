@@ -21191,6 +21191,58 @@ def test_oracle_210_slot_change_reinstall_ignores_a_noop_argument_consumer(
     ], result.stdout
 
 
+def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #233: an installed world member's stale recorded built
+    slot-operator dep must not abort the `@world` walk.
+
+    The copied world adds the installed consumers
+    `dev-libs/reinstslotconsumer` (`RDEPEND="dev-libs/reinstslottarget:0/1"`)
+    and `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`) while
+    `dev-libs/reinstslottarget` moved `0/1 -> 0/2` without a revbump
+    (the #210 fixture; the #54 K2/K3 copy pattern leaves the shared
+    fixture world untouched). Real 3.0.82.2 on the staged hermetic tree
+    (S0 probe `probe.log`: `FX_WORLD_EXTRA` with both consumers, argv
+    `--changed-slot --update --deep --newuse @world`) merges the four
+    unrelated world updates and withholds the reinstall silently, rc 0 --
+    the stale `:0/1=` still matches the installed instance in vartree,
+    so the edge is a satisfied nomerge edge, never a second instance and
+    never a miss (`depgraph.py:7799-7840` iterates the installed db for
+    every resolve). Before the fix portuale resolved the stale atom
+    ebuild-only, reported `there are no ebuilds to satisfy
+    "dev-libs/reinstslottarget:0/1="` with a doubled installed+argument
+    chain, and exited 1 before the #210 scan engaged.
+    """
+    env = _world_extra_env(
+        fixture_env,
+        tmp_path,
+        fixtures_root,
+        "dev-libs/reinstslotconsumer",
+        "dev-libs/reinstslotbound",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--changed-slot",
+            "--update",
+            "--deep",
+            "--newuse",
+            "@world",
+        ],
+        env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/newpkg-1.0 ",
+        "[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 ",
+        "[ebuild  N     ] dev-libs/withdeps-1.0 ",
+    ], result.stdout
+    assert result.stderr == "", (result.stdout, result.stderr)
+
+
 # Backlog #181: live real `emerge -p` text for the upstream
 # test_circular_dependencies pg0 cases (#50 batch 2). The batch-2 CASES
 # check only the exit code; their labels cite the ResolverPlayground
