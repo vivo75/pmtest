@@ -167,6 +167,20 @@ for repo in overlay independentoverlay layoutmasteroverlay; do
   fi
 done
 
+# 13. FX_SOUSAT_UNSAT=1 (#215 S0): install the unsatisfied-probe
+#     fragment -- installed `app-misc/sousatpar-1` bound to the
+#     abandoned provider slot (`RDEPEND=">=app-misc/sousatprov-1:0/1="`,
+#     EAPI-bearing vdb so real's `FakeVartree` overlay registers the
+#     built dep), in world. The tree holds only `sousatprov-2`
+#     (`SLOT="2/2"`) plus the parent's own live ebuild. The fragment
+#     lives outside the shared fixture vdb so the standard runs are
+#     untouched (same pattern as the slotop-bdeps fragment above).
+if [ "${FX_SOUSAT_UNSAT:-}" = 1 ]; then
+  HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  cp -r "$HERE/sousat-unsat/vdb/." "$FX/var/db/pkg/"
+  mkdir -p "$FX/var/lib/portage"
+  cat "$HERE/sousat-unsat/world" >> "$FX/var/lib/portage/world"
+fi
 # 12. FX_SLOTOP_BDEP=1 (#65 S0/S3): install the slot-operator build-time
 #     deps matrix -- provpkg-1.0 (sub-slot 0/1, upgraded to 2.0/0/2 in the
 #     tree) plus five installed consumers, one per dep key, each bound to
