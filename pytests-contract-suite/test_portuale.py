@@ -7150,6 +7150,100 @@ def test_emerge_selective_noop_without_oneshot_ask_prompts_for_world(
     )
 
 
+def test_emerge_onlydeps_selective_noop_keeps_the_resume_list_alone(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Critical-1): real folds `--onlydeps` into the
+    gate variable (`_emerge/actions.py:257`: `oneshot = "--oneshot" in
+    myopts or "--onlydeps" in myopts`), and the deferral arm tests that
+    folded value (`:499`, `:514`). So `-u --onlydeps` on an
+    already-installed package is the #225 shape -- `Nothing to merge;
+    quitting.` on stdout, exit 0, stale two-item resume list
+    byte-identical with no `resume_backup` key -- never the #232
+    rotation, and nothing recorded in the world file."""
+    root = tmp_path / "root"
+    env, mtimedb, before = _nothing_to_merge_env(root)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "--onlydeps", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge; quitting." in r.stdout
+    assert "Nothing to merge" not in r.stderr
+    assert "Recording" not in r.stdout
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+
+
+def test_emerge_selective_noop_without_oneshot_ask_decline_records_nothing(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Minor-6): the `--ask n`/EOF decline half of
+    the deferral arm (`depgraph.py:11376-11386` -- the `No` answer sets
+    `skip`, so nothing is recorded, while the run still succeeds). The
+    `n` answer shows the world prompt (and never the merge prompt),
+    records nothing in the world file, yet still rotates the stale
+    two-item list into `resume_backup`, rc 0. Same all-noop plan (`-u
+    dev-libs/samepkg`, no `--oneshot`)."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    r = _run_with_ask_pty(
+        emerge_binary,
+        ["--ask", "-u", "dev-libs/samepkg"],
+        "n\n",
+        env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Would you like to add these packages to your world favorites?" in r.stdout
+    assert "Would you like to merge" not in r.stdout
+    assert "Recording" not in r.stdout
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
+def test_emerge_selective_noop_without_oneshot_buildpkgonly_rotates_without_record(
+    emerge_binary, tmp_path
+):
+    """Backlog #232 review (Minor-6): `--buildpkgonly` defers (it is not
+    part of real's gate fold at `_emerge/actions.py:257`, so the `:514`
+    arm still fires) but records nothing (it is in real's
+    `saveNomergeFavorites` suppression set, `depgraph.py:11308`). Same
+    all-noop plan (`--verbose -u dev-libs/samepkg`, no `--oneshot`):
+    exit 0 with no `Nothing to merge` anywhere, the stale two-item list
+    rotated into `resume_backup`, and the world file byte-identical with
+    no `Recording` line."""
+    import json
+
+    root = tmp_path / "root"
+    env, mtimedb, _ = _nothing_to_merge_env(root)
+    world_before = (root / "var/lib/portage/world").read_bytes()
+    r = subprocess.run(
+        [str(emerge_binary), "--verbose", "-u", "--buildpkgonly", "dev-libs/samepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Nothing to merge" not in r.stdout + r.stderr
+    assert "Recording" not in r.stdout
+    assert (root / "var/lib/portage/world").read_bytes() == world_before
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert [x[2] for x in saved["resume_backup"]["mergelist"]] == [
+        "dev-libs/stale-a-1.0",
+        "dev-libs/stale-b-1.0",
+    ]
+
+
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
     """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
     `["binary", root, cpv, "merge"]` resume item from the bintree, so the
