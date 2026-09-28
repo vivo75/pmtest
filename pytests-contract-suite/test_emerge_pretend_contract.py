@@ -170,6 +170,8 @@ CASES = [
     ("-a bundled with -p", ["-pa", "dev-libs/newpkg"], 0),
     ("-a bundled deep in a short-flag run", ["-pauvDN", "dev-libs/newpkg"], 0),
     ("--ask=n inline form", ["--pretend", "--ask=n", "dev-libs/newpkg"], 0),
+    ("--ask=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
+    ("--read-news=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
     (
@@ -2268,6 +2270,110 @@ CASES = [
         0,
     ),
     (
+        "--onlydeps-with-rdeps=y keeps runtime deps under --onlydeps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=y", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps alone keeps runtime deps: with-rdeps defaults to y (#194)",
+        ["--pretend", "--onlydeps", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n keeps only build-time deps under --onlydeps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n --onlydeps-with-ideps=y restores IDEPEND (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=y",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=n --onlydeps-with-ideps=n drops IDEPEND too (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=n",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "bare --onlydeps-with-ideps enables IDEPEND like =y (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps is inert without --onlydeps-with-rdeps=n (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-ideps=n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "an EAPI 7 root drops IDEPEND even with runtime deps kept (#194)",
+        ["--pretend", "--onlydeps", "dev-libs/odw0g"],
+        0,
+    ),
+    (
+        "an EAPI 7 root drops IDEPEND on a plain run too (#194)",
+        ["--pretend", "dev-libs/odw0g"],
+        0,
+    ),
+    (
+        "--onlydeps-with-rdeps=foo is an invalid choice, rc 2 (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=foo", "dev-libs/odw0a"],
+        2,
+    ),
+    (
+        "--onlydeps-with-rdeps=True keeps runtime deps like =y (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=True", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps=True restores IDEPEND like =y (#194)",
+        [
+            "--pretend",
+            "--onlydeps",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=True",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "space-separated --onlydeps-with-rdeps n blanks runtime deps (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-rdeps", "n", "dev-libs/odw0a"],
+        0,
+    ),
+    (
+        "both flags are inert without --onlydeps: a plain merge (#194)",
+        [
+            "--pretend",
+            "--onlydeps-with-rdeps=n",
+            "--onlydeps-with-ideps=y",
+            "dev-libs/odw0a",
+        ],
+        0,
+    ),
+    (
+        "--onlydeps-with-ideps=foo is an invalid choice, rc 2 (#194)",
+        ["--pretend", "--onlydeps", "--onlydeps-with-ideps=foo", "dev-libs/odw0a"],
+        2,
+    ),
+    (
         "--update threads through dependency recursion, not just top-level",
         ["--pretend", "--update", "dev-libs/withdeps"],
         0,
@@ -4136,14 +4242,6 @@ def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     assert "terminated early" not in rust.stderr
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="oracle finding (Slice 3 capture, spec §4e): real's DFS applies "
-    "aucasclate's [cascade] flip before it walks aucascmid's own deps, so "
-    "aucascleaf is in the list; portuale's backward-cascade re-check leaves "
-    "the flag?-gated dep out (pinned the other way in "
-    "test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot)",
-)
 def test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf(
     emerge_binary, fixture_env
 ):
@@ -4155,12 +4253,13 @@ def test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf(
     (`_pkg_use_enabled`, :7795), so when `aucascmid` pops its `cascade?`
     dep is live and `aucascleaf` lands in the graph -- full 4-package list
     with the USE-changes block and the "terminated early" notice, exit 1.
-    Outside backlog #19; pinned so the shipped cascade pin has an
-    oracle-backed target."""
+    Outside backlog #19. Backlog #218: the in-graph ordering is ported
+    (the already-resolved-slot re-check re-expands the flipped package's
+    newly-gated deps in-walk), so this now passes unmarked."""
     args = ["--pretend", "dev-libs/aucasctop"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert [line.split()[2] for line in _merge_lines(rust.stdout)] == [
+    assert [line.split()[3] for line in _merge_lines(rust.stdout)] == [
         "dev-libs/aucascleaf-1.0",
         "dev-libs/aucascmid-1.0",
         "dev-libs/aucasclate-1.0",
@@ -5492,17 +5591,17 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     autounmask_use_config (real _needed_use_config_changes).
 
     Default (real --autounmask-backtrack off, depgraph.py:11736): the
-    graph is NOT re-driven -- aucascmid's own USE line is re-rendered to
-    `USE="cascade"` (real _pkg_use_enabled), but its cascade?-gated
-    aucascleaf does NOT appear. The change is still reported in the
-    standard "USE changes are necessary" block.
-
-    NOTE (oracle, 2026-09-11, Slice 3 of backlog #19): real 3.0.81.3 DOES
-    list aucascleaf here (`fixtures/abort-captures/dev-libs_aucasctop.*`),
-    because its DFS flips the still-unwalked aucascmid before walking its
-    deps. The pin below records portuale's current behaviour; the
-    oracle-backed target is the strict xfail
-    test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf.
+    graph is NOT re-driven -- and needs no re-drive, because real's DFS
+    applies the flip before the flipped node's walk (`_add_dep` only
+    pushes onto `_dep_stack`, depgraph.py:3254-3271, so `aucasclate` pops
+    first and flips the still-unwalked `aucascmid`): `aucascleaf` IS
+    listed here (live-captured in
+    `fixtures/abort-captures/dev-libs_aucasctop.*`, real 3.0.81.3,
+    `backtrack: 0/20`), alongside the standard "USE changes are
+    necessary" block and the "terminated early" notice, exit 1.
+    Backlog #218: the in-walk delta re-expansion ports that ordering, so
+    the default list below carries the leaf (it used to record only the
+    3-package list -- see the pre-#218 history of this pin).
 
     --autounmask-backtrack=y: the loop re-runs the whole walk with the
     flip applied, so aucascleaf now appears too."""
@@ -5510,11 +5609,11 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/aucascleaf-1.0 ",
         '[ebuild  N     ] dev-libs/aucascmid-1.0  USE="cascade"',
         "[ebuild  N     ] dev-libs/aucasclate-1.0 ",
         "[ebuild  N     ] dev-libs/aucasctop-1.0 ",
     ]
-    assert "aucascleaf" not in rust.stdout
     assert rust.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
@@ -5535,7 +5634,7 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         "[ebuild  N     ] dev-libs/aucasctop-1.0 ",
     ]
 
-    # --json (default) carries the same change, without aucascleaf
+    # --json (default) carries the same change, with aucascleaf
     j = _run([str(emerge_binary)], base + ["--json"], fixture_env)
     payload = json.loads(j.stdout)
     assert payload["autounmask_use_changes"] == [
@@ -5553,6 +5652,7 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         "aucasctop",
         "aucasclate",
         "aucascmid",
+        "aucascleaf",
     }
 
     # --autounmask-use=n: no flip, aucascmid[cascade] is unresolvable
@@ -9285,6 +9385,129 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
         ]
 
 
+def test_onlydeps_with_rdeps_ideps_pins_mergelists(emerge_binary, fixture_env):
+    """Backlog #194: `--onlydeps-with-rdeps` / `--onlydeps-with-ideps`
+    (real `_emerge/depgraph.py::_add_pkg_deps`, `main.py` parsing,
+    `man/emerge.1`). Fixtures are #194's own EAPI-8 namespace
+    (`dev-libs/odw0{a,b,c,d,e,f}`, root A carrying DEPEND B, BDEPEND F,
+    RDEPEND C, PDEPEND D, IDEPEND E; plus an EAPI-7 root
+    `dev-libs/odw0g-1` whose ebuild declares DEPEND/RDEPEND/PDEPEND/IDEPEND
+    on B/C/D/E while its md5-cache entry carries no IDEPEND line -- what
+    real `egencache` emits, since `bin/ebuild.sh` unsets IDEPEND below
+    EAPI 8)
+    instead of the upstream `odm0*`/`odi*` cells, which #220 owns. The
+    oracle (`/tmp/opencode/n194/oracle_odw.log`, captured from the real
+    `ResolverPlayground` on the same A/B/C/D/E/F + G shapes, not the
+    source literal) merges, all `success=True`: default/`=y`/`=True`
+    `[B, C, D, E, F]`; `=n` `[B, F]` (build-time only -- BDEPEND
+    survives); `=n` + ideps `=y`/bare/`=True` `[B, E, F]`; `=n` + ideps
+    `=n` `[B, F]`; EAPI-7 root default `[B, C, D]` and `=n` `[B]` (no E
+    -- real `bin/ebuild.sh` unsets IDEPEND below EAPI 8). The playground
+    `True` cells are the bare-flag shape (real `default_arg_opts`
+    inserts `"True"`); the literal `=True` argv form is the same real
+    code path (`_add_pkg_deps` only tests for `"n"`/`None`, and
+    `"True"` is in real `main.py`'s `choices: true_y_or_n`), pinned to
+    the same rows. The space-separated `n` form is what real
+    `insert_optional_args` consumes; both flags without `--onlydeps`
+    are inert (consulted only behind `pkg.onlydeps`), so that cell pins
+    the plain-merge rows including the root; `=foo` is a real argparse
+    invalid choice (rc 2, CASES-only).
+
+    All cells are clean today: portuale merges the oracle's exact set
+    with no warnings and empty stderr, so the exact rows are pinned.
+    Row order is portuale's own discovery order (the oracle marks these
+    cells `ambiguous_merge_order`); the ideps-without-rdeps-n and
+    `=foo` cells are CASES-only (same rows as the default cell, and rc
+    2 respectively).
+    """
+    env = dict(fixture_env)
+    n = "[ebuild  N     ] dev-libs/odw0"
+    cases = [
+        (
+            ["--pretend", "--onlydeps", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=y", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=n", "dev-libs/odw0a"],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=y",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=n",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "dev-libs/odw0g"],
+            [f"{n}c-1 ", f"{n}d-1 ", f"{n}b-1 "],
+        ),
+        (
+            ["--pretend", "dev-libs/odw0g"],
+            [f"{n}c-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}g-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps=True", "dev-libs/odw0a"],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=True",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}e-1 ", f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            ["--pretend", "--onlydeps", "--onlydeps-with-rdeps", "n", "dev-libs/odw0a"],
+            [f"{n}b-1 ", f"{n}f-1 "],
+        ),
+        (
+            [
+                "--pretend",
+                "--onlydeps-with-rdeps=n",
+                "--onlydeps-with-ideps=y",
+                "dev-libs/odw0a",
+            ],
+            [f"{n}c-1 ", f"{n}e-1 ", f"{n}d-1 ", f"{n}b-1 ", f"{n}f-1 ", f"{n}a-1 "],
+        ),
+    ]
+    for argv, rows in cases:
+        got = _run([str(emerge_binary)], argv, env)
+        assert got.returncode == 0, argv
+        assert got.stderr == "", argv
+        assert got.stdout.splitlines() == rows, argv
+
+
 def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
     """Upstream `test_eapi.py::testBdepend` (pg0) and `::testIdepend`
     (pg2), bulk-translated for #50 batch 6 (`dev-libs/epi0{a,b}`,
@@ -11979,6 +12202,8 @@ Dependency and target selection:
       --selective[=y|n]      same as --noreplace; =n cancels it
   -1, --oneshot              merge without recording the target in world / world_sets
   -o, --onlydeps             merge the targets' dependencies but not the targets themselves
+      --onlydeps-with-rdeps[=y|n]  include runtime deps under --onlydeps (default y)
+      --onlydeps-with-ideps[=y|n]  include install-time deps under --onlydeps --onlydeps-with-rdeps=n (default n)
   -O, --nodeps               ignore dependencies entirely
   -X, --exclude ATOMS        never act on a matching package (repeatable, space separated)
       --newrepo              reinstall if the package would now come from a different repo
@@ -21015,6 +21240,58 @@ def test_oracle_210_slot_change_reinstall_ignores_a_noop_argument_consumer(
     assert result.stdout.splitlines() == [
         "[ebuild   R    ] dev-libs/reinstslottarget-1.0 [1.0]",
     ], result.stdout
+
+
+def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """Backlog #233: an installed world member's stale recorded built
+    slot-operator dep must not abort the `@world` walk.
+
+    The copied world adds the installed consumers
+    `dev-libs/reinstslotconsumer` (`RDEPEND="dev-libs/reinstslottarget:0/1"`)
+    and `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`) while
+    `dev-libs/reinstslottarget` moved `0/1 -> 0/2` without a revbump
+    (the #210 fixture; the #54 K2/K3 copy pattern leaves the shared
+    fixture world untouched). Real 3.0.82.2 on the staged hermetic tree
+    (S0 probe `probe.log`: `FX_WORLD_EXTRA` with both consumers, argv
+    `--changed-slot --update --deep --newuse @world`) merges the four
+    unrelated world updates and withholds the reinstall silently, rc 0 --
+    the stale `:0/1=` still matches the installed instance in vartree,
+    so the edge is a satisfied nomerge edge, never a second instance and
+    never a miss (`depgraph.py:7799-7840` iterates the installed db for
+    every resolve). Before the fix portuale resolved the stale atom
+    ebuild-only, reported `there are no ebuilds to satisfy
+    "dev-libs/reinstslottarget:0/1="` with a doubled installed+argument
+    chain, and exited 1 before the #210 scan engaged.
+    """
+    env = _world_extra_env(
+        fixture_env,
+        tmp_path,
+        fixtures_root,
+        "dev-libs/reinstslotconsumer",
+        "dev-libs/reinstslotbound",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--changed-slot",
+            "--update",
+            "--deep",
+            "--newuse",
+            "@world",
+        ],
+        env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert result.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/newpkg-1.0 ",
+        "[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 ",
+        "[ebuild  N     ] dev-libs/withdeps-1.0 ",
+    ], result.stdout
+    assert result.stderr == "", (result.stdout, result.stderr)
 
 
 # Backlog #181: live real `emerge -p` text for the upstream
