@@ -5557,6 +5557,48 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert ">>> Jobs: 1 of 3 complete" in out
     assert ">>> Jobs: 3 of 3 complete" in out
 
+    # Backlog #197 (n197 container probe, real
+    # `_emerge/JobStatusDisplay.py::_display_status` on a non-tty): the
+    # `>>> Jobs:` line shape is `Jobs: C of M complete[, R running][,
+    # F failed][, W merge wait]` plus real's space padding to the
+    # 68-column jobs field. Real's `Load avg:` trailer is cut (fix
+    # round 1, coordinator ruling B14: repeated-run determinism is a
+    # jointly-owned gate, nondeterministic values never go to stdout --
+    # exactly like #185 cut the resolution seconds); the counters, arms
+    # and padding are pinned exactly, with no test-side normalisation.
+    import re
+
+    assert (
+        ">>> Jobs: 0 of 3 complete, 1 running" + " " * 36 in out
+    )
+    assert ">>> Jobs: 3 of 3 complete" + " " * 47 in out
+    assert "Load avg:" not in out
+    for line in out.splitlines():
+        if not line.startswith(">>> Jobs:"):
+            continue
+        assert re.fullmatch(
+            r">>> Jobs: \d+ of 3 complete(, \d+ (running|failed|merge wait))* +",
+            line,
+        ), repr(line)
+    # Dispatch order is deterministic: the first `1 running` line (leaf
+    # A's dispatch) precedes both leaves' `>>> Emerging` lines, and the
+    # final `3 of 3` line follows the last `>>> Completed` line.
+    assert out.index(">>> Jobs: 0 of 3 complete, 1 running") < min(
+        out.index(f">>> Emerging (1 of 3) dev-libs/schedleaf-a-1.0::testrepo for {root}"),
+        out.index(f">>> Emerging (2 of 3) dev-libs/schedleaf-b-1.0::testrepo for {root}"),
+    )
+    assert out.index(
+        ">>> Jobs: 3 of 3 complete" + " " * 47
+    ) > out.index(
+        f">>> Completed (3 of 3) dev-libs/schedparent-1.0::testrepo to {root}"
+    )
+    # Background mode (real `Scheduler._background_mode`): no leading
+    # blank line anywhere between the first and the last `>>> Jobs:`
+    # line -- every status line prints unblanked.
+    jobs_first = out.index(">>> Jobs:")
+    jobs_last = out.rindex(">>> Jobs: 3 of 3 complete")
+    assert "" not in out[jobs_first:jobs_last].splitlines()
+
     # Real `--quiet-build` (on by default under `--jobs`): each build's
     # own phase output is captured to `${T}/build.log`, NOT interleaved on
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
@@ -5580,6 +5622,182 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert (
         tmp_path / "portage-tmpdir/portage/dev-libs/schedleaf-a-1.0/temp/build.log"
     ).is_file()
+
+
+def test_emerge_serial_merge_status_lines_carry_reals_leading_blank(
+    emerge_binary, tmp_path
+):
+    """Backlog #197, S1 (real `_emerge/Scheduler.py::_status_msg`): a
+    serial non-`--quiet` merge is not in background mode, so real
+    prefixes every `>>>` status line with a blank line -- and prints no
+    `>>> Jobs:` lines at all (the display is quiet). Merges the same
+    three-package `schedparent` set the `-j2` pin above merges, one job
+    at a time. Grounded in the n197 container probe (serial shape)."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["FEATURES"] = "keepwork"
+
+    r = subprocess.run(
+        [str(emerge_binary), "--oneshot", "dev-libs/schedparent"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    out = r.stdout
+    assert ">>> Jobs:" not in out
+    lines = out.splitlines()
+    statuses = [
+        i
+        for i, line in enumerate(lines)
+        if line.startswith(">>> Emerging (")
+        or line.startswith(">>> Installing (")
+        or line.startswith(">>> Completed (")
+    ]
+    # All nine status lines (three packages x Emerging/Installing/
+    # Completed) print, each immediately preceded by exactly one blank
+    # line -- fix round 1: the pre-merge `println!` duplicated the
+    # first one, so the first line's predecessors are pinned too (its
+    # second predecessor is real's resolution-timing trailer, whose own
+    # blank is the only other blank allowed there).
+    assert len(statuses) == 9
+    for i in statuses:
+        assert lines[i - 1] == "", repr(lines[max(0, i - 2) : i + 1])
+    for i in statuses[1:]:
+        assert lines[i - 2] != "", repr(lines[i - 2 : i + 1])
+    first = statuses[0]
+    assert lines[first - 1] == "" and lines[first - 2] == "", repr(
+        lines[max(0, first - 3) : first + 1]
+    )
+    assert lines[first - 3] != "", repr(lines[max(0, first - 3) : first + 1])
+
+
+def test_emerge_quiet_verbose_shows_jobs_lines_without_blanks(
+    emerge_binary, tmp_path
+):
+    """Backlog #197, S2 (real `Scheduler._background_mode` +
+    `JobStatusDisplay`): `--quiet --verbose` is background mode with the
+    display live, so a serial merge prints `>>> Jobs:` lines (start,
+    build-end, merge-land, like the n197 probe's s3 shape) with no
+    leading blanks anywhere; `--quiet` alone prints the same status
+    lines with neither blanks nor Jobs lines (the probe's s4 shape).
+    Real's `Load avg:` trailer is cut (fix round 1, coordinator ruling
+    B14 -- see the `-j2` pin above), so the lines pin byte-for-byte."""
+    import shutil
+
+    def _run(args, n):
+        root = tmp_path / f"root{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{n}")
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", "dev-libs/schedleaf-a"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr
+        return r.stdout, root
+
+    out, root = _run(["--quiet", "--verbose"], 0)
+    assert ">>> Jobs: 0 of 1 complete, 1 running" + " " * 36 in out
+    assert ">>> Jobs: 1 of 1 complete" + " " * 47 in out
+    assert "Load avg:" not in out
+    assert f">>> Emerging (1 of 1) dev-libs/schedleaf-a-1.0::testrepo for {root}" in out
+    assert (
+        f">>> Installing (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
+    assert (
+        f">>> Completed (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
+    # No leading blanks anywhere in the status region (up to the last
+    # status line; the post-merge `install-info` tail, when the host
+    # prints one, lives after it -- see `_POST_EMERGE_INFO_LINES`).
+    assert "" not in out[: out.index(">>> Jobs: 1 of 1 complete")].splitlines()
+
+    out, root = _run(["--quiet"], 1)
+    assert ">>> Jobs:" not in out
+    assert "" not in out[: out.index(">>> Completed (1 of 1)")].splitlines()
+    assert f">>> Emerging (1 of 1) dev-libs/schedleaf-a-1.0::testrepo for {root}" in out
+    assert (
+        f">>> Completed (1 of 1) dev-libs/schedleaf-a-1.0::testrepo to {root}"
+        in out
+    )
+
+
+def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
+    emerge_binary, tmp_path
+):
+    """Backlog #197 fix round 1 (review Important 2): one failed build
+    fires each failure event exactly once. Real `_build_exit`'s failure
+    arm assigns absolutely (`3rdparty/portage`
+    `lib/_emerge/Scheduler.py:1641-1658`, `failed = len(_failed_pkgs)`
+    -- 1 for a single failure) before the freed build slot (`running`)
+    drops, so real prints exactly two `>>> Jobs:` lines: the failed-set
+    line, then the running-drop line. Both the `--quiet-build=y`
+    serial-captured split (`run_source_merge`'s captured branch) and
+    the `-j2` scheduler are pinned: a single `schedbad` under `-j2`
+    would take real's one-package serial reset (no Jobs lines at all),
+    so the parallel leg pairs it with `schedslow` (still asleep in
+    `src_compile` when `schedbad`'s `src_install` dies -- the same
+    pairing the kill-in-flight test uses). `, 2 failed` is the pre-fix
+    double-fire regressing. The run exits 1 naming the failed package;
+    real's `>>> Failed to emerge` tail is binary-path-only, so the
+    source failure surfaces on stderr instead."""
+    import shutil
+
+    def _run(args, pkgs, n):
+        root = tmp_path / f"failroot{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"failpt{n}")
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", *pkgs],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 1, (r.stdout, r.stderr)
+        assert "dev-libs/schedbad-1.0" in r.stderr, (r.stdout, r.stderr)
+        return r.stdout
+
+    # Serial-captured split: dispatch, failed-set, running-drop -- real's
+    # exact lines with real's padding (68-column field, no `Load avg:`
+    # trailer: B14).
+    out = _run(["--quiet-build=y"], ["dev-libs/schedbad"], 0)
+    assert ">>> Jobs: 0 of 1 complete, 1 running" + " " * 36 in out
+    assert ">>> Jobs: 0 of 1 complete, 1 running, 1 failed" + " " * 26 in out
+    assert ">>> Jobs: 0 of 1 complete, 1 failed" + " " * 37 in out
+    assert ", 2 failed" not in out
+    assert "Load avg:" not in out
+
+    # `-j2` scheduler: both leaves dispatch before either finishes, so
+    # the failed-set line still shows both build slots occupied.
+    out = _run(["-j2"], ["dev-libs/schedbad", "dev-libs/schedslow"], 1)
+    assert ">>> Jobs: 0 of 2 complete, 1 running" + " " * 36 in out
+    assert ">>> Jobs: 0 of 2 complete, 2 running" + " " * 36 in out
+    assert ">>> Jobs: 0 of 2 complete, 2 running, 1 failed" + " " * 26 in out
+    assert ">>> Jobs: 0 of 2 complete, 1 running, 1 failed" + " " * 26 in out
+    assert ", 2 failed" not in out
+    assert "Load avg:" not in out
 
 
 def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
