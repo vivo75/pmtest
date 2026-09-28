@@ -727,6 +727,21 @@ CASES = [
         0,
     ),
     (
+        "complete: upstream test_complete_graph pg0 libxml2 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", "dev-libs/cgp0x"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 >=x-2 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", ">=dev-libs/cgp1x-2"],
+        0,
+    ),
+    (
+        "complete: upstream test_complete_graph pg1 <x-1 --ignore-world merges like real (rc 0; pinned below)",
+        ["--pretend", "--ignore-world", "<dev-libs/cgp1x-1"],
+        0,
+    ),
+    (
         "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
@@ -9525,12 +9540,19 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned (`USE="icu*"` is real's
     changed-USE marker, `UD` the stock downgrade letters — both
-    normal rendering, not warnings). Not pinned: pg0's
+    normal rendering, not warnings). The three `--ignore-world` cells
+    (backlog #223: portuale now drops `@world` from the complete-graph
+    seeds exactly like real `depgraph.py:357-360`, so they merge the
+    oracle's exact rows too) are pinned in the same table — none of
+    the six cells touches an old-EAPI rule on the merged package
+    itself (plain atoms, no conditionals/slots on the merged rows;
+    the `[!icu?]` conditional lives on `cgp0q`, which neither graph
+    walks), so #220's EAPI raise leaves these rows unchanged.
+    Not pinned: pg0's
     `new-use=y` cell (oracle rc 1, portuale rc 0 — finding, no
     CASES), pg1's two `new-ver=y` cells (oracle rc 1, portuale rc
-    0 — findings, no CASES), and the three `--ignore-world` cells
-    (portuale answers rc 2 `not yet implemented` — finding, no
-    CASES). World caveat: upstream worlds (`x11-libs/qt-webkit`,
+    0 — findings, no CASES). World caveat: upstream worlds
+    (`x11-libs/qt-webkit`,
     `sys-apps/a`) are not emitted as shared world entries, so the
     non-`--ignore-world` cells run against the shared world file;
     the three rc-0 pins match real anyway.
@@ -9563,12 +9585,125 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
                 "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
             ],
         ),
+        (
+            ["--ignore-world", "dev-libs/cgp0x"],
+            [
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"',
+            ],
+        ),
+        (
+            ["--ignore-world", ">=dev-libs/cgp1x-2"],
+            [
+                "[ebuild     U  ] dev-libs/cgp1x-2 [1]",
+            ],
+        ),
+        (
+            ["--ignore-world", "<dev-libs/cgp1x-1"],
+            [
+                "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
+            ],
+        ),
     ]
     for args, rows in cases:
         got = _run([str(emerge_binary)], ["--pretend", *args], env)
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == rows, args
+
+
+def test_ignore_world_merges_only_the_arg_on_an_eapi_8_tree(
+    emerge_binary, fixture_env
+):
+    """`--ignore-world` on a modern-EAPI tree (backlog #223;
+    `dev-libs/igw0{x,a}`, EAPI 8).
+
+    Same shape as upstream `test_complete_graph.py::
+    testCompleteGraphVersionChange` pg1 (`dev-libs/cgp1{x,a}`, pinned
+    above), but written at EAPI 8 instead of the bulk-translated EAPI 0
+    the #220 raise has not reached yet: installed `igw0x-1` plus an
+    installed world-shaped consumer `igw0a-1` bounding it
+    (`>=igw0x-1 <igw0x-2`). Oracle: the real `ResolverPlayground` run at
+    EAPI 8 (`/tmp/opencode/n223/oracle_igw.py`, `PYTHONHASHSEED=0`,
+    `world=["dev-libs/igw0a"]`) answers both `--ignore-world` cells rc 0
+    with the requested version alone — EAPI raises nothing here, exactly
+    like the EAPI-0 oracle (`o50e-report.md` §5). Upstream's `world`
+    entry is not emitted as a shared world entry (world reason, same as
+    the `cgp1*` cells), so these run against the shared world file.
+    """
+    env = dict(fixture_env)
+    cases = [
+        (
+            ["--ignore-world", ">=dev-libs/igw0x-2"],
+            [
+                "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+            ],
+        ),
+        (
+            ["--ignore-world", "<dev-libs/igw0x-1"],
+            [
+                "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+            ],
+        ),
+    ]
+    for args, rows in cases:
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == rows, args
+
+
+def test_ignore_world_contrast_against_a_world_bound_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """`--ignore-world` contrast pin (backlog #223 fix round 1): the same
+    argument with and without the flag under a tmp ROOT whose world file
+    contains the bounding consumer `dev-libs/igw0a`.
+
+    Real semantics (`3rdparty/portage` 3.0.82.2): `--ignore-world`
+    empties `_required_set_names` (`lib/_emerge/depgraph.py:357-360`),
+    so `_complete_graph` (`:8677-8731`) no longer walks the world seeds;
+    without the flag the installed world member `igw0a-1`'s own pin
+    (`>=dev-libs/igw0x-1 <dev-libs/igw0x-2`) collides with the requested
+    out-of-range version. Grounded live against the real
+    `ResolverPlayground` at EAPI 8 (`world=["dev-libs/igw0a"]`,
+    `igw0{x,a}` ebuilds/installed as in the fixture): the plain
+    `>=dev-libs/igw0x-2` cell answers `success=False` with empty
+    `slot_collision_solutions`, while the `--ignore-world` cell answers
+    `success=True`, `mergelist=["dev-libs/igw0x-2"]` (same for
+    `<dev-libs/igw0x-1` vs `igw0x-0.1`) — the EAPI-8 mirror of upstream
+    `test_complete_graph.py::testCompleteGraphVersionChange`'s
+    `--complete-graph-if-new-ver=y` (fail) vs `--ignore-world` (pass)
+    cells. The tmp ROOT uses the `_world_extra_env` copied-fixture
+    pattern (shared world plus `dev-libs/igw0a`), so the shared fixture
+    world file stays untouched.
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/igw0a")
+    cases = [
+        (
+            ">=dev-libs/igw0x-2",
+            "[ebuild     U  ] dev-libs/igw0x-2 [1]",
+        ),
+        (
+            "<dev-libs/igw0x-1",
+            "[ebuild     UD ] dev-libs/igw0x-0.1 [1]",
+        ),
+    ]
+    for atom, row in cases:
+        plain = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert plain.returncode == 1, atom
+        assert plain.stderr == "", atom
+        merges = [
+            ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")
+        ]
+        assert merges == [row], atom
+        assert "slot conflict" in plain.stdout, atom
+        assert "dev-libs/igw0a-1" in plain.stdout, atom
+        flagged = _run(
+            [str(emerge_binary)], ["--pretend", "--ignore-world", atom], env
+        )
+        assert flagged.returncode == 0, atom
+        assert flagged.stderr == "", atom
+        assert flagged.stdout.splitlines() == [row], atom
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
@@ -11899,6 +12034,7 @@ Dependency and target selection:
       --rebuild-if-unbuilt, -new-rev, -new-ver, -new-slot  rebuild an installed package when a build dep is merged
       --rebuild-exclude ATOMS, --rebuild-ignore ATOMS  keep packages out of the rebuild triggers
       --complete-graph[=y|n], --complete-graph-if-new-use, --complete-graph-if-new-ver  force a full deep graph walk
+      --ignore-world[=y|n]  ignore the @world set and its dependencies (complete-graph walks args only)
       --dynamic-deps[=y|n]  walk the ebuild (y, default) or the vdb snapshot (n) during --deep
       --backtrack N         maximum resolver backtracking passes (default 10; 0 disables)
       --package-moves[=y|n]  apply profiles/updates/ package moves (default y)

@@ -1,0 +1,6 @@
+EAPI=8
+DESCRIPTION=fixture package: --ignore-world at EAPI 8, the newer version (backlog #223)
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=52164e8277f7d5b40e8e924d86ca877c
