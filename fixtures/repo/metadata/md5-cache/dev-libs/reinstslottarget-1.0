@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #210 same-version sub-slot change 0/1 -> 0/2 without a revbump
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=bea336b06419a8f63ff14bab521d0858
