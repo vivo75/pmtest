@@ -172,6 +172,17 @@ CASES = [
     ("--ask=n inline form", ["--pretend", "--ask=n", "dev-libs/newpkg"], 0),
     ("--ask=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
     ("--read-news=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
+    ("--verbose=True spelling (real true_y_or_n, same as bare --verbose)", ["--pretend", "--verbose=True", "dev-libs/newpkg"], 0),
+    ("--quiet=True spelling (real true_y_or_n, same as bare --quiet)", ["--pretend", "--quiet=True", "dev-libs/newpkg"], 0),
+    ("--deselect=True spelling (real true_y_or_n, same as bare --deselect)", ["--pretend", "--deselect=True", "dev-libs/foo"], 0),
+    ("--changed-deps=True spelling (real true_y_or_n, same as bare --changed-deps)", ["--pretend", "--changed-deps=True", "dev-libs/changeddepspkg"], 0),
+    ("--changed-deps-report=True spelling (real true_y_or_n, same as bare --changed-deps-report)", ["--pretend", "--changed-deps-report=True", "dev-libs/changeddepspkg"], 0),
+    ("--selective=True spelling (real true_y_or_n, same as bare --selective)", ["--pretend", "--selective=True", "dev-libs/samepkg"], 0),
+    ("--changed-slot=True spelling (real true_y_or_n, same as bare --changed-slot)", ["--pretend", "--changed-slot=True", "dev-libs/changedslotpkg"], 0),
+    ("--quiet-build=True spelling (real true_y_or_n, same as bare --quiet-build)", ["--pretend", "--quiet-build=True", "dev-libs/newpkg"], 0),
+    ("--with-test-deps=True spelling (real true_y_or_n, same as bare --with-test-deps)", ["--pretend", "--with-test-deps=True", "dev-libs/withtestdeppkg"], 0),
+    ("--autounmask-keep-keywords=True spelling (real true_y_or_n, same as bare, rc 1 like =y)", ["--pretend", "--autounmask-keep-keywords=True", "dev-libs/akk0a"], 1),
+    ("--autounmask-keep-masks=True spelling (real true_y_or_n, mask kept so fatal like the default)", ["--pretend", "--autounmask-keep-masks=True", "dev-libs/hardmaskedpkg"], 1),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
     (
@@ -9734,10 +9745,14 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     itself (plain atoms, no conditionals/slots on the merged rows;
     the `[!icu?]` conditional lives on `cgp0q`, which neither graph
     walks), so #220's EAPI raise leaves these rows unchanged.
-    Not pinned: pg0's
-    `new-use=y` cell (oracle rc 1, portuale rc 0 — finding, no
-    CASES), pg1's two `new-ver=y` cells (oracle rc 1, portuale rc
-    0 — findings, no CASES). World caveat: upstream worlds
+    Not pinned here: pg0's `new-use=y` cell and pg1's two `new-ver=y`
+    cells (oracle rc 1 with the consumer in world; the shared world
+    file has no such consumer, so these exact argvs stay rc 0 here --
+    like real with that world). The failing shape is pinned instead by
+    the world-carrying twins below (backlog #222:
+    `test_complete_graph_use_break_fails_with_world_consumer`,
+    `test_complete_graph_ver_break_fails_with_world_consumer`).
+    World caveat: upstream worlds
     (`x11-libs/qt-webkit`,
     `sys-apps/a`) are not emitted as shared world entries, so the
     non-`--ignore-world` cells run against the shared world file;
@@ -9890,6 +9905,121 @@ def test_ignore_world_contrast_against_a_world_bound_consumer(
         assert flagged.returncode == 0, atom
         assert flagged.stderr == "", atom
         assert flagged.stdout.splitlines() == [row], atom
+
+
+def test_complete_graph_use_break_fails_with_world_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """A USE change that breaks an installed bound fails the run
+    (backlog #222; upstream `test_complete_graph.py::
+    testCompleteGraphUseChange` pg0, `dev-libs/cgp0{x,q}`).
+
+    The tmp ROOT uses the `_world_extra_env` copied-fixture pattern
+    (shared world plus `dev-libs/cgp0q`), standing in for upstream's
+    `world=["x11-libs/qt-webkit"]`: the bulk translation emits no
+    world entries, so the shared-world cells can never see the
+    consumer. Grounded live against the real `ResolverPlayground`
+    (`3rdparty/portage` 3.0.82.2, EAPI-8 ebuilds mirroring the
+    fixtures, `world=["dev-libs/cgp0q"]`, `PYTHONHASHSEED=0`): the
+    `new-use=y` cell answers `success=False`,
+    `mergelist=["dev-libs/cgp0x-2.8.0"]` with empty
+    `slot_collision_solutions`, while the `new-use=n` and
+    `--ignore-world` cells answer `success=True` with the same
+    mergelist. Real mechanism: `_complete_graph` auto-enables on the
+    USE change (`lib/_emerge/depgraph.py:8592-8648`,
+    `complete_if_new_use` via the node-vs-installed USE diff) and its
+    end-of-walk loop fails the newly-unsatisfied dep the vdb still
+    matches (`:8751-8791`, installed `cgp0x` pulled in as a nomerge
+    node). Portuale renders the evaluated parent atom
+    (`dev-libs/cgp0x:2[-icu]` -- real stores the edge-time
+    `evaluate_conditionals` form) with the `("use", "icu")` reason
+    (`lib/_emerge/resolver/slot_collision.py:331-389`) plus the bare
+    `(Argument)` line (the `("AtomArg", None)` key, `:391-397`).
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp0q")
+    row = '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"'
+    plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/cgp0x"], env)
+    assert plain.returncode == 1, plain.stdout
+    assert plain.stderr == "", plain.stdout
+    merges = [ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert merges == [row], plain.stdout
+    assert "slot conflict" in plain.stdout, plain.stdout
+    assert "dev-libs/cgp0q-4.8.2" in plain.stdout, plain.stdout
+    assert "dev-libs/cgp0x:2[-icu]" in plain.stdout, plain.stdout
+    for args in (
+        ["--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
+        ["--ignore-world", "dev-libs/cgp0x"],
+    ):
+        got = _run([str(emerge_binary)], ["--pretend", *args], env)
+        assert got.returncode == 0, args
+        assert got.stderr == "", args
+        assert got.stdout.splitlines() == [row], args
+
+
+def test_complete_graph_ver_break_fails_with_world_consumer(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """A version change that breaks an installed bound fails the run
+    (backlog #222; upstream `test_complete_graph.py::
+    testCompleteGraphVersionChange` pg1, `dev-libs/cgp1{x,a}`) --
+    the committed-fixture twin of the `igw0a` contrast above.
+
+    Same `_world_extra_env` pattern (shared world plus
+    `dev-libs/cgp1a`) for upstream's `world=["sys-apps/a"]`. Grounded
+    live against the real `ResolverPlayground` (`3rdparty/portage`
+    3.0.82.2, EAPI-8 ebuilds mirroring the fixtures,
+    `world=["dev-libs/cgp1a"]`, `PYTHONHASHSEED=0`): both `new-ver=y`
+    cells (`>=dev-libs/cgp1x-2`, `<dev-libs/cgp1x-1`) answer
+    `success=False` with the requested version alone in the mergelist
+    and empty `slot_collision_solutions`, while the `new-ver=n` (with
+    `--rebuild-if-new-slot=n`) and `--ignore-world` cells answer
+    `success=True` with the same mergelists. No product change was
+    needed for this shape (the #223-era reverse-dep pins already fail
+    it once the consumer is world-reachable); these cells pin the
+    committed fixtures to the oracle.
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp1a")
+    cases = [
+        (
+            ">=dev-libs/cgp1x-2",
+            "[ebuild     U  ] dev-libs/cgp1x-2 [1]",
+            "dev-libs/cgp1a-1",
+        ),
+        (
+            "<dev-libs/cgp1x-1",
+            "[ebuild     UD ] dev-libs/cgp1x-0.1 [1]",
+            "dev-libs/cgp1a-1",
+        ),
+    ]
+    for atom, row, consumer in cases:
+        plain = _run([str(emerge_binary)], ["--pretend", atom], env)
+        assert plain.returncode == 1, atom
+        assert plain.stderr == "", atom
+        merges = [
+            ln for ln in plain.stdout.splitlines() if ln.startswith("[ebuild")
+        ]
+        assert merges == [row], atom
+        assert "slot conflict" in plain.stdout, atom
+        assert consumer in plain.stdout, atom
+        flagged = _run(
+            [str(emerge_binary)], ["--pretend", "--ignore-world", atom], env
+        )
+        assert flagged.returncode == 0, atom
+        assert flagged.stderr == "", atom
+        assert flagged.stdout.splitlines() == [row], atom
+        opted_out = _run(
+            [str(emerge_binary)],
+            [
+                "--pretend",
+                "--complete-graph-if-new-ver=n",
+                "--rebuild-if-new-slot=n",
+                atom,
+            ],
+            env,
+        )
+        assert opted_out.returncode == 0, atom
+        assert opted_out.stderr == "", atom
+        assert opted_out.stdout.splitlines() == [row], atom
 
 
 def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
