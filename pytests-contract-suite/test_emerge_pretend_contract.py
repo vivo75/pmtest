@@ -18422,8 +18422,13 @@ def test_oracle_slotop_conflict_mass_rebuild(
     abandoned slot even with an empty world (walked, not merely
     reachable). Ported through the `slot_operator_rebuild_scan`, so the
     leaves merge as walked `rR` nodes with the `causing rebuilds` block
-    (verified against the vendored portage's Playground mergelist)."""
-    installed = [("app-misc", "somassb", "1", "1", {})]
+    (verified against the vendored portage's Playground mergelist, and
+    against live real 3.0.82.2 in the #211 R2 container probe: the
+    rebuilds need EAPI-bearing vdb -- real's `FakeVartree` overlay
+    refuses EAPI-less records, so without the `EAPI` files below live
+    real merges no leaves while the Playground's EAPI-5 records do).
+    The `EAPI` files keep this pin's staging faithful to that oracle."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
     installed += [
         (
             "app-misc",
@@ -18431,6 +18436,7 @@ def test_oracle_slotop_conflict_mass_rebuild(
             "1",
             "0",
             {
+                "EAPI": "8",
                 "DEPEND": "app-misc/somassb:1/1=",
                 "RDEPEND": "app-misc/somassb:1/1=",
             },
@@ -18452,6 +18458,65 @@ def test_oracle_slotop_conflict_mass_rebuild(
         ("app-misc/somassc2c", "1"),
         ("app-misc/somassc3c", "1"),
         ("app-misc/somassc4c", "1"),
+    }
+
+
+def test_oracle_slotop_update_probe_refusal(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Real `_slot_operator_check_reverse_dependencies`
+    (`3rdparty/portage/lib/_emerge/depgraph.py:2472`, gates `:2622` and
+    `:2738`): the conflict-mass shape (bug 486580, `somassa
+    --backtrack 3 -uD`) plus an installed world parent
+    (`app-misc/somassveto-1`, recorded `<app-misc/somassb-2`) whose atom
+    the fresh `somassb-2` child violates. Real refuses the whole
+    replacement: the probe's candidate-child gate fails, so no leaf
+    rebuild is scheduled, while     `somassa-1` + `somassb-2` still merge
+    (verified against real 3.0.82.2 in the one container probe the
+    #211 R2 slice ran: control merges the 5 leaves at `backtrack: 1/3`,
+    the veto run merges only `somassa-1` + `somassb-2` at `0/3`; log in
+    the report). MATCHES real since #211 R2: the rebuild scan checks the
+    fresh candidate against every other in-scope installed parent (built
+    `:S/SS=` relaxed to `:=`) and withholds the edge on mismatch. The
+    veto parent rides the world file (complete-mode reachability, the
+    `FX_WORLD_EXTRA` staging pattern); its live ebuild carries the veto
+    atom itself (real only sees parent pins through the walked depstring
+    + the built-`:=` overlay, never raw vdb), and the `EAPI` files keep
+    the probe registration faithful (see the control pin above)."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
+    installed += [
+        (
+            "app-misc",
+            f"somassc{i}c",
+            "1",
+            "0",
+            {
+                "EAPI": "8",
+                "DEPEND": "app-misc/somassb:1/1=",
+                "RDEPEND": "app-misc/somassb:1/1=",
+            },
+        )
+        for i in range(5)
+    ]
+    installed.append(
+        (
+            "app-misc",
+            "somassveto",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "<app-misc/somassb-2"},
+        )
+    )
+    root = _b1_root(tmp_path, ["app-misc/somassveto"], installed)
+    rust = _b1_run(
+        ["--pretend", "--backtrack", "3", "--update", "--deep", "app-misc/somassa"],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/somass")}
+    assert got == {
+        ("app-misc/somassa", "1"),
+        ("app-misc/somassb", "2"),
     }
 
 
