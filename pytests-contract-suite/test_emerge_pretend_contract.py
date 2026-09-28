@@ -18615,8 +18615,13 @@ def test_oracle_slotop_conflict_mass_rebuild(
     abandoned slot even with an empty world (walked, not merely
     reachable). Ported through the `slot_operator_rebuild_scan`, so the
     leaves merge as walked `rR` nodes with the `causing rebuilds` block
-    (verified against the vendored portage's Playground mergelist)."""
-    installed = [("app-misc", "somassb", "1", "1", {})]
+    (verified against the vendored portage's Playground mergelist, and
+    against live real 3.0.82.2 in the #211 R2 container probe: the
+    rebuilds need EAPI-bearing vdb -- real's `FakeVartree` overlay
+    refuses EAPI-less records, so without the `EAPI` files below live
+    real merges no leaves while the Playground's EAPI-5 records do).
+    The `EAPI` files keep this pin's staging faithful to that oracle."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
     installed += [
         (
             "app-misc",
@@ -18624,6 +18629,7 @@ def test_oracle_slotop_conflict_mass_rebuild(
             "1",
             "0",
             {
+                "EAPI": "8",
                 "DEPEND": "app-misc/somassb:1/1=",
                 "RDEPEND": "app-misc/somassb:1/1=",
             },
@@ -18645,6 +18651,160 @@ def test_oracle_slotop_conflict_mass_rebuild(
         ("app-misc/somassc2c", "1"),
         ("app-misc/somassc3c", "1"),
         ("app-misc/somassc4c", "1"),
+    }
+
+
+def test_oracle_slotop_update_probe_refusal(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Real `_slot_operator_check_reverse_dependencies`
+    (`3rdparty/portage/lib/_emerge/depgraph.py:2472`, gates `:2622` and
+    `:2738`): the conflict-mass shape (bug 486580, `somassa
+    --backtrack 3 -uD`) plus an installed world parent
+    (`app-misc/somassveto-1`, recorded `<app-misc/somassb-2`) whose atom
+    the fresh `somassb-2` child violates. Real refuses the whole
+    replacement: the probe's candidate-child gate fails, so no leaf
+    rebuild is scheduled, while     `somassa-1` + `somassb-2` still merge
+    (verified against real 3.0.82.2 in the one container probe the
+    #211 R2 slice ran: control merges the 5 leaves at `backtrack: 1/3`,
+    the veto run merges only `somassa-1` + `somassb-2` at `0/3`; log in
+    the report). MATCHES real since #211 R2: the rebuild scan checks the
+    fresh candidate against every other in-scope installed parent (built
+    `:S/SS=` relaxed to `:=`) and withholds the edge on mismatch. The
+    veto parent rides the world file (complete-mode reachability, the
+    `FX_WORLD_EXTRA` staging pattern); its live ebuild carries the veto
+    atom itself (real only sees parent pins through the walked depstring
+    + the built-`:=` overlay, never raw vdb), and the `EAPI` files keep
+    the probe registration faithful (see the control pin above)."""
+    installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
+    installed += [
+        (
+            "app-misc",
+            f"somassc{i}c",
+            "1",
+            "0",
+            {
+                "EAPI": "8",
+                "DEPEND": "app-misc/somassb:1/1=",
+                "RDEPEND": "app-misc/somassb:1/1=",
+            },
+        )
+        for i in range(5)
+    ]
+    installed.append(
+        (
+            "app-misc",
+            "somassveto",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "<app-misc/somassb-2"},
+        )
+    )
+    root = _b1_root(tmp_path, ["app-misc/somassveto"], installed)
+    rust = _b1_run(
+        ["--pretend", "--backtrack", "3", "--update", "--deep", "app-misc/somassa"],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/somass")}
+    assert got == {
+        ("app-misc/somassa", "1"),
+        ("app-misc/somassb", "2"),
+    }
+
+
+def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 item 2: the new-child-slot arm also probes
+    `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
+    mismatch. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and an
+    installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
+    form; the live ebuild carries bare `:=`); the run upgrades slot 1
+    to `mmprov-3` (`1/2`). Real's candidate loop
+    (`_iter_similar_available`, `depgraph.py:2660-2695`) ranges over
+    every available package, not only fresh-slot merges, so the probe
+    fires for the slot-1 upgrade against the slot-0-bound consumer and
+    the consumer rebuilds. MATCHES real since #211 item 2 (code-grounded:
+    the loop text has no entry-kind restriction; the direction follows
+    the R2-probe-validated new-slot arm). The `EAPI` files keep the
+    probe registration faithful (see the conflict-mass pin)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+
+
+def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#211 I1: the `--solver=` bridge threads the request's
+    `update`/top-level atoms into its rebuild fixpoint, so the
+    new-child-slot arm (both the fresh-slot and the item-2
+    bound-slot-mismatch halves, plus the R2 refusal) runs there exactly
+    as on the default path. On the `mmprov` shape the pubgrub walk
+    produces the same slot-1 `Upgrade` entry, and the bridge schedules
+    the same consumer rebuild. (`resolvo` does not resolve the direct
+    upgrade arg at all here -- an engine-side gap below this layer,
+    reported for filing; the conflict-mass shape likewise resolves
+    walked `:=` deps to installed inside both engines, so scan-level
+    agreement cannot reach it without engine-side probe scheduling.)"""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "--solver=pubgrub",
+            "app-misc/mmprov",
+            "app-misc/mmcons",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
+    assert got == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
     }
 
 
