@@ -1925,9 +1925,14 @@ def _real_build_env(tmp_path):
     real chain never writes under `ROOT` at all -- only `${D}`/`PKGDIR`,
     both `tmp_path`-relative here), matching how portuale's own manual
     verification of `ebuild <file> package` and `emerge --buildpkgonly`
-    already proved this is safe."""
+    already proved this is safe. `PORTAGE_TMPDIR` gets a private dir
+    like every other real-op helper (backlog #266): the default
+    `/var/tmp/portage` is shared with the host system's real portage,
+    whose root runs recreate category dirs as `portage:portage` and then
+    the pre-clean dies with `Permission denied` for this user."""
     env = _fixture_env()
     env["PKGDIR"] = str(tmp_path / "pkgdir")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
     return env
 
 
@@ -4788,7 +4793,15 @@ def _news_env(tmp_path, name):
     import shutil
 
     root = tmp_path / name
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    # `mtimedb` is runtime state, not fixture state (backlog #267): a
+    # stale one in the shared fixtures' `var` (left by any real-merge
+    # run against ROOT=fixtures) would ride along here and make the
+    # resume-clear assertions (`not mtimedb.exists()`) fail on its
+    # `resume_backup` residue rather than on this test's own bookkeeping.
+    shutil.copytree(
+        Path(FIXTURES_ROOT) / "var", root / "var",
+        ignore=shutil.ignore_patterns("mtimedb"),
+    )
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)

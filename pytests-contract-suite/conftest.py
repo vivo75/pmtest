@@ -81,6 +81,19 @@ def _sudo_rm_rf(path: Path) -> bool:
     return result.returncode == 0 and not path.exists()
 
 
+def _reclaim_fixture_mtimedb() -> None:
+    """Backlog #267: `fixtures/var/cache/edb/mtimedb` is runtime state
+    that any real-merge run with `ROOT=fixtures` leaves behind (the
+    pre-merge `Scheduler._save_resume_list` shape), never committed
+    fixture state -- and it is `gitignore`d, so it drifts silently. A
+    stale one rides into every `_news_env` copytree and fails the
+    resume-clear assertions on its `resume_backup` residue. The
+    originating run is intermittent (observed once in a full session,
+    not reproducible under a watcher), so sweep defensively at session
+    start next to the other tmp hygiene."""
+    (FIXTURES_ROOT / "var" / "cache" / "edb" / "mtimedb").unlink(missing_ok=True)
+
+
 def _reclaim_portuale_bin_overlays(base: Path) -> None:
     """Every `emerge`/`ebuild` invocation makes its own PATH overlay at
     `$TMPDIR/portuale-bin.<pid>` (`ebuild_phases.rs::bin_dir()`) and never
@@ -115,6 +128,7 @@ def pytest_configure(config):
         _TMP_BASE_PATH = Path(_TMP_BASE)
         _TMP_BASE_PATH.mkdir(parents=True, exist_ok=True)
         _reclaim_portuale_bin_overlays(_TMP_BASE_PATH)
+        _reclaim_fixture_mtimedb()
         if not _BASETEMP.exists() or _sudo_rm_rf(_BASETEMP):
             config.option.basetemp = str(_BASETEMP)
         else:
