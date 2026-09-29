@@ -19969,6 +19969,128 @@ def test_oracle_prune_rebuilds_restart_adds_passes(
     assert by_cp[("app-misc", "pprov")]["outcome"] == "upgrade"
 
 
+def test_oracle_prune_rebuilds_conflict_missed_updates(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#253 half 1: the prune trigger chains real's conflict half of
+    missed updates (`_get_missed_updates`, `depgraph.py:1529-1565`,
+    the `:1533-1536` chain of `_runtime_pkg_mask` with
+    `_conflict_missed_update`). Installed `pprov-1` (`0/1`) + `pcons-1`
+    bound `>=app-misc/pprov-1:0/1=` (the #213 cell: the same-slot
+    update probe schedules the `pcons-1` rebuild, so the replace set is
+    non-empty); the `slotconflictoldconsumer`/`slotconflictnewconsumer`
+    pair (the #90 reversed shape: argv order graphs 2.0 first, the
+    direct solve removes it) leaves the ONLY missed update in
+    `_conflict_missed_update` -- no backtracking mask exists anywhere,
+    so portuale's mask-half-only predicate (`backtrack_missed_updates`,
+    the trigger at the #213 site) under-fires the prune (safe
+    direction: same rows, fewer passes). Probed on real 3.0.82.2, host
+    staged-fixture probe 2026-09-29 (PORTAGE_CONFIGROOT at the fixture
+    tree, ad-hoc ROOT with EAPI-bearing vdb for `pprov-1`/`pcons-1`,
+    neutral `make.local` shadow in a mount namespace; argv `--pretend
+    --color=n --backtrack=20 --update --deep app-misc/pprov
+    app-misc/pcons dev-libs/slotconflictoldconsumer
+    dev-libs/slotconflictnewconsumer`): rc 0, `Dependency resolution
+    took 17.85 s (backtrack: 3/20)`, five rows (`[ebuild N]
+    slotconflicttarget-1.0`, `[ebuild r U] pprov-2 [1]`, `[ebuild rR]
+    pcons-1`, `[ebuild N] oldconsumer`, `[ebuild N] newconsumer`), the
+    same skipped-update `WARNING` as the #90 pin
+    (`slotconflicttarget-2.0` against oldconsumer's `<2.0`) with NO
+    `!!!` backtracking tail (the mask half is empty -- this is the
+    conflict-source-only lock), and the same `causing rebuilds` block
+    (`pprov-2` rebuilds `pcons-1`). Portuale prints no timing line
+    under `--pretend`, so the prune is pinned through `--json`
+    (`backtrack.restarts == 3`, real's 3/20); without the predicate
+    chain the same run settles after 1 restart. The `--backtrack=0`
+    control takes no restart at all (the trigger stays gated there,
+    like the probe) while the rows -- including the `WARNING` -- are
+    unchanged (the direct solve is ungated, per the #90 pin). The
+    `EAPI` files keep the probe registration faithful (see the
+    conflict-mass pin). Half 2 (a rebuild the re-resolve drops) has no
+    pin: S0 shows no honest ebuild shape drops a probe-scheduled
+    rebuild on the re-resolve (the re-walk is identical once the
+    replace set regrows, and `_eliminate_rebuilds` rule 8 keeps every
+    `:=` consumer whose binding broke -- the scheduling condition
+    itself), so the drop half stays TBD (see the entry)."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    args = [
+        "--pretend",
+        "--backtrack",
+        "20",
+        "--update",
+        "--deep",
+        "app-misc/pprov",
+        "app-misc/pcons",
+        "dev-libs/slotconflictoldconsumer",
+        "dev-libs/slotconflictnewconsumer",
+    ]
+    rust = _b1_run(args, _b1_env(fixture_env, root), emerge_binary)
+    assert _b1_merges(rust.stdout) == [
+        "[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ",
+        "[ebuild  r  U  ] app-misc/pprov-2 [1]",
+        "[ebuild  rR    ] app-misc/pcons-1 ",
+        "[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 ",
+        "[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 ",
+    ]
+    assert "WARNING: One or more updates/rebuilds have been skipped" in rust.stdout
+    assert "dev-libs/slotconflicttarget:0" in rust.stdout
+    assert "dev-libs/slotconflicttarget-2.0:0/0::testrepo" in rust.stdout
+    assert "<dev-libs/slotconflicttarget-2.0 required by" in rust.stdout
+    # Conflict-source-only lock: no mask-half tail anywhere.
+    assert "triggered by backtracking" not in rust.stdout
+    assert (
+        f"(app-misc/pprov-2:0/2::testrepo, ebuild scheduled for merge to '{root}')"
+        in rust.stdout
+    )
+    assert (
+        f"(app-misc/pcons-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+        in rust.stdout
+    )
+    js = _b1_run(
+        ["--pretend", "--json", *args[1:]],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    report = json.loads(js.stdout)
+    assert report["backtrack"] == {"restarts": 3, "max": 20}
+    by_cp = {(e["category"], e["package"]): e for e in report["entries"]}
+    assert by_cp[("app-misc", "pcons")]["outcome"] == "reinstall"
+    assert by_cp[("app-misc", "pcons")]["slot_operator_rebuild"] is True
+    assert by_cp[("app-misc", "pprov")]["outcome"] == "upgrade"
+    # --backtrack=0 control: the trigger stays off (no prune restart,
+    # no consumer rebuild) while the direct solve still reports the
+    # conflict (WARNING persists, no !!! tail). Known delta TBD-270:
+    # real also withholds the pprov upgrade itself at bt0 (same probe
+    # with `--backtrack=0`: rc 0, `backtrack: 0/0`, three rows -- no
+    # pprov/pcons at all); portuale upgrades pprov-2 as a plain U --
+    # the bt0 update-atomicity rule is a different slice, and the
+    # trigger change here cannot reach it (the scan stays off at
+    # `--backtrack=0`).
+    bt0 = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack", "0", "--update", "--deep",
+         "app-misc/pprov", "app-misc/pcons",
+         "dev-libs/slotconflictoldconsumer",
+         "dev-libs/slotconflictnewconsumer"],
+        _b1_env(fixture_env, root),
+    )
+    assert bt0.returncode == 0
+    assert "WARNING: One or more updates/rebuilds have been skipped" in bt0.stdout
+    assert "dev-libs/slotconflicttarget:0" in bt0.stdout
+    assert "triggered by backtracking" not in bt0.stdout
+    assert not any("pcons" in ln for ln in _b1_merges(bt0.stdout))
+
+
 def test_oracle_slotop_required_use(
     emerge_binary, fixture_env, tmp_path
 ):
