@@ -1,0 +1,28 @@
+# Backlog #244 (batch-2026-09-28_244): argument-order-dependent autounmask
+# display. Upstream test_autounmask_use_breakage (dev-libs/aub0{a,b,c,d};
+# the fixture profile enables foo, so aub0a's aub0d[-foo] is the requester
+# that needs a change): all six argument orders under both
+# --autounmask-backtrack values, the two-argument pair, and aubreaktop (a
+# flag wanted both ways inside one package's deps). Real's walk is LIFO
+# over the arguments; a USE flip contradicting a needed change fails the
+# pass and sends it to the autounmask-breakage clean pass, whose
+# _create_graph stops at the first failing atom. Capture:
+# portuale docs/evidence/2026-09-28-244/.
+--autounmask-backtrack=y dev-libs/aub0c dev-libs/aub0b dev-libs/aub0a
+--autounmask-backtrack=y dev-libs/aub0c dev-libs/aub0a dev-libs/aub0b
+--autounmask-backtrack=y dev-libs/aub0b dev-libs/aub0c dev-libs/aub0a
+--autounmask-backtrack=y dev-libs/aub0b dev-libs/aub0a dev-libs/aub0c
+--autounmask-backtrack=y dev-libs/aub0a dev-libs/aub0c dev-libs/aub0b
+--autounmask-backtrack=y dev-libs/aub0a dev-libs/aub0b dev-libs/aub0c
+--autounmask-backtrack=n dev-libs/aub0c dev-libs/aub0b dev-libs/aub0a
+--autounmask-backtrack=n dev-libs/aub0c dev-libs/aub0a dev-libs/aub0b
+--autounmask-backtrack=n dev-libs/aub0b dev-libs/aub0c dev-libs/aub0a
+--autounmask-backtrack=n dev-libs/aub0b dev-libs/aub0a dev-libs/aub0c
+--autounmask-backtrack=n dev-libs/aub0a dev-libs/aub0c dev-libs/aub0b
+--autounmask-backtrack=n dev-libs/aub0a dev-libs/aub0b dev-libs/aub0c
+--autounmask-backtrack=y dev-libs/aub0b dev-libs/aub0a
+--autounmask-backtrack=y dev-libs/aub0a dev-libs/aub0b
+--autounmask-backtrack=n dev-libs/aub0b dev-libs/aub0a
+--autounmask-backtrack=n dev-libs/aub0a dev-libs/aub0b
+dev-libs/aubreaktop
+--autounmask-backtrack=y dev-libs/aubreaktop
