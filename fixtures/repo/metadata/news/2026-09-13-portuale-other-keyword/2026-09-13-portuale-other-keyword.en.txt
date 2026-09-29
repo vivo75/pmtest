@@ -1,0 +1,10 @@
+Title: Portuale news: relevant only on an arch this tree does not use
+Author: Portuale Test <portuale@example.org>
+Content-Type: text/plain
+Posted: 2026-09-13
+Revision: 1
+News-Item-Format: 2.0
+Display-If-Keyword: sparc
+
+The fixture ARCH is not sparc, so `emerge --check-news` never counts
+this item (real DisplayKeywordRestriction.checkRestriction).

@@ -17340,7 +17340,7 @@ def test_check_news_counts_unread_relevant_items(
     emerge_binary, fixture_env, tmp_path
 ):
     """emerge --check-news (real actions.py:3844 -> count_unread_news):
-    the fixture testrepo has eleven GLEP 42 news items -- one
+    the fixture testrepo has thirteen GLEP 42 news items -- one
     unrestricted, one `Display-If-Installed: dev-libs/samepkg` (in the
     vdb at 1.0), one `>=dev-libs/samepkg-1.0` (1.0 satisfies it), one
     `>dev-libs/samepkg-1.0` (1.0 does NOT), one on an uninstalled
@@ -17351,7 +17351,15 @@ def test_check_news_counts_unread_relevant_items(
     the whole item), and three News-Item-Format 1.x items -- one with a
     `:slot` atom, one with a `[use]` atom (both invalid under 1.x's EAPI
     0 atom grammar), and one with a plain atom relative to the installed
-    samepkg (valid AND relevant). Five are relevant, so the count is 5.
+    samepkg (valid AND relevant). Two more (backlog #258) are restricted
+    to what this tree is not: `Display-If-Profile` values that neither
+    equal the fixture profile `default` nor are a `/*` prefix of it, and
+    `Display-If-Keyword: sparc` against a profile with no sparc `ARCH`
+    (real `news.py` DisplayProfileRestriction / DisplayKeywordRestriction
+    .checkRestriction; the l3-20260928T195717Z container probe had real
+    at 15 gentoo items and portuale at 34 before the fix). Five are
+    relevant, so the count is 5. The rewritten state files carry real's
+    `apply_secpass_permissions(mode=0o064, mask=0)` group-write bits.
    """
     rust_env = _check_news_isolated_root(fixture_env, tmp_path, "root-rust")
     rust = _run([str(emerge_binary)], ["--check-news"], rust_env)
@@ -17382,6 +17390,10 @@ def test_check_news_counts_unread_relevant_items(
     assert "2026-09-08-portuale-malformed" not in skip
     assert "2026-09-09-portuale-format1-slotatom" not in skip
     assert "2026-09-10-portuale-format1-useatom" not in skip
+    assert "2026-09-12-portuale-other-profile" not in skip
+    assert "2026-09-13-portuale-other-keyword" not in skip
+    for name in ("news-testrepo.unread", "news-testrepo.skip"):
+        assert (news_dir / name).stat().st_mode & 0o064 == 0o064
 
     again = _run([str(emerge_binary)], ["--check-news"], env)
     assert "5 news items need reading for repository 'testrepo'." in again.stdout

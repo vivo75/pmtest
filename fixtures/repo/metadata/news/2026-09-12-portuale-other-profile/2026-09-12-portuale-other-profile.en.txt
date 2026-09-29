@@ -1,0 +1,12 @@
+Title: Portuale news: relevant only on profiles this tree does not use
+Author: Portuale Test <portuale@example.org>
+Content-Type: text/plain
+Posted: 2026-09-12
+Revision: 1
+News-Item-Format: 2.0
+Display-If-Profile: default/linux/s390/23.0
+Display-If-Profile: default/other/*
+
+The fixture profile is `default`: it equals neither value and does not
+sit under `default/other/`, so `emerge --check-news` never counts this
+item (real DisplayProfileRestriction.checkRestriction).
