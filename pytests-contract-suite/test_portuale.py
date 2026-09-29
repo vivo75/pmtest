@@ -6732,6 +6732,83 @@ def test_emerge_and_ebuild_refuse_to_merge_into_a_root_owned_tree(emerge_binary,
         assert "superuser access is required" not in r.stderr, (cmd, r.stderr)
 
 
+def _ask_offer_env(tmp_path, tag):
+    """Fixture env for the #246 offer pins: the committed fixture tree
+    as config, an unowned ROOT (root-owned `/usr`, so a non-root
+    caller is unprivileged -- the same trick as
+    `test_emerge_and_ebuild_refuse_to_merge_into_a_root_owned_tree`)."""
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = "/usr/portuale-ask-pretend-test-does-not-exist"
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt-{tag}")
+    return env
+
+
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="the privilege gate only fires for a non-root caller"
+)
+def test_emerge_ask_offers_pretend_to_unprivileged_caller_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #246: real `_emerge/actions.py:3983-4006` offers a
+    non-privileged caller `Would you like to add --pretend to options?`
+    when `--ask` is set, instead of refusing outright. `emerge --ask
+    --oneshot dev-libs/schedok` with an unowned ROOT must print `This
+    action requires superuser access...` and the question, and a `n`
+    answer must exit 130 (`128 + SIGINT`) with nothing else printed --
+    no `Interrupted.` (that line is the EOF/SIGINT arm's, #240), no
+    resolve, and no outright-refusal text on stderr. Host probe
+    2026-09-29 (`/usr/sbin/emerge` 3.0.82.2 as uid 1000, secpass 0,
+    `printf 'n\\n' | script -qec "emerge --ask --depclean"`, verbatim):
+    stdout `This action requires superuser access...` + bold `Would
+    you like to add --pretend to options?`, stderr colorized
+    `[Yes/No]` (readline's `input()`), rc 130, nothing else."""
+    env = _ask_offer_env(tmp_path, "offer-no")
+    r = _read_news_pty_run(emerge_binary, env, answers="n\n", flags=["--ask"])
+    assert r.returncode == 130, (r.stdout, r.stderr)
+    assert "This action requires superuser access..." in r.stdout, (
+        r.stdout,
+        r.stderr,
+    )
+    assert "Would you like to add --pretend to options?" in r.stdout, (
+        r.stdout,
+        r.stderr,
+    )
+    assert "Interrupted." not in r.stdout, (r.stdout, r.stderr)
+    assert "Calculating dependencies" not in r.stdout, (r.stdout, r.stderr)
+    assert "superuser access is required" not in r.stderr, (r.stdout, r.stderr)
+
+
+@pytest.mark.skipif(
+    os.geteuid() == 0, reason="the privilege gate only fires for a non-root caller"
+)
+def test_emerge_ask_pretend_offer_yes_continues_as_pretend_like_real(
+    emerge_binary, tmp_path
+):
+    """Backlog #246, the "Yes" arm: real sets `opts["--pretend"] =
+    True`, pops `--ask`, and the run continues as a pretend run
+    (`actions.py:4004-4006`). Host probe 2026-09-29 (`printf 'y\\n' |
+    script -qec "emerge --ask --depclean"`): after the offer the run
+    prints the depclean notice and `Calculating dependencies ...
+    done!` with no second prompt. Here a `y` answer must resolve the
+    pretend merge list (`dev-libs/schedok-1.0`) with rc 0 and must not
+    prompt again (`Would you like to merge these packages?` stays
+    absent -- `--ask` is no longer in effect)."""
+    env = _ask_offer_env(tmp_path, "offer-yes")
+    r = _read_news_pty_run(emerge_binary, env, answers="y\n", flags=["--ask"])
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "Would you like to add --pretend to options?" in r.stdout, (
+        r.stdout,
+        r.stderr,
+    )
+    assert "dev-libs/schedok-1.0" in r.stdout, (r.stdout, r.stderr)
+    assert "Would you like to merge these packages?" not in r.stdout, (
+        r.stdout,
+        r.stderr,
+    )
+
+
 def test_emerge_preserved_libs_advisory_and_rebuild_set(emerge_binary, tmp_path):
     """Real `post_emerge()` + `display_preserved_libs()`
     (`post_emerge.py:141-152`): after `emerge -C` preserves a still-linked
