@@ -6133,16 +6133,18 @@ def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
     source. The USE block names only the forcing chain
     (`_get_dep_chain(..., unsatisfied_dependency=True)` picks `abk0d-1`,
     whose `C[x]` the change satisfies, not `abk0a-3`'s plain `C`).
-    Known delta vs the probe, documented: no `[1]` oldbest bracket on
-    the `R` row (real shows one via the vdb-repo-mismatch disjunct,
-    `lib/_emerge/resolver/output.py:720-731`, which portuale
-    deliberately cuts -- backlog #247; see `resolve_pretend`'s
-    `myoldbest` comment)."""
+    The `R` row carries real's `[1]` oldbest bracket: the staged vdb
+    omits `repository`, so the installed instance reads as
+    `__unknown__` against the `testrepo` ebuild (real
+    `lib/_emerge/resolver/output.py:721-731` third disjunct, backlog
+    #247; fresh host `/usr/sbin/emerge` 3.0.82.2 staged-fixture probe
+    2026-09-29 confirms `[ebuild   R    ] dev-libs/abk0c-1 [1] ...
+    USE="x*"`)."""
     args = ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild   R    ] dev-libs/abk0c-1  USE=\"x*\"",
+        "[ebuild   R    ] dev-libs/abk0c-1 [1] USE=\"x*\"",
         "[ebuild     U  ] dev-libs/abk0a-3 [1]",
         "[ebuild  N     ] dev-libs/abk0d-1 ",
     ]
@@ -6171,9 +6173,17 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
     destination suffixes, which no portuale pin carries (the merge line
     stays bare, the header stays bare). The installed consumer carries
     real's ` in '<root>'` suffix (real's `Package.__str__` appends it
-    iff `ROOT != "/"`), interpolated from the test ROOT. Known delta
-    vs the probe, documented: no `[1]` on the `R` row (backlog #247's
-    deliberate repo-mismatch cut, same as the pristine cell). The
+    iff `ROOT != "/"`), interpolated from the test ROOT. The `R` row
+    carries real's `[1]` oldbest bracket (same vdb-repo-mismatch
+    disjunct as the pristine cell, backlog #247; fresh host
+    `/usr/sbin/emerge` 3.0.82.2 staged-fixture probe 2026-09-29
+    confirms `[ebuild   R    ] dev-libs/abk0c-1 [1] ...
+    USE="x* y*"`). Probe note: real's USE-chain first hop flaps
+    across runs between the two unsatisfied parents (`# required by
+    dev-libs/abk0a-2::testrepo` present or not -- a hash-order
+    tie-break in `_get_dep_chain`, not a version change); the pin
+    holds the deterministic two-line variant portuale stably renders.
+    The
     skipped row carries real's `ELIBC="glibc"` group while the
     installed consumer stays bare `USE=""`, both byte-for-byte from
     the probe (the staged vdb has no USE file, so real shows no expand
@@ -6186,7 +6196,7 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild   R    ] dev-libs/abk0c-1  USE=\"x* y*\"",
+        "[ebuild   R    ] dev-libs/abk0c-1 [1] USE=\"x* y*\"",
         "[ebuild     U  ] dev-libs/abk0a-2 [1]",
         "[ebuild  N     ] dev-libs/abk0d-1 ",
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
@@ -8773,8 +8783,10 @@ def test_pv_decorates_the_cpv_with_slot_and_repo(
         "[ebuild  NS    ] dev-libs/newslotpkg-2.0:1::testrepo [1.0:0::testrepo]"
     )
 
-    # A same-slot Reinstall -> no [old-ver], but the main cpv still gets
-    # ::testrepo at -v.
+    # A same-slot, same-repo Reinstall -> no [old-ver], but the main cpv still gets
+    # ::testrepo at -v (a repo-drifted same-slot reinstall does carry one --
+    # backlog #247's reopened `not quiet_repo_display and repo differs`
+    # disjunct; reinstallpkg's vdb records testrepo, so this cell stays bare).
     sp = _run(
         [str(emerge_binary)],
         ["--pretend", "-v", "--newuse", "dev-libs/reinstallpkg"],
@@ -8993,7 +9005,7 @@ def test_package_mask_minus_atom_removal_leaves_candidate_unaffected(
     own doc comment, portage-repo), not "already installed"."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/samepkg"], fixture_env)
     assert result.returncode == 0
-    assert result.stdout.strip() == '[ebuild   R    ] dev-libs/samepkg-1.0'
+    assert result.stdout.strip() == '[ebuild   R    ] dev-libs/samepkg-1.0 [1.0]'
 
 
 def test_license_eula_style_group_is_masked_by_the_real_default_accept_license(
@@ -10253,7 +10265,7 @@ def test_upstream_circular_choices_rust_pg0_pins_mergelists(
         (
             ["=dev-libs/ccr0r-1.46*"],
             [
-                "[ebuild   R    ] dev-libs/ccr0r-1.46.0 ",
+                "[ebuild   R    ] dev-libs/ccr0r-1.46.0 [1.46.0]",
             ],
         ),
         (
@@ -10313,7 +10325,7 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
         (
             ["--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
             [
-                '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"',
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*"',
             ],
         ),
         (
@@ -10339,7 +10351,7 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
         (
             ["--ignore-world", "dev-libs/cgp0x"],
             [
-                '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"',
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*"',
             ],
         ),
         (
@@ -10487,7 +10499,7 @@ def test_complete_graph_use_break_fails_with_world_consumer(
     `(Argument)` line (the `("AtomArg", None)` key, `:391-397`).
     """
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp0q")
-    row = '[ebuild   R    ] dev-libs/cgp0x-2.8.0  USE="icu*"'
+    row = '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*"'
     plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/cgp0x"], env)
     assert plain.returncode == 1, plain.stdout
     assert plain.stderr == "", plain.stdout
@@ -11364,7 +11376,7 @@ def test_newrepo_triggers_a_reinstall_for_a_differing_recorded_repository(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        '[ebuild   R    ] dev-libs/newrepopkg-1.0 ',
+        '[ebuild   R    ] dev-libs/newrepopkg-1.0 [1.0]',
     ]
 
 
@@ -11401,7 +11413,7 @@ def test_newrepo_fires_via_the_unknown_repo_sentinel_when_unrecorded(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        '[ebuild   R    ] dev-libs/samepkg-1.0 ',
+        '[ebuild   R    ] dev-libs/samepkg-1.0 [1.0]',
     ]
 
 
@@ -13110,7 +13122,7 @@ def test_custom_set_as_a_top_level_target_expands_to_its_members(
     )
     assert combined.returncode == 0
     assert combined.stdout.splitlines() == [
-        "[ebuild   R    ] dev-libs/samepkg-1.0 ",
+        "[ebuild   R    ] dev-libs/samepkg-1.0 [1.0]",
         "[ebuild   R    ] dev-libs/nestedsetpkg-1.0 ",
         "[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 ",
     ]
@@ -14711,7 +14723,7 @@ def test_deselect_n_does_not_trigger_deselect_mode(emerge_binary, fixture_env, t
         _deselect_env(fixture_env, tmp_path),
     )
     assert result.returncode == 0
-    assert result.stdout == '[ebuild   R    ] dev-libs/foo-1.0 \n'
+    assert result.stdout == '[ebuild   R    ] dev-libs/foo-1.0 [1.0]\n'
 
 
 def test_deselect_pinned_output(
@@ -15413,7 +15425,7 @@ def test_selective_n_cancels_selective_even_when_update_would_have_set_it(
         fixture_env,
     )
     assert with_selective_cancelled.returncode == 0
-    assert with_selective_cancelled.stdout == '[ebuild   R    ] dev-libs/samepkg-1.0 \n'
+    assert with_selective_cancelled.stdout == '[ebuild   R    ] dev-libs/samepkg-1.0 [1.0]\n'
 
 
 def test_update_upgrades_to_the_newer_visible_version(emerge_binary, fixture_env):
