@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #107 D2 provider, newer sub-slot (withheld)
+EAPI=8
+IUSE=+abi
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=163247658d69b8545531a69c9d5a8428

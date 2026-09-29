@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #107 D2 installed consumer pinning r107lib below 2.0 (weston shape)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=<dev-libs/r107lib-2.0:=
+SLOT=0
+_md5_=fc30ee85dfd2f47dce3494452331bd07
