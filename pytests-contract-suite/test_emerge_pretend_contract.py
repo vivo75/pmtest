@@ -22639,3 +22639,40 @@ def test_236_collapsed_slot_operator_child_is_upgraded_by_the_update_probe(
         "[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0]",
         "[ebuild  rR    ] dev-libs/consrdep-1.0 ",
     ]
+
+
+def test_236_r25_default_backtracking_settles_in_one_silent_pass(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#236 Slice C (#25 S2): the r25 shape with default backtracking.
+
+    Same hermetic world as the #209 `--backtrack=0` pin above (installed
+    world consumer `r25consumer-1.0` pins `<dev-libs/r25lib-2.0:=`,
+    installed `r25mid` binds `r25lib` through live `:=` + built
+    `>=r25lib-1.0:0/1=`). Real's `_minimize_children` binds both of
+    r25mid's atoms to the installed `r25lib-1.0`, and the slot-operator
+    update probe is refused by `r25consumer`'s `<2.0`
+    (`_slot_operator_check_reverse_dependencies`), so real never tries
+    `r25lib-2.0`: one pass, no skipped-update block. Expected from real:
+    the fixture-oracle `r25` cell (`differential-test-bed/logs/`
+    `l0-fx-20260929T204839Z`, captured under portuale
+    `docs/evidence/2026-09-29-236/fixture-oracle/`): `r25up-2.0 [U]` +
+    `r25target-1.0 [N]`, `backtrack: 0/20`, no warning; and real's own
+    ResolverPlayground (`docs/evidence/2026-09-29-236/playground/`
+    `r25-debug.log`). Before #236 portuale selected `r25lib-2.0`,
+    restarted once (`--json` `restarts: 1`) and printed the warning."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
+    args = ["--update", "--deep", "--newuse", "--oneshot", "dev-libs/r25target"]
+    rust = _run([str(emerge_binary)], ["--pretend", *args], env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild     U  ] dev-libs/r25up-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/r25target-1.0 ",
+    ]
+    out = rust.stdout + rust.stderr
+    assert "have been skipped" not in out
+    assert "causing rebuilds" not in out
+    rj = _run([str(emerge_binary)], ["--pretend", "--json", *args], env)
+    assert rj.returncode == 0
+    assert json.loads(rj.stdout)["backtrack"]["restarts"] == 0
+
