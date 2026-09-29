@@ -22494,3 +22494,79 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
     )
     assert rust.returncode == 1
     assert _G216_SELF_BLOCK in rust.stderr
+
+
+# Backlog #244 (batch-2026-09-28_244 Slice C): the aub0 argument-order
+# texts, one literal per distinct output (stdout / stderr).
+_AUB0_TEXT_0 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 0/M).\n\n'
+_AUB0_TEXT_1 = '\nemerge: there are no ebuilds built with USE flags to satisfy "dev-libs/aub0d[-foo]".\n!!! One of the following packages is required to complete your request:\n- dev-libs/aub0d-0::testrepo (Change USE: -foo)\n(dependency required by "dev-libs/aub0a-0::testrepo" [ebuild])\n(dependency required by "dev-libs/aub0a" [argument])\n'
+_AUB0_TEXT_2 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/M).\n\n'
+_AUB0_TEXT_3 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/M).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_4 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/M).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_5 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 1/M).\n\n'
+_AUB0_TEXT_6 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^^                                                                                  \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_7 = '\nThe following USE changes are necessary to proceed:\n (see "package.use" in the portage(5) man page for more details)\n# required by dev-libs/aub0a-0::testrepo\n# required by dev-libs/aub0a (argument)\n=dev-libs/aub0d-0 -foo\n\n * In order to avoid wasting time, backtracking has terminated early\n * due to the above autounmask change(s). The --autounmask-backtrack=y\n * option can be used to force further backtracking, but there is no\n * guarantee that it will produce a solution.\n'
+_AUB0_TEXT_8 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^^                                                                                  \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_9 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^^                                                                                  \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_10 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n'
+
+_AUB0_CELLS = [
+    ('y', 'c b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('y', 'c a b', 1, _AUB0_TEXT_2, _AUB0_TEXT_1),
+    ('y', 'b c a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('y', 'b a c', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('y', 'a c b', 1, _AUB0_TEXT_3, _AUB0_TEXT_1),
+    ('y', 'a b c', 1, _AUB0_TEXT_4, _AUB0_TEXT_1),
+    ('y', 'b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('y', 'a b', 1, _AUB0_TEXT_5, _AUB0_TEXT_1),
+    ('n', 'c b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('n', 'c a b', 1, _AUB0_TEXT_6, _AUB0_TEXT_7),
+    ('n', 'b c a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('n', 'b a c', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('n', 'a c b', 1, _AUB0_TEXT_8, _AUB0_TEXT_7),
+    ('n', 'a b c', 1, _AUB0_TEXT_9, _AUB0_TEXT_7),
+    ('n', 'b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
+    ('n', 'a b', 1, _AUB0_TEXT_10, _AUB0_TEXT_7),
+]
+
+
+@pytest.mark.parametrize(
+    ("backtrack", "order", "rc", "stdout", "stderr"),
+    _AUB0_CELLS,
+    ids=[f"bt-{b}-{o.replace(' ', '')}" for b, o, *_ in _AUB0_CELLS],
+)
+def test_autounmask_use_breakage_argument_order_text_matches_real(
+    emerge_binary, fixture_env, backtrack, order, rc, stdout, stderr
+):
+    """Backlog #244: upstream `test_autounmask_use_breakage` (`aub0a` needs
+    `aub0d[-foo]`, `aub0b` `aub0d[foo]`, `aub0c` `>=aub0d-1`; the fixture
+    profile enables `foo`), every argument order under both
+    `--autounmask-backtrack` values, plus the two-argument pair.
+
+    Real 3.0.82.2, fixture-oracle `l0-fx-20260929T151941Z` /
+    `l0-fx-20260929T152543Z` (portuale `docs/evidence/2026-09-28-244/
+    fixture-oracle{,-2}/real/`), pinned here verbatim except for
+    portuale's standing conventions: no `for <ROOT>` / `to '<ROOT>'`
+    suffixes (`fixture-miss-message-unsuffixed` /
+    `fixture-masked-path-suffix`), no wall-clock seconds on the timing
+    line, the `backtrack: N/M` denominator masked (portuale's default
+    `--backtrack` is 10, real's 20 -- #263; the restart count N is real's
+    in every cell), and no `ELIBC="glibc"` group on the slot-conflict
+    header and parent lines (#264).
+
+    The shape: real walks the arguments LIFO. Under `=y` every order
+    fails on A's `aub0d[-foo]` (the autounmask-breakage clean pass), and
+    only the two `a`-first orders -- where B and C are walked before A --
+    print the slot-conflict prefix, instances in admission order. Under
+    `=n` the orders that walk A before B fail the same way; the orders
+    that walk B first stop at the first pass (`need_config_change`):
+    merge list, conflict block with both B and A under `aub0d-0`, the
+    `-foo` change and the terminated-early notice (and no
+    `--backtrack=30` hint: that pass still allowed backtracking)."""
+    args = ["--pretend", f"--autounmask-backtrack={backtrack}"] + [
+        f"dev-libs/aub0{p}" for p in order.split()
+    ]
+    r = _run([str(emerge_binary)], args, fixture_env)
+    assert r.returncode == rc
+    assert re.sub(r"\(backtrack: (\d+)/\d+\)", r"(backtrack: \1/M)", r.stdout) == stdout
+    assert r.stderr == stderr
