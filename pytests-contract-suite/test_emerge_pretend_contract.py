@@ -19716,19 +19716,28 @@ def test_oracle_slotop_update_probe_refusal(
 def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#211 item 2: the new-child-slot arm also probes
-    `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
-    mismatch. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and an
-    installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
+    """#211 item 2, corrected by #252: the new-child-slot arm does NOT
+    probe `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
+    mismatch here. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and
+    an installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
     form; the live ebuild carries bare `:=`); the run upgrades slot 1
-    to `mmprov-3` (`1/2`). Real's candidate loop
-    (`_iter_similar_available`, `depgraph.py:2660-2695`) ranges over
-    every available package, not only fresh-slot merges, so the probe
-    fires for the slot-1 upgrade against the slot-0-bound consumer and
-    the consumer rebuilds. MATCHES real since #211 item 2 (code-grounded:
-    the loop text has no entry-kind restriction; the direction follows
-    the R2-probe-validated new-slot arm). The `EAPI` files keep the
-    probe registration faithful (see the conflict-mass pin)."""
+    to `mmprov-3` (`1/2`). Real merges only `mmprov-3`: the request's
+    own greedy per-slot arg (`_select_files`, `depgraph.py:5380`, via
+    `_greedy_slots`, `:5896`) pins the installed slot-0 instance with
+    `app-misc/mmprov:0`, and the update probe's reverse-deps gate
+    (`_slot_operator_check_reverse_dependencies`, `:2472-2538`) refuses
+    every slot-1 candidate against it, so the probe returns None and
+    `slot_operator_replace_installed` stays empty. Probed on real
+    3.0.82.2, host staged-fixture probe 2026-09-29 (PORTAGE_CONFIGROOT
+    at the fixture tree, ad-hoc ROOT with EAPI-bearing vdb, neutral
+    `make.local` shadow in a mount namespace; argv `--pretend
+    --color=n --backtrack=3 --update --deep app-misc/mmprov
+    app-misc/mmcons`): rc 0, `backtrack: 0/3`, single row `[ebuild
+    U ] app-misc/mmprov-3 [2]`, no `mmcons-1` row and no `causing
+    rebuilds` block (the earlier "MATCHES real (code-grounded)" claim
+    was never probed and was wrong -- cf. the g213 Playground data).
+    The `EAPI` files keep the probe registration faithful (see the
+    conflict-mass pin)."""
     installed = [
         ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
         ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
@@ -19757,7 +19766,6 @@ def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
     assert got == {
         ("app-misc/mmprov", "3"),
-        ("app-misc/mmcons", "1"),
     }
 
 
@@ -19831,17 +19839,19 @@ def test_oracle_slotop_unsatisfied_probe_heals_through_parent_reinstall(
 def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#211 I1: the `--solver=` bridge threads the request's
-    `update`/top-level atoms into its rebuild fixpoint, so the
-    new-child-slot arm (both the fresh-slot and the item-2
-    bound-slot-mismatch halves, plus the R2 refusal) runs there exactly
-    as on the default path. On the `mmprov` shape the pubgrub walk
-    produces the same slot-1 `Upgrade` entry, and the bridge schedules
-    the same consumer rebuild. (`resolvo` does not resolve the direct
-    upgrade arg at all here -- an engine-side gap below this layer,
-    reported for filing; the conflict-mass shape likewise resolves
-    walked `:=` deps to installed inside both engines, so scan-level
-    agreement cannot reach it without engine-side probe scheduling.)"""
+    """#211 I1, corrected by #252: the `--solver=` bridge threads the
+    request's `update`/top-level atoms into its rebuild fixpoint, so the
+    new-child-slot arm runs there exactly as on the default path -- and
+    on the `mmprov` shape that means the same empty replace set. On the
+    `mmprov` shape the pubgrub walk produces the same slot-1 `Upgrade`
+    entry, and the bridge schedules no consumer rebuild, like the
+    default path after the #252 probe (real 3.0.82.2 merges only
+    `mmprov-3`; see the entry pin above for the probe citation).
+    (`resolvo` does not resolve the direct upgrade arg at all here --
+    an engine-side gap below this layer, reported for filing; the
+    conflict-mass shape likewise resolves walked `:=` deps to installed
+    inside both engines, so scan-level agreement cannot reach it without
+    engine-side probe scheduling.)"""
     installed = [
         ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
         ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
@@ -19871,7 +19881,6 @@ def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     got = {c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")}
     assert got == {
         ("app-misc/mmprov", "3"),
-        ("app-misc/mmcons", "1"),
     }
 
 
