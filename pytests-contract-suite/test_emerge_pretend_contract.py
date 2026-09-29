@@ -22676,3 +22676,65 @@ def test_236_r25_default_backtracking_settles_in_one_silent_pass(
     assert rj.returncode == 0
     assert json.loads(rj.stdout)["backtrack"]["restarts"] == 0
 
+
+def test_107_use_dep_dynamic_deps_pair_settles_in_one_silent_pass(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#107 D2 (batch-2026-09-28_236_107 Slice D): the hermetic form of the
+    live reference workload (installed `media-libs/mesa`'s dynamic-deps
+    pair on `media-libs/libdisplay-info` carries use-deps,
+    `:=[abi_x86_32(-),abi_x86_64(-)]` + built `:0/3=[...]`; installed
+    `dev-libs/weston` pins `<libdisplay-info-0.4.0:=`).
+
+    Installed `r107mid` binds `r107lib` through live `dev-libs/r107lib:=[abi]`
+    and built `dev-libs/r107lib:0/1=[abi]`; installed world consumer
+    `r107pin` pins `<dev-libs/r107lib-2.0:=`; `r107up` 1.0->2.0 turns
+    real's complete mode on (the md4c role). Real's `_minimize_children`
+    matches use-deps against the installed instance's own recorded USE
+    (`findAtomForPackage(pkg, modified_use=_pkg_use_enabled(pkg))`), so
+    both of r107mid's atoms bind the installed `r107lib-1.0` and the
+    update probe is refused by `r107pin`: one silent pass. Expected from
+    real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-29-107-reprobe/playground/r107-debug.log`:
+    merge list `r107up-2.0`, `r107target-1.0`, `candidate package does not
+    match atom '<dev-libs/r107lib-2.0:='`, no backtrack, no warning) and
+    from the live host re-probe in the same directory. Before D2 portuale
+    counted a use-dep atom as matching only its own pick, selected
+    `r107lib-2.0`, restarted once and printed the skipped-update warning."""
+    installed = [
+        (
+            "dev-libs",
+            "r107lib",
+            "1.0",
+            "0/1",
+            {"EAPI": "8", "IUSE": "abi", "USE": "abi"},
+        ),
+        (
+            "dev-libs",
+            "r107mid",
+            "1.0",
+            "0",
+            {"EAPI": "8", "RDEPEND": "dev-libs/r107lib:0/1=[abi]"},
+        ),
+        (
+            "dev-libs",
+            "r107pin",
+            "1.0",
+            "0",
+            {"EAPI": "8", "RDEPEND": "<dev-libs/r107lib-2.0:0/1="},
+        ),
+        ("dev-libs", "r107up", "1.0", "0", {"EAPI": "8"}),
+    ]
+    root = _b1_root(tmp_path, ["dev-libs/r107pin"], installed)
+    env = _b1_env(fixture_env, root)
+    args = ["--update", "--deep", "--oneshot", "dev-libs/r107target"]
+    rust = _b1_run(["--pretend", *args], env, emerge_binary)
+    merges = [ln for ln in _b1_merges(rust.stdout) if "dev-libs/r107" in ln]
+    assert merges == [
+        "[ebuild     U  ] dev-libs/r107up-2.0 [1.0]",
+        "[ebuild  N     ] dev-libs/r107target-1.0 ",
+    ]
+    assert "have been skipped" not in rust.stdout + rust.stderr
+    rj = _b1_run(["--pretend", "--json", *args], env, emerge_binary)
+    assert json.loads(rj.stdout)["backtrack"]["restarts"] == 0
+

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #107 D2 installed mid-puller binding r107lib through :=[abi] (mesa shape)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/r107lib:=[abi]
+SLOT=0
+_md5_=a531d848eb45c23e4800cf80ce4c5eeb
