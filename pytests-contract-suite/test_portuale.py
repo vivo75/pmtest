@@ -4691,7 +4691,7 @@ def test_emerge_oneshot_prints_news_count_notice_twice_like_real(
     plus ` * Use eselect news read to view new items.`. The m185
     container probe shows the pre-resolution notice standing first in
     real's pre-`>>>` output (news, blank, header, `Calculating...`).
-    The fixture testrepo carries eleven news items, five of them
+    The fixture testrepo carries thirteen news items, five of them
     relevant (see `test_check_news_counts_unread_relevant_items`), so
     the hermetic count here is 5. Real `display_news_notification` is
     gated on `news` in FEATURES; the fixture config root ships no
