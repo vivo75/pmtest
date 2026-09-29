@@ -119,19 +119,6 @@
     --debug digraph for the cell).
   owner: portuale-bug
 
-- id: skipped-updates-installed-consumer-residue
-  category: skipped-updates
-  slugs:
-    - "--update_--deep_--newuse_--oneshot_dev-libs_r25target"
-  match: "skipped-update block present for portuale, absent for real"
-  reason: >
-    Portuale reconciles an installed world consumer's pin after the pass
-    and prints the skipped-update warning; real carries the consumer as a
-    complete-graph nomerge node, settles in pass 1 and prints nothing.
-    This is backlog #25's residue (S1c, `_minimize_children`, waits for
-    the slot-operator update probe #211; batch-2026-09-27 B13).
-  owner: portuale-bug
-
 - id: slotop-world-complete-graph-order
   category: order
   slugs:

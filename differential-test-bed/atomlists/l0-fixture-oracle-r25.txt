@@ -14,13 +14,13 @@
 # complete-mode auto-enable); installed world consumer `r25consumer`
 # carries `<dev-libs/r25lib-2.0:=` against the `r25lib` 1.0->2.0 upgrade.
 # Real merges `r25up-2.0` + `r25target-1.0` silently (`backtrack: 0/20`);
-# portuale prints the same two rows plus the skipped-update warning
-# (`--json` restarts 1) until the S1b/S1c overlay+minimizer port lands,
-# so an unexplained warning-divergence row was expected here until then
-# (no allowlist entry). It never showed: the fixture-oracle comparator does
-# not compare the "One or more updates/rebuilds have been skipped" block
-# (backlog #227), so this cell only checks the merge rows. The warning
-# and `--json` restarts are pinned by the contract suite instead (#25 S2).
+# since #236 (batch-2026-09-28_236_107 Slices A-C: real's
+# `_minimize_children` plus the slot-operator update probe's forcing
+# half) portuale does the same in one pass (`--json` restarts 0). The
+# fixture-oracle comparator does not compare the "One or more
+# updates/rebuilds have been skipped" block (backlog #227), so this cell
+# checks the merge rows; the no-warning / restarts-0 end state is pinned
+# by the contract suite (`test_236_r25_default_backtracking_settles_in_one_silent_pass`).
 --update --deep --newuse --oneshot dev-libs/r25target
 # Backlog #209 — the same shape with backtracking off. Real's
 # `_resolve_conflicts` (`_emerge/depgraph.py:9444`) runs
