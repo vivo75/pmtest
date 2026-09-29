@@ -5857,6 +5857,15 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     autounmask change and re-resolves once with suggestion off -- NO 'USE
     changes are necessary' block, aubreaksub at its default USE="-brk",
     aubreakwant's [brk] as the ordinary non-fatal dependency warning.
+
+    Backlog #244 (real 3.0.82.2, fixture-oracle `l0-fx-20260929T152543Z`,
+    portuale `docs/evidence/2026-09-28-244/fixture-oracle-2/real/`): the
+    default block's chain starts at the requester that needed the change
+    (`aubreakwant`, three lines), not at whoever pulled `aubreaksub` in
+    first; under `=y` real's clean pass stops at the first failing atom,
+    so the chain is that atom's own path only (`aubreakwant` ->
+    `aubreaktop` -> argument) -- the old four-line union was the
+    "#19-parked multi-branch narrowing" this batch closes.
    """
     args = ["--pretend", "dev-libs/aubreaktop"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -5870,6 +5879,7 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     assert rust.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/aubreakwant-1.0::testrepo\n"
         "# required by dev-libs/aubreaktop-1.0::testrepo\n"
         "# required by dev-libs/aubreaktop (argument)\n"
         ">=dev-libs/aubreaksub-1.0 brk\n"
@@ -5881,20 +5891,17 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
     _assert_abort_preamble(rust_ab.stdout)
     assert "USE changes are necessary" not in rust_ab.stderr
-    # Backlog #20: the block, not the bare line. Chain note: real shows
-    # only its DFS-first parent branch (`aubreakwant` -> `aubreaktop` ->
-    # argument); portuale's shared chain walker discloses every failing
-    # branch (the #19-parked multi-branch narrowing, see `masked_dep_chain`),
-    # so the two extra `aubreakunwant`/`aubreakwant` lines are expected.
+    # Backlog #20: the block, not the bare line. Backlog #244: the chain
+    # is the first failing atom's own path, as real's fail-fast clean
+    # pass reports it (`aubreakwant` -> `aubreaktop` -> argument).
     assert rust_ab.stderr == (
         '\n'
         'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/aubreaksub[brk]".\n'
         "!!! One of the following packages is required to complete your request:\n"
         "- dev-libs/aubreaksub-1.0::testrepo (Change USE: +brk)\n"
+        '(dependency required by "dev-libs/aubreakwant-1.0::testrepo" [ebuild])\n'
         '(dependency required by "dev-libs/aubreaktop-1.0::testrepo" [ebuild])\n'
         '(dependency required by "dev-libs/aubreaktop" [argument])\n'
-        '(dependency required by "dev-libs/aubreakunwant-1.0::testrepo" [ebuild])\n'
-        '(dependency required by "dev-libs/aubreakwant-1.0::testrepo" [ebuild])\n'
     )
 
 
