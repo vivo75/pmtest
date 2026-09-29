@@ -2924,6 +2924,11 @@ CASES = [
         ["--pretend", "--color=n", "dev-libs/newpkg"],
         0,
     ),
+    (
+        "#236 B: an ebuild parent's same-cp version range collapses (_minimize_children)",
+        ["--pretend", "dev-libs/libgit2-glib"],
+        0,
+    ),
 ]
 
 
@@ -22570,3 +22575,67 @@ def test_autounmask_use_breakage_argument_order_text_matches_real(
     assert r.returncode == rc
     assert re.sub(r"\(backtrack: (\d+)/\d+\)", r"(backtrack: \1/M)", r.stdout) == stdout
     assert r.stderr == stderr
+
+
+def test_236_minimize_children_collapses_an_ebuild_parents_version_range(
+    emerge_binary, fixture_env
+):
+    """#236 Slice B: real `_minimize_children` (`_emerge/depgraph.py:4751-4854`)
+    on an ebuild parent. The fixture's `libgit2-glib-0.99.0.1` depends on
+    `<dev-libs/libgit2-1:0= >=dev-libs/libgit2-0.26.0`; the `<1` atom picks
+    `libgit2-0.99.0-r1` (`0/0.99`), the `>=` atom alone would pick the
+    tree's `1.0.0-r1` (`0/1.0`). Real selects both first and then
+    eliminates, ascending: `0.99.0-r1` is the only match of `<1` and stays,
+    `1.0.0-r1` is dropped, so both atoms bind `0.99.0-r1` and there is no
+    conflict to report. Expected from real's own ResolverPlayground
+    (portuale `docs/evidence/2026-09-29-236/playground/libgit2-glib.log`:
+    merge list `libgit2-0.99.0-r1`, `libgit2-glib-0.99.0.1`, no problems
+    block). Before Slice B portuale printed the same two rows plus a
+    skipped-update warning naming `libgit2-1.0.0-r1`."""
+    r = _run([str(emerge_binary)], ["--pretend", "dev-libs/libgit2-glib"], fixture_env)
+    assert r.returncode == 0
+    assert r.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/libgit2-0.99.0-r1 ",
+        "[ebuild  N     ] dev-libs/libgit2-glib-0.99.0.1 ",
+    ]
+    assert "have been skipped" not in r.stdout + r.stderr
+
+
+def test_236_collapsed_slot_operator_child_is_upgraded_by_the_update_probe(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#236 Slices A+B: the installed consumer's live `dev-libs/provpkg:=`
+    and its appended built `>=dev-libs/provpkg-1.0:0/1=` (EAPI 8 vdb, so the
+    dynamic-deps append applies) both bind the installed `provpkg-1.0` once
+    `_minimize_children` is ported, and the upgrade comes back only through
+    real's slot-operator update probe (`_slot_operator_update_probe` +
+    `_slot_operator_update_backtrack`, `_emerge/depgraph.py:2576-2800`,
+    `:2400-2452`): the restart merges `U provpkg-2.0` and rebuilds
+    `consrdep`. Expected from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-29-236/playground/slotop-debug.log`: `backtracking
+    due to missed slot abi update`, then `provpkg-2.0` + `consrdep-1.0`) and
+    from the fixture-oracle `slotop` list's `-uDvN --oneshot
+    dev-libs/consrdep` cell. With the collapse but without the probe's
+    forcing half, portuale merged nothing here."""
+    installed = [
+        ("dev-libs", "provpkg", "1.0", "0/1", {"EAPI": "8"}),
+        (
+            "dev-libs",
+            "consrdep",
+            "1.0",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=dev-libs/provpkg-1.0:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, ["dev-libs/provpkg", "dev-libs/consrdep"], installed)
+    env = _b1_env(fixture_env, root)
+    out = _b1_run(
+        ["--pretend", "--update", "--deep", "--newuse", "--oneshot", "dev-libs/consrdep"],
+        env,
+        emerge_binary,
+    ).stdout
+    merges = [ln for ln in _b1_merges(out) if "dev-libs/provpkg" in ln or "dev-libs/cons" in ln]
+    assert merges == [
+        "[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0]",
+        "[ebuild  rR    ] dev-libs/consrdep-1.0 ",
+    ]
