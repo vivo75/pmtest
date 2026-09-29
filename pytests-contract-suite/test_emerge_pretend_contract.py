@@ -6275,7 +6275,10 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
     (verified against a live `emerge -pv www-client/firefox`). Backlog
     #217: no "terminated early" trailer -- the top-level flip is a
     fresh-candidate one, so real reaches the
-    `_success_without_autounmask` tail (depgraph.py:5793)."""
+    `_success_without_autounmask` tail (depgraph.py:5793). Backlog #248:
+    the chain is exactly one line -- real `_get_dep_chain` never prints
+    the start node (fresh host 3.0.82.2 staged-fixture probe 2026-09-29:
+    only `# required by dev-libs/useflagpkg[-foo] (argument)`)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "-v", "dev-libs/useflagpkg[-foo]"],
@@ -6289,7 +6292,6 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
     assert result.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/useflagpkg-1.0::testrepo\n"
         "# required by dev-libs/useflagpkg[-foo] (argument)\n"
         ">=dev-libs/useflagpkg-1.0 -foo\n"
     )
@@ -6669,7 +6671,9 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
     on stdout, real depgraph.py::_display_autounmask's `The following
     keyword changes are necessary to proceed:` block goes to stderr
     (real _writemsg + _get_dep_chain_as_comment: the `#required by ...`
-    dep chain, then `=<cpv> <kw>`), and the run exits **1** -- real
+    dep chain -- one line here, the argument package's own change, since
+    real never prints the start node (fresh host 3.0.82.2 staged-fixture
+    probe 2026-09-29) -- then `=<cpv> <kw>`), and the run exits **1** -- real
     `action_build` returns 1 for any autounmask change under `--pretend`
     too. v1 covers the "masked by KEYWORDS alone" case only. Backlog
     #217: no "terminated early" trailer -- a lone keyword change reaches
@@ -6684,7 +6688,6 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
     assert result.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
         ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/autounmaskkeywordpkg-1.0::testrepo\n"
         "# required by dev-libs/autounmaskkeywordpkg (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
     )
@@ -6730,7 +6733,9 @@ def test_autounmask_only_suppresses_the_merge_list(emerge_binary, fixture_env):
     """--autounmask-only (real actions.py:456): resolve the graph, then
     `mydepgraph.display_problems(); return 0` -- the `[ebuild ...]` merge
     list is NOT printed, only the autounmask changes block (+ slot
-    conflicts), and the exit code stays 0. Byte-identical Rust/Python."""
+    conflicts), and the exit code stays 0. Byte-identical Rust/Python.
+    Backlog #248: the chain is the same one-liner as the sibling test
+    above (fresh host 3.0.82.2 staged-fixture probe 2026-09-29)."""
     args = ["--pretend", "--autounmask", "--autounmask-only", "dev-libs/autounmaskkeywordpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
@@ -6740,7 +6745,6 @@ def test_autounmask_only_suppresses_the_merge_list(emerge_binary, fixture_env):
     assert rust.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
         ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
-        "# required by dev-libs/autounmaskkeywordpkg-1.0::testrepo\n"
         "# required by dev-libs/autounmaskkeywordpkg (argument)\n"
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
     )
