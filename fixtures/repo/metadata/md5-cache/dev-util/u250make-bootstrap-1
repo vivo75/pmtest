@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=250 fixture: cycle-free build tool alternative
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=9af29528382b1aeecf8d15d57486cdee
