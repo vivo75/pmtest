@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=256 fixture: slot-moved provider, new slot only
+EAPI=8
+KEYWORDS=amd64
+SLOT=2/2
+_md5_=f5c94e665ea4821958dca701434b8ccc

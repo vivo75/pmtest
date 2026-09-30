@@ -22885,3 +22885,82 @@ def test_107_use_dep_dynamic_deps_pair_settles_in_one_silent_pass(
     rj = _b1_run(["--pretend", "--json", *args], env, emerge_binary)
     assert json.loads(rj.stdout)["backtrack"]["restarts"] == 0
 
+
+def test_256_unsatisfied_probe_seeds_every_hitting_parent_in_one_pass(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#256: two installed parents (`app-misc/u256pa`, `u256pb`) each carry
+    a built `>=app-misc/u256prov-1:0/1=` the tree no longer satisfies (the
+    provider moved to slot `2/2`), and each has a same-slot ebuild whose
+    live `u256prov:=` accepts `u256prov-2`. The entry assumed real restarts
+    on the first hitting edge; real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-256-257/u256-a-*.log`) shows otherwise:
+    `_add_dep`'s `return 1` (`_emerge/depgraph.py:3453-3455`) ends only that
+    edge, the walk goes on, both edges probe in the same pass
+    (`backtracking due to unsatisfied built slot-operator dep` twice) and
+    one restart heals both -- `u256prov-2` + both reinstalls, in every
+    argument order. Portuale's one-pass seeding is therefore real's shape:
+    the same rows and one restart."""
+    installed = [
+        (
+            "app-misc",
+            name,
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/u256prov-1:0/1="},
+        )
+        for name in ("u256pa", "u256pb")
+    ]
+    root = _b1_root(tmp_path, ["app-misc/u256pa", "app-misc/u256pb"], installed)
+    env = _b1_env(fixture_env, root)
+    args = ["--update", "--deep", "app-misc/u256pa", "app-misc/u256pb"]
+    out = _b1_run(["--pretend", *args], env, emerge_binary).stdout
+    assert [ln for ln in _b1_merges(out) if "app-misc/u256" in ln] == [
+        "[ebuild  N     ] app-misc/u256prov-2 ",
+        "[ebuild  rR    ] app-misc/u256pa-1 ",
+        "[ebuild  rR    ] app-misc/u256pb-1 ",
+    ]
+    rj = _b1_run(["--pretend", "--json", *args], env, emerge_binary)
+    assert json.loads(rj.stdout)["backtrack"]["restarts"] == 1
+
+
+def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#257: real `_slot_operator_unsatisfied_backtrack`
+    (`_emerge/depgraph.py:2881-2915`) masks a *non-installed* built parent
+    (`slot_operator_mask_built`, `:2896-2903`) whose built `:S/SS=` dep no
+    longer resolves, and restarts; `_add_dep` tries that probe before the
+    missing-dependency mask (`:3447-3455`). A local binary
+    `app-misc/u257par-1` recorded `RDEPEND=app-misc/u257prov:0/1=`; the
+    provider moved to slot `2/2`, and the same-slot ebuild's live
+    `u257prov:=` accepts `u257prov-2`. Real's ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-256-257/u257-usepkg.log`): one unsatisfied
+    probe hit, one restart, `[ebuild N] u257prov-2` + `[ebuild N]
+    u257par-1`; under `--usepkgonly` there is no ebuild replacement and
+    the run fails on the binary's dep (`u257-usepkgonly.log`). Before
+    #257 portuale's missing-dependency path masked the whole parent and
+    aborted on `app-misc/u257prov:0/1=` even with `--usepkg`."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root)
+    pkgdir = tmp_path / "fixtures" / "pkgdir"
+    packages = (pkgdir / "Packages").read_text()
+    count = int(re.search(r"^PACKAGES: (\d+)", packages, re.M).group(1))
+    packages = re.sub(r"^PACKAGES: \d+", f"PACKAGES: {count + 1}", packages, count=1, flags=re.M)
+    packages = packages.rstrip("\n") + (
+        "\n\nCPV: app-misc/u257par-1\nBUILD_TIME: 1000\nDEFINED_PHASES: -\n"
+        "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nPATH: app-misc/u257par-1.tbz2\n"
+        "RDEPEND: app-misc/u257prov:0/1=\nREPO: testrepo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
+    )
+    (pkgdir / "Packages").write_text(packages)
+    r = _run([str(emerge_binary)], ["--pretend", "--usepkg", "app-misc/u257par"], env)
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.splitlines() == [
+        "[ebuild  N     ] app-misc/u257prov-2 ",
+        "[ebuild  N     ] app-misc/u257par-1 ",
+    ]
+    rj = _run([str(emerge_binary)], ["--pretend", "--json", "--usepkg", "app-misc/u257par"], env)
+    assert json.loads(rj.stdout)["backtrack"]["restarts"] == 1
+    only = _run([str(emerge_binary)], ["--pretend", "--usepkgonly", "app-misc/u257par"], env)
+    assert only.returncode == 1
+    assert 'satisfy "app-misc/u257prov:0/1="' in only.stderr
+
