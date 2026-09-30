@@ -22,6 +22,10 @@ REPOS_SHALLOW_SINCE=2026-08-23T15:30:57Z
 DATESTART=2026-08-23T15:30:57Z
 
 STAGEID=stage3-amd64-systemd
+# #281: portage version baked into the image below (single source of
+# truth; passed into the `buildah unshare` heredoc via the environment,
+# since the heredoc is quoted 'EOF' and sees no shell expansion).
+PORTAGE_PIN=3.0.82.2
 STAGETS=${DATESTART//-/}
 STAGETS=${STAGETS//:/}
 
@@ -153,8 +157,15 @@ for gid in ${GIDS} ; do
 done
 
 ${SU} podman rmi localhost/test-portuale
-${SU} buildah unshare bash << 'EOF'
+# #281: handed into the quoted heredoc through the environment (the
+# 'EOF' quoting means "$PORTAGE_PIN" below is expanded by the unshared
+# shell, not here). `--preserve-env=PORTAGE_PIN` keeps just this one
+# variable across sudo's env_reset (not `-E`: the rest of root's
+# environment has no business in the rootless build).
+export PORTAGE_PIN
+sudo --preserve-env=PORTAGE_PIN -su vivo buildah unshare bash << 'EOF'
 set -x
+: "${PORTAGE_PIN:?PORTAGE_PIN not passed into buildah unshare}"
 
 ctr=$(buildah from scratch)
 mnt=$(buildah mount "$ctr")
@@ -168,6 +179,18 @@ buildah umount "$ctr"
 #buildah config --user 1000 "$ctr"
 buildah config --user 0 "$ctr"
 buildah config --entrypoint '["/init"]' "$ctr"
+# #281: bake the pin into the image so every layer's own portage-upgrade
+# block is a no-op. The one-shot form keeps @world (and the L0 baselines)
+# unchanged -- do NOT use scripts/00-install-portage.sh's non-oneshot
+# `emerge -tv` here. Every layer already skips its own upgrade when the
+# installed version equals its pin (layers/l0/in-container.sh,
+# layers/l1/consume.sh, layers/l3/build-and-merge.sh, ...).
+# (2026-09-30: the running image was produced as a derived layer instead
+# -- `podman commit` over the previous image, backup tag
+# `localhost/test-portuale:pre-281` -- so it matches this recipe except
+# for build provenance.)
+buildah run --network host "$ctr" -- env FEATURES="-cgroup -userpriv -usersandbox -userfetch -usersync -pid-sandbox -network-sandbox -ipc-sandbox" ACCEPT_KEYWORDS="~amd64" /usr/bin/emerge -q -1 --usepkg=n "=sys-apps/portage-$PORTAGE_PIN" \
+  || { echo "portage pin emerge failed" >&2; exit 1; }
 buildah commit "$ctr" localhost/test-portuale:latest
 buildah rm "$ctr"
 EOF

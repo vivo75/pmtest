@@ -10,11 +10,18 @@
 #   L3_PM=both|portage|portuale  (default both; one-side iteration)
 #   L3_CONTROL=1                 also run a second portage container and
 #                                diff the two portage runs (noise floor)
-#   L3_BUILD_ARGS="--emptytree --oneshot --usepkg=n --color=n"
+#   L3_BUILD_ARGS                unset -> the atom list's `# l3-build-args:`
+#                                directive, else the default; set in the
+#                                host env wins over the directive (#280)
+#   L3_TMPFS=1                   build on a tmpfs at /var/tmp/portage;
+#                                0 = today's disk behaviour (#282)
+#   L3_TMPFS_SIZE=8g             tmpfs size (#282). Measured peaks at
+#                                -j28: l3-core 3.1 GiB (gcc closure,
+#                                l3-20260930T212609Z), l3-smoke 0.9 GiB
+#                                (l3-20260930T211117Z); 8g leaves ~2.5x.
 #   L3_DISTFILES                 default $LOGS_DIR/_l2-distfiles
 #   L3_TIMEOUT=28800             per-container wall-clock cap
 #   L3_SKIP_PORTAGE_UPGRADE=0
-#   L3_KEEP_TMP=1                keep /var/tmp/portage (build logs)
 #
 # Exit: 0 green (candidate diff and control pair 0 unexplained),
 #       1 unexplained finding(s), 2 setup error.
@@ -51,15 +58,33 @@ run_pm() {  # <label> <portage|portuale>
   # `podman_run_pm`'s own mounts (`$PM_MOUNTS`: the PM binaries, its
   # checkout at its build-time path, /TEST, the shared logs) and adds
   # the distfiles cache.
+  # #282: builds run configure scripts from /var/tmp/portage, and
+  # podman's --tmpfs defaults to noexec -- so the mount needs `exec`.
+  # L3_TMPFS=0 keeps exactly today's command (no mount). The array is
+  # empty then; the ${arr[@]+"${arr[@]}"} form stays safe under set -u.
+  tmpfs_args=()
+  if [ "${L3_TMPFS:-1}" = 1 ]; then
+    # L3_TMPFS_SIZE default 8g: ~2.5x the measured l3-core peak (3.1 GiB).
+    tmpfs_args=(--tmpfs "/var/tmp/portage:rw,exec,nosuid,nodev,size=${L3_TMPFS_SIZE:-8g},mode=0775")
+  fi
+  # #280: L3_BUILD_ARGS is forwarded ONLY when set in the host env --
+  # always passing it with a default would shadow the atom list's
+  # `# l3-build-args:` directive inside build-and-merge.sh.
+  build_args_env=()
+  if [ -n "${L3_BUILD_ARGS+x}" ]; then
+    build_args_env=(-e "L3_BUILD_ARGS=$L3_BUILD_ARGS")
+  fi
   timeout "$TIMEOUT" "$PODMAN" run --rm --name "porttest-l3-$label-$$" \
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private \
     --hostname porttest-l3 \
     "${PM_MOUNTS[@]}" \
     -v "$DISTFILES:/distfiles" \
+    ${tmpfs_args[@]+"${tmpfs_args[@]}"} \
     -e DISTDIR=/distfiles \
     -e "SNAPSHOT_PRUNE=$PM_REPO" \
     -e "L3_SKIP_PORTAGE_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}" \
-    -e "L3_BUILD_ARGS=${L3_BUILD_ARGS:---emptytree --oneshot --usepkg=n --color=n}" \
+    -e "L3_TMPFS=${L3_TMPFS:-1}" \
+    ${build_args_env[@]+"${build_args_env[@]}"} \
     -e "L3_JOBS=${L3_JOBS:-1}" \
     --entrypoint /bin/bash "$IMAGE" \
     /TEST/layers/l3/build-and-merge.sh "$pm" "$REL_ATOMLIST" "/TEST/logs/$RUN/$label" \
@@ -119,6 +144,11 @@ summary() {  # <file> <label>
   echo "atoms  : $REL_ATOMLIST"
   echo "mode   : $MODE (control=${L3_CONTROL:-0})"
   echo "jobs   : -j${L3_JOBS:-1} (MAKEOPTS; 1 = deterministic)"
+  if [ "${L3_TMPFS:-1}" = 1 ]; then
+    echo "tmpfs  : on (size=${L3_TMPFS_SIZE:-8g})"
+  else
+    echo "tmpfs  : off"
+  fi
   echo "dates  : $(date -u +%FT%TZ)"
   echo "portage: $OUT/portage.merge.log"
   echo "portuale: $OUT/portuale.merge.log"
@@ -132,6 +162,13 @@ summary() {  # <file> <label>
   for label in portage portuale control-a control-b; do
     [ -f "$OUT/$label.merged-cpvs.txt" ] || continue
     echo "  $label: $(wc -l < "$OUT/$label.merged-cpvs.txt")"
+  done
+  echo "## per-PM build args + tmpfs peak (#280, #282)"
+  for label in portage portuale control-a control-b; do
+    [ -f "$OUT/$label.meta.tsv" ] || continue
+    echo "  $label build_args: $(awk -F'\t' '$1=="build_args"{print $2}' "$OUT/$label.meta.tsv")"
+    [ -f "$OUT/$label.tmpfs-peak" ] || continue
+    echo "  $label tmpfs-peak: $(cat "$OUT/$label.tmpfs-peak")"
   done
 } > "$OUT/l3-report.txt"
 ln -sfn "$RUN/l3-report.txt" "$LOGS_DIR/l3-report.txt"
