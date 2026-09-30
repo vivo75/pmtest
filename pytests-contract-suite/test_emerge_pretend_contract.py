@@ -23001,3 +23001,40 @@ def test_251a_demoted_branch_keeps_only_the_settled_blockers(
         "[uninstall     ] dev-util/u251olda-1 ",
         '[blocks b      ] dev-util/u251olda ("dev-util/u251olda" is soft blocking dev-util/u251ta-1)',
     ]
+
+
+def test_251b_installed_instance_of_a_recorded_cp_keeps_its_own_choice(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#251 corner (b): a `--deep` installed-cp collision. Installed
+    `dev-libs/u251p-1` (slot 1, world) carries `|| ( dev-util/u251q
+    dev-util/u251r )`; the merging `u251p-2` (slot 2) carries the same `||`
+    as a build dep, and `u251q` closes a cycle back to `u251p:2`. Real keys
+    `circular_dependency` by package node (`Package.__hash__`), so only the
+    slot-2 node's choice is demoted (to `u251r`); the installed slot-1
+    instance keeps `u251q`, which is in the graph anyway. Portuale's
+    installed deep walk takes an empty map for the same reason. Expected
+    from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-251/u251b.txt`): `u251r-1`, `u251p-2` (new
+    slot), `u251q-1` in both argument orders."""
+    installed = [
+        (
+            "dev-libs",
+            "u251p",
+            "1",
+            "1",
+            {"EAPI": "8", "RDEPEND": "|| ( dev-util/u251q dev-util/u251r )"},
+        ),
+    ]
+    root = _b1_root(tmp_path, ["dev-libs/u251p:1"], installed)
+    env = _b1_env(fixture_env, root)
+    for args in (
+        ["dev-util/u251q", "dev-libs/u251p:2"],
+        ["dev-libs/u251p:2", "dev-util/u251q"],
+    ):
+        out = _b1_run(["--pretend", "--deep", *args], env, emerge_binary).stdout
+        assert [ln for ln in _b1_merges(out) if "u251" in ln] == [
+            "[ebuild  N     ] dev-util/u251r-1 ",
+            "[ebuild  NS    ] dev-libs/u251p-2 [1]",
+            "[ebuild  N     ] dev-util/u251q-1 ",
+        ], args

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=251b fixture: installed slot-1 instance carrying the same || as the merging slot-2 node
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-util/u251q dev-util/u251r )
+SLOT=1
+_md5_=1d19a3c6fd233192dfe12e4dc6c8cf8f

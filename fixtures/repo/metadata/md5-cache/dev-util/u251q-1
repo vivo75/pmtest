@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/u251p:2
+DEFINED_PHASES=-
+DESCRIPTION=251b fixture: cycle-closing branch
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=ef916f603b3e5c694b89847a5549403f
