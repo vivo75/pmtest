@@ -22964,3 +22964,43 @@ def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     assert only.returncode == 1
     assert 'satisfy "app-misc/u257prov:0/1="' in only.stderr
 
+
+def test_250_use_mismatched_installed_instance_does_not_satisfy_a_build_edge(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#250 (owner B6: fixture first). Bug 703440's cycle
+    (`dev-util/u250make` BDEPENDs `dev-libs/u250json:0=`, which BDEPENDs
+    `|| ( dev-util/u250make-bootstrap dev-util/u250make[foo] )`) with the
+    tool already installed but built `-foo`. Real's satisfaction test for
+    the build edge is `vardb.match_pkgs(atom)`, which honours use-deps, so
+    the installed `-foo` build does not satisfy `u250make[foo]`: the edge
+    is unbreakable, the cycle forms, the circular restart demotes the
+    branch and the bootstrap merges. Expected from real's own
+    ResolverPlayground (portuale `docs/evidence/2026-09-30-250/u250.txt`):
+    `u250make-bootstrap-1`, `u250json-1`, `u250make-1` for the tool, and
+    `u250make-bootstrap-1`, `u250json-1` for the library. Portuale's edge
+    check was version/slot only: the installed instance "satisfied" the
+    edge, no cycle was seen, and it reinstalled the tool instead."""
+    installed = [
+        (
+            "dev-util",
+            "u250make",
+            "1",
+            "0",
+            {"EAPI": "8", "IUSE": "foo", "USE": "", "BDEPEND": "dev-libs/u250json:0/0="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    tool = _b1_run(["--pretend", "dev-util/u250make"], env, emerge_binary).stdout
+    assert [ln for ln in _b1_merges(tool) if "u250" in ln] == [
+        "[ebuild  N     ] dev-util/u250make-bootstrap-1 ",
+        "[ebuild  N     ] dev-libs/u250json-1 ",
+        '[ebuild   R    ] dev-util/u250make-1  USE="foo*"',
+    ]
+    lib = _b1_run(["--pretend", "dev-libs/u250json"], env, emerge_binary).stdout
+    assert [ln for ln in _b1_merges(lib) if "u250" in ln] == [
+        "[ebuild  N     ] dev-util/u250make-bootstrap-1 ",
+        "[ebuild  N     ] dev-libs/u250json-1 ",
+    ]
+

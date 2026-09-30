@@ -1,0 +1,8 @@
+BDEPEND=dev-libs/u250json:0=
+DEFINED_PHASES=-
+DESCRIPTION=250 fixture: build tool closing the cycle, installed built -foo
+EAPI=8
+IUSE=+foo
+KEYWORDS=amd64
+SLOT=0
+_md5_=a4408e8422cb13d2003165377d3b0ed0

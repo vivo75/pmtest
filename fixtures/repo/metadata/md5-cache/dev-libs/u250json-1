@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-util/u250make-bootstrap dev-util/u250make[foo] )
+DEFINED_PHASES=-
+DESCRIPTION=250 fixture: build-time || needing the tool with a flag its installed build lacks
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f92001ef065e4f6bd85e770cc82aed8a
