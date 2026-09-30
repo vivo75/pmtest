@@ -23038,3 +23038,45 @@ def test_251b_installed_instance_of_a_recorded_cp_keeps_its_own_choice(
             "[ebuild  NS    ] dev-libs/u251p-2 [1]",
             "[ebuild  N     ] dev-util/u251q-1 ",
         ], args
+
+
+def test_251c_every_branch_demoted_keeps_reals_partial_list(emerge_binary, fixture_env):
+    """#251 corner (c): every branch of a `||` demoted. `dev-libs/u251y`
+    BDEPENDs `|| ( dev-util/u251c dev-util/u251d ) dev-util/u251d`; both
+    alternatives BDEPEND `u251y`. With `u251c` already in the graph, pass 1
+    records both cycles, so `u251y`'s record holds both branches and real's
+    in-bin promotion runs over `other` (`dep_check.py:738-802`); the cycle
+    through the direct `u251d` dep persists and both sides abort. Expected
+    from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-251/u251c.txt`): the forced tree lists
+    `u251y` (nomerge), `u251d`, `u251c`, `u251y` for either argument
+    order and `u251y`, `u251c`, `u251d`, `u251y` for `u251y` alone; with
+    `u251c` first the circular block also matches. The other two orders
+    start the cycle at a different node -- the rotation class filed as
+    #278, not this corner."""
+    def rows(args):
+        r = _run([str(emerge_binary)], ["--pretend", *args], fixture_env)
+        assert r.returncode == 1
+        return r, [ln.rstrip() for ln in r.stdout.splitlines() if ln.startswith("[")]
+
+    both = [
+        "[nomerge       ] dev-libs/u251y-1::testrepo",
+        "[ebuild  N     ]  dev-util/u251d-1::testrepo  0 KiB",
+        "[ebuild  N     ]  dev-util/u251c-1::testrepo  0 KiB",
+        "[ebuild  N     ]   dev-libs/u251y-1::testrepo  0 KiB",
+    ]
+    r, got = rows(["dev-util/u251c", "dev-libs/u251y"])
+    assert got == both
+    assert (
+        "(dev-libs/u251y-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-util/u251c-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/u251y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)"
+    ) in r.stdout + r.stderr
+    assert rows(["dev-libs/u251y", "dev-util/u251c"])[1] == both
+    assert rows(["dev-libs/u251y"])[1] == [
+        "[nomerge       ] dev-libs/u251y-1::testrepo",
+        "[ebuild  N     ]  dev-util/u251c-1::testrepo  0 KiB",
+        "[ebuild  N     ]  dev-util/u251d-1::testrepo  0 KiB",
+        "[ebuild  N     ]   dev-libs/u251y-1::testrepo  0 KiB",
+    ]
+

@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/u251y
+DEFINED_PHASES=-
+DESCRIPTION=251c fixture: first branch closing a cycle
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=eb949bc902723e36e1902ebbd22d5145
