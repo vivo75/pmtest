@@ -1,0 +1,7 @@
+BDEPEND=virtual/u249make
+DEFINED_PHASES=-
+DESCRIPTION=249 fixture: build-time dep on the virtual (jsoncpp shape)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=291a3344411918dba21d86908e7c16ab
