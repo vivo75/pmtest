@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=254 fixture: installed consumer whose := on abiprov sits under a USE conditional that is off in the tree ebuild
+EAPI=8
+IUSE=cflag
+KEYWORDS=amd64
+RDEPEND=cflag? ( app-misc/abiprov:= )
+SLOT=0
+_md5_=0f3adc9fb5106658782f88e9f5284d0a

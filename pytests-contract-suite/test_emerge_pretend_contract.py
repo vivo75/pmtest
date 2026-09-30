@@ -22964,3 +22964,85 @@ def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     assert only.returncode == 1
     assert 'satisfy "app-misc/u257prov:0/1="' in only.stderr
 
+
+def test_254_conflict_abi_probe_evaluates_the_replacements_use_conditionals(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#254: the #214 conflict-fired ABI probe on a replacement whose `:=`
+    sits under a USE conditional that is off. Installed world member
+    `app-misc/abicondcons-1` was built with `cflag` (vdb `USE=cflag`,
+    recorded `RDEPEND=app-misc/abiprov:0/1=`); its tree ebuild carries
+    `cflag? ( app-misc/abiprov:= )` with `cflag` off; world member
+    `abiforce` needs `>=abiprov-2`, so `abiprov-1`/`abiprov-2` conflict in
+    slot 0. Real's probe evaluates the replacement's conditionals
+    (`_select_atoms_probe`, `_emerge/depgraph.py:2667-2713`) and refuses;
+    real then masks `abiprov-1` for the conflict, and the unsatisfied probe
+    (whose `validated_atoms` keep every conditional branch,
+    `_emerge/Package.py:329-359`) reinstalls the consumer. Expected from
+    real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-254-255/u254-cond.txt`): the same three rows
+    as the unconditional shape but **no** "causing rebuilds" block (real's
+    `_compute_abi_rebuild_info` only pairs a provider that is a child of
+    the replacement). Before #254 portuale accepted the flat token and
+    printed the block."""
+    installed = [
+        (
+            "app-misc",
+            "abicondcons",
+            "1",
+            "0",
+            {
+                "EAPI": "8",
+                "IUSE": "cflag",
+                "USE": "cflag",
+                "RDEPEND": "app-misc/abiprov:0/1=",
+            },
+        ),
+    ]
+    root = _b1_root(tmp_path, ["app-misc/abicondcons", "app-misc/abiforce"], installed)
+    env = _b1_env(fixture_env, root)
+    out = _b1_run(
+        ["--pretend", "--update", "--deep", "--backtrack", "4", "@world"], env, emerge_binary
+    ).stdout
+    assert [ln for ln in _b1_merges(out) if "app-misc/abi" in ln] == [
+        "[ebuild  N     ] app-misc/abiprov-2 ",
+        '[ebuild  rR    ] app-misc/abicondcons-1  USE="-cflag*"',
+        "[ebuild  N     ] app-misc/abiforce-1 ",
+    ]
+    assert "causing rebuilds" not in out
+
+
+def test_255_forced_rebuild_marker_is_keyed_by_the_providers_slot(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#255: real's `r` column (`PkgAttrDisplay.force_reinstall`,
+    `resolver/output.py:812-816`) is only set on a merge that is not
+    `new`, and `new` comes from `_get_installed_best` (`:708-768`), which
+    is slot-keyed: a provider installed only in *another* slot is
+    `new_slot`, still `new`. The #214 shape (installed `abicons-1` bound
+    to `abiprov:0/1=`, `abiforce` pulling `abiprov-2`) plus an installed
+    `abiprov-0.5` in slot `1/1`: real's ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-254-255/u255-otherslot.txt`) prints
+    `[ebuild  NS    ] app-misc/abiprov-2 [0.5]` -- no `r`. Portuale keyed
+    newness off any installed version of the cp and printed `rS`."""
+    installed = [
+        ("app-misc", "abiprov", "0.5", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "abicons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/abiprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, ["app-misc/abicons", "app-misc/abiforce"], installed)
+    env = _b1_env(fixture_env, root)
+    out = _b1_run(
+        ["--pretend", "--update", "--deep", "--backtrack", "4", "@world"], env, emerge_binary
+    ).stdout
+    assert [ln for ln in _b1_merges(out) if "app-misc/abi" in ln] == [
+        "[ebuild  NS    ] app-misc/abiprov-2 [0.5]",
+        "[ebuild  rR    ] app-misc/abicons-1 ",
+        "[ebuild  N     ] app-misc/abiforce-1 ",
+    ]
+
