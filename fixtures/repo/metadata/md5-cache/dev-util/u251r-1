@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=251b fixture: cycle-free branch
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=a31f4a757a4618b21b783bcd31b60fa8

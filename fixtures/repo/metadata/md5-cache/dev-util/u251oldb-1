@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=251a fixture: installed package blocked by the surviving branch
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=47c94e240de5313aadc014916155f925

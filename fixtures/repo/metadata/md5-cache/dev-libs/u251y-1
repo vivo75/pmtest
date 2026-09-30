@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-util/u251c dev-util/u251d ) dev-util/u251d
+DEFINED_PHASES=-
+DESCRIPTION=251c fixture: || plus a direct dep on the second branch, so both branches get demoted
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=e3957cb8e0de9686bf06599a90982dde

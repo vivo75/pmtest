@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-util/u251q dev-util/u251r )
+DEFINED_PHASES=-
+DESCRIPTION=251b fixture: merging slot-2 node whose || closes a cycle
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=66fc6672f6ea179e9eb7460efb3749d5

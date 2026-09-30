@@ -23083,3 +23083,119 @@ def test_249_virtual_or_choice_uses_the_pullers_circular_record(emerge_binary, f
     assert bt0.returncode == 1
     assert "Error: circular dependencies:" in bt0.stdout + bt0.stderr
 
+
+def test_251a_demoted_branch_keeps_only_the_settled_blockers(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#251 corner (a): the flat-list blocker disposition with a demoted
+    `||` branch. `dev-libs/u251m` BDEPENDs `|| ( dev-util/u251ta
+    dev-util/u251tb )`; `u251ta` closes a cycle back to `u251m` and blocks
+    installed `u251olda`, `u251tb` blocks installed `u251oldb`. After the
+    circular restart demotes `u251ta`, only `u251tb`'s blocker belongs to
+    the settled graph -- unless `u251ta` is itself the target. Expected
+    from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-251/u251a.txt`): for `u251m`, `u251tb` +
+    its `[uninstall]`/`[blocks b]` pair + `u251m`; for `u251ta`, both pairs
+    in merge order."""
+    installed = [
+        ("dev-util", "u251olda", "1", "0", {"EAPI": "8"}),
+        ("dev-util", "u251oldb", "1", "0", {"EAPI": "8"}),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    m = _b1_run(["--pretend", "dev-libs/u251m"], env, emerge_binary).stdout
+    assert [ln for ln in m.splitlines() if "u251" in ln] == [
+        "[ebuild  N     ] dev-util/u251tb-1 ",
+        "[uninstall     ] dev-util/u251oldb-1 ",
+        '[blocks b      ] dev-util/u251oldb ("dev-util/u251oldb" is soft blocking dev-util/u251tb-1)',
+        "[ebuild  N     ] dev-libs/u251m-1 ",
+    ]
+    ta = _b1_run(["--pretend", "dev-util/u251ta"], env, emerge_binary).stdout
+    assert [ln for ln in ta.splitlines() if "u251" in ln] == [
+        "[ebuild  N     ] dev-util/u251tb-1 ",
+        "[uninstall     ] dev-util/u251oldb-1 ",
+        '[blocks b      ] dev-util/u251oldb ("dev-util/u251oldb" is soft blocking dev-util/u251tb-1)',
+        "[ebuild  N     ] dev-libs/u251m-1 ",
+        "[ebuild  N     ] dev-util/u251ta-1 ",
+        "[uninstall     ] dev-util/u251olda-1 ",
+        '[blocks b      ] dev-util/u251olda ("dev-util/u251olda" is soft blocking dev-util/u251ta-1)',
+    ]
+
+
+def test_251b_installed_instance_of_a_recorded_cp_keeps_its_own_choice(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#251 corner (b): a `--deep` installed-cp collision. Installed
+    `dev-libs/u251p-1` (slot 1, world) carries `|| ( dev-util/u251q
+    dev-util/u251r )`; the merging `u251p-2` (slot 2) carries the same `||`
+    as a build dep, and `u251q` closes a cycle back to `u251p:2`. Real keys
+    `circular_dependency` by package node (`Package.__hash__`), so only the
+    slot-2 node's choice is demoted (to `u251r`); the installed slot-1
+    instance keeps `u251q`, which is in the graph anyway. Portuale's
+    installed deep walk takes an empty map for the same reason. Expected
+    from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-251/u251b.txt`): `u251r-1`, `u251p-2` (new
+    slot), `u251q-1` in both argument orders."""
+    installed = [
+        (
+            "dev-libs",
+            "u251p",
+            "1",
+            "1",
+            {"EAPI": "8", "RDEPEND": "|| ( dev-util/u251q dev-util/u251r )"},
+        ),
+    ]
+    root = _b1_root(tmp_path, ["dev-libs/u251p:1"], installed)
+    env = _b1_env(fixture_env, root)
+    for args in (
+        ["dev-util/u251q", "dev-libs/u251p:2"],
+        ["dev-libs/u251p:2", "dev-util/u251q"],
+    ):
+        out = _b1_run(["--pretend", "--deep", *args], env, emerge_binary).stdout
+        assert [ln for ln in _b1_merges(out) if "u251" in ln] == [
+            "[ebuild  N     ] dev-util/u251r-1 ",
+            "[ebuild  NS    ] dev-libs/u251p-2 [1]",
+            "[ebuild  N     ] dev-util/u251q-1 ",
+        ], args
+
+
+def test_251c_every_branch_demoted_keeps_reals_partial_list(emerge_binary, fixture_env):
+    """#251 corner (c): every branch of a `||` demoted. `dev-libs/u251y`
+    BDEPENDs `|| ( dev-util/u251c dev-util/u251d ) dev-util/u251d`; both
+    alternatives BDEPEND `u251y`. With `u251c` already in the graph, pass 1
+    records both cycles, so `u251y`'s record holds both branches and real's
+    in-bin promotion runs over `other` (`dep_check.py:738-802`); the cycle
+    through the direct `u251d` dep persists and both sides abort. Expected
+    from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-251/u251c.txt`): the forced tree lists
+    `u251y` (nomerge), `u251d`, `u251c`, `u251y` for either argument
+    order and `u251y`, `u251c`, `u251d`, `u251y` for `u251y` alone; with
+    `u251c` first the circular block also matches. The other two orders
+    start the cycle at a different node -- the rotation class filed as
+    #278, not this corner."""
+    def rows(args):
+        r = _run([str(emerge_binary)], ["--pretend", *args], fixture_env)
+        assert r.returncode == 1
+        return r, [ln.rstrip() for ln in r.stdout.splitlines() if ln.startswith("[")]
+
+    both = [
+        "[nomerge       ] dev-libs/u251y-1::testrepo",
+        "[ebuild  N     ]  dev-util/u251d-1::testrepo  0 KiB",
+        "[ebuild  N     ]  dev-util/u251c-1::testrepo  0 KiB",
+        "[ebuild  N     ]   dev-libs/u251y-1::testrepo  0 KiB",
+    ]
+    r, got = rows(["dev-util/u251c", "dev-libs/u251y"])
+    assert got == both
+    assert (
+        "(dev-libs/u251y-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-util/u251c-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/u251y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)"
+    ) in r.stdout + r.stderr
+    assert rows(["dev-libs/u251y", "dev-util/u251c"])[1] == both
+    assert rows(["dev-libs/u251y"])[1] == [
+        "[nomerge       ] dev-libs/u251y-1::testrepo",
+        "[ebuild  N     ]  dev-util/u251c-1::testrepo  0 KiB",
+        "[ebuild  N     ]  dev-util/u251d-1::testrepo  0 KiB",
+        "[ebuild  N     ]   dev-libs/u251y-1::testrepo  0 KiB",
+    ]
+
