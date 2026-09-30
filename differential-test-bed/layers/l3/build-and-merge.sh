@@ -12,7 +12,14 @@
 # Env:
 #   L3_PORTAGE_PIN=3.0.82.2
 #   L3_SKIP_PORTAGE_UPGRADE=0
-#   L3_BUILD_ARGS="--emptytree --oneshot --usepkg=n --color=n"
+#   L3_BUILD_ARGS              effective build args: env wins when SET
+#                              (even to a value equal to the default),
+#                              else the atom list's `# l3-build-args:`
+#                              directive, else `--emptytree --oneshot
+#                              --usepkg=n --color=n` (#280)
+#   L3_TMPFS=1                 when 1 and /var/tmp/portage is a tmpfs
+#                              mount, its peak use is sampled across the
+#                              merge and written to $OUT.tmpfs-peak (#282)
 #   L3_JOBS=1                  MAKEOPTS -j only (1 = deterministic; batch
 #                              2026-09-24 R1: pass 20 on gate/source cells)
 #
@@ -25,7 +32,13 @@ ATOMLIST=${2:?atom list}
 OUT=${3:?output prefix}
 PIN=${L3_PORTAGE_PIN:-3.0.82.2}
 SKIP_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}
-BUILD_ARGS=${L3_BUILD_ARGS:---emptytree --oneshot --usepkg=n --color=n}
+# #280: effective build args resolve below (after log() exists), as env
+# L3_BUILD_ARGS when SET (even to a value equal to the default) -> else
+# the atom list's `# l3-build-args:` header directive (first match,
+# anywhere in the file's comment lines; leading/trailing space stripped)
+# -> else today's default. The atom-line parser strips `#...` comments,
+# so the directive line is naturally not an atom.
+DEFAULT_BUILD_ARGS="--emptytree --oneshot --usepkg=n --color=n"
 JOBS=${L3_JOBS:-1}
 
 case $PM in
@@ -89,6 +102,20 @@ if [ "$SKIP_UPGRADE" != 1 ]; then
 fi
 log "$($EM --version 2>/dev/null | head -1 || echo "$PM")"
 
+if [ -n "${L3_BUILD_ARGS+x}" ]; then
+  BUILD_ARGS=$L3_BUILD_ARGS
+  BUILD_ARGS_SOURCE=env
+else
+  BUILD_ARGS=$(sed -n 's/^[[:space:]]*#[[:space:]]*l3-build-args:[[:space:]]*//p' "$ATOMLIST" | head -n 1 | sed 's/[[:space:]]*$//')
+  if [ -n "$BUILD_ARGS" ]; then
+    BUILD_ARGS_SOURCE=atomlist
+  else
+    BUILD_ARGS=$DEFAULT_BUILD_ARGS
+    BUILD_ARGS_SOURCE=default
+  fi
+fi
+log "build args ($BUILD_ARGS_SOURCE): $BUILD_ARGS"
+
 atoms=()
 while IFS= read -r line || [ -n "$line" ]; do
   line=${line%%#*}; line=$(printf '%s' "$line" | tr -d '[:space:]')
@@ -100,28 +127,69 @@ installed_cpvs() { ( cd /var/db/pkg && ls -d */*/ 2>/dev/null | sed 's:/$::' ) |
 installed_cpvs > "$OUT.installed-before.txt"
 
 log "building ${#atoms[@]} atoms: $EM $BUILD_ARGS ${atoms[*]}"
+# #282: when L3_TMPFS=1 and /var/tmp/portage is a tmpfs mount, sample
+# its peak use around the merge only. Kept cheap on purpose (df every
+# 5 s, no du); writes $OUT.tmpfs-peak as one `<bytes>\t<GiB, 1 decimal>`
+# line when the sampler is killed below.
+tmpfs_sampler_pid=""
+if [ "${L3_TMPFS:-0}" = 1 ]; then
+  tmpfs_fstype=$(findmnt -n -o FSTYPE /var/tmp/portage 2>/dev/null || stat -f -c %T /var/tmp/portage 2>/dev/null || true)
+  if [ "$tmpfs_fstype" = tmpfs ]; then
+    (
+      peak=0
+      write_peak() {
+        gib=$(awk -v b="$peak" 'BEGIN { printf "%.1f", b/1073741824 }')
+        printf '%s\t%s\n' "$peak" "$gib" > "$OUT.tmpfs-peak"
+      }
+      trap write_peak EXIT
+      trap 'write_peak; exit 0' TERM
+      while :; do
+        used=$(df -B1 --output=used /var/tmp/portage 2>/dev/null | tail -n 1 | tr -d '[:space:]')
+        case $used in ''|*[!0-9]*) ;; *) [ "$used" -gt "$peak" ] && peak=$used ;; esac
+        sleep 5 & wait $! 2>/dev/null
+      done
+    ) &
+    tmpfs_sampler_pid=$!
+    log "tmpfs sampler on /var/tmp/portage (pid $tmpfs_sampler_pid)"
+  fi
+fi
 set +e
-# `L3_BUILD_ARGS` already carries `--oneshot` (and `--emptytree
-# --usepkg=n`): the set must be rebuilt from source, never satisfied
-# from `$PKGDIR`/installed state.
+# The effective build args always carry `--oneshot --usepkg=n`: the set
+# must be rebuilt from source, never satisfied from `$PKGDIR`/installed
+# state.
 $EM $BUILD_ARGS "${atoms[@]}" > "$OUT.merge.log" 2>&1
 rc=$?
+# #282: stop the sampler right after the merge returns, before the
+# snapshot. Guarded so it never changes this script's exit code.
+if [ -n "$tmpfs_sampler_pid" ]; then
+  kill "$tmpfs_sampler_pid" 2>/dev/null || true
+  wait "$tmpfs_sampler_pid" 2>/dev/null || true
+fi
 set -e
 installed_cpvs > "$OUT.installed-after.txt"
 comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.merged-cpvs.txt"
 log "merge rc=$rc, $(wc -l < "$OUT.merged-cpvs.txt") packages touched"
 
-{
+# Kept in a variable too: `compare/snapshot.sh` rewrites `$OUT.meta.tsv`
+# with its own fingerprint (`>`), so on the snapshot path this block is
+# re-appended afterwards (the `layers/l1/consume.sh` pattern); written
+# here as well so a failed merge still leaves it for triage.
+l3_meta=$({
   echo "pm	$PM"
   echo "merge_rc	$rc"
   echo "atoms	${#atoms[@]}"
   echo "merged	$(wc -l < "$OUT.merged-cpvs.txt")"
   echo "portage_version	$(/usr/sbin/emerge --version 2>/dev/null | head -1)"
   [ "$PM" = portuale ] && echo "portuale_bin	$(/usr/local/bin/emerge --help 2>&1 | head -1)"
+  echo "build_args	$BUILD_ARGS"
+  echo "build_args_source	$BUILD_ARGS_SOURCE"
+  # #282: only present when the tmpfs sampler ran (L3_TMPFS=1 on tmpfs).
+  [ -f "$OUT.tmpfs-peak" ] && echo "tmpfs_peak_bytes	$(cut -f1 "$OUT.tmpfs-peak")"
   echo "date_utc	$(date -u +%FT%TZ)"
   echo "source_date_epoch	1740000000"
   echo "profile	$(readlink -f /etc/portage/make.profile 2>/dev/null || echo none)"
-} > "$OUT.meta.tsv"
+})
+printf '%s\n' "$l3_meta" > "$OUT.meta.tsv"
 
 if [ "$rc" != 0 ]; then
   echo "partial" > "$OUT.partial"
@@ -136,4 +204,5 @@ if ! /TEST/compare/snapshot.sh / "$OUT" 2> "$OUT.snapshot.err"; then
   tail -5 "$OUT.snapshot.err" | sed 's/^/    /'
   exit 2
 fi
+printf '%s\n' "$l3_meta" >> "$OUT.meta.tsv"
 log "done"

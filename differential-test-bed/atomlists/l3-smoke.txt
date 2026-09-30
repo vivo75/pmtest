@@ -1,11 +1,20 @@
-# L3 source-build parity, smoke set -- small, real, dependency-light;
-# the fast iteration set for the harness + the portage-vs-portage noise
-# floor. Both PMs build+merge these with `--emptytree --oneshot
-# --usepkg=n` under the determinism block. Closure: ~6 packages
-# (ncurses, pkgconf, virtual/pkgconfig included).
+# L3 source-build parity, per-slice smoke gate (#280) -- the fast set run
+# per slice; built from source WITHOUT --emptytree (deps come from the
+# image, so it stays about 5 packages and about 15 min at -j28). glibc + bash
+# are the two packages whose files every process maps, so re-merging
+# them from source also exercises the SOURCE half of the merge-path
+# safety gate (the --emptytree merge-gate cell l3-merge-gate.txt stays;
+# --emptytree glibc drags in ~321 packages, logs/l3-20260924T140811Z).
+# Run shape: L3_PM=both, no control pair. Trend note: runs before
+# 2026-09-30 used --emptytree on tree/pv/dmidecode only, so older
+# logs/metrics smoke points are not comparable.
 #
 #   differential-test-bed/run/l3-source-parity.sh differential-test-bed/atomlists/l3-smoke.txt
+#
+# l3-build-args: --oneshot --usepkg=n --color=n
 
 app-text/tree
 sys-apps/pv
 sys-apps/dmidecode
+sys-libs/glibc
+app-shells/bash

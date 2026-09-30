@@ -164,6 +164,29 @@ Host-only self-tests (no container): `compare/test-gpkg-structure.sh`,
 
 ### L3+ (not yet implemented)
 
+L3 source parity (`run/l3-source-parity.sh` + `layers/l3/build-and-merge.sh`)
+builds one atom list from source under both PMs and diffs the snapshots.
+The per-slice smoke is `atomlists/l3-smoke.txt` (tree, pv, dmidecode plus
+glibc + bash — the two packages whose files every process maps, so the
+smoke also covers the SOURCE half of the merge-path safety gate):
+
+```sh
+differential-test-bed/run/l3-source-parity.sh differential-test-bed/atomlists/l3-smoke.txt
+```
+
+About 15 min at `-j28` (≈9 min building, ≈5.5 min for the two
+full-tree snapshots, run one after the other), `L3_PM=both`, no control pair. Effective build args resolve
+as: env `L3_BUILD_ARGS` when set → else the atom list's `# l3-build-args:`
+directive → else `--emptytree --oneshot --usepkg=n --color=n` (#280); the
+smoke list carries `# l3-build-args: --oneshot --usepkg=n --color=n`
+(deps come from the image, no `--emptytree`). Builds run on a tmpfs at
+`/var/tmp/portage` (`L3_TMPFS=1`, size `L3_TMPFS_SIZE`, default `8g`:
+measured peaks 3.1 GiB for `l3-core`, 0.9 GiB for the smoke; `L3_TMPFS=0` = disk); the mount needs `exec` because podman's
+`--tmpfs` defaults to `noexec` and builds run configure scripts there
+(#282). The image now ships Portage 3.0.82.2 baked in
+(`create-container.bash`, #281), so the layers' portage-upgrade blocks
+are no-ops.
+
 `net/up.sh` / `net/down.sh` (shared network + volumes) for the HTTP
 binhost / `mrg` client. Designs, controls, deferred fixtures, risks,
 and metrics: `docs/real-world-testing.md` §§2–8 (extracted from
