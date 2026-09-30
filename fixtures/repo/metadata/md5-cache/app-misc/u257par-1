@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=257 fixture: parent whose stale binary is bound to the abandoned provider slot
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/u257prov:=
+SLOT=0
+_md5_=99853268c8b7a10693d8aefcf2c084b6

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=256 fixture: second installed parent bound to the abandoned provider slot
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/u256prov:=
+SLOT=0
+_md5_=60cd1413faf1212dd2c2f952ce30c646
