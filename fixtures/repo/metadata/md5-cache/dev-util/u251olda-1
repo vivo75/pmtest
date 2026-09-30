@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=251a fixture: installed package blocked by the demoted branch
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=bdb7904beabfd0aab6f9d4c28d07c90a

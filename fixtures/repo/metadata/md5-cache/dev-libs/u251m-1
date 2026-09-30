@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-util/u251ta dev-util/u251tb )
+DEFINED_PHASES=-
+DESCRIPTION=251a fixture: build-time || whose first branch closes a cycle
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=d196f1a504c01c3999d6125f8d686889

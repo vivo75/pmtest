@@ -22964,3 +22964,40 @@ def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     assert only.returncode == 1
     assert 'satisfy "app-misc/u257prov:0/1="' in only.stderr
 
+
+def test_251a_demoted_branch_keeps_only_the_settled_blockers(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#251 corner (a): the flat-list blocker disposition with a demoted
+    `||` branch. `dev-libs/u251m` BDEPENDs `|| ( dev-util/u251ta
+    dev-util/u251tb )`; `u251ta` closes a cycle back to `u251m` and blocks
+    installed `u251olda`, `u251tb` blocks installed `u251oldb`. After the
+    circular restart demotes `u251ta`, only `u251tb`'s blocker belongs to
+    the settled graph -- unless `u251ta` is itself the target. Expected
+    from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-09-30-251/u251a.txt`): for `u251m`, `u251tb` +
+    its `[uninstall]`/`[blocks b]` pair + `u251m`; for `u251ta`, both pairs
+    in merge order."""
+    installed = [
+        ("dev-util", "u251olda", "1", "0", {"EAPI": "8"}),
+        ("dev-util", "u251oldb", "1", "0", {"EAPI": "8"}),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    m = _b1_run(["--pretend", "dev-libs/u251m"], env, emerge_binary).stdout
+    assert [ln for ln in m.splitlines() if "u251" in ln] == [
+        "[ebuild  N     ] dev-util/u251tb-1 ",
+        "[uninstall     ] dev-util/u251oldb-1 ",
+        '[blocks b      ] dev-util/u251oldb ("dev-util/u251oldb" is soft blocking dev-util/u251tb-1)',
+        "[ebuild  N     ] dev-libs/u251m-1 ",
+    ]
+    ta = _b1_run(["--pretend", "dev-util/u251ta"], env, emerge_binary).stdout
+    assert [ln for ln in ta.splitlines() if "u251" in ln] == [
+        "[ebuild  N     ] dev-util/u251tb-1 ",
+        "[uninstall     ] dev-util/u251oldb-1 ",
+        '[blocks b      ] dev-util/u251oldb ("dev-util/u251oldb" is soft blocking dev-util/u251tb-1)',
+        "[ebuild  N     ] dev-libs/u251m-1 ",
+        "[ebuild  N     ] dev-util/u251ta-1 ",
+        "[uninstall     ] dev-util/u251olda-1 ",
+        '[blocks b      ] dev-util/u251olda ("dev-util/u251olda" is soft blocking dev-util/u251ta-1)',
+    ]

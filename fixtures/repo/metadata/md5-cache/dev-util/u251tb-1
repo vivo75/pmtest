@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=251a fixture: surviving branch that blocks an installed package
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=!dev-util/u251oldb
+SLOT=0
+_md5_=4e8c68b8fc55f187452949374a03c44f

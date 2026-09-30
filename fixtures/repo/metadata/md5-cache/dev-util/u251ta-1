@@ -1,0 +1,8 @@
+BDEPEND=dev-libs/u251m
+DEFINED_PHASES=-
+DESCRIPTION=251a fixture: cycle-closing branch that blocks an installed package
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=!dev-util/u251olda
+SLOT=0
+_md5_=b64ac32e2e1c119d89812f61e82b6ea3
