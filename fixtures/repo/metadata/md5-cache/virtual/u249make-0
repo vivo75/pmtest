@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=249 fixture: new-style virtual holding the || choice
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-util/u249make-bootstrap dev-util/u249make )
+SLOT=0
+_md5_=76da48f3d73e9372287eb99773ec4ff0

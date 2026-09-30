@@ -2925,6 +2925,11 @@ CASES = [
         0,
     ),
     (
+        "#249: a virtual's || choice is demoted through its puller's circular record",
+        ["--pretend", "dev-util/u249make"],
+        0,
+    ),
+    (
         "#236 B: an ebuild parent's same-cp version range collapses (_minimize_children)",
         ["--pretend", "dev-libs/libgit2-glib"],
         0,
@@ -22963,4 +22968,37 @@ def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     only = _run([str(emerge_binary)], ["--pretend", "--usepkgonly", "app-misc/u257par"], env)
     assert only.returncode == 1
     assert 'satisfy "app-misc/u257prov:0/1="' in only.stderr
+
+
+def test_249_virtual_or_choice_uses_the_pullers_circular_record(emerge_binary, fixture_env):
+    """#249: real's `dep_zapdeps` chains `circular_dependency.get(parent)`
+    and `.get(virt_parent)` (`portage/dep/dep_check.py:673-678`). Real
+    expands a new-style virtual's RDEPEND inline, inside the dep_check of
+    the package that pulled it, so `parent` there is the puller. Shape
+    (the upstream `testCircularJsoncppCmakeBootstrapOrDeps` bug-703440 cycle
+    with the `||` moved into a virtual): `dev-util/u249make` BDEPENDs
+    `dev-libs/u249json:0=`, which BDEPENDs `virtual/u249make`, whose
+    RDEPEND is `|| ( dev-util/u249make-bootstrap dev-util/u249make )`.
+    Pass 1 picks `u249make` and closes the cycle; real records
+    `u249json -> {u249make}`, `virtual/u249make -> {u249json}`,
+    `u249make -> {virtual/u249make}` and, on the restart, finds
+    `u249make` under the *puller* `u249json`'s key, demotes that branch and
+    merges the bootstrap. Expected from real's own ResolverPlayground
+    (portuale `docs/evidence/2026-09-30-249/u249.txt`): `u249make-bootstrap-1`,
+    `virtual/u249make-0`, `u249json-1`, `u249make-1`, rc 0; with
+    `--backtrack=0` the cycle aborts. Portuale walks the virtual as its own
+    node and looked up only the virtual's key, so it reported the cycle."""
+    r = _run([str(emerge_binary)], ["--pretend", "dev-util/u249make"], fixture_env)
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.splitlines() == [
+        "[ebuild  N     ] dev-util/u249make-bootstrap-1 ",
+        "[ebuild  N     ] virtual/u249make-0 ",
+        "[ebuild  N     ] dev-libs/u249json-1 ",
+        "[ebuild  N     ] dev-util/u249make-1 ",
+    ]
+    bt0 = _run(
+        [str(emerge_binary)], ["--pretend", "--backtrack=0", "dev-util/u249make"], fixture_env
+    )
+    assert bt0.returncode == 1
+    assert "Error: circular dependencies:" in bt0.stdout + bt0.stderr
 

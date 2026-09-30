@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=249 fixture: cycle-free build tool alternative (cmake-bootstrap shape)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=fdac660b408d676455c8f50aca513cc0

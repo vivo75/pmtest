@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/u249json:0=
+DEFINED_PHASES=-
+DESCRIPTION=249 fixture: build tool closing the cycle (cmake shape)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=d7896fca69e58f5749302318f94299fc
