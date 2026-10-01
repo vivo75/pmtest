@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #266 provider, slot 3 (bar default-on)
+EAPI=8
+IUSE=+bar
+KEYWORDS=amd64
+SLOT=3
+_md5_=3f193d36556eb7034a07c3e6d2c815c2

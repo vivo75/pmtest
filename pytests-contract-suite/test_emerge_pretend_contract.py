@@ -23346,6 +23346,81 @@ def test_236_r25_default_backtracking_settles_in_one_silent_pass(
     assert json.loads(rj.stdout)["backtrack"]["restarts"] == 0
 
 
+def test_266_minimize_children_matches_use_deps_against_candidate_use(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#266: `_minimize_children` matches a use-dep atom against a
+    not-yet-built package's own candidate effective USE (real
+    `findAtomForPackage(pkg, modified_use=self._pkg_use_enabled(pkg))`,
+    `_emerge/depgraph.py:4797-4807`), not just its own pick.
+
+    Fixture `dev-libs/r266mid-1.0` (ebuild parent) depends on
+    `>=dev-libs/r266lib-1[bar] <dev-libs/r266lib-3`; the provider ships
+    1.0/2.0/3.0 in slots 1/2/3 with `bar` default-off amongst 1.0/2.0
+    and default-on in 3.0. The `<3` atom always picks 2.0, the `>=` atom
+    always picks 3.0 (the only default-on build of `bar`).
+
+    Profile B (fixture defaults, no `package.use` override): 2.0 builds
+    `-bar`, so the `>=` atom matches only 3.0 and the pair does not
+    collapse -- real merges all three and reports the `bar` enablement
+    as a USE-changes block (rc 1). Profile A (staged `package.use`
+    `dev-libs/r266lib bar`, so 2.0 builds `+bar`): 2.0 now satisfies
+    both atoms and real collapses the pair onto 2.0 (rc 0, two rows).
+
+    Grounded on real Portage 3.0.82.2, host staged-fixture probes
+    2026-10-01 (`/usr/sbin/emerge`, PORTAGE_CONFIGROOT at a fixtures
+    copy, cwd at ROOT for the relative `repos.conf` locations, argv
+    `--ignore-default-opts --pretend dev-libs/r266mid`): profile B ->
+    rc 1, `backtrack: 0/20`, rows `N r266lib-3.0 USE="bar"` +
+    `N r266lib-2.0 USE="-bar"` + `N r266mid-1.0` with the
+    `>=dev-libs/r266lib-3.0 bar` USE-changes block; profile A (same
+    plus `dev-libs/r266lib bar` in `etc/portage/package.use`) -> rc 0,
+    rows `N r266lib-2.0 USE="bar"` + `N r266mid-1.0`, no block. Same
+    split from real's own ResolverPlayground (portuale
+    `docs/evidence/2026-10-01-266/r266_pg.py`: B mergelist
+    `[2.0, 3.0, mid]`, A mergelist `[2.0, mid]`). Before the fix
+    portuale printed three rows in both profiles (a use-dep atom only
+    ever matched its own pick for an ebuild candidate).
+
+    Merge-order note: real lists profile B's rows `3.0, 2.0, mid`
+    while portuale lists `2.0, 3.0, mid` (the standing #17 class), so
+    profile B asserts the sorted row set, not the sequence; profile A
+    is byte-ordered on both sides."""
+    # Profile B: fixture defaults -- the pair must NOT collapse.
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/r266mid"], fixture_env)
+    assert rust.returncode == 1
+    assert sorted(rust.stdout.splitlines()) == [
+        "[ebuild  N     ] dev-libs/r266lib-2.0  USE=\"-bar\" ",
+        "[ebuild  N     ] dev-libs/r266lib-3.0  USE=\"bar\" ",
+        "[ebuild  N     ] dev-libs/r266mid-1.0 ",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/r266mid-1.0::testrepo\n"
+        "# required by dev-libs/r266mid (argument)\n"
+        ">=dev-libs/r266lib-3.0 bar\n"
+    )
+    # Profile A: staged package.use enabling bar -- the pair collapses.
+    dest = tmp_path / "fixtures"
+    shutil.copytree(fixtures_root, dest, symlinks=True)
+    with (dest / "etc" / "portage" / "package.use").open("a") as f:
+        f.write("dev-libs/r266lib bar\n")
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(dest)
+    env["ROOT"] = str(dest)
+    env["PORTAGE_RUNNING_ROOT"] = str(dest)
+    env["DISTDIR"] = str(dest / "distfiles")
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/r266mid"], env)
+    assert rust.returncode == 0
+    assert rust.stdout.splitlines() == [
+        "[ebuild  N     ] dev-libs/r266lib-2.0  USE=\"bar\" ",
+        "[ebuild  N     ] dev-libs/r266mid-1.0 ",
+    ]
+    assert "have been skipped" not in rust.stdout + rust.stderr
+    assert "USE changes are necessary" not in rust.stdout + rust.stderr
+
+
 def test_107_use_dep_dynamic_deps_pair_settles_in_one_silent_pass(
     emerge_binary, fixture_env, tmp_path
 ):
