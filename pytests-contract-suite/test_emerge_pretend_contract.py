@@ -19930,6 +19930,158 @@ def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     }
 
 
+def test_oracle_slotop_pin_gate_explicit_request_atoms_probe(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#268 cut (a): explicit slot/version request atoms carry no greedy
+    pin, so the new-slot probe fires. Same installed/tree shape as the
+    #252 pin (`mmprov-1` `0/1` + `mmprov-2` `1/1` + `mmcons-1` bound
+    `mmprov:0/1=`, tree `mmprov-3` `1/2`), but the provider request pins
+    a slot or version: real's `_greedy_slots` (`depgraph.py:5896`) then
+    spans a single slot and returns no `mmprov:0` arg, so the update
+    probe's reverse-deps gate has nothing to refuse against and the
+    consumer rebuilds. Probed on real 3.0.82.2, host staged-fixture probe
+    2026-10-01 (PORTAGE_CONFIGROOT at the fixture tree, ad-hoc ROOT with
+    EAPI-bearing vdb, cwd at ROOT for the relative `repos.conf`
+    locations; argv `--ignore-default-opts --pretend --color=n
+    --backtrack=3 --update --deep <atoms>`): `app-misc/mmprov:1/2
+    app-misc/mmcons` -> rc 0, `backtrack: 1/3`, rows `[ebuild U]
+    app-misc/mmprov-3 [2]` + `[ebuild rR] app-misc/mmcons-1`, no
+    `causing rebuilds` block (new-slot arm, #269); `=app-misc/mmprov-3
+    app-misc/mmcons` -> rc 0, `backtrack: 1/3`, the same two rows (the
+    version pin names the upgrade target itself, still no greedy pin).
+    Residue #285: `=app-misc/mmprov-2` (naming the *installed* version)
+    rebuilds the consumer on both sides, but portuale additionally
+    upgrades the provider past the pin (`[ebuild U] mmprov-3`) where
+    real keeps it (`[ebuild rR] mmcons-1` alone) -- update-selection for
+    exact-version requests, a different mechanism from this gate.
+    Control, same probe: `app-misc/mmprov:1/2` alone -> rc 0,
+    `backtrack: 0/3`, row `[ebuild U] app-misc/mmprov-3 [2]` alone (no
+    consumer walked, nothing to probe -- both sides agree)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "app-misc/mmprov:1/2",
+            "app-misc/mmcons",
+        ],
+        env,
+        emerge_binary,
+    )
+    assert {
+        c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")
+    } == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "=app-misc/mmprov-3",
+            "app-misc/mmcons",
+        ],
+        env,
+        emerge_binary,
+    )
+    assert {
+        c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")
+    } == {
+        ("app-misc/mmprov", "3"),
+        ("app-misc/mmcons", "1"),
+    }
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--backtrack",
+            "3",
+            "--update",
+            "--deep",
+            "app-misc/mmprov:1/2",
+        ],
+        env,
+        emerge_binary,
+    )
+    assert {
+        c for c in _slotop_cpv(rust.stdout) if c[0].startswith("app-misc/mm")
+    } == {
+        ("app-misc/mmprov", "3"),
+    }
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="#284: blocker-resolved uninstall stays a hard block (rc 1, "
+    "no [uninstall] row), so the discard shape cannot settle like real",
+)
+def test_oracle_slotop_pin_gate_blocker_discard_probes(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#268 cut (b): a blocker-lookahead revision discard removes the
+    greedy pin, so the new-slot probe fires. Fixture `app-misc/bdprov`
+    (`-1` `0/1`, `-2` `1/1`, `-3` `1/2` whose `RDEPEND` soft-blocks the
+    old slot `!app-misc/bdprov:0`) + `app-misc/bdcons-1` bound
+    `bdprov:0/1=` (installed vdb carries the recorded `0/1=` form; the
+    live ebuild carries bare `:=`). Real revises the `--update` greedy
+    args with blocker lookahead (`depgraph.py:5421`, `_greedy_slots(...,
+    blocker_lookahead=True)`): the `bdprov:0` pin conflicts with the
+    highest package and is discarded, the old slot is uninstalled instead
+    of updated, and the probe rebuilds the consumer. Probed on real
+    3.0.82.2, host staged-fixture probe 2026-10-01 (same staging as the
+    cut-(a) pin; argv `--ignore-default-opts --pretend --color=n
+    --backtrack=3 --update --deep <atoms>`): `app-misc/bdprov
+    app-misc/bdcons` -> rc 0, `backtrack: 1/3`, rows `[ebuild U]
+    app-misc/bdprov-3 [2]`, `[uninstall] app-misc/bdprov-1`, `[blocks b]
+    app-misc/bdprov:0`, `[ebuild rR] app-misc/bdcons-1`, no `causing
+    rebuilds` block (new-slot arm, #269); `app-misc/bdprov` alone -> rc
+    0, `backtrack: 0/3`, the same rows minus the consumer rebuild."""
+    installed = [
+        ("app-misc", "bdprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "bdprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "bdcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/bdprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    args = ["--pretend", "--backtrack", "3", "--update", "--deep"]
+    rust = _b1_run([*args, "app-misc/bdprov", "app-misc/bdcons"], env, emerge_binary)
+    assert _b1_merges(rust.stdout) == [
+        "[ebuild     U  ] app-misc/bdprov-3 [2]",
+        "[ebuild  rR    ] app-misc/bdcons-1 ",
+    ]
+    assert "[uninstall     ] app-misc/bdprov-1 " in rust.stdout
+    assert "causing rebuilds" not in rust.stdout
+    rust = _b1_run([*args, "app-misc/bdprov"], env, emerge_binary)
+    assert _b1_merges(rust.stdout) == [
+        "[ebuild     U  ] app-misc/bdprov-3 [2]",
+    ]
+    assert "[uninstall     ] app-misc/bdprov-1 " in rust.stdout
+
+
 def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
     emerge_binary, fixture_env, tmp_path
 ):

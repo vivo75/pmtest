@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=268 cut-b fixture: multi-slot provider, slot 0 (bound slot)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/1
+_md5_=a1d94932613fbdf57066234f5c1edc5a
