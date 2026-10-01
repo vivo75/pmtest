@@ -511,7 +511,9 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     print real's `Package.__str__` node text with real's three leading
     newlines, and the `--solver=portage` path renders the stuck remainder
     as real's forced `--verbose --tree` display (same bytes as the walk
-    path); the pubgrub stdout shape is unchanged."""
+    path); the pubgrub stdout shape is unchanged. Backlog #278: both
+    paths start the printed cycle at `hardcycleb` (real's
+    `shortest_cycle[0]` under the single-root rendering)."""
     legacy_stdout = (
         "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
         "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
@@ -529,9 +531,9 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     expected_stderr = (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
