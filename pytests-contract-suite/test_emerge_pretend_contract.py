@@ -3037,15 +3037,17 @@ def _assert_slot_collision_block(stdout, slot_atom, instances, backtrack_hint=Tr
     """`instances` is a list of (cpv, [(parent_cpv_or_None, atom), ...]).
     Checks the real `get_conflict()` `!!! Multiple package instances ...`
     block rather than pinning the whole multi-line paragraph in every
-    test. Each parent atom is followed by its ` USE=""` slot (real
-    `pkg_use_display`) and a `^` marker line (real `highlight_violations`)
-    -- both checked here structurally; the exact caret columns are pinned
-    once in the slotconfgroup test."""
+    test. Each instance header and parent line carries real
+    `pkg_use_display` -- `USE=""` plus the implicit `ELIBC="glibc"`
+    group on this fixture profile (backlog #264) -- and a `^` marker
+    line (real `highlight_violations`) -- both checked here
+    structurally; the exact caret columns are pinned once in the
+    slotconfgroup test."""
     assert _SLOT_COLLISION_PREAMBLE in stdout
     assert f"\n{slot_atom}\n" in stdout
     for cpv, parents in instances:
         assert (
-            f'  ({cpv}, ebuild scheduled for merge) USE="" pulled in by\n' in stdout
+            f'  ({cpv}, ebuild scheduled for merge) USE="" ELIBC="glibc" pulled in by\n' in stdout
         )
         for parent_cpv, atom in parents:
             if parent_cpv is None:
@@ -3053,7 +3055,7 @@ def _assert_slot_collision_block(stdout, slot_atom, instances, backtrack_hint=Tr
             else:
                 line = (
                     f'    {atom} required by ({parent_cpv}, '
-                    f'ebuild scheduled for merge) USE=""\n'
+                    f'ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
                 )
                 assert line in stdout
                 # the `^` marker line immediately follows
@@ -6575,7 +6577,7 @@ def test_required_use_violated_top_level_aborts_the_whole_run(emerge_binary, fix
     assert result.stderr.strip() == (
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
         "unmet requirements.\n"
-        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar"\n'
+        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar" ELIBC="glibc"\n'
         "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
         "    foo? ( bar )"
     )
@@ -6604,7 +6606,7 @@ def test_required_use_violated_dependency_still_aborts_the_whole_run(
     assert result.stderr.strip() == (
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
         "unmet requirements.\n"
-        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar"\n'
+        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar" ELIBC="glibc"\n'
         "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
         "    foo? ( bar )\n"
         "\n"
@@ -6639,13 +6641,13 @@ def test_required_use_violations_are_collected_across_the_whole_walk_not_just_th
     assert result.stderr.strip() == (
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg2" has '
         "unmet requirements.\n"
-        '- dev-libs/requiredusebadpkg2-1.0::testrepo USE="baz -qux"\n'
+        '- dev-libs/requiredusebadpkg2-1.0::testrepo USE="baz -qux" ELIBC="glibc"\n'
         "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
         "    baz? ( qux )\n"
         "\n\n"
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
         "unmet requirements.\n"
-        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar"\n'
+        '- dev-libs/requiredusebadpkg-1.0::testrepo USE="foo -bar" ELIBC="glibc"\n'
         "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
         "    foo? ( bar )"
     )
@@ -12021,26 +12023,28 @@ def test_slot_conflict_notice_renders_pkg_use_display(emerge_binary, fixture_env
     """Real `slot_collision.py`'s `get_conflict()`: each instance header
     and each shown parent line carries that package's own
     `pkg_use_display(pkg, myopts, modified_use=...)` -- `USE="…"` with
-    every IUSE flag, enabled-first -- not a hardcoded `USE=""`.
-    `dev-libs/scusetarget` has `IUSE="+scuon scuoff"`, `dev-libs/scusenewpin`
-    `IUSE="+scupin"`, `dev-libs/scuseoldpin` none. The `^` marker line
-    still spans the full (now longer) `cur_line`."""
+    every IUSE flag, enabled-first, plus the implicit `ELIBC="glibc"`
+    group on this fixture profile (backlog #264; real 3.0.82.2
+    `--pretend --ignore-default-opts dev-libs/scuseparent` on the
+    staged fixture). `dev-libs/scusetarget` has `IUSE="+scuon scuoff"`,
+    `dev-libs/scusenewpin` `IUSE="+scupin"`, `dev-libs/scuseoldpin` none.
+    The `^` marker line still spans the full (now longer) `cur_line`."""
     rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/scuseparent"], fixture_env)
     assert rust.returncode == 1
     assert (
         '  (dev-libs/scusetarget-2.0:0/0::testrepo, ebuild scheduled for merge) '
-        'USE="scuon -scuoff" pulled in by\n'
+        'USE="scuon -scuoff" ELIBC="glibc" pulled in by\n'
         '    >=dev-libs/scusetarget-2.0 required by (dev-libs/scusenewpin-1.0:0/0::testrepo, '
-        'ebuild scheduled for merge) USE="scupin"\n'
+        'ebuild scheduled for merge) USE="scupin" ELIBC="glibc"\n'
     ) in rust.stdout
-    # a parent with no IUSE still renders a bare USE=""
+    # a parent with no IUSE still renders a bare USE group plus ELIBC
     assert (
         '    <dev-libs/scusetarget-2.0 required by (dev-libs/scuseoldpin-1.0:0/0::testrepo, '
-        'ebuild scheduled for merge) USE=""\n'
+        'ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
     ) in rust.stdout
     # the caret marker line immediately follows the >=… parent line and
     # spans at least to the atom's version token
-    tail = rust.stdout.split("required by (dev-libs/scusenewpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"scupin\"\n", 1)[1]
+    tail = rust.stdout.split("required by (dev-libs/scusenewpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"scupin\" ELIBC=\"glibc\"\n", 1)[1]
     marker = tail.split("\n", 1)[0]
     assert marker.startswith("    ") and set(marker) <= {" ", "^"} and "^" in marker
 
@@ -12065,12 +12069,12 @@ def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
     out = collapsed.stdout
     # the >=2.0 parent of the 2.0 instance: carets under ">=" and "2.0"
     assert (
-        '  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" pulled in by\n'
-        '    >=dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconfgroupnew-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""\n'
+        '  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" pulled in by\n'
+        '    >=dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconfgroupnew-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
         "    ^^                            ^^^"
     ) in out
     # exactly one of a/b/c is shown, then the omission tail + NOTE
-    shown = [p for p in ("a", "b", "c") if f"slotconfgroup{p}-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\"" in out]
+    shown = [p for p in ("a", "b", "c") if f"slotconfgroup{p}-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\"" in out]
     assert shown == ["c"]
     assert "    (and 2 more with the same problem)\n" in out
     assert (
@@ -12087,7 +12091,7 @@ def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
     vout = verbose.stdout
     for p in ("a", "b", "c"):
         assert (
-            f"    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconfgroup{p}-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\"\n"
+            f"    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconfgroup{p}-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"\" ELIBC=\"glibc\"\n"
             in vout
         )
     assert "with the same problem" not in vout
@@ -12118,7 +12122,7 @@ def test_slot_conflict_color_y_colours_violated_spans_with_aligned_markers(
         f"    {RED}>{R}{RED}={R}dev-libs/slotconflicttarget-"
         f"{RED}2{R}{RED}.{R}{RED}0{R} required by "
         "(dev-libs/slotconfgroupnew-1.0:0/0::testrepo, ebuild scheduled for merge) "
-        'USE=""\n'
+        'USE="" ELIBC="glibc"\n'
     )
     assert atom_line in out, out
     marker = out.split(atom_line)[1].split("\n")[0] + "\n"
@@ -12171,13 +12175,13 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     assert out.count("slot conflict:") == 1
     # the 2.0 instance keeps its version-key parent
     assert (
-        '  (dev-libs/slotusetarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="(-x)" pulled in by\n'
-        '    >=dev-libs/slotusetarget-2.0 required by (dev-libs/slotuseplain-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""\n'
+        '  (dev-libs/slotusetarget-2.0:0/0::testrepo, ebuild scheduled for merge) USE="(-x)" ELIBC="glibc" pulled in by\n'
+        '    >=dev-libs/slotusetarget-2.0 required by (dev-libs/slotuseplain-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
         "    ^^                       ^^^"
     ) in out
     # the 1.0 instance shows both use parents, unconditional [y] first
-    y_line = '    >=dev-libs/slotusetarget-1.0[y] required by (dev-libs/slotusey-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""\n'
-    x_line = '    >=dev-libs/slotusetarget-1.0[x] required by (dev-libs/slotusex-1.0:0/0::testrepo, ebuild scheduled for merge) USE=""\n'
+    y_line = '    >=dev-libs/slotusetarget-1.0[y] required by (dev-libs/slotusey-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
+    x_line = '    >=dev-libs/slotusetarget-1.0[x] required by (dev-libs/slotusex-1.0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
     assert y_line in out
     assert x_line in out
     assert out.index(y_line) < out.index(x_line)
@@ -15851,13 +15855,19 @@ def _assert_residual_slot_conflict_block(
     installed consumer renders `required by (<cpv>, installed in
     '<root>')`. Structural asserts like _assert_slot_collision_block
     (exact caret columns are pinned once, in the slotconfgroup test):
-    each parent atom is followed by its ` USE=""` slot and a `^` marker
+    each parent atom is followed by its ` USE=""` slot (plus the
+    implicit `ELIBC="glibc"` group on this fixture profile for
+    merge-scheduled packages -- backlog #264) and a `^` marker
     line, and a bare command-line parent renders `<atom> (Argument)` with
-    no marker. Parents are (parent_cpv_or_None, atom, installed) lists."""
+    no marker. An installed header or installed parent keeps the bare
+    `USE=""`: the fixture vdb records empty USE/IUSE, so real
+    `pkg_use_display` has no group to render there either (real 3.0.82.2
+    `--pretend --ignore-default-opts dev-libs/needer dev-libs/othermod`
+    on the staged fixture). Parents are (parent_cpv_or_None, atom, installed) lists."""
     assert _SLOT_COLLISION_PREAMBLE in stdout
     assert f"\n{slot_atom}\n" in stdout
     assert (
-        f'  ({merge_cpv}, ebuild scheduled for merge) USE="" pulled in by\n' in stdout
+        f'  ({merge_cpv}, ebuild scheduled for merge) USE="" ELIBC="glibc" pulled in by\n' in stdout
     )
     assert (
         f"  ({inst_cpv}, installed in '{root}') USE=\"\" pulled in by\n" in stdout
@@ -15874,7 +15884,7 @@ def _assert_residual_slot_conflict_block(
         else:
             line = (
                 f'    {atom} required by ({parent_cpv}, '
-                f'ebuild scheduled for merge) USE=""\n'
+                f'ebuild scheduled for merge) USE="" ELIBC="glibc"\n'
             )
         assert line in stdout
         after = stdout.split(line, 1)[1]
@@ -22658,15 +22668,14 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
 _AUB0_TEXT_0 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 0/M).\n\n'
 _AUB0_TEXT_1 = '\nemerge: there are no ebuilds built with USE flags to satisfy "dev-libs/aub0d[-foo]".\n!!! One of the following packages is required to complete your request:\n- dev-libs/aub0d-0::testrepo (Change USE: -foo)\n(dependency required by "dev-libs/aub0a-0::testrepo" [ebuild])\n(dependency required by "dev-libs/aub0a" [argument])\n'
 _AUB0_TEXT_2 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/M).\n\n'
-_AUB0_TEXT_3 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/M).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_4 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/M).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_3 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/M).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_4 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/M).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_5 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 1/M).\n\n'
-_AUB0_TEXT_6 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^^                                                                                  \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_6 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_7 = '\nThe following USE changes are necessary to proceed:\n (see "package.use" in the portage(5) man page for more details)\n# required by dev-libs/aub0a-0::testrepo\n# required by dev-libs/aub0a (argument)\n=dev-libs/aub0d-0 -foo\n\n * In order to avoid wasting time, backtracking has terminated early\n * due to the above autounmask change(s). The --autounmask-backtrack=y\n * option can be used to force further backtracking, but there is no\n * guarantee that it will produce a solution.\n'
-_AUB0_TEXT_8 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^^                                                                                  \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_9 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n    ^^               ^                                                                                 \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^                                                                                  \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE=""\n                   ^^^^                                                                                  \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_8 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_9 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_10 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n'
-
 _AUB0_CELLS = [
     ('y', 'c b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
     ('y', 'c a b', 1, _AUB0_TEXT_2, _AUB0_TEXT_1),
@@ -22706,10 +22715,12 @@ def test_autounmask_use_breakage_argument_order_text_matches_real(
     portuale's standing conventions: no `for <ROOT>` / `to '<ROOT>'`
     suffixes (`fixture-miss-message-unsuffixed` /
     `fixture-masked-path-suffix`), no wall-clock seconds on the timing
-    line, the `backtrack: N/M` denominator masked (portuale's default
+    line, and the `backtrack: N/M` denominator masked (portuale's default
     `--backtrack` is 10, real's 20 -- #263; the restart count N is real's
-    in every cell), and no `ELIBC="glibc"` group on the slot-conflict
-    header and parent lines (#264).
+    in every cell). The slot-conflict header and parent lines carry
+    real's `USE="…"` plus the implicit `ELIBC="glibc"` group on this
+    fixture profile (backlog #264; real renders both through
+    `pkg_use_display`).
 
     The shape: real walks the arguments LIFO. Under `=y` every order
     fails on A's `aub0d[-foo]` (the autounmask-breakage clean pass), and
