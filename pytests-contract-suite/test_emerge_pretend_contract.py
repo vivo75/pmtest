@@ -5059,6 +5059,62 @@ def test_use_unsat_missing_iuse_reports_the_missing_flag(
     ]
 
 
+def test_use_unsat_conditional_flag_on_iuse_less_target_is_missing_iuse(
+    emerge_binary, fixture_env
+):
+    """Backlog #265(a), first cell: `=dev-libs/mia0a-1` depends on
+    `dev-libs/mia0b[foo?]` while `mia0b`'s own IUSE has no `foo`. Real
+    counts the conditional flag toward `Missing IUSE:` (real
+    `use.required` is every no-default flag, conditionals included,
+    `lib/portage/dep/__init__.py:1363`) and prints the USE block with
+    `- dev-libs/mia0b-1::testrepo (Missing IUSE: foo)` plus the
+    `(dependency required by …)` chain. Grounded on a fresh real 3.0.82.2
+    staged-fixture probe with identical options (`emerge
+    --ignore-default-opts --pretend "=dev-libs/mia0a-1"`,
+    `docs/evidence/2026-09-30-265/real/mia0a-1.txt` in the portuale
+    checkout). Upstream shape: `test_missing_iuse_and_evaluated_atoms`
+    pg0 `=A-1`."""
+    args = ["--pretend", "=dev-libs/mia0a-1"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/mia0b[foo?]".',
+        "!!! One of the following packages is required to complete your request:",
+        "- dev-libs/mia0b-1::testrepo (Missing IUSE: foo)",
+        '(dependency required by "dev-libs/mia0a-1::testrepo" [ebuild])',
+        '(dependency required by "=dev-libs/mia0a-1" [argument])',
+    ]
+
+
+def test_use_unsat_conditional_flag_beside_plain_flag_is_missing_iuse(
+    emerge_binary, fixture_env
+):
+    """Backlog #265(a), second cell: `=dev-libs/mia0a-2` depends on
+    `dev-libs/mia0b[foo?,bar]`; `bar` is satisfiable but the conditional
+    `foo` still counts toward `Missing IUSE:`, so real prints
+    `- dev-libs/mia0b-1::testrepo (Missing IUSE: foo)` -- not a
+    `Change USE: +bar` row. Grounded on a fresh real 3.0.82.2
+    staged-fixture probe with identical options (`emerge
+    --ignore-default-opts --pretend "=dev-libs/mia0a-2"`,
+    `docs/evidence/2026-09-30-265/real/mia0a-2.txt` in the portuale
+    checkout). Upstream shape: `test_missing_iuse_and_evaluated_atoms`
+    pg0 `=A-2`."""
+    args = ["--pretend", "=dev-libs/mia0a-2"]
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 1
+    _assert_abort_preamble(rust.stdout)
+    assert rust.stderr.splitlines() == [
+        "",
+        'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/mia0b[foo?,bar]".',
+        "!!! One of the following packages is required to complete your request:",
+        "- dev-libs/mia0b-1::testrepo (Missing IUSE: foo)",
+        '(dependency required by "dev-libs/mia0a-2::testrepo" [ebuild])',
+        '(dependency required by "=dev-libs/mia0a-2" [argument])',
+    ]
+
+
 def test_use_unsat_lists_only_the_latest_change_use_candidate(
     emerge_binary, fixture_env
 ):
@@ -6249,7 +6305,16 @@ def test_use_dep_enforcement_negated_flag_declared_but_enabled_does_not_match(
     enabled, not disabled -- genuinely unsatisfied. With --autounmask-use=n
     (autounmask-use is on by default and would otherwise resolve this via
     an implicit package.use flip -- see the resolution test below) there's
-    no visible candidate for this atom at all."""
+    no visible candidate for this atom at all, so the run aborts with
+    real `_show_unsatisfied_dep`'s "no ebuilds built with USE flags"
+    block (backlog #265(b) with #273): the `(Change USE: -foo)` row and,
+    like real for an argument parent, no `(dependency required by …)`
+    lines. Grounded on a fresh real 3.0.82.2 staged-fixture probe with
+    identical options (`emerge --ignore-default-opts --pretend
+    --autounmask-use=n 'dev-libs/useflagpkg[-foo]'`,
+    `docs/evidence/2026-09-30-265/real/useflagpkg-autounmask-use-n.txt`
+    in the portuale checkout). Portuale omits real's staging
+    `for <root>.` suffix (the `fixture-miss-message-unsuffixed` class)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask-use=n", "dev-libs/useflagpkg[-foo]"],
@@ -6257,9 +6322,11 @@ def test_use_dep_enforcement_negated_flag_declared_but_enabled_does_not_match(
     )
     assert result.returncode == 1
     assert result.stdout == ""
-    assert result.stderr.strip() == (
-        'emerge: there are no ebuilds to satisfy "dev-libs/useflagpkg[-foo]".'
-    )
+    assert result.stderr.splitlines() == [
+        'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/useflagpkg[-foo]".',
+        "!!! One of the following packages is required to complete your request:",
+        "- dev-libs/useflagpkg-1.0::testrepo (Change USE: -foo)",
+    ]
 
 
 def test_use_dep_enforcement_plain_flag_declared_but_disabled_does_not_match(
@@ -8571,14 +8638,28 @@ def test_installed_dependency_use_dep_flag_only_in_built_use_is_kept(
     assert result.stderr == ""
 
     # As a top-level target the same atom still needs a *visible* ebuild
-    # (the avoid-update-against-vdb path is dependency-only), so it fails.
+    # (the avoid-update-against-vdb path is dependency-only), so it fails --
+    # with real `_show_unsatisfied_dep`'s "no ebuilds built with USE flags"
+    # block (backlog #265(b) with #273: the argument-atom half, same path
+    # as the `useflagpkg[-foo]` cell): the `(Missing IUSE: divergedflag)`
+    # row and, like real for an argument parent, no `(dependency required
+    # by …)` lines. Grounded on a real 3.0.82.2 container probe over the
+    # oracle's own staging (`emerge --ignore-default-opts --pretend
+    # 'dev-libs/builtusedivergedep[divergedflag]'`, rc 1, the block above
+    # with real's staging `for <root>.` suffix, which portuale omits per
+    # the `fixture-miss-message-unsuffixed` class).
     top = _run(
         [str(emerge_binary)],
         ["--pretend", "dev-libs/builtusedivergedep[divergedflag]"],
         fixture_env,
     )
     assert top.returncode == 1
-    assert 'no ebuilds to satisfy "dev-libs/builtusedivergedep[divergedflag]"' in top.stderr
+    assert top.stdout == ""
+    assert top.stderr.splitlines() == [
+        'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/builtusedivergedep[divergedflag]".',
+        "!!! One of the following packages is required to complete your request:",
+        "- dev-libs/builtusedivergedep-1.0::testrepo (Missing IUSE: divergedflag)",
+    ]
 
 
 def test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable(
