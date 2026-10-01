@@ -23052,23 +23052,26 @@ _CYC0_REAL_BLOCKS = {
 }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="backlog #242 (ex-#207): live real builds the cycle over its "
-    "cross-root graph (EAPI >= 7 DEPEND against ESYSROOT=/), so the start "
-    "node differs (#206's node text already ships; the =cyc0w-3 twin now "
-    "matches via backlog #278 and is pinned passing below)",
-)
 @pytest.mark.parametrize("atom", ["=dev-libs/cyc0z-1"])
 def test_circular_dependencies_upstream_pg0_real_text(
     emerge_binary, fixture_env, atom
 ):
-    """Real's `_show_circular_deps` block for the #50 batch-2
-    `=dev-libs/cyc0z-1` circular case, verbatim from live
+    """Backlog #242 (ex-#207): real's `_show_circular_deps` block for the
+    #50 batch-2 `=dev-libs/cyc0z-1` circular case, verbatim from live
     `emerge -p --color=n` (real depgraph.py:10425; nodes via
     `circular_dependency_handler._prepare_circular_dep_message` ->
-    Package.__str__). Exit code 1 already agrees on both sides."""
-    rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    Package.__str__). Exit code 1 already agrees on both sides.
+
+    Cross-root run (PORTAGE_RUNNING_ROOT=/ != ROOT=fixtures): with a
+    non-`/` ROOT, EAPI >= 7 DEPEND resolves against the running root, so
+    the cycle forms there around `cyc0z-3` -- the default-staging bytes in
+    portuale `docs/evidence/2026-09-29-242-inventory/probes/`
+    (`default-cyc0z-1.txt`, real 3.0.82.2). `/` is deterministic here:
+    the fixture-only `cyc0*` CPs are never in the host vdb (the same basis
+    as the existing PORTAGE_RUNNING_ROOT=/ pins)."""
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = "/"
+    rust = _run([str(emerge_binary)], ["--pretend", atom], env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
 
