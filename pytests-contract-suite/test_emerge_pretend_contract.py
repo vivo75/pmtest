@@ -19629,12 +19629,16 @@ def test_oracle_slotop_conflict_mass_rebuild(
     (`depgraph.py:3121-3126`) schedules the installed leaves bound to the
     abandoned slot even with an empty world (walked, not merely
     reachable). Ported through the `slot_operator_rebuild_scan`, so the
-    leaves merge as walked `rR` nodes with the `causing rebuilds` block
-    (verified against the vendored portage's Playground mergelist, and
-    against live real 3.0.82.2 in the #211 R2 container probe: the
-    rebuilds need EAPI-bearing vdb -- real's `FakeVartree` overlay
-    refuses EAPI-less records, so without the `EAPI` files below live
-    real merges no leaves while the Playground's EAPI-5 records do).
+    leaves merge as walked `rR` nodes with NO `causing rebuilds` block:
+    the new-slot arm records the consumer alone (#269; real's
+    `_slot_operator_update_backtrack`, `depgraph.py:2442`), verified
+    against live real 3.0.82.2 in the #269 container probe 2026-10-01
+    (the earlier revision of this docstring claimed the block was
+    verified live too -- it was not: the Playground mergelist carries no
+    display, and the live display shows no block). The rebuilds need
+    EAPI-bearing vdb -- real's `FakeVartree` overlay refuses EAPI-less
+    records, so without the `EAPI` files below live real merges no
+    leaves while the Playground's EAPI-5 records do.
     The `EAPI` files keep this pin's staging faithful to that oracle."""
     installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
     installed += [
@@ -19667,6 +19671,8 @@ def test_oracle_slotop_conflict_mass_rebuild(
         ("app-misc/somassc3c", "1"),
         ("app-misc/somassc4c", "1"),
     }
+    # #269: the new-slot arm records the consumer alone -- no block.
+    assert "causing rebuilds" not in rust.stdout
 
 
 def test_oracle_slotop_update_probe_refusal(
@@ -19782,6 +19788,82 @@ def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     assert got == {
         ("app-misc/mmprov", "3"),
     }
+
+
+def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#269: the new-slot arm records the consumer alone -- no provider
+    `r`, no `causing rebuilds` block. The `mmprov`/`mmcons` shape from
+    the #253 recipe with only `mmcons` requested: installed `mmprov-1`
+    (`0/1`) + `mmprov-2` (`1/1`) + `mmcons-1` bound `mmprov:0/1=`
+    (real's recorded form; the live ebuild carries bare `:=`), tree
+    `mmprov-3` (`1/2`). Real's update probe (`new_child_slot=True`,
+    `depgraph.py:3121-3126`) finds `mmprov-3` among the *available*
+    packages even though no pass scheduled it, and the backtrack
+    (`_slot_operator_update_backtrack`, `depgraph.py:2442`) files the
+    child reinstall only when `new_child_slot is None` -- so the
+    consumer alone joins the replace set. Probed on real 3.0.82.2, host
+    container probe 2026-10-01 (staged fixture tree, ad-hoc ROOT with
+    EAPI-bearing vdb, `emerge --ignore-default-opts --pretend --color=n
+    --backtrack=20 --update --deep app-misc/mmcons
+    dev-libs/slotconflictoldconsumer dev-libs/slotconflictnewconsumer`):
+    rc 0, `Dependency resolution took 1.18 s (backtrack: 3/20)`, five
+    rows (`[ebuild N] slotconflicttarget-1.0`, `[ebuild U] mmprov-3 [2]`
+    bare, `[ebuild rR] mmcons-1`, `[ebuild N] oldconsumer`, `[ebuild N]
+    newconsumer`), the conflict skipped-update `WARNING`, and NO
+    `causing rebuilds` block (`_forced_rebuilds` stays empty; the
+    `--debug` trace shows `forced reinstall atoms: app-misc/mmcons:0`
+    alone). Portuale prints no timing line under `--pretend`, so the
+    pass count is pinned through `--json` (`backtrack.restarts == 3`).
+    The `EAPI` files keep the probe registration faithful (see the
+    conflict-mass pin)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    args = [
+        "--pretend",
+        "--backtrack",
+        "20",
+        "--update",
+        "--deep",
+        "app-misc/mmcons",
+        "dev-libs/slotconflictoldconsumer",
+        "dev-libs/slotconflictnewconsumer",
+    ]
+    rust = _b1_run(args, _b1_env(fixture_env, root), emerge_binary)
+    assert _b1_merges(rust.stdout) == [
+        "[ebuild  N     ] dev-libs/slotconflicttarget-1.0 ",
+        "[ebuild     U  ] app-misc/mmprov-3 [2]",
+        "[ebuild  rR    ] app-misc/mmcons-1 ",
+        "[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 ",
+        "[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 ",
+    ]
+    assert "WARNING: One or more updates/rebuilds have been skipped" in rust.stdout
+    # The new-slot arm records the consumer alone: no provider `r` (the
+    # `U` row above is bare) and no `causing rebuilds` block.
+    assert "causing rebuilds" not in rust.stdout
+    js = _b1_run(
+        ["--pretend", "--json", *args[1:]],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    report = json.loads(js.stdout)
+    assert report["backtrack"] == {"restarts": 3, "max": 20}
+    assert report["abi_rebuilds"] == []
+    by_cp = {(e["category"], e["package"]): e for e in report["entries"]}
+    assert by_cp[("app-misc", "mmcons")]["outcome"] == "reinstall"
+    assert by_cp[("app-misc", "mmcons")]["slot_operator_rebuild"] is True
+    assert by_cp[("app-misc", "mmprov")]["outcome"] == "upgrade"
 
 
 def test_oracle_slotop_unsatisfied_probe_heals_through_parent_reinstall(
