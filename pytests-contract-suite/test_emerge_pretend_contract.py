@@ -23446,6 +23446,87 @@ def test_256_unsatisfied_probe_seeds_every_hitting_parent_in_one_pass(
     assert json.loads(rj.stdout)["backtrack"]["restarts"] == 1
 
 
+def _276_root(tmp_path):
+    """Shared ad-hoc ROOT for the #276 pair: world members
+    `app-misc/u276pa` (healing parent: tree ebuild `u276pa-1` carries a
+    live `u276prov:=` that accepts the moved provider) and
+    `app-misc/u276pb` (stuck parent: tree ebuild `u276pb-1` pins
+    `<u276prov-2:=`, so no replacement resolves), both installed at `-1`
+    with the abandoned built want `>=app-misc/u276prov-1:0/1=`."""
+    return _b1_root(
+        tmp_path,
+        ["app-misc/u276pa", "app-misc/u276pb"],
+        [
+            (
+                "app-misc",
+                name,
+                "1",
+                "0",
+                {"EAPI": "8", "RDEPEND": ">=app-misc/u276prov-1:0/1="},
+            )
+            for name in ("u276pa", "u276pb")
+        ],
+    )
+
+
+def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#276: real masks an installed parent whose live dep cannot be
+    satisfied (`_add_dep` `:3456-3470` -> `runtime_pkg_mask` "missing
+    dependency") and restarts; under `@world` it then drops that parent
+    as an argument ("The following update has been skipped due to
+    unsatisfied dependencies" + "Problems have been detected with your
+    world file") and heals the rest. The stuck parent's ebuild is masked
+    on the next pass the same way, the unsatisfied probe seeds the
+    healing sibling, and the update probe schedules its forced
+    reinstall. Expected from real 3.0.82.2: the ResolverPlayground
+    shape b (portuale `docs/evidence/2026-09-30-256-257/u256-b-@world.log`:
+    mergelist `['app-misc/u256prov-2', 'app-misc/u256pa-1']`, `backtracking
+    try 4` records `[ebuild rR] u256pa-1` through the forced reinstall
+    atoms) and the host staged-fixture probe of this hermetic shape
+    (PORTAGE_CONFIGROOT at the fixture tree, ad-hoc ROOT, `--pretend
+    --update --deep @world`): rc 0, `backtrack: 5/20`, rows `[ebuild N]
+    app-misc/u276prov-2` + `[ebuild rR] app-misc/u276pa-1`, the
+    skipped-update block for `app-misc/u276pb:0`, and no
+    `causing rebuilds` block (real's `forced rebuilds` stays empty --
+    the `rR` rides the forced reinstall atoms, like #256). Before #276
+    portuale aborted on the installed parent's built atom
+    (`>=app-misc/u276prov-1:0/1=`) instead."""
+    root = _276_root(tmp_path)
+    env = _b1_env(fixture_env, root)
+    out = _b1_run(["--pretend", "--update", "--deep", "@world"], env, emerge_binary).stdout
+    assert [ln for ln in _b1_merges(out) if "app-misc/u276" in ln] == [
+        "[ebuild  N     ] app-misc/u276prov-2 ",
+        "[ebuild  rR    ] app-misc/u276pa-1 ",
+    ]
+
+
+def test_276_explicit_args_abort_on_the_stuck_parents_live_atom(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#276, second arm: with explicit arguments real has no argument to
+    drop, so the run fails on the stuck parent's live atom after masking
+    the installed and the merge-bound instances (`u256-b-app-misc_u256pa+
+    app-misc_u256pb.log`: "backtracking aborted after 2 tries", rc 1).
+    Same hermetic shape as the `@world` arm (shared `_276_root` helper):
+    real 3.0.82.2 staged-fixture probe (`--pretend --update --deep
+    app-misc/u276pa app-misc/u276pb`): rc 1, `backtrack: 2/20`, no merge
+    rows, `emerge: there are no ebuilds to satisfy
+    "<app-misc/u276prov-2:="` with the installed-parent chain. Before
+    #276 portuale aborted on the built atom
+    (`>=app-misc/u276prov-1:0/1=`) instead."""
+    root = _276_root(tmp_path)
+    env = _b1_env(fixture_env, root)
+    r = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "--deep", "app-misc/u276pa", "app-misc/u276pb"],
+        env,
+    )
+    assert r.returncode == 1
+    assert 'satisfy "<app-misc/u276prov-2:="' in r.stderr
+
+
 def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):

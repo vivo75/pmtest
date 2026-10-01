@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=276 fixture: healing parent bound to the abandoned provider slot
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/u276prov:=
+SLOT=0
+_md5_=a3f9a373391c2dd3ee1ef5f03b1f0aba
