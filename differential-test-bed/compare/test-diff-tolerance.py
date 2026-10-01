@@ -323,6 +323,116 @@ def build_size_cases(root: Path) -> None:
           rc == 1 and "[VDB] cat/foo-1.0/SIZE" in out, out)
 
 
+# --- B1 (#261): hardlink-set .debug naming race ---------------------------
+# estrip splits debug in parallel jobs (bin/estrip:515-674); hardlinks to
+# one inode serialise on a per-inode lockfile (:216-229) and
+# save_elf_debug names the .debug after the basename of whichever job wins
+# the lock (:125-158, dst_basename=${src_basename}.debug). In a hardlink
+# set (glibc's getconf/POSIX_V6_* family) the .debug/@buildid name is
+# decided by the scheduler: each side carries exactly one .debug for the
+# set, whatever its name. Those MISSING/CONTENTS rows count as explained.
+# Everything else stays hard.
+GETCONF_BIN_MD5 = "c" * 32
+GETCONF_DBG_MD5 = "9" * 32
+GETCONF_SHA = "d" * 64
+GETCONF_DBG_SHA = "e" * 64
+GETCONF_BINS = [
+    "/usr/bin/getconf",
+    "/usr/lib64/misc/glibc/getconf/POSIX_V6_LP64_OFF64",
+    "/usr/lib64/misc/glibc/getconf/POSIX_V7_LP64_OFF64",
+]
+GETCONF_BIDS_A = [
+    ("@buildid:/usr/bin/getconf", "/usr/bin/getconf"),
+    ("@buildid:/usr/lib/debug/usr/bin/getconf.debug",
+     "/usr/lib/debug/usr/bin/getconf.debug"),
+]
+GETCONF_BIDS_B = [
+    ("@buildid:/usr/lib64/misc/glibc/getconf/POSIX_V6_LP64_OFF64",
+     "/usr/lib64/misc/glibc/getconf/POSIX_V6_LP64_OFF64"),
+    ("@buildid:/usr/lib/debug/usr/lib64/misc/glibc/getconf/POSIX_V6_LP64_OFF64.debug",
+     "/usr/lib/debug/usr/lib64/misc/glibc/getconf/POSIX_V6_LP64_OFF64.debug"),
+]
+
+
+def write_261_side(root: Path, name: str, dbg_stem: str,
+                   bids: list[tuple[str, str]], extra_debug: str | None = None) -> Path:
+    """One side of the #261 shape: hardlinked binaries sharing one md5,
+    exactly one .debug name (dbg_stem) for the set in both debug dirs,
+    plus its @buildid symlinks. extra_debug adds a second .debug name
+    (the near-miss: two for the set on one side)."""
+    prefix = root / name
+    dbgs = [f"/usr/lib/debug/usr/bin/{dbg_stem}.debug",
+            f"/usr/lib/debug/usr/lib64/misc/glibc/getconf/{dbg_stem}.debug"]
+    if extra_debug is not None:
+        dbgs.append(f"/usr/lib/debug/usr/bin/{extra_debug}.debug")
+    lines = [f"{b}\tf\t0755\t0\t0\t10\t{GETCONF_SHA}\t-\t-"
+             for b in GETCONF_BINS]
+    lines += [f"{d}\tf\t0644\t0\t0\t11\t{GETCONF_DBG_SHA}\t-\t-"
+              for d in dbgs]
+    lines += [f"{bid}\tl\t0777\t0\t0\t{len(tgt)}\t-\t{tgt}\t-"
+              for bid, tgt in bids]
+    (root / f"{name}.files.norm.tsv").write_text("\n".join(lines) + "\n")
+    (root / f"{name}.mtimes.tsv").write_text("")
+    contents = [f"obj {b} {GETCONF_BIN_MD5} 1000" for b in GETCONF_BINS]
+    contents += [f"obj {d} {GETCONF_DBG_MD5} 1000" for d in dbgs]
+    contents += [f"sym {bid} -> {tgt} 1000" for bid, tgt in bids]
+    vdb = prefix.parent / (prefix.name + ".vdb") / "pkg" / "sys-libs" / "glibc-2.43-r2"
+    vdb.mkdir(parents=True)
+    (vdb / "CONTENTS").write_text("\n".join(contents) + "\n")
+    return prefix
+
+
+def write_261_lone_side(root: Path, name: str, with_debug: bool) -> Path:
+    """A .debug whose binary is NOT in a hardlink set (unique md5)."""
+    prefix = root / name
+    lines = [f"/usr/bin/solo\tf\t0755\t0\t0\t10\t{'f' * 64}\t-\t-"]
+    contents = [f"obj /usr/bin/solo {'a' * 32} 1000"]
+    if with_debug:
+        lines.append(f"/usr/lib/debug/usr/bin/solo.debug\tf\t0644\t0\t0\t11\t{'b' * 64}\t-\t-")
+        contents.append(f"obj /usr/lib/debug/usr/bin/solo.debug {'c' * 32} 1000")
+    (root / f"{name}.files.norm.tsv").write_text("\n".join(lines) + "\n")
+    (root / f"{name}.mtimes.tsv").write_text("")
+    vdb = prefix.parent / (prefix.name + ".vdb") / "pkg" / "cat" / "solo-1.0"
+    vdb.mkdir(parents=True)
+    (vdb / "CONTENTS").write_text("\n".join(contents) + "\n")
+    return prefix
+
+
+def build_261_cases(root: Path) -> None:
+    a = write_261_side(root, "hc-a", "getconf", GETCONF_BIDS_A)
+    b = write_261_side(root, "hc-b", "POSIX_V6_LP64_OFF64", GETCONF_BIDS_B)
+    for flag in ([], ["--tolerate-payload"]):
+        rc, out = run([*flag, str(a), str(b)])
+        mode = "tolerated" if flag else "default"
+        clean = rc == 0 and "#261-hardlink-debug-race" in out \
+            and re.search(r"unexplained\s*:\s*0", out, re.I) is not None
+        check(f"#261 hardlink-set .debug race is explained ({mode} mode)",
+              clean,
+              (f"rc={rc}\n" + "\n".join(out.splitlines()[:30])) if not clean else "")
+
+    # near-miss: a second .debug on one side (two names for the set) stays hard
+    c = write_261_side(root, "hc2-a", "getconf", GETCONF_BIDS_A,
+                       extra_debug="POSIX_V6_LP64_OFF64")
+    rc, out = run(["--tolerate-payload", str(c), str(b)])
+    check("#261 near-miss: two .debug names for the set on one side stays hard",
+          rc == 1 and "[MISSING]" in out and "#261-hardlink-debug-race" not in out, out)
+
+    # near-miss: a .debug whose object is not in a hardlink set stays hard
+    d = write_261_lone_side(root, "hc3-a", with_debug=True)
+    e = write_261_lone_side(root, "hc3-b", with_debug=False)
+    rc, out = run(["--tolerate-payload", str(d), str(e)])
+    check("#261 near-miss: lone .debug outside any hardlink set stays hard",
+          rc == 1 and "[MISSING]" in out and "#261-hardlink-debug-race" not in out, out)
+
+    # near-miss: a plain MISSING file that is not .debug/@buildid stays hard
+    f = write_side(root, "hc4-a", "a" * 64, "d" * 32, extra=False)
+    g = write_side(root, "hc4-b", "a" * 64, "d" * 32, extra=True)
+    rc, out = run(["--tolerate-payload", str(f), str(g)])
+    check("#261 near-miss: plain non-debug MISSING stays hard",
+          rc == 1 and "[MISSING] /usr/share/extra" in out
+          and "#261-hardlink-debug-race" not in out, out)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="difftol.") as td:
         root = Path(td)
@@ -358,6 +468,8 @@ def main() -> int:
         build_r3_cases(root)
 
         build_size_cases(root)
+
+        build_261_cases(root)
 
     print(f"\ntest-diff-tolerance: {'OK' if FAILED == 0 else f'{FAILED} failure(s)'}")
     return 1 if FAILED else 0
