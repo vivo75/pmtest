@@ -160,6 +160,120 @@ def diff_contents(k: str, ta: str, tb: str, rep: Report, tolerate_payload: bool)
             rep.add("CONTENTS", k, f"{key[0]} {key[1]}: portage {ma[key]!r} portuale {mb[key]!r}")
 
 
+# --- #261: hardlink-set .debug naming race -------------------------------
+# estrip splits debug in parallel jobs (bin/estrip:515-674); hardlinks to
+# one inode serialise on a per-inode lockfile (:216-229) and
+# save_elf_debug names the .debug after the basename of whichever job wins
+# the lock (:125-158, dst_basename=${src_basename}.debug). In a hardlink
+# set (glibc's getconf/POSIX_V6_* family) the .debug/@buildid name is
+# decided by the scheduler: each side carries exactly one .debug for the
+# set, whatever its name. Those MISSING/CONTENTS rows count as explained.
+# Deliberately NOT a blanket .debug/@buildid ignore: splitdebug stays on
+# in the L3 determinism block so #38 (portuale's split-debug output and
+# build-ids equal to the oracle's) stays under test.
+HARDLINK_DEBUG_ID = "#261-hardlink-debug-race"
+
+_ENTRY_PATH_RE = re.compile(
+    r"(?:portage-only|portuale-only) (?:entry|line): (?:obj|sym|dir) (\S+)"
+)
+_MISMATCH_PATH_RE = re.compile(r"^(?:obj|sym) (\S+):")
+
+
+def _debug_stem(path: str) -> str:
+    """Basename of a debug path minus a trailing .debug, if present."""
+    base = path.rsplit("/", 1)[-1]
+    return base[:-6] if base.endswith(".debug") else base
+
+
+def _buildid_target(path: str) -> str | None:
+    """Resolved target of a normalised @buildid key, else None."""
+    return path[len("@buildid:"):] if path.startswith("@buildid:") else None
+
+
+def hardlink_debug_tolerated(a_vdb: dict, b_vdb: dict) -> set[str]:
+    """Object paths (.debug files and @buildid keys) explained by #261.
+
+    A hardlink set is a group of >=2 real (non-.debug) obj paths sharing
+    one md5 on side A and sharing one md5 (possibly different) on side B.
+    A set qualifies when each side carries exactly one distinct .debug
+    basename for it. The tolerated paths are that set's .debug obj paths
+    on either side plus the @buildid keys resolving to the set.
+    """
+    def obj_groups(vdb: dict) -> dict[str, set[str]]:
+        md5s: dict[str, set[str]] = {}
+        for key, text in vdb.items():
+            if not key.endswith("/CONTENTS"):
+                continue
+            for (kind, path), md5 in _contents_map(text).items():
+                if kind != "obj" or path.endswith(".debug"):
+                    continue
+                md5s.setdefault(md5, set()).add(path)
+        return md5s
+
+    groups_a = [set(s) for s in obj_groups(a_vdb).values() if len(s) >= 2]
+    sets_b = [s for s in obj_groups(b_vdb).values() if len(s) >= 2]
+    confirmed = [s for s in groups_a if s in sets_b]
+
+    def debug_objs(vdb: dict) -> list[str]:
+        out: list[str] = []
+        for key, text in vdb.items():
+            if not key.endswith("/CONTENTS"):
+                continue
+            for (kind, path) in _contents_map(text):
+                if kind == "obj" and path.endswith(".debug"):
+                    out.append(path)
+        return out
+
+    def buildid_keys(vdb: dict) -> list[str]:
+        out: list[str] = []
+        for key, text in vdb.items():
+            if not key.endswith("/CONTENTS"):
+                continue
+            for (kind, path) in _contents_map(text):
+                if kind == "sym" and path.startswith("@buildid:"):
+                    out.append(path)
+        return out
+
+    tolerated: set[str] = set()
+    for members in confirmed:
+        basenames = {p.rsplit("/", 1)[-1] for p in members}
+        names_a = {_debug_stem(d) for d in debug_objs(a_vdb)
+                   if _debug_stem(d) in basenames}
+        names_b = {_debug_stem(d) for d in debug_objs(b_vdb)
+                   if _debug_stem(d) in basenames}
+        if len(names_a) != 1 or len(names_b) != 1:
+            continue
+        for d in debug_objs(a_vdb) + debug_objs(b_vdb):
+            if _debug_stem(d) in basenames:
+                tolerated.add(d)
+        for k in buildid_keys(a_vdb) + buildid_keys(b_vdb):
+            target = _buildid_target(k)
+            if target is not None and _debug_stem(target) in basenames:
+                tolerated.add(k)
+    return tolerated
+
+
+def hardlink_debug_explained(f: dict, tolerated: set[str]) -> str | None:
+    """Explain a #261 MISSING/CONTENTS row, else None. Everything else
+    stays hard: non-debug paths, lone debugs, and two-debug sets never
+    enter `tolerated`, so they fall through here."""
+    if f["category"] == "MISSING":
+        obj = f["path"]
+    elif f["category"] == "CONTENTS":
+        m = _ENTRY_PATH_RE.search(f["detail"])
+        if m is None:
+            m = _MISMATCH_PATH_RE.search(f["detail"])
+        if m is None:
+            return None
+        obj = m.group(1)
+    else:
+        return None
+    if obj.endswith(".debug") or obj.startswith("@buildid:"):
+        if obj in tolerated:
+            return HARDLINK_DEBUG_ID
+    return None
+
+
 def _owned_paths(a_text: str | None, b_text: str | None) -> set[str]:
     """Filesystem paths a package owns, from either side's vdb CONTENTS.
 
@@ -327,8 +441,12 @@ def main(argv: list[str]) -> int:
 
     rep = Report()
     diff_files(load_files(a), load_files(b), rep, tolerate_payload)
-    diff_vdb(load_vdb(a), load_vdb(b), rep, tolerate_payload)
+    a_vdb, b_vdb = load_vdb(a), load_vdb(b)
+    diff_vdb(a_vdb, b_vdb, rep, tolerate_payload)
     mtime_diffs = diff_mtimes(load_mtimes(a), load_mtimes(b), rep)
+    # #261 hardlink-set .debug race: scheduler-named, not a finding.
+    # Applies to every pair (control and candidate) and every layer.
+    race_tolerated = hardlink_debug_tolerated(a_vdb, b_vdb)
 
     unexplained: list[dict] = []
     explained_hits: list[tuple[dict, str]] = []
@@ -340,6 +458,8 @@ def main(argv: list[str]) -> int:
         if f["category"] not in HARD:
             continue
         eid = explained(f, allow, layer, run_fs, run_backend)
+        if eid is None:
+            eid = hardlink_debug_explained(f, race_tolerated)
         if eid:
             f["explained_by"] = eid
             explained_hits.append((f, eid))
