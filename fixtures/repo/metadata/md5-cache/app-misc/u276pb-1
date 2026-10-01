@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=276 fixture: stuck parent whose ebuild pins below the moved provider
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=<app-misc/u276prov-2:=
+SLOT=0
+_md5_=2dadbc0a60c40d1484272a5a326c6bc8
