@@ -3669,7 +3669,13 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
     argument cycle the other way round (leading `[nomerge]` row), so
     the pin records portuale's three rows with real's decorations and
     a `Total:` that counts the rendered merge rows, exactly like
-    real's counters count its own rows."""
+    real's counters count its own rows.
+
+    Backlog #278: the cycle starts where real's single-root rendering
+    starts (`shortest_cycle[0]` — here `hardcycleb`, matching real's
+    `FX_HOST_ROOTS=1` capture; portuale
+    `docs/evidence/2026-09-30-278/`). Real's default-staging rendering
+    starts at the other node (cross-root graph, Track X #242)."""
     base = ["--pretend", "dev-libs/hardcyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
 
@@ -3684,9 +3690,9 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
     assert rust.stderr == (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/hardcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/hardcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3788,11 +3794,11 @@ def test_mixed_priority_cycle_prints_each_edge_real_label(
     byte-identical to 3rdparty 3.0.82.2, the display path per the n206
     probe): real exits 1 with `slopcycb depends on / slopcyca
     (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
-    (unconditional atoms give `_find_suggestions` nothing). Portuale
-    rotates to the requested atom (lowest entries index -- the #208
-    family, left for that item), so the pin records `slopcyca depends
-    on / slopcycb (runtime_slot_op) / slopcyca (buildtime)` with the
-    same per-edge labels; stdout is portuale's own forced verbose-tree
+    (unconditional atoms give `_find_suggestions` nothing). Backlog
+    #278 starts the printed cycle where real does
+    (`shortest_cycle[0]`; portuale `docs/evidence/2026-09-30-278/` —
+    real starts here under both stagings), so the pin now records
+    real's bytes; stdout is portuale's own forced verbose-tree
     stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
     the rendered merge rows) with real's decorations, exactly like the
     `hardcyclea` pin above. Full probe outputs:
@@ -3811,9 +3817,9 @@ def test_mixed_priority_cycle_prints_each_edge_real_label(
     assert rust.stderr == (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) (runtime_slot_op)\n"
-        "  (dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/slopcyca-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/slopcycb-1.0:0/0::testrepo, ebuild scheduled for merge) (runtime_slot_op)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3838,7 +3844,12 @@ def test_circular_dep_use_flag_suggestion(
     grounded on the live n206 probe (`localhost/test-portuale:latest`,
     display paths diff-verified identical to 3rdparty 3.0.82.2), shape
     from portuale's own tree renderer (see
-    test_unbreakable_build_time_cycle_prints_the_circular_deps_error)."""
+    test_unbreakable_build_time_cycle_prints_the_circular_deps_error).
+    Backlog #278: the cycle starts where real's single-root rendering
+    starts (`shortest_cycle[0]` — here `usecycleb`, matching real's
+    `FX_HOST_ROOTS=1` capture; portuale
+    `docs/evidence/2026-09-30-278/`). The `-x` suggestion is
+    unaffected (it names the USE-gated member, not the start node)."""
     base = ["--pretend", "dev-libs/usecyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
@@ -3852,9 +3863,9 @@ def test_circular_dep_use_flag_suggestion(
     assert rust.stderr == (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -3888,10 +3899,9 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     --tree` stuck-remainder display and the stderr block carries real's
     three leading newlines plus `Package.__str__` node text. The n206
     probe shows live real starting this cycle at `gpcycleb-1.0`
-    (`gpcycleb → gpcyclea → gpcycleb`); portuale keeps its own
-    lowest-index rotation (`gpcyclea` first) — a cycle-start difference
-    of the #208 family, left for that item, so only the node format is
-    re-pinned here."""
+    (`gpcycleb → gpcyclea → gpcycleb`); backlog #278 starts portuale's
+    printed cycle there too (`shortest_cycle[0]`; portuale
+    `docs/evidence/2026-09-30-278/`), so the pin records real's bytes."""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -3906,9 +3916,9 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     assert rust.stderr == (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -3997,11 +4007,11 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     Row format and counters grounded on the live n206 probe
     (`localhost/test-portuale:latest`, display paths diff-verified
     identical to 3rdparty 3.0.82.2); shape from portuale's own tree
-    renderer. Live real starts this ring at `cyc4c-1.0`
-    (`cyc4c → cyc4d → cyc4a → cyc4b → cyc4c`); portuale keeps its own
-    lowest-index rotation (`cyc4a` first) — a cycle-start difference of
-    the #208 family, left for that item, so only the node format is
-    re-pinned here."""
+    renderer. Backlog #278 starts the printed ring where real's
+    single-root rendering starts (`shortest_cycle[0]` — `cyc4b`,
+    matching real's `FX_HOST_ROOTS=1` capture; portuale
+    `docs/evidence/2026-09-30-278/`; real's default-staging rendering
+    starts at `cyc4c`, cross-root Track X #242)."""
     args = ["--pretend", "dev-libs/cyc4a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4017,11 +4027,11 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     assert rust.stderr == (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/cyc4c-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "   (dev-libs/cyc4d-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "    (dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc4c-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc4d-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "   (dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "    (dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -22631,10 +22641,17 @@ def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
 # xfail until its backlog item lands.
 _CYC0_REAL_BLOCKS = {
     # #206 only: same cycle and suggestion, real prints package nodes.
+    # Backlog #278: the start is real's single-root (`FX_HOST_ROOTS=1`)
+    # rendering (`dev-libs/cyc0a` first); live real under default
+    # staging starts at the other node (`dev-libs/cyc0b` first —
+    # recorded in portuale `docs/evidence/2026-09-30-278/` alongside
+    # the O1 triage captures), a cross-root difference owned by
+    # Track X (#242). Portuale renders the single-root graph, so the
+    # pin records the hostroots bytes.
     "=dev-libs/cyc0b-1": (
-        "(dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/cyc0a-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/cyc0a-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc0a-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -22665,20 +22682,18 @@ _CYC0_REAL_BLOCKS = {
 
 @pytest.mark.xfail(
     strict=True,
-    reason="backlog #242 (ex-#207/#208(a)): live real builds the cycle "
-    "over its cross-root graph (EAPI >= 7 DEPEND against ESYSROOT=/), "
-    "so the start node differs (#206's node text already ships; "
-    "#208(b)'s -foo suggestion now matches)",
+    reason="backlog #242 (ex-#207): live real builds the cycle over its "
+    "cross-root graph (EAPI >= 7 DEPEND against ESYSROOT=/), so the start "
+    "node differs (#206's node text already ships; the =cyc0w-3 twin now "
+    "matches via backlog #278 and is pinned passing below)",
 )
-@pytest.mark.parametrize(
-    "atom", sorted(a for a in _CYC0_REAL_BLOCKS if a != "=dev-libs/cyc0b-1")
-)
+@pytest.mark.parametrize("atom", ["=dev-libs/cyc0z-1"])
 def test_circular_dependencies_upstream_pg0_real_text(
     emerge_binary, fixture_env, atom
 ):
-    """Real's `_show_circular_deps` block for two of the eight #50
-    batch-2 circular cases, verbatim from live `emerge -p --color=n`
-    (real depgraph.py:10425; nodes via
+    """Real's `_show_circular_deps` block for the #50 batch-2
+    `=dev-libs/cyc0z-1` circular case, verbatim from live
+    `emerge -p --color=n` (real depgraph.py:10425; nodes via
     `circular_dependency_handler._prepare_circular_dep_message` ->
     Package.__str__). Exit code 1 already agrees on both sides."""
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
@@ -22698,6 +22713,23 @@ def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
     whose `_show_circular_deps` / node-text / display paths are
     diff-verified identical to 3rdparty 3.0.82.2)."""
     atom = "=dev-libs/cyc0b-1"
+    rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
+    assert rust.returncode == 1
+    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+
+
+def test_circular_dependencies_upstream_pg0_real_text_cyc0w3(
+    emerge_binary, fixture_env
+):
+    """Backlog #278 (ex-#208(a)): the `=dev-libs/cyc0w-3` third of the
+    block above, now passing — portuale starts the printed cycle where
+    real's `shortest_cycle[0]` starts (`dev-libs/cyc0y`, under both
+    stagings), so the strict-xfail this case used to share with
+    `=dev-libs/cyc0z-1` XPASSed and the case is pinned passing here.
+    Grounded on the same live-real block as its siblings (the n206
+    container probe and the O1 `FX_HOST_ROOTS=1` triage capture, which
+    agree)."""
+    atom = "=dev-libs/cyc0w-3"
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
     assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
@@ -23250,6 +23282,54 @@ def test_249_virtual_or_choice_uses_the_pullers_circular_record(emerge_binary, f
     )
     assert bt0.returncode == 1
     assert "Error: circular dependencies:" in bt0.stdout + bt0.stderr
+
+
+def test_278_printed_cycle_starts_where_reals_shortest_cycle_starts(
+    emerge_binary, fixture_env
+):
+    """#278: the circular-dependency block starts at the other node of a
+    two-node cycle. Fixtures `dev-libs/u278json` (`BDEPEND
+    "virtual/u278make dev-util/u278make"`), `dev-util/u278make`
+    (`BDEPEND "dev-libs/u278json:0="`), `dev-util/u278make-bootstrap`
+    and `virtual/u278make` (`RDEPEND "|| ( …-bootstrap … )"`) mirror
+    the #249 shape with the puller also depending on the build tool
+    directly, so both build-time edges are hard and `--backtrack=0`
+    aborts with the ring `u278json -> u278make -> u278json`. Real's
+    `circular_dependency_handler` prints `shortest_cycle[0]`
+    (`resolver/circular_dependency.py:76`), and `_find_cycles`
+    (`:48-56`) keeps the first strictly-shortest cycle of real
+    `digraph.get_cycles` order (earliest-inserted node first) — here
+    `u278json`, the earliest-inserted node, whose ring closes through
+    its child `u278make`. Grounded on live real 3.0.82.2 on the same
+    geometry under `u249` names, both stagings (portuale
+    `docs/evidence/2026-09-30-278/`: single-root rendering starts at
+    `u249json`; default staging starts at `u249make` on real's
+    cross-root graph, Track X #242). Portuale renders the single-root
+    graph, so the pin records the `u278json` start."""
+    r = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "dev-util/u278make"],
+        fixture_env,
+    )
+    assert r.returncode == 1
+    assert r.stdout == (
+        "[nomerge       ] dev-util/u278make-1::testrepo\n"
+        "[ebuild  N     ]  dev-libs/u278json-1::testrepo  0 KiB\n"
+        "[ebuild  N     ]   dev-util/u278make-1::testrepo  0 KiB\n"
+        "[ebuild  N     ]   virtual/u278make-0::testrepo  0 KiB\n"
+        "\n"
+        "Total: 3 packages (3 new), Size of downloads: 0 KiB\n"
+    )
+    assert r.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-libs/u278json-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-util/u278make-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/u278json-1:0/0::testrepo, ebuild scheduled for merge) (buildtime_slot_op)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
 
 
 def test_251a_demoted_branch_keeps_only_the_settled_blockers(
