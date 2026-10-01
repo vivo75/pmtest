@@ -3436,7 +3436,7 @@ def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
     assert rust.returncode == 0
     assert rust.stderr == ""
     assert rust.stdout == (
-        f"[ebuild   R    ] dev-libs/deeprootdepchild-1.0 to {env['ROOT']} USE=\"-flip*\"\n"
+        f"[ebuild   R    ] dev-libs/deeprootdepchild-1.0 to {env['ROOT']} USE=\"-flip*\" \n"
         "[ebuild  N     ] dev-libs/deeprootdepconsumer-1.0 \n"
     )
 
@@ -3446,7 +3446,7 @@ def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
     control = _run([str(emerge_binary)], ["--pretend", "-D", "dev-libs/deeprootdepconsumer"], env)
     assert control.returncode == 0
     assert control.stdout == (
-        "[ebuild   R    ] dev-libs/deeprootdepchild-1.0  USE=\"-flip*\"\n"
+        "[ebuild   R    ] dev-libs/deeprootdepchild-1.0  USE=\"-flip*\" \n"
         "[ebuild  N     ] dev-libs/deeprootdepconsumer-1.0 \n"
     )
 
@@ -3713,7 +3713,7 @@ def test_ccd4b_tree_follows_the_cycle_breaking_branch(
 
     assert rust.returncode == 0
     assert rust.stdout == (
-        '[ebuild  N     ] dev-libs/ccd4b-7.3.0  USE="-low-memory"\n'
+        '[ebuild  N     ] dev-libs/ccd4b-7.3.0  USE="-low-memory" \n'
         "[ebuild  N     ]  dev-libs/ccd4a-7.3.0 \n"
         "[ebuild  N     ]   dev-libs/ccd4c-7.3.0 \n"
     )
@@ -3843,7 +3843,7 @@ def test_circular_dep_use_flag_suggestion(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout == (
-        "[nomerge       ] dev-libs/usecyclea-1.0::testrepo USE=\"x\"\n"
+        "[nomerge       ] dev-libs/usecyclea-1.0::testrepo USE=\"x\" \n"
         "[ebuild  N     ]  dev-libs/usecycleb-1.0::testrepo  0 KiB\n"
         "[ebuild  N     ]   dev-libs/usecyclea-1.0::testrepo  USE=\"x\" 0 KiB\n"
         "\n"
@@ -3897,7 +3897,7 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     assert rust.returncode == 1
     assert rust.stdout == (
         "[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo  0 KiB\n"
-        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\"\n"
+        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\" \n"
         "[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo  0 KiB\n"
         "[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo  USE=\"x\" 0 KiB\n"
         "\n"
@@ -3939,7 +3939,7 @@ def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo  0 KiB",
-        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\"",
+        "[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo USE=\"x\" ",
         "[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo  0 KiB",
         "[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo  USE=\"x\" 0 KiB",
         "",
@@ -4006,7 +4006,7 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[nomerge       ] dev-libs/cyc4a-1.0::testrepo USE=\"x\"",
+        "[nomerge       ] dev-libs/cyc4a-1.0::testrepo USE=\"x\" ",
         "[ebuild  N     ]  dev-libs/cyc4b-1.0::testrepo  0 KiB",
         "[ebuild  N     ]   dev-libs/cyc4c-1.0::testrepo  0 KiB",
         "[ebuild  N     ]    dev-libs/cyc4d-1.0::testrepo  0 KiB",
@@ -4873,7 +4873,7 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/unsatusealt-1.0  USE="unsatuseorflag"',
+        '[ebuild  N     ] dev-libs/unsatusealt-1.0  USE="unsatuseorflag" ',
         '[ebuild  N     ] dev-libs/unsatuseor-1.0 ',
     ]
     assert rust.stderr.splitlines() == [
@@ -4946,7 +4946,7 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/unsatusealt-1.0  USE="unsatuseorflag"',
+        '[ebuild  N     ] dev-libs/unsatusealt-1.0  USE="unsatuseorflag" ',
         "[ebuild  N     ] dev-libs/unsatuseinstconsumer-1.0 ",
     ]
     assert "doesnotexist-unsatuseor" not in rust.stderr, (
@@ -5161,7 +5161,7 @@ def test_or_group_unsat_use_installed_bin_keys_on_the_targeted_slot_not_just_cp(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        '[ebuild   R    ] dev-libs/unsatuseslotother-1.0  USE="unsatuseorflag*"',
+        '[ebuild   R    ] dev-libs/unsatuseslotother-1.0  USE="unsatuseorflag*" ',
         "[ebuild  N     ] dev-libs/unsatuseslot-1.0 ",
     ]
     assert "unsatuseslotalt" not in rust.stdout, (
@@ -5187,7 +5187,7 @@ def test_or_group_preferred_non_installed_outranks_unsat_use_non_installed(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/unsatuseordertarget-1.0  USE="unsatuseotherflag -unsatuseorflag"',
+        '[ebuild  N     ] dev-libs/unsatuseordertarget-1.0  USE="unsatuseotherflag -unsatuseorflag" ',
         "[ebuild  N     ] dev-libs/unsatuseorder-1.0 ",
     ]
     assert rust.stderr == ""
@@ -5211,7 +5211,7 @@ def test_or_group_use_mask_violation_demotes_to_other_never_selected(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/unsatuseordertarget-1.0  USE="unsatuseorflag unsatuseotherflag"',
+        '[ebuild  N     ] dev-libs/unsatuseordertarget-1.0  USE="unsatuseorflag unsatuseotherflag" ',
         "[ebuild  N     ] dev-libs/unsatusemasked-1.0 ",
     ]
     assert "unsatusemaskedalt" not in rust.stdout, (
@@ -5797,7 +5797,7 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
     )
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
-                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="-foo -missingflag"',
+                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="-foo -missingflag" ',
                                              '[ebuild  N     ] dev-libs/usedeprejectedpkg-1.0 ',
                                          ]
     assert result.stderr == (
@@ -5838,7 +5838,7 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/aucascleaf-1.0 ",
-        '[ebuild  N     ] dev-libs/aucascmid-1.0  USE="cascade"',
+        '[ebuild  N     ] dev-libs/aucascmid-1.0  USE="cascade" ',
         "[ebuild  N     ] dev-libs/aucasclate-1.0 ",
         "[ebuild  N     ] dev-libs/aucasctop-1.0 ",
     ]
@@ -5857,7 +5857,7 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
     assert rust_ab.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/aucascleaf-1.0 ",
-        '[ebuild  N     ] dev-libs/aucascmid-1.0  USE="cascade"',
+        '[ebuild  N     ] dev-libs/aucascmid-1.0  USE="cascade" ',
         "[ebuild  N     ] dev-libs/aucasclate-1.0 ",
         "[ebuild  N     ] dev-libs/aucasctop-1.0 ",
     ]
@@ -5939,7 +5939,7 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/aubreaksub-1.0  USE="brk"',
+        '[ebuild  N     ] dev-libs/aubreaksub-1.0  USE="brk" ',
         "[ebuild  N     ] dev-libs/aubreakwant-1.0 ",
         "[ebuild  N     ] dev-libs/aubreakunwant-1.0 ",
         "[ebuild  N     ] dev-libs/aubreaktop-1.0 ",
@@ -6112,7 +6112,7 @@ def test_autounmask_keep_keywords_y_falls_back_to_the_older_stable_version(
     # them on stderr. The masked-`akk0b` disclosure rides inside the
     # notice unit, so it is stdout here too.
     assert rust.stdout.splitlines() == [
-        "[ebuild  N     ] dev-libs/akk0c-1  USE=\"foo\"",
+        "[ebuild  N     ] dev-libs/akk0c-1  USE=\"foo\" ",
         "[ebuild  N     ] dev-libs/akk0a-1 ",
         "",
         "!!! The following update has been skipped due to unsatisfied dependencies:",
@@ -6207,7 +6207,7 @@ def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild   R    ] dev-libs/abk0c-1 [1] USE=\"x*\"",
+        "[ebuild   R    ] dev-libs/abk0c-1 [1] USE=\"x*\" ",
         "[ebuild     U  ] dev-libs/abk0a-3 [1]",
         "[ebuild  N     ] dev-libs/abk0d-1 ",
     ]
@@ -6259,7 +6259,7 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        "[ebuild   R    ] dev-libs/abk0c-1 [1] USE=\"x* y*\"",
+        "[ebuild   R    ] dev-libs/abk0c-1 [1] USE=\"x* y*\" ",
         "[ebuild     U  ] dev-libs/abk0a-2 [1]",
         "[ebuild  N     ] dev-libs/abk0d-1 ",
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
@@ -6294,7 +6294,7 @@ def test_use_dep_enforcement_plain_flag_declared_and_enabled_matches(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag"',
+                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag" ',
                                          ]
 
 
@@ -6394,7 +6394,7 @@ def test_use_dep_enforcement_negated_flag_declared_and_disabled_matches(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag"',
+                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag" ',
                                          ]
 
 
@@ -6431,7 +6431,7 @@ def test_use_dep_enforcement_plus_default_rescues_an_undeclared_flag(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag"',
+                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag" ',
                                          ]
 
 
@@ -6447,7 +6447,7 @@ def test_required_use_satisfied_resolves_normally(emerge_binary, fixture_env):
     )
     assert result.returncode == 0
     assert result.stdout == (
-                            '[ebuild  N     ] dev-libs/requireduseokpkg-1.0  USE="bar foo"\n'
+                            '[ebuild  N     ] dev-libs/requireduseokpkg-1.0  USE="bar foo" \n'
                             )
 
 
@@ -6475,7 +6475,7 @@ def test_iuse_plus_minus_defaults_apply_when_nothing_else_says_otherwise(
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/iusedefaultpkg-1.0::testrepo  USE="enableddefault plainflag -disableddefault"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N     ] dev-libs/iusedefaultpkg-1.0::testrepo  USE="enableddefault plainflag -disableddefault" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -6493,7 +6493,7 @@ def test_iuse_names_a_flag_twice_and_it_renders_once(emerge_binary, fixture_env)
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/dupiusepkg-1.0::testrepo  USE="foo -bar -test"'
+        '[ebuild  N     ] dev-libs/dupiusepkg-1.0::testrepo  USE="foo -bar -test" '
         "\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n"
     )
 
@@ -6559,7 +6559,7 @@ def test_global_use_force_and_use_mask_win_over_a_contradicting_package_use_entr
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/globalprecedencepkg-1.0::testrepo  USE="(globalforceflag) (-globalmaskflag)"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N     ] dev-libs/globalprecedencepkg-1.0::testrepo  USE="(globalforceflag) (-globalmaskflag)" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -6593,7 +6593,7 @@ def test_later_level_global_use_mask_cancels_earlier_package_use_stable_mask(
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/crossmaskcancelpkg-1.0::testrepo  USE="xmc"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N     ] dev-libs/crossmaskcancelpkg-1.0::testrepo  USE="xmc" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -6617,7 +6617,7 @@ def test_profile_level_minus_flag_genuinely_cancels_an_iuse_plus_default(
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/cancelledpkg-1.0::testrepo  USE="-cancelme"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N     ] dev-libs/cancelledpkg-1.0::testrepo  USE="-cancelme" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -6862,7 +6862,7 @@ def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
     assert use.stdout == (
         "[ebuild  N     ] dev-libs/newpkg-1.0 \n"
         "[ebuild  N     ] dev-libs/hiddendep-1.0 \n"
-        '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo missingflag"\n'
+        '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo missingflag" \n'
     )
     assert use.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
@@ -7532,7 +7532,7 @@ def test_binpkg_respect_use_rejects_a_use_mismatched_binary_by_default(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-                                             '[ebuild  N     ] dev-libs/binaryusemismatchpkg-1.0  USE="foo"',
+                                             '[ebuild  N     ] dev-libs/binaryusemismatchpkg-1.0  USE="foo" ',
                                          ]
     assert result.stderr == ""
 
@@ -7553,7 +7553,7 @@ def test_use_mismatched_remote_binary_at_the_ebuilds_key_does_not_hide_the_ebuil
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0, (rust.stdout, rust.stderr)
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/binaryusemismatchpkg-1.0  USE="foo"',
+        '[ebuild  N     ] dev-libs/binaryusemismatchpkg-1.0  USE="foo" ',
     ]
 
 
@@ -7595,7 +7595,7 @@ def test_usepkgonly_defaults_binpkg_respect_use_off(emerge_binary, fixture_env):
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-                                             '[binary  N     ] dev-libs/binaryusemismatchpkg-1.0-1  USE="-foo"',
+                                             '[binary  N     ] dev-libs/binaryusemismatchpkg-1.0-1  USE="-foo" ',
                                          ]
     assert result.stderr == ""
 
@@ -8167,7 +8167,7 @@ def test_getbinpkg_makes_a_remote_binhost_binary_eligible(
     )
     assert g.returncode == 0
     assert g.stdout.splitlines() == [
-                                        '[binary  N g   ] dev-libs/remotebinpkg-1.0-1  USE="-rbfoo"',
+                                        '[binary  N g   ] dev-libs/remotebinpkg-1.0-1  USE="-rbfoo" ',
                                     ]
 
     # --getbinpkg -v: the `g` column, the ::repo decoration, the ` N KiB`
@@ -8190,7 +8190,7 @@ def test_getbinpkg_makes_a_remote_binhost_binary_eligible(
     )
     assert only.returncode == 0
     assert only.stdout.splitlines() == [
-                                           '[binary  N g   ] dev-libs/remotebinpkg-1.0-1  USE="-rbfoo"',
+                                           '[binary  N g   ] dev-libs/remotebinpkg-1.0-1  USE="-rbfoo" ',
                                        ]
 
 
@@ -8790,7 +8790,7 @@ def test_real_use_flags_from_profile_gate_a_dependency(emerge_binary, fixture_en
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag"',
+                                             '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag" ',
                                          ]
     assert "hiddendep" not in result.stdout
 
@@ -8811,7 +8811,7 @@ def test_use_expand_variable_drives_a_dependency(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         '[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ',
-        '[ebuild  N     ] dev-libs/useexpandpkg-1.0::testrepo  VIDEO_CARDS="nvidia -amdgpu"',
+        '[ebuild  N     ] dev-libs/useexpandpkg-1.0::testrepo  VIDEO_CARDS="nvidia -amdgpu" ',
         '',
         'Total: 2 packages (2 new), Size of downloads: 0 KiB',
     ]
@@ -8835,7 +8835,7 @@ def test_package_use_expand_prefix_shorthand_drives_a_dependency(emerge_binary, 
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         '[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ',
-        '[ebuild  N     ] dev-libs/packageuseexpandpkg-1.0::testrepo  PYTHON_TARGETS="python3_12"',
+        '[ebuild  N     ] dev-libs/packageuseexpandpkg-1.0::testrepo  PYTHON_TARGETS="python3_12" ',
         '',
         'Total: 2 packages (2 new), Size of downloads: 0 KiB',
     ]
@@ -8856,7 +8856,7 @@ def test_use_expand_unprefixed_variable_drives_a_dependency(emerge_binary, fixtu
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         '[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ',
-        '[ebuild  N     ] dev-libs/archusepkg-1.0::testrepo  USE="amd64 -riscv"',
+        '[ebuild  N     ] dev-libs/archusepkg-1.0::testrepo  USE="amd64 -riscv" ',
         '',
         'Total: 2 packages (2 new), Size of downloads: 0 KiB',
     ]
@@ -8880,7 +8880,7 @@ def test_use_expand_star_wildcard_expands_against_the_packages_own_iuse(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         '[ebuild  N     ] dev-libs/wildexpanddep-1.0::testrepo ',
-        '[ebuild  N     ] dev-libs/wildexpandpkg-1.0::testrepo  LINGUAS="de (-en)"',
+        '[ebuild  N     ] dev-libs/wildexpandpkg-1.0::testrepo  LINGUAS="de (-en)" ',
         '',
         'Total: 2 packages (2 new), Size of downloads: 0 KiB',
     ]
@@ -8942,7 +8942,8 @@ def test_pv_groups_use_by_use_expand_variable(
     group per USE_EXPAND variable (prefix stripped), empty groups omitted.
     dev-libs/useexpandpkg (IUSE video_cards_nvidia video_cards_amdgpu,
     VIDEO_CARDS a USE_EXPAND var) shows VIDEO_CARDS="nvidia -amdgpu" and
-    no USE="" at all."""
+    no USE="" at all. Real `_create_use_string` appends one trailing
+    space per group (backlog #272), so the row ends with `" `."""
     for pkg, expected in [
         ("useexpandpkg", 'VIDEO_CARDS="nvidia -amdgpu"'),
         ("packageuseexpandpkg", 'PYTHON_TARGETS="python3_12"'),
@@ -8951,7 +8952,7 @@ def test_pv_groups_use_by_use_expand_variable(
         rust = _run([str(emerge_binary)], args, fixture_env)
         assert rust.returncode == 0
         pkg_line = next(l for l in rust.stdout.splitlines() if f"/{pkg}-1.0" in l)
-        assert pkg_line == f"[ebuild  N     ] dev-libs/{pkg}-1.0::testrepo  {expected}", pkg
+        assert pkg_line == f"[ebuild  N     ] dev-libs/{pkg}-1.0::testrepo  {expected} ", pkg
         assert 'USE="' not in pkg_line, pkg
 
 
@@ -8999,7 +9000,7 @@ def test_pv_marks_use_changes_against_the_installed_version(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
-        '[ebuild     U  ] dev-libs/upgradeusepkg-2.0::testrepo [1.0::testrepo] USE="added%* keep -change* (-drop%)"',
+        '[ebuild     U  ] dev-libs/upgradeusepkg-2.0::testrepo [1.0::testrepo] USE="added%* keep -change* (-drop%)" ',
         "",
         "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
     ]
@@ -9010,7 +9011,7 @@ def test_pv_marks_use_changes_against_the_installed_version(
         fixture_env,
     )
     assert alpha.stdout.splitlines()[0] == (
-        '[ebuild     U  ] dev-libs/upgradeusepkg-2.0::testrepo [1.0::testrepo] USE="added%* -change* (-drop%) keep"'
+        '[ebuild     U  ] dev-libs/upgradeusepkg-2.0::testrepo [1.0::testrepo] USE="added%* -change* (-drop%) keep" '
     )
 
     # A New install has no installed side -> no markers, every flag plain.
@@ -9083,7 +9084,7 @@ def test_use_stable_force_and_package_use_stable_mask_apply_when_stable(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         '[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ',
-        '[ebuild  N     ] dev-libs/stableusepkg-1.0::testrepo  USE="(stableforceflag) (-maskflag)"',
+        '[ebuild  N     ] dev-libs/stableusepkg-1.0::testrepo  USE="(stableforceflag) (-maskflag)" ',
         '',
         'Total: 2 packages (2 new), Size of downloads: 0 KiB',
     ]
@@ -9109,7 +9110,7 @@ def test_use_stable_force_and_package_use_stable_mask_skip_an_unstable_candidate
     # only via a "dev-libs/unstableusepkg ~amd64" package.accept_keywords
     # entry -- a testing keyword for our own arch (real gen_mask_str).
     assert result.stdout == (
-        '[ebuild  N    ~] dev-libs/unstableusepkg-1.0::testrepo  USE="maskflag -stableforceflag"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N    ~] dev-libs/unstableusepkg-1.0::testrepo  USE="maskflag -stableforceflag" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -9224,7 +9225,9 @@ def test_license_use_conditional_visible_when_flag_off_masked_when_forced_on(
     same real default that masks dev-libs/eulapkg."""
     off = _run([str(emerge_binary)], ["--pretend", "dev-libs/uselicensepkg"], fixture_env)
     assert off.returncode == 0
-    assert off.stdout.strip() == '[ebuild  N     ] dev-libs/uselicensepkg-1.0  USE="-nonfreeflag"'
+    # Real `_create_use_string` appends one trailing space per group
+    # (backlog #272); compare unstripped so the byte is pinned.
+    assert off.stdout == '[ebuild  N     ] dev-libs/uselicensepkg-1.0  USE="-nonfreeflag" \n'
 
     forced_on = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/uselicensepkgforced"], fixture_env
@@ -9477,7 +9480,7 @@ def test_pv_use_flag_list_is_natural_sorted(emerge_binary, fixture_env):
         v = _run([str(emerge_binary)], args, fixture_env)
         assert v.returncode == 0
         assert v.stdout.splitlines()[0] == (
-            '[ebuild  N     ] dev-libs/naturalsortpkg-1.0::testrepo  USE="n2 n9 n10"'
+            '[ebuild  N     ] dev-libs/naturalsortpkg-1.0::testrepo  USE="n2 n9 n10" '
         ), extra
 
 
@@ -9554,14 +9557,14 @@ def test_color_y_renders_real_ansi_bracket_line(emerge_binary, fixture_env):
     ru = _run([str(emerge_binary)], u_args, fixture_env)
     assert next(
         l for l in ru.stdout.splitlines() if "useflagpkg-1.0" in l
-    ).endswith(f'USE="\x1b[31;01mfoo{R} \x1b[34;01m-missingflag{R}"')
+    ).endswith(f'USE="\x1b[31;01mfoo{R} \x1b[34;01m-missingflag{R}" ')
     # An Upgrade: `added%*` -> yellow core + plain %*, `keep` red
     # (unchanged-on), `-change*` -> green core + plain *, `(-drop%)` ->
     # yellow core inside plain ( … ).
     up2_args = ["--pretend", "-v", "--color=y", "--update", "dev-libs/upgradeusepkg"]
     rup2 = _run([str(emerge_binary)], up2_args, fixture_env)
     assert rup2.stdout.splitlines()[0].endswith(
-        f'USE="\x1b[33;01madded{R}%* \x1b[31;01mkeep{R} \x1b[32;01m-change{R}* (\x1b[33;01m-drop{R}%)"'
+        f'USE="\x1b[33;01madded{R}%* \x1b[31;01mkeep{R} \x1b[32;01m-change{R}* (\x1b[33;01m-drop{R}%)" '
     )
 
     # Increment 4: the counters line's `interactive` word is WARN
@@ -9627,7 +9630,7 @@ def test_package_use_wildcard_entry_enables_a_flag_and_pulls_in_a_dependency(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/packageuseenablepkg-1.0  USE="pkguseflag"',
+                                             '[ebuild  N     ] dev-libs/packageuseenablepkg-1.0  USE="pkguseflag" ',
                                          ]
 
 
@@ -9648,7 +9651,7 @@ def test_env_use_is_the_highest_tier_and_overrides_a_package_use_flag(
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/packageuseenablepkg-1.0  USE="-pkguseflag"',
+        '[ebuild  N     ] dev-libs/packageuseenablepkg-1.0  USE="-pkguseflag" ',
     ]
 
 
@@ -9666,7 +9669,7 @@ def test_package_env_env_file_use_enables_a_flag_and_pulls_in_a_dependency(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/newpkg-1.0 ",
-        '[ebuild  N     ] dev-libs/penvpkg-1.0  USE="penvflag -penvother"',
+        '[ebuild  N     ] dev-libs/penvpkg-1.0  USE="penvflag -penvother" ',
     ]
 
 
@@ -9687,7 +9690,7 @@ def test_package_env_env_file_use_expands_dollar_vars(
     assert rust.stdout.splitlines()[:2] == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         '[ebuild  N     ] dev-libs/penvexppkg-1.0::testrepo  '
-        'USE="amd64-penvexp penvexp-penvexpscope -penvexpother"',
+        'USE="amd64-penvexp penvexp-penvexpscope -penvexpother" ',
     ]
 
 
@@ -9707,7 +9710,7 @@ def test_profile_defaults_walk_is_per_level_not_flat(
     assert rust.returncode == 0
     assert rust.stdout.splitlines()[0] == (
         '[ebuild  N     ] dev-libs/interleavepkg-1.0::testrepo  '
-        'USE="-interleaveflag -other"'
+        'USE="-interleaveflag -other" '
     )
     assert "dev-libs/newpkg" not in rust.stdout
 
@@ -9736,7 +9739,7 @@ def test_profile_use_expand_default_is_folded_per_level(
     assert rust.returncode == 0
     assert rust.stdout.splitlines()[0] == (
         '[ebuild  N     ] dev-libs/singletargetpkg-1.0::testrepo  '
-        'LUA_SINGLE_TARGET="luajit -lua5-1"'
+        'LUA_SINGLE_TARGET="luajit -lua5-1" '
     )
     assert "REQUIRED_USE" not in rust.stdout
 
@@ -9757,7 +9760,7 @@ def test_repo_make_defaults_use_enables_a_flag_and_pulls_in_a_dependency(
     assert rust.stdout.splitlines()[:2] == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         '[ebuild  N     ] dev-libs/repomakedefaultpkg-1.0::testrepo  '
-        'USE="repo_amd64 repomakedefaultflag -other"',
+        'USE="repo_amd64 repomakedefaultflag -other" ',
     ]
 
 
@@ -9777,7 +9780,7 @@ def test_envd_use_enables_a_flag_and_pulls_in_a_dependency(
     assert rust.stdout.splitlines()[:2] == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         '[ebuild  N     ] dev-libs/envdusepkg-1.0::testrepo  '
-        'USE="envdusetestflag -other"',
+        'USE="envdusetestflag -other" ',
     ]
 
 
@@ -9799,7 +9802,7 @@ def test_envd_use_read_from_eroot_not_config_root(
     assert rust.returncode == 0
     assert rust.stdout.splitlines()[:1] == [
         '[ebuild  N     ] dev-libs/envdusepkg-1.0::testrepo  '
-        'USE="-envdusetestflag -other"',
+        'USE="-envdusetestflag -other" ',
     ]
 
 
@@ -9819,7 +9822,7 @@ def test_overlay_own_make_defaults_use_enables_a_flag_for_its_packages(
     assert rust.stdout.splitlines()[:2] == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         '[ebuild  N     ] dev-libs/overlaymakedefaultpkg-1.0::overlay  '
-        'USE="omdflag -other"',
+        'USE="omdflag -other" ',
     ]
 
 
@@ -9841,14 +9844,14 @@ def test_features_test_enables_the_test_use_flag_and_pulls_test_deps(
     assert rust.stdout.splitlines()[:2] == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         '[ebuild  N     ] dev-libs/featuretestpkg-1.0::testrepo  '
-        'USE="test -other"',
+        'USE="test -other" ',
     ]
 
     # No FEATURES=test -> test off, no dep.
     rust_off = _run([str(emerge_binary)], args, fixture_env)
     assert rust_off.stdout.splitlines()[0] == (
         '[ebuild  N     ] dev-libs/featuretestpkg-1.0::testrepo  '
-        'USE="-other -test"'
+        'USE="-other -test" '
     )
 
 
@@ -9867,7 +9870,7 @@ def test_package_use_entry_disables_a_globally_enabled_flag_for_one_package(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-                                             '[ebuild  N     ] dev-libs/packageusedisablepkg-1.0  USE="-foo"',
+                                             '[ebuild  N     ] dev-libs/packageusedisablepkg-1.0  USE="-foo" ',
                                          ]
 
 
@@ -9886,7 +9889,7 @@ def test_repo_level_package_use_enables_a_flag_and_pulls_in_a_dependency(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/repouseenablepkg-1.0  USE="repouseflag"',
+                                             '[ebuild  N     ] dev-libs/repouseenablepkg-1.0  USE="repouseflag" ',
                                          ]
 
 
@@ -9903,7 +9906,7 @@ def test_profile_level_package_use_enables_a_flag_and_pulls_in_a_dependency(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/profileuseenablepkg-1.0  USE="profileuseflag"',
+                                             '[ebuild  N     ] dev-libs/profileuseenablepkg-1.0  USE="profileuseflag" ',
                                          ]
 
 
@@ -9923,7 +9926,7 @@ def test_repo_level_package_use_loses_to_the_profile_defaults_layer(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/repouseweakpkg-1.0::testrepo  USE="-repoweakflag"',
+        '[ebuild  N     ] dev-libs/repouseweakpkg-1.0::testrepo  USE="-repoweakflag" ',
         '',
         'Total: 1 package (1 new), Size of downloads: 0 KiB',
     ]
@@ -9941,7 +9944,7 @@ def test_profile_level_package_use_loses_to_make_conf(emerge_binary, fixture_env
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/profileuseweakpkg-1.0::testrepo  USE="-profweakflag"',
+        '[ebuild  N     ] dev-libs/profileuseweakpkg-1.0::testrepo  USE="-profweakflag" ',
         '',
         'Total: 1 package (1 new), Size of downloads: 0 KiB',
     ]
@@ -9970,7 +9973,7 @@ def test_package_use_mask_and_force_with_atom_specificity_ordering(emerge_binary
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/pkgusemaskforcepkg-1.0::testrepo  USE="(forceflag) (-maskflag) -specflag"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N     ] dev-libs/pkgusemaskforcepkg-1.0::testrepo  USE="(forceflag) (-maskflag) -specflag" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -10032,9 +10035,9 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
     """
     env = dict(fixture_env)
     for atom, dep in (
-        ("=dev-libs/udd0a-1", "dev-libs/udd0b-1  USE=\"foo\""),
+        ("=dev-libs/udd0a-1", "dev-libs/udd0b-1  USE=\"foo\" "),
         ("=dev-libs/udd0a-2", "dev-libs/udd0b-2 "),
-        ("=dev-libs/udd0a-3", "dev-libs/udd0b-1  USE=\"foo\""),
+        ("=dev-libs/udd0a-3", "dev-libs/udd0b-1  USE=\"foo\" "),
     ):
         got = _run([str(emerge_binary)], ["--pretend", atom], env)
         assert got.returncode == 0
@@ -10291,7 +10294,7 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
             ["dev-libs/ccd3c"],
             [
                 "[ebuild  N     ] dev-libs/ccd3b-3.16.2 ",
-                '[ebuild  N     ] virtual/ccd3v-0  USE="bootstrap"',
+                '[ebuild  N     ] virtual/ccd3v-0  USE="bootstrap" ',
                 "[ebuild  N     ] dev-libs/ccd3a-1.9.2 ",
                 "[ebuild  N     ] dev-libs/ccd3c-3.16.2 ",
             ],
@@ -10462,7 +10465,7 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
         (
             ["--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
             [
-                '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*"',
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*" ',
             ],
         ),
         (
@@ -10488,7 +10491,7 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
         (
             ["--ignore-world", "dev-libs/cgp0x"],
             [
-                '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*"',
+                '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*" ',
             ],
         ),
         (
@@ -10636,7 +10639,7 @@ def test_complete_graph_use_break_fails_with_world_consumer(
     `(Argument)` line (the `("AtomArg", None)` key, `:391-397`).
     """
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp0q")
-    row = '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*"'
+    row = '[ebuild   R    ] dev-libs/cgp0x-2.8.0 [2.8.0] USE="icu*" '
     plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/cgp0x"], env)
     assert plain.returncode == 1, plain.stdout
     assert plain.stderr == "", plain.stdout
@@ -11395,7 +11398,7 @@ def test_overlay_own_package_use_gates_a_dependency(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/overlayuseenablepkg-1.0  USE="overlayuseflag"',
+                                             '[ebuild  N     ] dev-libs/overlayuseenablepkg-1.0  USE="overlayuseflag" ',
                                          ]
 
 
@@ -11410,7 +11413,7 @@ def test_overlay_own_package_use_force_gates_a_dependency(emerge_binary, fixture
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/overlayuseforcepkg-1.0  USE="(overlayforceflag)"',
+                                             '[ebuild  N     ] dev-libs/overlayuseforcepkg-1.0  USE="(overlayforceflag)" ',
                                          ]
 
 
@@ -11424,7 +11427,7 @@ def test_overlay_own_package_use_mask_blocks_a_dependency(emerge_binary, fixture
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-                                             '[ebuild  N     ] dev-libs/overlayusemaskpkg-1.0  USE="(-overlaymaskflag)"',
+                                             '[ebuild  N     ] dev-libs/overlayusemaskpkg-1.0  USE="(-overlaymaskflag)" ',
                                          ]
 
 
@@ -11756,8 +11759,8 @@ def test_use_dep_equal_parent_matches_when_parent_flag_is_enabled(emerge_binary,
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-                                             '[ebuild  N     ] dev-libs/useeqchildpkg-1.0  USE="eqflag"',
-                                             '[ebuild  N     ] dev-libs/useeqparentonpkg-1.0  USE="eqflag"',
+                                             '[ebuild  N     ] dev-libs/useeqchildpkg-1.0  USE="eqflag" ',
+                                             '[ebuild  N     ] dev-libs/useeqparentonpkg-1.0  USE="eqflag" ',
                                          ]
     assert result.stderr == ""
 
@@ -12294,8 +12297,8 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     assert rust.stderr == ''
     out = rust.stdout
     assert out.splitlines()[:6] == [
-        '[ebuild  N     ] dev-libs/slotusetarget-1.0  USE="x y"',
-        '[ebuild  N     ] dev-libs/slotusetarget-2.0  USE="(-x)"',
+        '[ebuild  N     ] dev-libs/slotusetarget-1.0  USE="x y" ',
+        '[ebuild  N     ] dev-libs/slotusetarget-2.0  USE="(-x)" ',
         '[ebuild  N     ] dev-libs/slotuseplain-1.0 ',
         '[ebuild  N     ] dev-libs/slotusex-1.0 ',
         '[ebuild  N     ] dev-libs/slotusey-1.0 ',
@@ -12419,7 +12422,7 @@ def test_interactive_bracket_column(emerge_binary, fixture_env):
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-                                             '[ebuild  N     ] dev-libs/interactivecondpkg-1.0  USE="-gtk"',
+                                             '[ebuild  N     ] dev-libs/interactivecondpkg-1.0  USE="-gtk" ',
                                          ]
 
 
@@ -12716,13 +12719,13 @@ def test_verbose_shows_use_flags_gated_by_profile_and_make_conf(emerge_binary, f
     )
     assert verbose.returncode == 0
     assert verbose.stdout.splitlines()[1] == (
-        '[ebuild  N     ] dev-libs/useflagpkg-1.0::testrepo  USE="foo -missingflag"'
+        '[ebuild  N     ] dev-libs/useflagpkg-1.0::testrepo  USE="foo -missingflag" '
     )
 
     quiet = _run([str(emerge_binary)], ["--pretend", "dev-libs/useflagpkg"], fixture_env)
     assert quiet.returncode == 0
     assert quiet.stdout.splitlines()[1] == (
-        '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag"'
+        '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo -missingflag" '
     )
     # -v-only: the ::repo decoration and the counters line.
     assert "::testrepo" not in quiet.stdout
@@ -12750,8 +12753,8 @@ def test_use_line_at_p_is_full_for_a_new_pkg_and_changed_only_for_a_reinstall(
         assert p.returncode == 0
         p_line = next(l for l in p.stdout.splitlines() if f"/{pkg}-1.0" in l)
         pv_line = next(l for l in pv.stdout.splitlines() if f"/{pkg}-1.0" in l)
-        assert p_line == f"[ebuild  N     ] dev-libs/{pkg}-1.0  {use}", pkg
-        assert pv_line == f"[ebuild  N     ] dev-libs/{pkg}-1.0::testrepo  {use}", pkg
+        assert p_line == f"[ebuild  N     ] dev-libs/{pkg}-1.0  {use} ", pkg
+        assert pv_line == f"[ebuild  N     ] dev-libs/{pkg}-1.0::testrepo  {use} ", pkg
 
     # An Upgrade with a real USE diff: -p shows only the changes,
     # -pv shows everything (unchanged `keep`, removed `(-drop%)`).
@@ -12768,12 +12771,12 @@ def test_use_line_at_p_is_full_for_a_new_pkg_and_changed_only_for_a_reinstall(
     assert up.returncode == 0
     assert (
         next(l for l in up.stdout.splitlines() if "upgradeusepkg-2.0" in l)
-        == '[ebuild     U  ] dev-libs/upgradeusepkg-2.0 [1.0] USE="added%* -change*"'
+        == '[ebuild     U  ] dev-libs/upgradeusepkg-2.0 [1.0] USE="added%* -change*" '
     )
     assert (
         next(l for l in upv.stdout.splitlines() if "upgradeusepkg-2.0" in l)
         == '[ebuild     U  ] dev-libs/upgradeusepkg-2.0::testrepo [1.0::testrepo]'
-        ' USE="added%* keep -change* (-drop%)"'
+        ' USE="added%* keep -change* (-drop%)" '
     )
 
 
@@ -12796,8 +12799,10 @@ def test_reinst_flags_force_show_a_dropped_iuse_trigger_flag_at_plain_p(
             fixture_env,
         )
         assert p.returncode == 0
-        assert p.stdout.strip() == (
-            '[ebuild   R    ] dev-libs/reinstdropiusepkg-1.0  USE="(-gone%*)"'
+        # Real `_create_use_string` appends one trailing space per group
+        # (backlog #272); compare unstripped so the byte is pinned.
+        assert p.stdout == (
+            '[ebuild   R    ] dev-libs/reinstdropiusepkg-1.0  USE="(-gone%*)" \n'
         ), flag
 
     pv = _run(
@@ -12808,7 +12813,7 @@ def test_reinst_flags_force_show_a_dropped_iuse_trigger_flag_at_plain_p(
     # -pv already showed every flag: unchanged `-keep` plus the removed one.
     assert next(
         l for l in pv.stdout.splitlines() if "reinstdropiusepkg-1.0" in l
-    ) == '[ebuild   R    ] dev-libs/reinstdropiusepkg-1.0::testrepo  USE="-keep (-gone%*)"'
+    ) == '[ebuild   R    ] dev-libs/reinstdropiusepkg-1.0::testrepo  USE="-keep (-gone%*)" '
 
 
 def test_verbose_use_order_is_enabled_first_and_alphabetical_flips_it(
@@ -12837,11 +12842,11 @@ def test_verbose_use_order_is_enabled_first_and_alphabetical_flips_it(
     lines = default.stdout.splitlines()
     assert any(
         ln
-        == '[ebuild  N     ] dev-libs/iusedefaultpkg-1.0::testrepo  USE="enableddefault plainflag -disableddefault"'
+        == '[ebuild  N     ] dev-libs/iusedefaultpkg-1.0::testrepo  USE="enableddefault plainflag -disableddefault" '
         for ln in lines
     )
     assert any(
-        ln == '[ebuild  N     ] dev-libs/useexpandpkg-1.0::testrepo  VIDEO_CARDS="nvidia -amdgpu"'
+        ln == '[ebuild  N     ] dev-libs/useexpandpkg-1.0::testrepo  VIDEO_CARDS="nvidia -amdgpu" '
         for ln in lines
     )
 
@@ -12854,11 +12859,11 @@ def test_verbose_use_order_is_enabled_first_and_alphabetical_flips_it(
     alines = alpha.stdout.splitlines()
     assert any(
         ln
-        == '[ebuild  N     ] dev-libs/iusedefaultpkg-1.0::testrepo  USE="-disableddefault enableddefault plainflag"'
+        == '[ebuild  N     ] dev-libs/iusedefaultpkg-1.0::testrepo  USE="-disableddefault enableddefault plainflag" '
         for ln in alines
     )
     assert any(
-        ln == '[ebuild  N     ] dev-libs/useexpandpkg-1.0::testrepo  VIDEO_CARDS="-amdgpu nvidia"'
+        ln == '[ebuild  N     ] dev-libs/useexpandpkg-1.0::testrepo  VIDEO_CARDS="-amdgpu nvidia" '
         for ln in alines
     )
 
@@ -12884,7 +12889,7 @@ def test_verbose_use_flags_reflect_package_use_overrides(emerge_binary, fixture_
         [str(emerge_binary)], ["--pretend", "-v", "dev-libs/packageusedisablepkg"], fixture_env
     )
     assert disable.stdout.splitlines() == [
-        '[ebuild  N     ] dev-libs/packageusedisablepkg-1.0::testrepo  USE="-foo"',
+        '[ebuild  N     ] dev-libs/packageusedisablepkg-1.0::testrepo  USE="-foo" ',
         '',
         'Total: 1 package (1 new), Size of downloads: 0 KiB',
     ]
@@ -14967,7 +14972,7 @@ def test_newuse_reinstalls_a_package_whose_use_changed(emerge_binary, fixture_en
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild   R    ] dev-libs/reinstallpkg-1.0  USE="foo*"',
+                                             '[ebuild   R    ] dev-libs/reinstallpkg-1.0  USE="foo*" ',
                                          ]
 
 
@@ -14979,7 +14984,7 @@ def test_newuse_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild   R    ] dev-libs/reinstallpkg-1.0  USE="foo*"',
+                                             '[ebuild   R    ] dev-libs/reinstallpkg-1.0  USE="foo*" ',
                                          ]
 
 
@@ -14995,7 +15000,7 @@ def test_newuse_verbose_shows_use_flags_too(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         '[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ',
-        '[ebuild   R    ] dev-libs/reinstallpkg-1.0::testrepo  USE="foo*"',
+        '[ebuild   R    ] dev-libs/reinstallpkg-1.0::testrepo  USE="foo*" ',
         '',
         'Total: 2 packages (1 new, 1 reinstall), Size of downloads: 0 KiB',
     ]
@@ -15067,7 +15072,7 @@ def test_newuse_vs_changed_use_diverge_on_a_newly_added_iuse_flag(emerge_binary,
     assert newuse_result.returncode == 0
     assert newuse_result.stdout == (
         (
-        '[ebuild   R    ] dev-libs/changedusepkg-1.0  USE="-brandnewflag%"\n'
+        '[ebuild   R    ] dev-libs/changedusepkg-1.0  USE="-brandnewflag%" \n'
         )
     )
 
@@ -15103,7 +15108,7 @@ def test_changed_use_still_catches_an_enablement_change_on_a_shared_flag(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild   R    ] dev-libs/reinstallpkg-1.0  USE="foo*"',
+                                             '[ebuild   R    ] dev-libs/reinstallpkg-1.0  USE="foo*" ',
                                          ]
 
 
@@ -15357,7 +15362,7 @@ def test_without_with_test_deps_a_test_gated_dependency_is_never_pulled_in(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test"',
+                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test" ',
                                          ]
 
 
@@ -15377,7 +15382,7 @@ def test_with_test_deps_pulls_in_a_top_level_atoms_own_test_gated_dependency(
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
                                              '[ebuild  N     ] dev-libs/testonlydep-1.0 ',
-                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test"',
+                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test" ',
                                          ]
 
 
@@ -15390,7 +15395,7 @@ def test_with_test_deps_n_explicitly_disables_it(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test"',
+                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test" ',
                                          ]
 
 
@@ -15408,7 +15413,7 @@ def test_with_test_deps_does_not_apply_beyond_a_top_level_atom(emerge_binary, fi
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
                                              '[ebuild  N     ] dev-libs/newpkg-1.0 ',
-                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test"',
+                                             '[ebuild  N     ] dev-libs/withtestdeppkg-1.0  USE="-test" ',
                                              '[ebuild  N     ] dev-libs/withtestdepconsumer-1.0 ',
                                          ]
 
@@ -15447,7 +15452,7 @@ def test_nodeps_still_shows_the_top_level_atoms_own_use_display(emerge_binary, f
     )
     assert result.returncode == 0
     assert result.stdout == (
-        '[ebuild  N     ] dev-libs/useflagpkg-1.0::testrepo  USE="foo -missingflag"\n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
+        '[ebuild  N     ] dev-libs/useflagpkg-1.0::testrepo  USE="foo -missingflag" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
 
 
@@ -16471,7 +16476,7 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        '[ebuild   R    ] dev-libs/deepusedepchild-1.0  USE="-flip*"',
+        '[ebuild   R    ] dev-libs/deepusedepchild-1.0  USE="-flip*" ',
         "[ebuild  N     ] dev-libs/deepusedepconsumer-1.0 ",
     ]
     assert rust.stderr == (
@@ -16497,7 +16502,7 @@ def test_an_evaluated_conditional_use_dep_reaches_candidate_selection(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
-        '[ebuild   R    ] dev-libs/deepusedepbchild-1.0  USE="-flip*"',
+        '[ebuild   R    ] dev-libs/deepusedepbchild-1.0  USE="-flip*" ',
         "[ebuild  N     ] dev-libs/deepusedepbconsumer-1.0 ",
     ]
 
@@ -17695,7 +17700,7 @@ def test_quiet_drops_the_mask_column_and_the_use_line(emerge_binary, fixture_env
     assert "Total:" not in pq.stdout
 
     pvq = _run([str(emerge_binary)], ["-pvq", "dev-libs/useflagpkg"], fixture_env)
-    assert '[ebuild  N    ] dev-libs/useflagpkg-1.0  USE="foo -missingflag"\n' in pvq.stdout
+    assert '[ebuild  N    ] dev-libs/useflagpkg-1.0  USE="foo -missingflag" \n' in pvq.stdout
     assert "::testrepo" not in pvq.stdout
     assert "Total:" not in pvq.stdout
 
@@ -20805,7 +20810,7 @@ def test_oracle_binnew_rejects_a_binary_missing_the_ebuilds_iuse_flag(
     )
     env = _b1_env(fixture_env, root)
 
-    ebuild_r = "[ebuild   R    ] dev-libs/binnew-1.0  USE=\"-newflag%\""
+    ebuild_r = "[ebuild   R    ] dev-libs/binnew-1.0  USE=\"-newflag%\" "
     binary_r = "[binary   R    ] dev-libs/binnew-1.0-1 "
 
     for args, expected in (
@@ -21286,10 +21291,10 @@ def test_oracle_150_tree_shared_child_nests_without_a_nomerge_ancestor(
     assert result.stdout.splitlines()[:6] == [
         "[ebuild  N     ] dev-libs/slotusegroup-1.0 ",
         "[ebuild  N     ]  dev-libs/slotuseplain-1.0 ",
-        '[ebuild  N     ]   dev-libs/slotusetarget-2.0  USE="(-x)"',
+        '[ebuild  N     ]   dev-libs/slotusetarget-2.0  USE="(-x)" ',
         "[ebuild  N     ]  dev-libs/slotusey-1.0 ",
         "[ebuild  N     ]  dev-libs/slotusex-1.0 ",
-        '[ebuild  N     ]   dev-libs/slotusetarget-1.0  USE="x y"',
+        '[ebuild  N     ]   dev-libs/slotusetarget-1.0  USE="x y" ',
     ], result.stdout
     assert "[nomerge" not in result.stdout
     flat = _run(
@@ -21695,7 +21700,7 @@ def test_oracle_b0b_satisfied_replacement_p1_p1b_no_row(
     assert result.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         "[ebuild     U  ] dev-libs/upgradepkg-2.0::testrepo [1.0::testrepo]",
-        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\"",
+        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\" ",
         "[ebuild     U  ] dev-libs/bparent-1.1::testrepo [1.0::testrepo]",
         "[ebuild  N     ] dev-libs/withdeps-1.0::testrepo ",
         "",
@@ -21717,7 +21722,7 @@ def test_oracle_b0b_satisfied_replacement_p1_p1b_no_row(
     assert result.stdout.splitlines() == [
         "[ebuild  N     ] dev-libs/newpkg-1.0::testrepo ",
         "[ebuild     U  ] dev-libs/upgradepkg-2.0::testrepo [1.0::testrepo]",
-        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\"",
+        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\" ",
         "[ebuild  N     ] dev-libs/bparent-1.1::testrepo ",
         "[ebuild  N     ] dev-libs/withdeps-1.0::testrepo ",
         "",
@@ -21750,7 +21755,7 @@ def test_oracle_b0b_satisfied_replacement_p2b_installed_dep_no_row(
         "[ebuild     U  ] dev-libs/upgradepkg-2.0::testrepo [1.0::testrepo]",
         "[ebuild     U  ] dev-libs/bparent-1.1::testrepo [1.0::testrepo]",
         "[ebuild  N     ] dev-libs/withdeps-1.0::testrepo ",
-        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\"",
+        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\" ",
         "",
         "Total: 5 packages (3 upgrades, 2 new), Size of downloads: 0 KiB",
     ], result.stdout
@@ -21788,7 +21793,7 @@ def test_oracle_b0b_satisfied_replacement_p2c_inline_row(
         "[ebuild     U  ] dev-libs/upgradepkg-2.0::testrepo [1.0::testrepo]",
         "[ebuild     U  ] dev-libs/bparent-1.1::testrepo [1.0::testrepo]",
         "[ebuild  N     ] dev-libs/withdeps-1.0::testrepo ",
-        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\"",
+        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\" ",
         '[blocks b      ] <dev-libs/blocked-2.0 ("<dev-libs/blocked-2.0" is soft '
         "blocking dev-libs/bparent-1.1)",
         "",
@@ -21824,7 +21829,7 @@ def test_oracle_b0b_satisfied_replacement_p2d_transitive_inline_row(
         "[ebuild     U  ] dev-libs/bparent-1.1::testrepo [1.0::testrepo]",
         "[ebuild  N     ] dev-libs/withdeps-1.0::testrepo ",
         "[ebuild  N     ] dev-libs/bmid-1.0::testrepo ",
-        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\"",
+        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\" ",
         '[blocks b      ] <dev-libs/blocked-2.0 ("<dev-libs/blocked-2.0" is soft '
         "blocking dev-libs/bparent-1.1)",
         "",
@@ -21858,7 +21863,7 @@ def test_oracle_b0b_satisfied_replacement_p2e_runtime_inline_row(
         "[ebuild     U  ] dev-libs/upgradepkg-2.0::testrepo [1.0::testrepo]",
         "[ebuild     U  ] dev-libs/bparent-1.1::testrepo [1.0::testrepo]",
         "[ebuild  N     ] dev-libs/withdeps-1.0::testrepo ",
-        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\"",
+        "[ebuild     U  ] dev-libs/blocked-2.0::testrepo [1.0::testrepo] USE=\"flip\" ",
         '[blocks b      ] <dev-libs/blocked-2.0 ("<dev-libs/blocked-2.0" is soft '
         "blocking dev-libs/bparent-1.1)",
         "",
@@ -22883,11 +22888,11 @@ _AUB0_TEXT_2 = 'These are the packages that would be merged, in order:\n\nCalcul
 _AUB0_TEXT_3 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_4 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_5 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 1/20).\n\n'
-_AUB0_TEXT_6 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_6 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar" \n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_7 = '\nThe following USE changes are necessary to proceed:\n (see "package.use" in the portage(5) man page for more details)\n# required by dev-libs/aub0a-0::testrepo\n# required by dev-libs/aub0a (argument)\n=dev-libs/aub0d-0 -foo\n\n * In order to avoid wasting time, backtracking has terminated early\n * due to the above autounmask change(s). The --autounmask-backtrack=y\n * option can be used to force further backtracking, but there is no\n * guarantee that it will produce a solution.\n'
-_AUB0_TEXT_8 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_9 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_10 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo"\n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n'
+_AUB0_TEXT_8 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_9 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1  USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n[ebuild  N     ] dev-libs/aub0c-0 \n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_10 = '[ebuild  N     ] dev-libs/aub0d-0  USE="-foo" \n[ebuild  N     ] dev-libs/aub0a-0 \n[ebuild  N     ] dev-libs/aub0b-0 \n'
 _AUB0_CELLS = [
     ('y', 'c b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
     ('y', 'c a b', 1, _AUB0_TEXT_2, _AUB0_TEXT_1),
@@ -23228,7 +23233,7 @@ def test_254_conflict_abi_probe_evaluates_the_replacements_use_conditionals(
     ).stdout
     assert [ln for ln in _b1_merges(out) if "app-misc/abi" in ln] == [
         "[ebuild  N     ] app-misc/abiprov-2 ",
-        '[ebuild  rR    ] app-misc/abicondcons-1  USE="-cflag*"',
+        '[ebuild  rR    ] app-misc/abicondcons-1  USE="-cflag*" ',
         "[ebuild  N     ] app-misc/abiforce-1 ",
     ]
     assert "causing rebuilds" not in out
@@ -23448,7 +23453,7 @@ def test_250_use_mismatched_installed_instance_does_not_satisfy_a_build_edge(
     assert [ln for ln in _b1_merges(tool) if "u250" in ln] == [
         "[ebuild  N     ] dev-util/u250make-bootstrap-1 ",
         "[ebuild  N     ] dev-libs/u250json-1 ",
-        '[ebuild   R    ] dev-util/u250make-1  USE="foo*"',
+        '[ebuild   R    ] dev-util/u250make-1  USE="foo*" ',
     ]
     lib = _b1_run(["--pretend", "dev-libs/u250json"], env, emerge_binary).stdout
     assert [ln for ln in _b1_merges(lib) if "u250" in ln] == [
