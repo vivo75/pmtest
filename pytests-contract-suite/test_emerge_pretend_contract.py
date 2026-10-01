@@ -20389,6 +20389,61 @@ def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     }
 
 
+def test_oracle_slotop_synth_oldbest_marks_repo_drifted_rebuild(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #274: the old post-pass slot-op synthesiser's own `oldbest`
+    assembly carries #247's third disjunct. Installed `sounneed-1.0`
+    (`0/1`, vdb repo `oldrepo`) is rebuilt over the `souprov` `1.0`
+    (`0/1`) -> `2.0` (`0/2`) sub-slot bump while its tree ebuild (`0/1`
+    in `testrepo`) agrees on the slot -- the `--solver=pubgrub` bridge
+    (which keeps the pre-S3 synthesiser) must still print the `[1.0]`
+    old-best bracket on the `R` row, exactly like the default solver
+    already does on this shape since #247. Grounded in real
+    `lib/_emerge/resolver/output.py:721-731` (vendored 3rdparty/portage
+    3.0.82.2, byte-identical to host `/usr/sbin/emerge` 3.0.82.2 at
+    these lines: the `cpv_exists` arm shows the installed instance as
+    old-best when slot, sub-slot *or* (`not quiet_repo_display` and)
+    repo differs) -- the live-probe leg is #247's own abk0 probes on
+    that same arm, plus the default solver's live `[1.0]` on this exact
+    root (cross-solver agreement)."""
+    root = _b1_root(
+        tmp_path,
+        ["dev-libs/sounneed", "dev-libs/souprov"],
+        [
+            ("dev-libs", "souprov", "1.0", "0/1", {}),
+            (
+                "dev-libs",
+                "sounneed",
+                "1.0",
+                "0/1",
+                {
+                    "RDEPEND": "dev-libs/souprov:0/1=",
+                    "repository": "oldrepo",
+                },
+            ),
+        ],
+    )
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--solver=pubgrub",
+            "--update",
+            "--deep",
+            "@world",
+        ],
+        _b1_env(fixture_env, root),
+        emerge_binary,
+    )
+    merges = _b1_merges(rust.stdout)
+    assert "[ebuild  rR    ] dev-libs/sounneed-1.0 [1.0]" in merges, rust.stdout
+    assert "[ebuild  r  U  ] dev-libs/souprov-2.0 [1.0]" in merges, rust.stdout
+    assert (
+        "(dev-libs/sounneed-1.0:0/1::testrepo, ebuild scheduled for merge"
+        in rust.stdout
+    ), rust.stdout
+
+
 def test_oracle_prune_rebuilds_restart_adds_passes(
     emerge_binary, fixture_env, tmp_path
 ):
