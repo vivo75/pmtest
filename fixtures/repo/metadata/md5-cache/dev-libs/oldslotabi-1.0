@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=277 fixture: middle node pulling the consumer and the old provider revision
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/oldslotcons =dev-libs/oldslotprov-1.0
+SLOT=0
+_md5_=fd415316c9f1651d7412d77a51652c99

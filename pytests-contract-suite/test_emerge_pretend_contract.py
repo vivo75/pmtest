@@ -3143,6 +3143,123 @@ def test_debug_resolver_trace_stages_2_4_walk(
     assert "\nExiting... (dev-libs/common-1.0:0/0::testrepo, ebuild scheduled for merge)\n" in rust.stdout
 
 
+def test_debug_oldslot_conflict_cons_chain_prints_provider_like_real(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#277 chain 1: `--backtrack=0` on the oldslot shape narrates the
+    consumer-to-provider chain like real's innermost visit.
+
+    Shape: installed `dev-libs/oldslotcons-1` (vdb `RDEPEND` recorded as
+    `>=dev-libs/oldslotprov-1.0:0/0=`, the built form of the ebuild's
+    `dev-libs/oldslotprov:=`) plus tree `oldslotprov-1.0` (`SLOT="0/0"`)
+    / `-2.0` (`SLOT="0/1"`, both `RDEPEND="dev-libs/oldslotabi"`) /
+    `oldslotabi-1.0` (`RDEPEND="dev-libs/oldslotcons
+    =dev-libs/oldslotprov-1.0"`). Grounded in real 3.0.82.2, host
+    staged-fixture probe 2026-10-01 (`PORTAGE_CONFIGROOT` at the staged
+    fixtures, ad-hoc `ROOT` with the installed cons above,
+    `PYTHONHASHSEED=0`, argv `emerge --pretend --backtrack=0 --color=n
+    --ignore-default-opts --debug dev-libs/oldslotprov
+    dev-libs/oldslotcons`): rc 1, four merge rows (`abi N`, `prov-2.0
+    N`, `cons U`, `prov-1.0 N`), the two-node `dev-libs/oldslotprov:0`
+    slot-conflict abort, and --debug narrating `Child:
+    (dev-libs/oldslotprov-2.0:0/1::testrepo, ebuild scheduled for
+    merge ...)` with `Parent Dep: dev-libs/oldslotprov:0= required by
+    (dev-libs/oldslotcons-1.0 ...)` -- the `oldslotcons ->
+    oldslotprov:0=` chain. Portuale keeps its standing withhold here
+    (rc 0, three rows, missed-update `WARNING`; the abort itself is
+    PARKED #270's general bt0 solver, explicitly not this slice), but
+    the trace must still narrate the provider node with its true
+    `0/1::testrepo` identity instead of the `:0/0::__unknown__`
+    placeholder it prints today."""
+    installed = [
+        (
+            "dev-libs",
+            "oldslotcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=dev-libs/oldslotprov-1.0:0/0="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    args = [
+        "--pretend",
+        "--debug",
+        "--backtrack=0",
+        "dev-libs/oldslotprov",
+        "dev-libs/oldslotcons",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    # Standing behavior (cf. PARKED #270): the withhold, not the abort.
+    assert rust.returncode == 0
+    assert (
+        "Child:         (dev-libs/oldslotprov-2.0:0/1::testrepo, ebuild scheduled for merge) USE=\"\"\n"
+        in rust.stdout
+    )
+    assert (
+        "Parent Dep:    dev-libs/oldslotprov:0= required by "
+        "(dev-libs/oldslotcons-1.0:0/0::testrepo, ebuild scheduled for merge)\n"
+        in rust.stdout
+    )
+
+
+def test_debug_oldslot_conflict_provider_chain_redescends_like_real(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#277 chain 2: `--backtrack=0` on the oldslot shape re-narrates the
+    provider's inner ring like real's live walk does.
+
+    Same shape and grounding as
+    `test_debug_oldslot_conflict_cons_chain_prints_provider_like_real`:
+    real's --debug re-narrates every visit, so `oldslotabi-1.0`'s stanza
+    (`Depstring: dev-libs/oldslotcons =dev-libs/oldslotprov-1.0`) is
+    followed by the re-descended `Child:` blocks for both resolved
+    children -- `oldslotcons-1.0` (`Parent Dep: dev-libs/oldslotcons
+    required by (dev-libs/oldslotabi-1.0 ...)`) and
+    `oldslotprov-1.0` (`Parent Dep: =dev-libs/oldslotprov-1.0 required
+    by (dev-libs/oldslotabi-1.0 ...)`) -- the `oldslotprov ->
+    {oldslotabi, oldslotcons} -> oldslotprov` inner ring -- before the
+    `Slot Conflict:` event. Portuale's post-hoc dump prints each entry
+    once (documented BFS-order divergence), so the stanza jumps from
+    `Candidates:` straight to `Exiting...` and the inner ring never
+    prints. The re-descent is bounded (at most one re-narration per
+    graph entry per dump) and single-root local (never follows a
+    cross-root edge); the abort behavior itself stays untouched (cf.
+    PARKED #270)."""
+    installed = [
+        (
+            "dev-libs",
+            "oldslotcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=dev-libs/oldslotprov-1.0:0/0="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    args = [
+        "--pretend",
+        "--debug",
+        "--backtrack=0",
+        "dev-libs/oldslotprov",
+        "dev-libs/oldslotcons",
+    ]
+    rust = _run([str(emerge_binary)], args, env)
+    # Standing behavior (cf. PARKED #270): the withhold, not the abort.
+    assert rust.returncode == 0
+    assert (
+        "Candidates: ['dev-libs/oldslotcons', '=dev-libs/oldslotprov-1.0']\n"
+        "Child:         (dev-libs/oldslotcons-1.0:0/0::testrepo, ebuild scheduled for merge)"
+        in rust.stdout
+    )
+    assert (
+        "Parent Dep:    dev-libs/oldslotcons required by "
+        "(dev-libs/oldslotabi-1.0:0/0::testrepo, ebuild scheduled for merge)\n"
+        "Child:         (dev-libs/oldslotprov-1.0:0/0::testrepo, ebuild scheduled for merge)"
+        in rust.stdout
+    )
+
+
 def test_debug_resolver_trace_stage5_rebuild_summaries(
     emerge_binary, fixture_env, tmp_path
 ):

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=277 fixture: provider new sub-slot, the same-slot pair of -1.0
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/oldslotabi
+SLOT=0/1
+_md5_=1f0061bffbf83150e3c1056997d53fc9

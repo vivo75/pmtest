@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=277 fixture: consumer of the provider's slot with rebuild operator
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/oldslotprov:0=
+SLOT=0
+_md5_=9bff923da4b9e71e95db56a659d5d2a2
