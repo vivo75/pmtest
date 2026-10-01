@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=268 cut-b fixture: installed consumer bound to the provider slot 0
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/bdprov:=
+SLOT=0
+_md5_=b0f0863e6b58bc431456f4ef16faea64
