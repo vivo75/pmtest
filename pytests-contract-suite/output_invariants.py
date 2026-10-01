@@ -374,8 +374,11 @@ def check_summary(stdout: str) -> list[str]:
 
 def check_cross_mode(plain: str, tree: str, quiet: str, doc: dict,
                      args: list[str] | None = None) -> list[str]:
-    """`args` is the command line: `--autounmask-only` prints no merge list
-    by design, and `--onlydeps` keeps the suppressed arguments in `--json`
+    """`args` is the command line: `--autounmask-only` is skipped because a
+    changeless resolve prints no merge list in either implementation (real
+    re-shows the list only from inside its change loops -- backlog #271 --
+    so displayed rows and `--json` entries legitimately differ there), and
+    `--onlydeps` keeps the suppressed arguments in `--json`
     (as `requested`) but not in the displayed list."""
     problems = []
     args = args or []

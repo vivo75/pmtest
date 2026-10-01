@@ -1435,7 +1435,7 @@ CASES = [
         1,
     ),
     (
-        "--autounmask-only: only the changes block, no merge list",
+        "--autounmask-only: the merge list is re-shown plus the changes block",
         ["--pretend", "--autounmask", "--autounmask-only", "dev-libs/autounmaskkeywordpkg"],
         0,
     ),
@@ -6813,18 +6813,29 @@ def test_autounmask_continue_and_backtrack_are_inert_without_autounmask_changes(
     assert "--autounmask-continue has been disabled by --autounmask=n" in warn.stderr
 
 
-def test_autounmask_only_suppresses_the_merge_list(emerge_binary, fixture_env):
-    """--autounmask-only (real actions.py:456): resolve the graph, then
-    `mydepgraph.display_problems(); return 0` -- the `[ebuild ...]` merge
-    list is NOT printed, only the autounmask changes block (+ slot
-    conflicts), and the exit code stays 0. Byte-identical Rust/Python.
-    Backlog #248: the chain is the same one-liner as the sibling test
-    above (fresh host 3.0.82.2 staged-fixture probe 2026-09-29)."""
+def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
+    """--autounmask-only (real actions.py:456-458) returns 0 before the
+    normal display(), but real `_display_autounmask` re-shows the merge
+    list itself via `_show_merge_list` (depgraph.py:10625, :10488-10495,
+    called from each change loop at :10686/:10733/:10767/:10803) whenever
+    it has changes to report. So under `--pretend --autounmask
+    --autounmask-only` real prints the SAME merge list as the control
+    (without --autounmask-only) plus the changes block, rc 0. Backlog
+    #271. Grounded on a fresh host real 3.0.82.2 (`/usr/sbin/emerge`)
+    staged-fixture probe with identical options (`--ignore-default-opts`,
+    `docs/evidence/2026-09-30-271/` in the portuale checkout): real's
+    only-run stdout is byte-identical to its control stdout (modulo the
+    timing line and the first-run Global Updates noise), stderr
+    byte-identical, rc 0 vs 1. Portuale omits real's staging `to <root>`
+    row suffix, the preamble/timing lines and the news notice (standing
+    pretend-shape cuts). Replaces
+    `test_autounmask_only_suppresses_the_merge_list`, which asserted the
+    old suppressing bytes (`stdout == ""`)."""
     args = ["--pretend", "--autounmask", "--autounmask-only", "dev-libs/autounmaskkeywordpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
-    # No merge list on stdout at all.
-    assert rust.stdout == ""
+    # The merge list is re-shown: the same row as the control below.
+    assert rust.stdout == "[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 \n"
     # The changes block still goes to stderr.
     assert rust.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
@@ -6833,13 +6844,51 @@ def test_autounmask_only_suppresses_the_merge_list(emerge_binary, fixture_env):
         "=dev-libs/autounmaskkeywordpkg-1.0 ~amd64\n"
     )
 
-    # Control: without --autounmask-only, the merge list IS printed.
+    # Control: without --autounmask-only, the same list, rc 1.
     full = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/autounmaskkeywordpkg"],
         fixture_env,
     )
-    assert full.stdout == "[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 \n"
+    assert full.returncode == 1
+    assert full.stdout == rust.stdout
+    assert full.stderr == rust.stderr
+
+    # USE-change cell: the implicit flip re-resolves the gated deps, so
+    # the re-shown list carries all three rows (real's bytes, same cuts).
+    use_args = ["--pretend", "--autounmask", "--autounmask-only", "dev-libs/useflagpkg[missingflag]"]
+    use = _run([str(emerge_binary)], use_args, fixture_env)
+    assert use.returncode == 0
+    assert use.stdout == (
+        "[ebuild  N     ] dev-libs/newpkg-1.0 \n"
+        "[ebuild  N     ] dev-libs/hiddendep-1.0 \n"
+        '[ebuild  N     ] dev-libs/useflagpkg-1.0  USE="foo missingflag"\n'
+    )
+    assert use.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/useflagpkg[missingflag] (argument)\n"
+        ">=dev-libs/useflagpkg-1.0 missingflag\n"
+    )
+    use_full = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--autounmask", "dev-libs/useflagpkg[missingflag]"],
+        fixture_env,
+    )
+    assert use_full.returncode == 1
+    assert use_full.stdout == use.stdout
+    assert use_full.stderr == use.stderr
+
+    # No changes (a plain package): real's change loops never fire
+    # `_show_merge_list`, so still nothing on either stream, rc 0.
+    plain = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--autounmask-only", "dev-libs/newpkg"],
+        fixture_env,
+    )
+    assert plain.returncode == 0
+    assert plain.stdout == ""
+    assert plain.stderr == ""
 
 
 def test_autounmask_dependency_gets_no_keyword_suggestion_by_default(emerge_binary, fixture_env):
@@ -13034,7 +13083,7 @@ Dependency and target selection:
 Autounmask (read-only: prints the required changes and stops -- never writes config):
       --autounmask[=y|n], --autounmask-use[=y|n], --autounmask-keep-keywords[=y|n]
       --autounmask-license[=y|n], --autounmask-keep-masks[=y|n]
-      --autounmask-only[=y|n]  resolve, print only the change block, and exit 0
+      --autounmask-only[=y|n]  resolve, print the merge list and the change block, and exit 0
       --autounmask-backtrack<y|n>  keep re-resolving after autounmask changes (off by default)
       --autounmask-continue[=y|n]  recognized; implies --autounmask-backtrack=y
 
