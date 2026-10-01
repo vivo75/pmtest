@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=277 fixture: provider old sub-slot, pulled by oldslotcons's :0/0= pin
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/oldslotabi
+SLOT=0/0
+_md5_=bdceff45528db6ebfe3f21cbb676ad45
