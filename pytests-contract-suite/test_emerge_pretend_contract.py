@@ -20154,11 +20154,6 @@ def test_oracle_slotop_pin_gate_explicit_request_atoms_probe(
     }
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#284: blocker-resolved uninstall stays a hard block (rc 1, "
-    "no [uninstall] row), so the discard shape cannot settle like real",
-)
 def test_oracle_slotop_pin_gate_blocker_discard_probes(
     emerge_binary, fixture_env, tmp_path
 ):
@@ -20196,14 +20191,14 @@ def test_oracle_slotop_pin_gate_blocker_discard_probes(
     args = ["--pretend", "--backtrack", "3", "--update", "--deep"]
     rust = _b1_run([*args, "app-misc/bdprov", "app-misc/bdcons"], env, emerge_binary)
     assert _b1_merges(rust.stdout) == [
-        "[ebuild     U  ] app-misc/bdprov-3 [2]",
-        "[ebuild  rR    ] app-misc/bdcons-1 ",
+        f"[ebuild     U  ] app-misc/bdprov-3 [2] to {root}",
+        f"[ebuild  rR    ] app-misc/bdcons-1 to {root}",
     ]
     assert "[uninstall     ] app-misc/bdprov-1 " in rust.stdout
     assert "causing rebuilds" not in rust.stdout
     rust = _b1_run([*args, "app-misc/bdprov"], env, emerge_binary)
     assert _b1_merges(rust.stdout) == [
-        "[ebuild     U  ] app-misc/bdprov-3 [2]",
+        f"[ebuild     U  ] app-misc/bdprov-3 [2] to {root}",
     ]
     assert "[uninstall     ] app-misc/bdprov-1 " in rust.stdout
 
