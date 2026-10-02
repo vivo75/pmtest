@@ -8,8 +8,21 @@
 #
 # Env:
 #   L3_PM=both|portage|portuale  (default both; one-side iteration)
+#   L3_CONCURRENT=1              with L3_PM=both the portage and portuale
+#                                sides run concurrently on disjoint CPU
+#                                halves (see cpusets below); 0 restores
+#                                the old serial order byte-for-byte
+#                                (same snapshots, same verdict logic).
+#                                Single-side modes always run serially.
+#   L3_CPUSET_A / L3_CPUSET_B    override the computed `--cpuset-cpus`
+#                                strings for the portage / portuale side
+#                                (e.g. L3_CPUSET_A=0-5,16-21).
+#   L3_JOBS                      guest MAKEOPTS parallelism per side
+#                                (default 1 = deterministic; the smoke
+#                                use is L3_JOBS=12 per side).
 #   L3_CONTROL=1                 also run a second portage container and
 #                                diff the two portage runs (noise floor)
+#                                (controls run serially, after the wait)
 #   L3_BUILD_ARGS                unset -> the atom list's `# l3-build-args:`
 #                                directive, else the default; set in the
 #                                host env wins over the directive (#280)
@@ -47,11 +60,30 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT" "$DISTFILES"
 ln -sfn "$RUN" "$LOGS_DIR/l3-latest"
 
-ensure_pm_built "$OUT"
-ensure_image
+# L3_SKIP_PREFLIGHT=1 skips the PM build + image check (test seam for
+# the podman-stub mock in compare/test-l3-concurrent-mock.sh: the stub
+# stands in for the image, and there is no PM binary to stamp; never
+# set on real runs).
+if [ -z "${L3_SKIP_PREFLIGHT:-}" ]; then
+  ensure_pm_built "$OUT"
+  ensure_image
+else
+  echo ">>> L3_SKIP_PREFLIGHT=1: PM build + image check skipped (mock)"
+fi
 
-run_pm() {  # <label> <portage|portuale>
-  local label=$1 pm=$2
+# The two sides of one cell run concurrently (B1): each side builds at
+# -j12 on 6 whole physical cores of its own CCX (both SMT threads, never
+# half a core), the rest of the machine stays headroom for the host and
+# podman. The split is computed from the host topology by l3_cpusets()
+# below, never hard-coded. Per-side distfiles dirs (seeded by hardlink
+# from the shared cache, new tarballs copied back after the wait) remove
+# the one shared-write hazard: both sides fetch the same tarballs, and
+# two containers fetching into one host dir race on the same dentries.
+# Least invasive because it touches only host-side mounts -- no extra
+# container run, no guest change -- at the price of at most one redundant
+# download per tarball.
+run_pm() {  # <label> <portage|portuale> [cpuset] [distfiles-dir]
+  local label=$1 pm=$2 cpuset=${3:-} sidedist=${4:-$DISTFILES}
   echo ">>> L3 build+merge: $label ($pm)"
   set +e
   # `timeout` cannot run a shell function, so this reuses
@@ -74,11 +106,18 @@ run_pm() {  # <label> <portage|portuale>
   if [ -n "${L3_BUILD_ARGS+x}" ]; then
     build_args_env=(-e "L3_BUILD_ARGS=$L3_BUILD_ARGS")
   fi
+  # Optional per-side pinning. Empty (the serial path) keeps exactly the
+  # old command line: an empty array expands to no argument at all.
+  cpuset_args=()
+  if [ -n "$cpuset" ]; then
+    cpuset_args=(--cpuset-cpus "$cpuset")
+  fi
   timeout "$TIMEOUT" "$PODMAN" run --rm --name "porttest-l3-$label-$$" \
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private \
     --hostname porttest-l3 \
     "${PM_MOUNTS[@]}" \
-    -v "$DISTFILES:/distfiles" \
+    ${cpuset_args[@]+"${cpuset_args[@]}"} \
+    -v "$sidedist:/distfiles" \
     ${tmpfs_args[@]+"${tmpfs_args[@]}"} \
     -e DISTDIR=/distfiles \
     -e "SNAPSHOT_PRUNE=$PM_REPO" \
@@ -91,19 +130,161 @@ run_pm() {  # <label> <portage|portuale>
     2>&1 | tee "$OUT/$label.container.log"
   local rc=${PIPESTATUS[0]}
   set -e
+  # Persist the real rc next to the logs: run_pm returns 0 by design (a
+  # failing side must not stop the orchestrator under `set -e`; grading
+  # happens below), and a backgrounded call's `return` is unreadable, so
+  # the status file is the record `wait` cannot give back.
+  echo "$rc" > "$OUT/$label.exit"
   echo ">>> $label rc=$rc"
   return 0
 }
 
-if [ "$MODE" = both ] || [ "$MODE" = portage ]; then
-  run_pm portage portage
-fi
-if [ "$MODE" = both ] || [ "$MODE" = portuale ]; then
-  run_pm portuale portuale
+# l3_cpusets: derive the per-side `--cpuset-cpus` strings from the host
+# topology -- 6 whole physical cores (both SMT threads) on one CCX per
+# side, the rest headroom. Sets CPUSET_A (portage) / CPUSET_B (portuale);
+# empty when the topology is unreadable or the host is too small, in
+# which case run_pm() runs unpinned. L3_CPUSET_A/B win per side.
+l3_cpusets() {
+  local auto_a= auto_b=
+  local l3map= d= n= sib= e= low= mem= l3=
+  local cores_l3= groups= ngroups= ga= gb= ma= mb=
+  local core_order=()
+  # Whole cores from SMT siblings: cpus sharing one
+  # thread_siblings_list string are one physical core. `core_order`
+  # keeps numeric (lowest cpu) order -- the sysfs glob itself expands
+  # lexically (cpu0 cpu1 cpu10 ...), so the ids are sorted numerically
+  # first; otherwise "first seen" is not the lowest cpu and the first-6
+  # selection below picks the wrong cores. `cores_l3` maps each core to
+  # its L3 id (`lscpu -p` columns CPU,Core,...,L3 -- the last field).
+  if [ -d /sys/devices/system/cpu ]; then
+    declare -A seen_core=()
+    for n in $(for d in /sys/devices/system/cpu/cpu[0-9]*; do
+                 [ -e "$d" ] && printf '%s\n' "${d##*cpu}"
+               done 2>/dev/null | LC_ALL=C sort -n); do
+      d=/sys/devices/system/cpu/cpu$n
+      [ -r "$d/topology/thread_siblings_list" ] || { core_order=(); break; }
+      sib=$(tr -d ' \n' < "$d/topology/thread_siblings_list")
+      if [ -z "${seen_core[$sib]:-}" ]; then
+        seen_core[$sib]="$n"
+        core_order+=("$n:$sib")
+      fi
+    done
+  fi
+  l3map=$(lscpu -p 2>/dev/null | grep -v '^#' || true)
+  if [ -n "$l3map" ] && [ "${#core_order[@]}" -gt 0 ]; then
+    # Attach each core's L3 id (both threads of a core share one CCX,
+    # so looking it up by the lowest cpu is exact).
+    cores_l3=$(for e in "${core_order[@]}"; do
+      low=${e%%:*} mem=${e#*:}
+      l3=$(printf '%s\n' "$l3map" | awk -F, -v c="$low" '$1==c{print $NF; exit}')
+      printf '%s %s %s\n' "$low" "$mem" "${l3:-?}"
+    done | LC_ALL=C sort -n -k1,1)
+    # Group cores per L3 id (numeric order: first group -> side A).
+    groups=$(printf '%s\n' "$cores_l3" | awk '$3 != "?" {print $3}' | sort -n -u)
+    ngroups=$(printf '%s\n' "$groups" | grep -c . || true)
+    if [ "$ngroups" -ge 2 ]; then
+      ga=$(printf '%s\n' "$groups" | sed -n 1p)
+      gb=$(printf '%s\n' "$groups" | sed -n 2p)
+      ma=$(printf '%s\n' "$cores_l3" | awk -v g="$ga" '$3==g{print $2}' \
+           | head -6 | expand_cpu_lists | LC_ALL=C sort -n -u | tr '\n' ' ')
+      mb=$(printf '%s\n' "$cores_l3" | awk -v g="$gb" '$3==g{print $2}' \
+           | head -6 | expand_cpu_lists | LC_ALL=C sort -n -u | tr '\n' ' ')
+      # Whole cores only: each side needs 6 cores = 12 threads.
+      if [ "$(printf '%s' "$ma" | wc -w)" -eq 12 ] \
+         && [ "$(printf '%s' "$mb" | wc -w)" -eq 12 ]; then
+        # shellcheck disable=SC2086  # $ma/$mb are space-separated cpu lists
+        auto_a=$(cpuset_compress $ma)
+        # shellcheck disable=SC2086
+        auto_b=$(cpuset_compress $mb)
+      fi
+    fi
+  fi
+  if [ -z "$auto_a" ] || [ -z "$auto_b" ]; then
+    # Fallback (no CCX info): first 6 whole cores / next 6 whole cores
+    # of the numeric core order (NOT lexical member-string order).
+    if [ "${#core_order[@]}" -ge 12 ]; then
+      ma=$(printf '%s\n' "${core_order[@]:0:6}" | sed 's/^[^:]*://' \
+           | expand_cpu_lists | LC_ALL=C sort -n -u | tr '\n' ' ')
+      mb=$(printf '%s\n' "${core_order[@]:6:6}" | sed 's/^[^:]*://' \
+           | expand_cpu_lists | LC_ALL=C sort -n -u | tr '\n' ' ')
+      # shellcheck disable=SC2086  # space-separated cpu lists
+      auto_a=$(cpuset_compress $ma)
+      # shellcheck disable=SC2086
+      auto_b=$(cpuset_compress $mb)
+    fi
+  fi
+  CPUSET_A=${L3_CPUSET_A:-$auto_a}
+  CPUSET_B=${L3_CPUSET_B:-$auto_b}
+}
+
+# cpuset_compress <cpu...> -- 0 1 2 16 17 -> 0-2,16-17.
+cpuset_compress() {
+  printf '%s\n' "$@" | LC_ALL=C sort -n -u | awk '
+    NR==1 { s=$1; p=$1; next }
+    $1==p+1 { p=$1; next }
+    { out=(out==""?"":out",") (s==p? s : s"-"p); s=$1; p=$1 }
+    END { out=(out==""?"":out",") (s==p? s : s"-"p); print out }'
+}
+
+# expand_cpu_lists: stdin lines like "0,16" / "0-3,8" -> one cpu per line.
+expand_cpu_lists() {
+  local t=
+  tr ',' '\n' | while IFS= read -r t; do
+    case $t in
+      *-[0-9]*) seq "${t%-*}" "${t#*-}" ;;
+      '') continue ;;
+      *) printf '%s\n' "$t" ;;
+    esac
+  done
+}
+
+L3_CONCURRENT=${L3_CONCURRENT:-1}
+l3_cpusets
+
+if [ "$MODE" = both ] && [ "$L3_CONCURRENT" = 1 ]; then
+  # Concurrent sides: seed per-side distfiles dirs, drop stale names,
+  # background each run_pm (each keeps its own `timeout` and its own
+  # `$label.container.log`), wait for both. Container names are unique
+  # per side by construction (`porttest-l3-$label-$$`); the rm -f only
+  # clears same-name residue from a killed run, which would otherwise
+  # fail the relaunch.
+  DISTFILES_A=$OUT/distfiles-portage
+  DISTFILES_B=$OUT/distfiles-portuale
+  mkdir -p "$DISTFILES_A" "$DISTFILES_B"
+  cp -al "$DISTFILES/." "$DISTFILES_A/" 2>/dev/null \
+    || cp -a "$DISTFILES/." "$DISTFILES_A/" 2>/dev/null || true
+  cp -al "$DISTFILES/." "$DISTFILES_B/" 2>/dev/null \
+    || cp -a "$DISTFILES/." "$DISTFILES_B/" 2>/dev/null || true
+  "$PODMAN" rm -f "porttest-l3-portage-$$" "porttest-l3-portuale-$$" \
+    >/dev/null 2>&1 || true
+  run_pm portage portage "$CPUSET_A" "$DISTFILES_A" & pid_a=$!
+  run_pm portuale portuale "$CPUSET_B" "$DISTFILES_B" & pid_b=$!
+  wait "$pid_a" || true
+  wait "$pid_b" || true
+  # Copy genuinely new tarballs back into the shared cache for the next
+  # run (both containers are gone, so nothing writes anymore).
+  find "$DISTFILES_A" "$DISTFILES_B" -maxdepth 1 -type f -print0 2>/dev/null |
+  while IFS= read -r -d '' f; do
+    b=${f##*/}
+    [ -e "$DISTFILES/$b" ] || cp -a -- "$f" "$DISTFILES/$b" 2>/dev/null || true
+  done
+else
+  if [ "$MODE" = both ] || [ "$MODE" = portage ]; then
+    run_pm portage portage
+  fi
+  if [ "$MODE" = both ] || [ "$MODE" = portuale ]; then
+    run_pm portuale portuale
+  fi
 fi
 if [ "${L3_CONTROL:-0}" = 1 ]; then
-  run_pm control-a portage
-  run_pm control-b portage
+  if [ "$MODE" = both ] && [ "$L3_CONCURRENT" = 1 ]; then
+    # Nobody else runs now: serial pair, cpusets reused for isolation.
+    run_pm control-a portage "$CPUSET_A" "$DISTFILES"
+    run_pm control-b portage "$CPUSET_B" "$DISTFILES"
+  else
+    run_pm control-a portage
+    run_pm control-b portage
+  fi
 fi
 
 for label in portage portuale control-a control-b; do
@@ -144,6 +325,8 @@ summary() {  # <file> <label>
   echo "atoms  : $REL_ATOMLIST"
   echo "mode   : $MODE (control=${L3_CONTROL:-0})"
   echo "jobs   : -j${L3_JOBS:-1} (MAKEOPTS; 1 = deterministic)"
+  echo "concur : ${L3_CONCURRENT:-1} (1 = sides overlap; 0 = old serial order)"
+  echo "cpusets: portage=[${CPUSET_A:-none}] portuale=[${CPUSET_B:-none}]"
   if [ "${L3_TMPFS:-1}" = 1 ]; then
     echo "tmpfs  : on (size=${L3_TMPFS_SIZE:-8g})"
   else
