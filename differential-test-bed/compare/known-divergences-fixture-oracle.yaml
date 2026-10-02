@@ -90,22 +90,13 @@
 #    @world cells (below).
 
 # -- the skipped-update warning block (compared since backlog #227).
-
-- id: skipped-updates-cross-root-missed-line
-  category: skipped-updates
-  slugs: ["--backtrack_0_dev-libs_blk0*"]
-  match: 'ABI_X86="(64)" conflicts with | portuale-only (1): (dev-libs/blk0x-'
-  reason: >
-    The skipped-update block's missed line (the `conflicts with` header,
-    not its parent lines): real resolves the blk0 build deps against the
-    running root `/` because the bed stages ROOT=$FX, so the missed
-    dev-libs/blk0x instance sits in `/` and renders the host profile's
-    USE_EXPAND (`ABI_X86="(64)"`); portuale resolves in the one target
-    root and renders the fixture profile's (`ELIBC="glibc"`). Package
-    lists and every parent line match. Cross-root resolution is backlog
-    #242 (owner decision B17, batch-2026-09-27); #230 shipped the block's
-    rendering.
-  owner: portuale-bug
+#
+# (Backlog #242 Slice D retired `skipped-updates-cross-root-missed-line`:
+# the main list now runs with FX_HOST_RUNNING_ROOT=1, so portuale resolves
+# the blk0 build deps against the container host like real does — the
+# missed dev-libs/blk0x instance sits in `/` and paints the host profile's
+# USE_EXPAND on both sides. Entry removed; if the bed ever flags the
+# missed-line USE again, re-add it with fresh bytes rather than this text.)
 
 - id: g216-b0-cycle-abort-tree-ancestors
   categories: [extra, order]

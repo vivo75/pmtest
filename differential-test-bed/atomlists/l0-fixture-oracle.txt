@@ -4,6 +4,11 @@
 # the contract suite already covers, so each divergence is a real
 # behavioural difference, not a new scenario.
 #
+# Run with FX_HOST_RUNNING_ROOT=1 (no PORTAGE_RUNNING_ROOT pin): the
+# running root is the container host for both PMs, so cross-root rows
+# resolve and paint identically (backlog #242 Slice D; the blk0 missed
+# line retires `skipped-updates-cross-root-missed-line`).
+#
 # multi-package diamond
 dev-libs/diamond
 # the diamond leaf, whose staged cache entry is deliberately stale (#46

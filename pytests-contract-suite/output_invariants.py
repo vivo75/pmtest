@@ -76,7 +76,16 @@ def parse_plain(stdout: str) -> list[dict]:
         m = _LINE.match(line)
         if not m:
             continue
-        cat, pkg, version = split_cpv(m.group("cpv"))
+        cpv, rest = m.group("cpv"), m.group("rest")
+        # Track X Slice D (#242): every merge/nomerge/uninstall row whose
+        # entry root != "/" carries real's `to <ROOT>` suffix. The spaced
+        # form (`pkg-1.0 to /ROOT`) leaves `cpv` clean; the tree-code
+        # nomerge shape glues it (`diamond-1.0to /ROOT`), so strip a
+        # trailing `to` when the rest starts with the root path (a real
+        # cpv never ends in `to` followed by ` /...`).
+        if cpv.endswith("to") and rest.startswith(" /"):
+            cpv = cpv[: -len("to")]
+        cat, pkg, version = split_cpv(cpv)
         rows.append({
             "kind": m.group("kind"),
             "flags": m.group("flags"),
@@ -86,7 +95,7 @@ def parse_plain(stdout: str) -> list[dict]:
             "depth": len(m.group("indent")) - 1,
             "cp": (cat, pkg),
             "version": version,
-            "rest": m.group("rest"),
+            "rest": rest,
         })
     return rows
 
