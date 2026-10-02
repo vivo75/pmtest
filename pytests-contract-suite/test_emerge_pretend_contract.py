@@ -20076,11 +20076,11 @@ def test_oracle_slotop_pin_gate_explicit_request_atoms_probe(
     `causing rebuilds` block (new-slot arm, #269); `=app-misc/mmprov-3
     app-misc/mmcons` -> rc 0, `backtrack: 1/3`, the same two rows (the
     version pin names the upgrade target itself, still no greedy pin).
-    Residue #285: `=app-misc/mmprov-2` (naming the *installed* version)
-    rebuilds the consumer on both sides, but portuale additionally
-    upgrades the provider past the pin (`[ebuild U] mmprov-3`) where
-    real keeps it (`[ebuild rR] mmcons-1` alone) -- update-selection for
-    exact-version requests, a different mechanism from this gate.
+    Fixed by #285 (`test_oracle_285_..._keeps_pinned_provider`):
+    `=app-misc/mmprov-2` (naming the *installed* version) rebuilds the
+    consumer on both sides while keeping the pinned provider
+    (`[ebuild rR] mmcons-1` alone) -- update-selection reuses the
+    argument-pinned in-graph instance for the rebuilt consumer's `:=`.
     Control, same probe: `app-misc/mmprov:1/2` alone -> rc 0,
     `backtrack: 0/3`, row `[ebuild U] app-misc/mmprov-3 [2]` alone (no
     consumer walked, nothing to probe -- both sides agree)."""
@@ -20152,6 +20152,66 @@ def test_oracle_slotop_pin_gate_explicit_request_atoms_probe(
     } == {
         ("app-misc/mmprov", "3"),
     }
+
+
+def test_oracle_285_exact_version_update_keeps_pinned_provider(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#285: an exact-version top-level request keeps its named installed
+    instance under `--update`. Same installed/tree shape as the #268 pin
+    (`mmprov-1` `0/1` + `mmprov-2` `1/1` + `mmcons-1` bound `mmprov:0/1=`,
+    tree `mmprov-3` `1/2`; ad-hoc ROOT via `_b1_root`, EAPI-bearing vdb).
+    Probed on real 3.0.82.2, host staged-fixture probe 2026-10-02 (same
+    staging as #268; argv `--ignore-default-opts --pretend --color=n
+    --backtrack=3 --update --deep <atoms>`, rc 0 throughout; capture
+    `r3-s0-captures.md` in the R3 batch): `=app-misc/mmprov-2
+    app-misc/mmcons` -> `backtrack: 1/3`, single row `[ebuild rR]
+    app-misc/mmcons-1` (the `=mmprov-2` argument puts installed
+    `mmprov-2:1/1` in the graph; after the missed-slot-abi backtrack the
+    rebuilt consumer's `app-misc/mmprov:=` reuses that node instead of
+    re-selecting `mmprov-3`); `~app-misc/mmprov-2 app-misc/mmcons` ->
+    the same single row (`backtrack: 1/3`). The four agreeing shapes
+    stay pinned: `app-misc/mmprov:1/2`, `=app-misc/mmprov-3` and
+    `>=app-misc/mmprov-2` (each with `app-misc/mmcons`) merge
+    `[ebuild U] app-misc/mmprov-3 [2]` + `[ebuild rR] app-misc/mmcons-1`
+    (`backtrack: 1/3`), and `=app-misc/mmprov-2` alone merges nothing
+    (`backtrack: 0/3`)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    args = ["--pretend", "--backtrack", "3", "--update", "--deep"]
+    rebuild_only = [f"[ebuild  rR    ] app-misc/mmcons-1 to {root}"]
+    upgrade_pair = [
+        f"[ebuild     U  ] app-misc/mmprov-3 [2] to {root}",
+        f"[ebuild  rR    ] app-misc/mmcons-1 to {root}",
+    ]
+    for atoms in (
+        ["=app-misc/mmprov-2", "app-misc/mmcons"],
+        ["~app-misc/mmprov-2", "app-misc/mmcons"],
+    ):
+        rust = _b1_run([*args, *atoms], env, emerge_binary)
+        assert _b1_merges(rust.stdout) == rebuild_only, atoms
+        assert "causing rebuilds" not in rust.stdout
+    for atoms in (
+        ["app-misc/mmprov:1/2", "app-misc/mmcons"],
+        ["=app-misc/mmprov-3", "app-misc/mmcons"],
+        [">=app-misc/mmprov-2", "app-misc/mmcons"],
+    ):
+        rust = _b1_run([*args, *atoms], env, emerge_binary)
+        assert _b1_merges(rust.stdout) == upgrade_pair, atoms
+        assert "causing rebuilds" not in rust.stdout
+    rust = _b1_run([*args, "=app-misc/mmprov-2"], env, emerge_binary)
+    assert _b1_merges(rust.stdout) == []
 
 
 def test_oracle_slotop_pin_gate_blocker_discard_probes(
