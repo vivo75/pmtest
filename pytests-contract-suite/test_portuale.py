@@ -522,7 +522,7 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
         f'[ebuild  N     ] dev-libs/hardcycleb-1.0 to {fixture_env["ROOT"]}\n'
     )
     partial_stdout = (
-        f'[nomerge       ] dev-libs/hardcyclea-1.0::testrepoto {fixture_env["ROOT"]}\n'
+        f'[nomerge       ] dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         "\n"
