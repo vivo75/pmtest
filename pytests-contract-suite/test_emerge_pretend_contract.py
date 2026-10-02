@@ -23733,8 +23733,8 @@ def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
     env = _b1_env(fixture_env, root)
     out = _b1_run(["--pretend", "--update", "--deep", "@world"], env, emerge_binary).stdout
     assert [ln for ln in _b1_merges(out) if "app-misc/u276" in ln] == [
-        "[ebuild  N     ] app-misc/u276prov-2 ",
-        "[ebuild  rR    ] app-misc/u276pa-1 ",
+        f"[ebuild  N     ] app-misc/u276prov-2 to {root}",
+        f"[ebuild  rR    ] app-misc/u276pa-1 to {root}",
     ]
 
 
