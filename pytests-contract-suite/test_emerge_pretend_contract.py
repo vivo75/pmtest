@@ -3799,7 +3799,7 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
 
     assert rust.returncode == 1
     assert rust.stdout == (
-        f'[nomerge       ] dev-libs/hardcyclea-1.0::testrepoto {fixture_env["ROOT"]}\n'
+        f'[nomerge       ] dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         "\n"
@@ -3875,7 +3875,7 @@ def test_softened_build_time_cycle_reports_the_persisting_ring(
 
     assert rust.returncode == 1
     assert rust.stdout == (
-        f'[nomerge       ] dev-libs/sbrA-1.0::testrepoto {fixture_env["ROOT"]}\n'
+        f'[nomerge       ] dev-libs/sbrA-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/sbrB-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/sbrA-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         "\n"
@@ -3926,7 +3926,7 @@ def test_mixed_priority_cycle_prints_each_edge_real_label(
 
     assert rust.returncode == 1
     assert rust.stdout == (
-        f'[nomerge       ] dev-libs/slopcyca-1.0::testrepoto {fixture_env["ROOT"]}\n'
+        f'[nomerge       ] dev-libs/slopcyca-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/slopcycb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/slopcyca-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         "\n"
@@ -3972,7 +3972,7 @@ def test_circular_dep_use_flag_suggestion(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout == (
-        f'[nomerge       ] dev-libs/usecyclea-1.0::testrepoto {fixture_env["ROOT"]} USE=\"x\" \n'
+        f'[nomerge       ] dev-libs/usecyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" \n'
         f'[ebuild  N     ]  dev-libs/usecycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/usecyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB\n'
         "\n"
@@ -4025,7 +4025,7 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     assert rust.returncode == 1
     assert rust.stdout == (
         f'[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
-        f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepoto {fixture_env["ROOT"]} USE=\"x\" \n'
+        f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" \n'
         f'[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB\n'
         "\n"
@@ -4067,7 +4067,7 @@ def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
-        f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepoto {fixture_env["ROOT"]} USE=\"x\" ',
+        f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" ',
         f'[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB',
         "",
@@ -4134,7 +4134,7 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
-        f'[nomerge       ] dev-libs/cyc4a-1.0::testrepoto {fixture_env["ROOT"]} USE=\"x\" ',
+        f'[nomerge       ] dev-libs/cyc4a-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" ',
         f'[ebuild  N     ]  dev-libs/cyc4b-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]   dev-libs/cyc4c-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]    dev-libs/cyc4d-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
@@ -12004,7 +12004,7 @@ def test_tree_onlydeps_shows_the_root_as_a_nomerge_ancestor(emerge_binary, fixtu
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        f'[nomerge       ] dev-libs/diamond-1.0to {fixture_env["ROOT"]}',
+        f'[nomerge       ] dev-libs/diamond-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-libs/shared-b-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-libs/shared-a-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]   dev-libs/common-1.0 to {fixture_env["ROOT"]}',
@@ -19030,9 +19030,9 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
         f'[ebuild  N     ]   dev-libs/mgfb-1 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-libs/mgxa-1 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]   dev-libs/mgxb-1 to {fixture_env["ROOT"]}',
-        f'[nomerge       ] dev-libs/mgfa-1to {fixture_env["ROOT"]}',
+        f'[nomerge       ] dev-libs/mgfa-1 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-libs/mgfc-1 to {fixture_env["ROOT"]}',
-        f'[nomerge       ] dev-libs/mgxa-1to {fixture_env["ROOT"]}',
+        f'[nomerge       ] dev-libs/mgxa-1 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-libs/mgxc-1 to {fixture_env["ROOT"]}',
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
@@ -21720,7 +21720,7 @@ def test_oracle_87_rdepend_disjunctive_wait_is_default_bed_covered(
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        f'[nomerge       ] dev-libs/blockerpkg-1.0to {fixture_env["ROOT"]}',
+        f'[nomerge       ] dev-libs/blockerpkg-1.0 to {fixture_env["ROOT"]}',
         '[blocks b      ]  dev-libs/samepkg ("dev-libs/samepkg" is hard '
         "blocking dev-libs/blockerpkg-1.0)",
         f'[uninstall     ]   dev-libs/samepkg-1.0 to {fixture_env["ROOT"]}',
@@ -23947,7 +23947,7 @@ def test_278_printed_cycle_starts_where_reals_shortest_cycle_starts(
     )
     assert r.returncode == 1
     assert r.stdout == (
-        f'[nomerge       ] dev-util/u278make-1::testrepoto {fixture_env["ROOT"]}\n'
+        f'[nomerge       ] dev-util/u278make-1::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/u278json-1::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-util/u278make-1::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   virtual/u278make-0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
@@ -24061,7 +24061,7 @@ def test_251c_every_branch_demoted_keeps_reals_partial_list(emerge_binary, fixtu
         return r, [ln.rstrip() for ln in r.stdout.splitlines() if ln.startswith("[")]
 
     both = [
-        f'[nomerge       ] dev-libs/u251y-1::testrepoto {fixture_env["ROOT"]}',
+        f'[nomerge       ] dev-libs/u251y-1::testrepo to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-util/u251d-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]  dev-util/u251c-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]   dev-libs/u251y-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
@@ -24075,7 +24075,7 @@ def test_251c_every_branch_demoted_keeps_reals_partial_list(emerge_binary, fixtu
     ) in r.stdout + r.stderr
     assert rows(["dev-libs/u251y", "dev-util/u251c"])[1] == both
     assert rows(["dev-libs/u251y"])[1] == [
-        f'[nomerge       ] dev-libs/u251y-1::testrepoto {fixture_env["ROOT"]}',
+        f'[nomerge       ] dev-libs/u251y-1::testrepo to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-util/u251c-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]  dev-util/u251d-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]   dev-libs/u251y-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
