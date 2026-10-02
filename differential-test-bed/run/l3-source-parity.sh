@@ -17,6 +17,25 @@
 #   L3_CPUSET_A / L3_CPUSET_B    override the computed `--cpuset-cpus`
 #                                strings for the portage / portuale side
 #                                (e.g. L3_CPUSET_A=0-5,16-21).
+#   L3_CPUSET_MODE=auto|cgroup|taskset
+#                                how the per-side pinning is applied
+#                                (default auto). cgroup is the existing
+#                                `--cpuset-cpus` flag. taskset leaves the
+#                                flag off and pins INSIDE the container:
+#                                the guest becomes `/bin/bash -c 'exec
+#                                taskset -c "$0"
+#                                /TEST/layers/l3/build-and-merge.sh "$@"'
+#                                <cpuset> <pm> <atomlist> <outdir>` (same
+#                                build-and-merge argv, quoting-safe: the
+#                                cpuset travels as `$0`, never
+#                                interpolated). auto selects cgroup when
+#                                euid is 0 or the user's systemd service
+#                                `cgroup.controllers` lists `cpuset`,
+#                                else taskset (rootless podman without a
+#                                delegated cpuset controller dies in crun
+#                                with rc 126, so the cgroup flag is
+#                                unusable there; in-container taskset is
+#                                inherited by all children).
 #   L3_JOBS                      guest MAKEOPTS parallelism per side
 #                                (default 1 = deterministic; the smoke
 #                                use is L3_JOBS=12 per side).
@@ -108,9 +127,22 @@ run_pm() {  # <label> <portage|portuale> [cpuset] [distfiles-dir]
   fi
   # Optional per-side pinning. Empty (the serial path) keeps exactly the
   # old command line: an empty array expands to no argument at all.
+  # CPUSET_MODE=cgroup keeps the existing `--cpuset-cpus` flag;
+  # CPUSET_MODE=taskset leaves the flag off and pins inside the
+  # container via `taskset -c <cpuset>` wrapping the otherwise
+  # identical build-and-merge.sh argv (quoting-safe: the cpuset travels
+  # as `$0` to `bash -c`, never interpolated into the script string).
+  # The serial path passes no cpuset, so it stays byte-for-byte the old
+  # command in either mode.
   cpuset_args=()
+  guest_cmd=(/TEST/layers/l3/build-and-merge.sh "$pm" "$REL_ATOMLIST" "/TEST/logs/$RUN/$label")
   if [ -n "$cpuset" ]; then
-    cpuset_args=(--cpuset-cpus "$cpuset")
+    if [ "${CPUSET_MODE:-cgroup}" = taskset ]; then
+      guest_cmd=(-c 'exec taskset -c "$0" /TEST/layers/l3/build-and-merge.sh "$@"' \
+        "$cpuset" "$pm" "$REL_ATOMLIST" "/TEST/logs/$RUN/$label")
+    else
+      cpuset_args=(--cpuset-cpus "$cpuset")
+    fi
   fi
   timeout "$TIMEOUT" "$PODMAN" run --rm --name "porttest-l3-$label-$$" \
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private \
@@ -126,7 +158,7 @@ run_pm() {  # <label> <portage|portuale> [cpuset] [distfiles-dir]
     ${build_args_env[@]+"${build_args_env[@]}"} \
     -e "L3_JOBS=${L3_JOBS:-1}" \
     --entrypoint /bin/bash "$IMAGE" \
-    /TEST/layers/l3/build-and-merge.sh "$pm" "$REL_ATOMLIST" "/TEST/logs/$RUN/$label" \
+    "${guest_cmd[@]}" \
     2>&1 | tee "$OUT/$label.container.log"
   local rc=${PIPESTATUS[0]}
   set -e
@@ -238,8 +270,37 @@ expand_cpu_lists() {
   done
 }
 
+# l3_cpuset_mode: resolve L3_CPUSET_MODE=auto|cgroup|taskset into
+# CPUSET_MODE. auto selects cgroup when euid is 0 or the user's
+# systemd service cgroup.controllers lists `cpuset`, else taskset.
+# L3_CGROUP_CONTROLLERS_FILE overrides the probe path (test seam for
+# the mock: point it at a fake controllers file to exercise auto).
+l3_cpuset_mode() {
+  local req=${L3_CPUSET_MODE:-auto}
+  case $req in
+    auto)
+      if [ "$(id -u)" = 0 ]; then
+        CPUSET_MODE=cgroup
+        return
+      fi
+      local ctl=${L3_CGROUP_CONTROLLERS_FILE:-/sys/fs/cgroup/user.slice/user-$(id -u).slice/user@$(id -u).service/cgroup.controllers}
+      local controllers=
+      if [ -r "$ctl" ]; then
+        controllers=$(cat "$ctl" 2>/dev/null || true)
+      fi
+      case " $controllers " in
+        *" cpuset "*) CPUSET_MODE=cgroup ;;
+        *) CPUSET_MODE=taskset ;;
+      esac
+      ;;
+    cgroup|taskset) CPUSET_MODE=$req ;;
+    *) echo "L3_CPUSET_MODE must be auto|cgroup|taskset" >&2; exit 2 ;;
+  esac
+}
+
 L3_CONCURRENT=${L3_CONCURRENT:-1}
 l3_cpusets
+l3_cpuset_mode
 
 if [ "$MODE" = both ] && [ "$L3_CONCURRENT" = 1 ]; then
   # Concurrent sides: seed per-side distfiles dirs, drop stale names,
@@ -326,7 +387,7 @@ summary() {  # <file> <label>
   echo "mode   : $MODE (control=${L3_CONTROL:-0})"
   echo "jobs   : -j${L3_JOBS:-1} (MAKEOPTS; 1 = deterministic)"
   echo "concur : ${L3_CONCURRENT:-1} (1 = sides overlap; 0 = old serial order)"
-  echo "cpusets: portage=[${CPUSET_A:-none}] portuale=[${CPUSET_B:-none}]"
+  echo "cpusets: portage=[${CPUSET_A:-none}] portuale=[${CPUSET_B:-none}] (mode=${CPUSET_MODE:-cgroup})"
   if [ "${L3_TMPFS:-1}" = 1 ]; then
     echo "tmpfs  : on (size=${L3_TMPFS_SIZE:-8g})"
   else

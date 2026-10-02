@@ -19,6 +19,20 @@
 #      to (1), l3-report.txt equal modulo dates/concur/cpusets lines.
 #   4. serial failing side: same rc 2 + same grading line as (2) --
 #      the failing side yields the same final verdict path as before.
+#   5. concurrent taskset green (L3_CPUSET_MODE=taskset): no
+#      --cpuset-cpus flag; the guest is `bash -c 'exec taskset -c
+#      "$0" ...' <cpuset> <pm> <atomlist> <outdir>` with the same
+#      cpuset strings as (1), same snapshots, report mode=taskset.
+#   6. serial taskset green (L3_CPUSET_MODE=taskset, L3_CONCURRENT=0):
+#      byte-for-byte the old command -- neither --cpuset-cpus nor
+#      taskset -- shared distfiles bind.
+#   7. auto probe (L3_CPUSET_MODE=auto + L3_CGROUP_CONTROLLERS_FILE):
+#      a fake controllers file listing cpuset selects cgroup mode, one
+#      without selects taskset mode.
+#
+# Cases 1-4 force L3_CPUSET_MODE=cgroup so the legacy
+# `--cpuset-cpus` argv stays pinned while auto defaults to taskset on
+# this host (rootless, no delegated cpuset controller).
 #
 #   differential-test-bed/compare/test-l3-concurrent-mock.sh
 #
@@ -76,9 +90,12 @@ case $cmd in
   rm) printf 'RM t=%s argv=%s\n' "$(ts)" "$*" >>"$LOG"; exit 0 ;;
   run)
     shift
-    name= cpuset= jobs= logsbind= distbind= guestout=
-    prev=
+    name= cpuset= taskset= jobs= logsbind= distbind= guestout=
+    prev= saw_taskset_script=0
     for a in "$@"; do
+      if [ "$saw_taskset_script" = 1 ]; then
+        taskset=$a; saw_taskset_script=0; prev=; continue
+      fi
       case $prev in
         --name) name=$a; prev=; continue ;;
         --cpuset-cpus) cpuset=$a; prev=; continue ;;
@@ -95,11 +112,13 @@ case $cmd in
       case $a in
         -v|--name|--cpuset-cpus|-e) prev=$a ;;
         /TEST/logs/*) guestout=$a ;;
+        *'exec taskset -c'*) saw_taskset_script=1 ;;
       esac
     done
     label=${name#porttest-l3-}; label=${label%-*}
-    printf 'RUN t=%s name=%s label=%s cpuset=%s jobs=%s dist=%s\n' \
-      "$(ts)" "$name" "$label" "$cpuset" "$jobs" "$distbind" >>"$LOG"
+    printf 'RUN t=%s name=%s label=%s cpuset=%s taskset=%s jobs=%s dist=%s\n' \
+      "$(ts)" "$name" "$label" "$cpuset" "$taskset" "$jobs" "$distbind" >>"$LOG"
+    printf 'ARGV t=%s label=%s argv=%s\n' "$(ts)" "$label" "$*" >>"$LOG"
     if [ "${STUB_FAIL_LABEL:-}" = "$label" ]; then
       rc=${STUB_FAIL_RC:-124}
       printf 'END t=%s name=%s label=%s rc=%s fail=1\n' "$(ts)" "$name" "$label" "$rc" >>"$LOG"
@@ -130,7 +149,9 @@ printf 'seed-tarball\n' > "$SEED/seed-from-cache.tar"
 SEED_SHA=$(sha256sum "$SEED/seed-from-cache.tar" | cut -d' ' -f1)
 
 # --- one orchestrator run ----------------------------------------------
-# run_case <name>: uses $CASE_CONCURRENT / $CASE_FAIL_LABEL globals.
+# run_case <name>: uses $CASE_CONCURRENT / $CASE_FAIL_LABEL /
+# $CASE_CPUSET_MODE globals (CASE_CPUSET_MODE defaults to cgroup so
+# the four legacy cases keep the old `--cpuset-cpus` argv).
 # Sets OUT (run dir) and SEC (this case's stub-log section).
 run_case() {
   local name=$1 l0 rc
@@ -140,8 +161,14 @@ run_case() {
   ( export PORTTEST_PODMAN="$STUB" L3_SKIP_PREFLIGHT=1 L3_TIMEOUT=120 \
       L3_DISTFILES="$SEED" STUB_LOG STUB_SLEEP="${STUB_SLEEP:-2}" \
       STUB_FAIL_LABEL="${CASE_FAIL_LABEL:-}" STUB_FAIL_RC="${CASE_FAIL_RC:-124}" \
-      L3_CONCURRENT="$CASE_CONCURRENT"
+      L3_CONCURRENT="$CASE_CONCURRENT" \
+      L3_CPUSET_MODE="${CASE_CPUSET_MODE:-cgroup}"
     unset L3_JOBS L3_CPUSET_A L3_CPUSET_B
+    if [ -n "${CASE_CONTROLLERS_FILE:-}" ]; then
+      export L3_CGROUP_CONTROLLERS_FILE="$CASE_CONTROLLERS_FILE"
+    else
+      unset L3_CGROUP_CONTROLLERS_FILE
+    fi
     "$SCRIPT" "$ATOMLIST" >"$OUT_RUN" 2>&1
   )
   rc=$?
@@ -162,7 +189,7 @@ run_case() {
 sec() { grep -a "$1" "$SEC"; }
 start_of() { sec "^RUN " | grep -a "label=$1 " | sed 's/^RUN t=\([^ ]*\) .*/\1/'; }
 end_of()   { sec "^END " | grep -a "label=$1 " | sed 's/^END t=\([^ ]*\) .*/\1/'; }
-field_of() {  # <label> <field>: cpuset/jobs/dist from the RUN record
+field_of() {  # <label> <field>: cpuset/taskset/jobs/dist from the RUN record
   sec "^RUN " | grep -a "label=$1 " | sed "s/.* $2=\\([^ ]*\\).*/\\1/" | head -1
 }
 overlapped() {  # <a> <b>: 1 when the two stubs overlapped in time
@@ -172,7 +199,7 @@ overlapped() {  # <a> <b>: 1 when the two stubs overlapped in time
 }
 
 # --- 1. concurrent green -------------------------------------------------
-CASE_CONCURRENT=1; CASE_FAIL_LABEL=
+CASE_CONCURRENT=1; CASE_FAIL_LABEL=; CASE_CPUSET_MODE=cgroup; CASE_CONTROLLERS_FILE=
 run_case conc-green
 OUT_CG=$OUT
 [ "$CASE_RC" = 0 ] && ok "conc-green: final rc 0" || bad "conc-green: final rc=$CASE_RC (want 0)"
@@ -204,9 +231,21 @@ DA=$(field_of portage dist); DB=$(field_of portuale dist)
   && ok "conc-green: new tarballs copied back to shared cache" \
   || bad "conc-green: copy-back missing"
 rm -f "$SEED"/fetched-by-*.tar  # keep the seed pristine for later cases
+# cgroup argv: --cpuset-cpus present, no taskset wrapper.
+if grep -a "^ARGV " "$SEC" | grep -a "label=portage " | grep -q -- "--cpuset-cpus"; then
+  ok "conc-green: cgroup argv carries --cpuset-cpus"
+else bad "conc-green: cgroup argv lacks --cpuset-cpus"; fi
+if grep -a "^ARGV " "$SEC" | grep -q "taskset"; then
+  bad "conc-green: cgroup argv unexpectedly wraps taskset"
+else ok "conc-green: cgroup argv has no taskset wrapper"; fi
+[ -z "$(field_of portage taskset)" ] && [ -z "$(field_of portuale taskset)" ] \
+  && ok "conc-green: no taskset pinning recorded" \
+  || bad "conc-green: unexpected taskset field"
+grep -q "(mode=cgroup)" "$OUT/l3-report.txt" && ok "conc-green: report mode=cgroup" \
+  || bad "conc-green: report lacks mode=cgroup"
 
 # --- 2. concurrent failing side ------------------------------------------
-CASE_CONCURRENT=1; CASE_FAIL_LABEL=portuale; CASE_FAIL_RC=124
+CASE_CONCURRENT=1; CASE_FAIL_LABEL=portuale; CASE_FAIL_RC=124; CASE_CPUSET_MODE=cgroup; CASE_CONTROLLERS_FILE=
 run_case conc-fail
 [ "$CASE_RC" = 2 ] && ok "conc-fail: final rc 2" || bad "conc-fail: final rc=$CASE_RC (want 2)"
 [ "$(cat "$OUT/portuale.exit")" = 124 ] && [ "$(cat "$OUT/portage.exit")" = 0 ] \
@@ -218,7 +257,7 @@ else bad "conc-fail: grading line missing"; fi
   || bad "conc-fail: unexpected candidate.txt"
 
 # --- 3. serial green -------------------------------------------------------
-CASE_CONCURRENT=0; CASE_FAIL_LABEL=
+CASE_CONCURRENT=0; CASE_FAIL_LABEL=; CASE_CPUSET_MODE=cgroup; CASE_CONTROLLERS_FILE=
 run_case serial-green
 OUT_SG=$OUT
 [ "$CASE_RC" = 0 ] && ok "serial-green: final rc 0" || bad "serial-green: final rc=$CASE_RC (want 0)"
@@ -246,13 +285,99 @@ if diff <(norm_report "$OUT_CG/l3-report.txt") \
 else bad "serial-green: l3-report.txt differs beyond dates/concur/cpusets/run-path"; fi
 
 # --- 4. serial failing side: same verdict path as (2) -----------------------
-CASE_CONCURRENT=0; CASE_FAIL_LABEL=portuale; CASE_FAIL_RC=124
+CASE_CONCURRENT=0; CASE_FAIL_LABEL=portuale; CASE_FAIL_RC=124; CASE_CPUSET_MODE=cgroup; CASE_CONTROLLERS_FILE=
 run_case serial-fail
 [ "$CASE_RC" = 2 ] && ok "serial-fail: final rc 2 (same as concurrent)" \
   || bad "serial-fail: final rc=$CASE_RC (want 2, same as concurrent)"
 if grep -q "missing snapshot: portuale -- run invalid" "$OUT_RUN"; then
   ok "serial-fail: same grading line as concurrent"
 else bad "serial-fail: grading line differs"; fi
+
+# --- 5. concurrent taskset green -----------------------------------------
+CASE_CONCURRENT=1; CASE_FAIL_LABEL=; CASE_CPUSET_MODE=taskset; CASE_CONTROLLERS_FILE=
+run_case conc-taskset
+OUT_TS=$OUT
+[ "$CASE_RC" = 0 ] && ok "conc-taskset: final rc 0" || bad "conc-taskset: final rc=$CASE_RC (want 0)"
+if overlapped portage portuale; then ok "conc-taskset: stubs overlapped"
+else bad "conc-taskset: stubs did NOT overlap"; fi
+TA=$(field_of portage taskset); TB=$(field_of portuale taskset)
+[ -n "$TA" ] && [ -n "$TB" ] && [ "$TA" != "$TB" ] \
+  && ok "conc-taskset: distinct taskset cpusets [$TA] [$TB]" \
+  || bad "conc-taskset: taskset cpusets missing/indistinct [$TA] [$TB]"
+[ "$TA" = "$CA" ] && [ "$TB" = "$CB" ] \
+  && ok "conc-taskset: cpuset strings identical to cgroup mode" \
+  || bad "conc-taskset: cpuset strings differ from cgroup mode [$TA vs $CA] [$TB vs $CB]"
+[ -z "$(field_of portage cpuset)" ] && [ -z "$(field_of portuale cpuset)" ] \
+  && ok "conc-taskset: no --cpuset-cpus flag" \
+  || bad "conc-taskset: unexpected --cpuset-cpus flag"
+if grep -a "^ARGV " "$SEC" | grep -a "label=portage " | grep -q -- "--cpuset-cpus"; then
+  bad "conc-taskset: argv unexpectedly carries --cpuset-cpus"
+else ok "conc-taskset: argv has no --cpuset-cpus"; fi
+if grep -a "^ARGV " "$SEC" | grep -a "label=portage " | grep -q 'exec taskset -c'; then
+  ok "conc-taskset: argv wraps build-and-merge in taskset"
+else bad "conc-taskset: argv lacks taskset wrapper"; fi
+# The build-and-merge.sh argv after the wrapper must be otherwise
+# identical: <cpuset> <pm> <atomlist> <outdir> with the same pm names
+# and guest outdirs as the cgroup run.
+if grep -a "^ARGV " "$SEC" | grep -a "label=portage " | grep -q "/TEST/layers/l3/build-and-merge.sh"; then
+  ok "conc-taskset: wrapper still calls build-and-merge.sh"
+else bad "conc-taskset: wrapper lost build-and-merge.sh"; fi
+if grep -a "^ARGV " "$SEC" | grep -a "label=portuale " | grep -q "portuale.*l3-smoke.txt.*/TEST/logs/"; then
+  ok "conc-taskset: portuale wrapper carries pm + atomlist + outdir"
+else bad "conc-taskset: portuale wrapper argv incomplete"; fi
+[ "$(cat "$OUT/portage.exit")" = 0 ] && [ "$(cat "$OUT/portuale.exit")" = 0 ] \
+  && ok "conc-taskset: .exit 0/0" || bad "conc-taskset: .exit wrong"
+grep -q "(mode=taskset)" "$OUT/l3-report.txt" && ok "conc-taskset: report mode=taskset" \
+  || bad "conc-taskset: report lacks mode=taskset"
+if cmp -s "$OUT_CG/candidate.txt" "$OUT_TS/candidate.txt"; then
+  ok "conc-taskset: candidate.txt byte-equal to cgroup run"
+else bad "conc-taskset: candidate.txt differs from cgroup run"; fi
+rm -f "$SEED"/fetched-by-*.tar
+
+# --- 6. serial taskset green: old command, no pinning at all ---------------
+CASE_CONCURRENT=0; CASE_FAIL_LABEL=; CASE_CPUSET_MODE=taskset; CASE_CONTROLLERS_FILE=
+run_case serial-taskset
+[ "$CASE_RC" = 0 ] && ok "serial-taskset: final rc 0" || bad "serial-taskset: final rc=$CASE_RC (want 0)"
+[ -z "$(field_of portage cpuset)" ] && [ -z "$(field_of portuale cpuset)" ] \
+  && ok "serial-taskset: no --cpuset-cpus (old command line)" \
+  || bad "serial-taskset: unexpected cpuset flags"
+[ -z "$(field_of portage taskset)" ] && [ -z "$(field_of portuale taskset)" ] \
+  && ok "serial-taskset: no taskset wrapper (old command line)" \
+  || bad "serial-taskset: unexpected taskset wrapper"
+if grep -a "^ARGV " "$SEC" | grep -q "taskset"; then
+  bad "serial-taskset: argv unexpectedly mentions taskset"
+else ok "serial-taskset: argv has no taskset"; fi
+[ "$(field_of portage dist)" = "$SEED" ] && [ "$(field_of portuale dist)" = "$SEED" ] \
+  && ok "serial-taskset: shared distfiles bind (old behaviour)" \
+  || bad "serial-taskset: distfiles bind changed"
+grep -q "(mode=taskset)" "$OUT/l3-report.txt" && ok "serial-taskset: report mode=taskset" \
+  || bad "serial-taskset: report lacks mode=taskset"
+if cmp -s "$OUT_SG/candidate.txt" "$OUT/candidate.txt"; then
+  ok "serial-taskset: candidate.txt byte-equal to serial cgroup run"
+else bad "serial-taskset: candidate.txt differs from serial cgroup run"; fi
+
+# --- 7. auto probe via fake controllers files ------------------------------
+FAKE_ON=$TMP/controllers-with-cpuset
+FAKE_OFF=$TMP/controllers-without-cpuset
+printf 'cpu memory pids cpuset\n' > "$FAKE_ON"
+printf 'cpu memory pids\n' > "$FAKE_OFF"
+CASE_CONCURRENT=1; CASE_FAIL_LABEL=; CASE_CPUSET_MODE=auto; CASE_CONTROLLERS_FILE=$FAKE_ON
+run_case auto-cgroup
+[ -n "$(field_of portage cpuset)" ] && [ -z "$(field_of portage taskset)" ] \
+  && ok "auto-cgroup: controllers listing cpuset selects cgroup mode" \
+  || bad "auto-cgroup: did not select cgroup mode"
+grep -q "(mode=cgroup)" "$OUT/l3-report.txt" && ok "auto-cgroup: report mode=cgroup" \
+  || bad "auto-cgroup: report lacks mode=cgroup"
+rm -f "$SEED"/fetched-by-*.tar
+CASE_CONCURRENT=1; CASE_FAIL_LABEL=; CASE_CPUSET_MODE=auto; CASE_CONTROLLERS_FILE=$FAKE_OFF
+run_case auto-taskset
+[ -z "$(field_of portage cpuset)" ] && [ -n "$(field_of portage taskset)" ] \
+  && ok "auto-taskset: controllers without cpuset selects taskset mode" \
+  || bad "auto-taskset: did not select taskset mode"
+grep -q "(mode=taskset)" "$OUT/l3-report.txt" && ok "auto-taskset: report mode=taskset" \
+  || bad "auto-taskset: report lacks mode=taskset"
+rm -f "$SEED"/fetched-by-*.tar
+CASE_CONTROLLERS_FILE=
 
 # cache untouched overall?
 [ "$(sha256sum "$SEED/seed-from-cache.tar" | cut -d' ' -f1)" = "$SEED_SHA" ] \
