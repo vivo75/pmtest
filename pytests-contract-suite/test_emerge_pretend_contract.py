@@ -23150,7 +23150,7 @@ _G216_SELF_BLOCK = (
 
 
 def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
-    emerge_binary, fixture_env
+    emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #216: `app-misc/g216top` merges
     `[g216boot, g216comp, g216mid, g216top]`, rc 0. Real's pass 1 keeps
@@ -23163,38 +23163,82 @@ def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
     (`/tmp/opencode/g216/probe.log`, real 3.0.81.3) shows exactly this
     merge list. MATCHES real since #216: the `circular_self` bolt-on
     now only fires when the self atom matches nothing in-graph, and the
-    serialize dead-end feeds a `circular_dependency` retry."""
-    rust = _run([str(emerge_binary)], ["--pretend", "app-misc/g216top"], fixture_env)
+    serialize dead-end feeds a `circular_dependency` retry.
+
+    Track X Slice C (#242): re-pinned to the default-staging dual-root
+    bytes. The fixture BDEPEND resolves against the running root (real
+    `ESYSROOT`, `depgraph.py:4255-4291`), so `g216comp` merges TWICE --
+    once per root -- and the running-root `g216boot` leads the list
+    (`docs/evidence/2026-09-29-242-inventory/probes/default-g216top.txt`,
+    real 3.0.82.2: 5 rows, `backtrack: 1/20`, rc 0). The running root
+    here is a hermetic empty tmp tree (nothing installed, same testrepo),
+    so the run is deterministic. Suffix placement (`to <root>` on the
+    running rows vs real's target-row suffix) is Slice D's, not this
+    pin's: this pin fixes the row SET and order."""
+    running = tmp_path / "running"
+    running.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = str(running)
+    rust = _run([str(emerge_binary)], ["--pretend", "app-misc/g216top"], env)
     assert rust.returncode == 0
     rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
     assert rows == [
-        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        f"[ebuild  N     ] dev-lang/g216boot-1.0 to {running}",
+        f"[ebuild  N     ] dev-lang/g216comp-1.0 to {running}",
         "[ebuild  N     ] dev-lang/g216comp-1.0 ",
         "[ebuild  N     ] dev-libs/g216mid-1.0 ",
         "[ebuild  N     ] app-misc/g216top-1.0 ",
     ]
+    verbose = _run(
+        [str(emerge_binary)], ["--pretend", "--verbose", "app-misc/g216top"], env
+    )
+    assert verbose.returncode == 0
+    total = [ln for ln in verbose.stdout.splitlines() if ln.startswith("Total:")]
+    assert total == ["Total: 5 packages (5 new), Size of downloads: 0 KiB"]
 
 
 def test_or_pick_backtrack0_reports_the_self_cycle(
-    emerge_binary, fixture_env
+    emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #216: `app-misc/g216top --backtrack=0` fails with real's
     pass-1 self-cycle block, rc 1, verbatim from the S0 container probe
     (real 3.0.81.3 `emerge -p --color=n --backtrack=0 app-misc/g216top`;
     the block text is staging-independent). With no backtracking real
     displays the pass-1 graph -- the `* Error: circular dependencies:`
-    self ring -- instead of re-resolving."""
+    self ring -- instead of re-resolving.
+
+    Track X Slice C (#242): re-pinned to the default-staging dual-root
+    bytes. Under the hermetic dual-root env (see the rc-0 pin above) the
+    pass-1 graph strands on the running-root self loop with FOUR merge
+    rows behind the block (dual `g216comp`), and the `Total:` counts
+    both roots (`docs/evidence/2026-09-29-242-inventory/probes/
+    default-g216top-b0.txt`, real 3.0.82.2: `Total: 4`, rc 1). Row-level
+    abort-partial rendering stays owned by backlog #245 (the
+    `g216-b0-cycle-abort-tree-ancestors` bed allowlist): this pin fixes
+    rc, the verbatim block, and the Total."""
+    running = tmp_path / "running"
+    running.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = str(running)
     rust = _run(
         [str(emerge_binary)],
         ["--pretend", "--backtrack=0", "app-misc/g216top"],
-        fixture_env,
+        env,
     )
     assert rust.returncode == 1
     assert _G216_SELF_BLOCK in rust.stderr
+    verbose = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "--backtrack=0", "app-misc/g216top"],
+        env,
+    )
+    assert verbose.returncode == 1
+    total = [ln for ln in verbose.stdout.splitlines() if ln.startswith("Total:")]
+    assert total == ["Total: 4 packages (4 new), Size of downloads: 0 KiB"]
 
 
 def test_or_pick_direct_target_resolves_to_bootstrap(
-    emerge_binary, fixture_env
+    emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #216 (review M3): `dev-lang/g216comp` merges
     `[g216boot, g216comp]`, rc 0 -- the direct-target mirror of the
@@ -23205,32 +23249,69 @@ def test_or_pick_direct_target_resolves_to_bootstrap(
     3.0.81.3) shows rc 0 with the bootstrap merge, and the L0 oracle
     single-root capture shows exactly these two rows. Single-root
     `fixture_env` (`RUNNING_ROOT == ROOT`) carries no `to <ROOT>`
-    suffix and no dual-root `g216comp` row."""
-    rust = _run([str(emerge_binary)], ["--pretend", "dev-lang/g216comp"], fixture_env)
+    suffix and no dual-root `g216comp` row.
+
+    Track X Slice C (#242): re-pinned to the default-staging dual-root
+    bytes. The direct target lands in the target root while its BDEPEND
+    self pick resolves running-rooted, so even the direct target merges
+    `g216comp` TWICE plus the running `g216boot` (3 rows;
+    `docs/evidence/2026-09-29-242-inventory/probes/default-g216comp.txt`,
+    real 3.0.82.2: `backtrack: 1/20`, rc 0). Hermetic dual-root env as
+    in the `g216top` pin above; suffix placement is Slice D's."""
+    running = tmp_path / "running"
+    running.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = str(running)
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-lang/g216comp"], env)
     assert rust.returncode == 0
     rows = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
     assert rows == [
-        "[ebuild  N     ] dev-lang/g216boot-1.0 ",
+        f"[ebuild  N     ] dev-lang/g216boot-1.0 to {running}",
+        f"[ebuild  N     ] dev-lang/g216comp-1.0 to {running}",
         "[ebuild  N     ] dev-lang/g216comp-1.0 ",
     ]
+    verbose = _run(
+        [str(emerge_binary)], ["--pretend", "--verbose", "dev-lang/g216comp"], env
+    )
+    assert verbose.returncode == 0
+    total = [ln for ln in verbose.stdout.splitlines() if ln.startswith("Total:")]
+    assert total == ["Total: 3 packages (3 new), Size of downloads: 0 KiB"]
 
 
 def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
-    emerge_binary, fixture_env
+    emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #216 (review M3): `dev-lang/g216comp --backtrack=0`
     fails with real's pass-1 self-cycle block, rc 1 -- the
     direct-target mirror of the `g216top` b0 pin above. Same verbatim
     block (`_G216_SELF_BLOCK`, staging-independent); the L0 oracle
     single-root capture shows the one-row `[ebuild] g216comp` merge
-    list under it (`Total: 1`)."""
+    list under it (`Total: 1`).
+
+    Track X Slice C (#242): re-pinned to the default-staging dual-root
+    bytes. Under the hermetic dual-root env the direct target strands
+    with BOTH `g216comp` instances behind the block
+    (`docs/evidence/2026-09-29-242-inventory/probes/
+    default-g216comp-b0.txt`, real 3.0.82.2: `Total: 2`, rc 1)."""
+    running = tmp_path / "running"
+    running.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = str(running)
     rust = _run(
         [str(emerge_binary)],
         ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
-        fixture_env,
+        env,
     )
     assert rust.returncode == 1
     assert _G216_SELF_BLOCK in rust.stderr
+    verbose = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "--backtrack=0", "dev-lang/g216comp"],
+        env,
+    )
+    assert verbose.returncode == 1
+    total = [ln for ln in verbose.stdout.splitlines() if ln.startswith("Total:")]
+    assert total == ["Total: 2 packages (2 new), Size of downloads: 0 KiB"]
 
 
 # Backlog #244 (batch-2026-09-28_244 Slice C): the aub0 argument-order

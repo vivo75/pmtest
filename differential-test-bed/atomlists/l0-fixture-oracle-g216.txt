@@ -3,27 +3,30 @@
 # `|| ( >=self self-bootstrap )` is reached in-graph through a
 # mid-graph consumer).
 #
-# Run with `FX_HOST_ROOTS=1` (single `ROOT=/`, like the L0 rows):
-# under the default staging real splits BDEPEND across ESYSROOT=/
-# and prints dual `g216comp` rows (`to /` + `to <ROOT>`) with Total 4,
-# which needs multi-root graph modeling (residual, see the G12
-# report); the single-root shape is what the L0 probes exercise.
+# Run under the default staging (no knob: the bed's `ROOT=$FX` with
+# `ROOT != "/"` already splits real's BDEPEND across the running root,
+# so no `FX_HOST_ROOTS=1`). Track X Slice C (#242) ships the
+# multi-root graph modeling the old header called residual.
 # The comparator ignores `to <ROOT>` suffixes and collapses the dual
-# rows by `(type, cp, slot)` either way.
+# rows by `(type, cp, slot)` either way; suffix placement itself
+# (`to <EROOT>` on target rows) is Slice D's, not this list's.
 #
-#   FX_HOST_ROOTS=1 \
-#     differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g216.txt
+#   differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g216.txt
 #
-# Shape (S0 probe `/tmp/opencode/g216/probe.log`, real 3.0.81.3; the
-# bed pins 3.0.82.2, same mechanism): `g216top` RDEPENDs `g216mid`,
-# `g216mid` RDEPENDs `g216comp`, `g216comp` BDEPENDs
-# `|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )`. Real's pass 1
-# keeps the in-graph `>=g216comp` branch live (`dep_zapdeps`
-# `preferred_in_graph`, `dep_check.py`), dead-ends on the self cycle
-# (`_serialize_tasks`, `depgraph.py:10262`), and re-resolves with the
-# `circular_dependency` map to `g216boot` (`backtrack: 1/20`, rc 0);
-# `--backtrack=0` reports the pass-1 graph with the
-# `* Error: circular dependencies:` self block (rc 1).
+# Shape (real 3.0.82.2, the L0 pin;
+# `docs/evidence/2026-09-29-242-inventory/probes/default-g216*.txt`):
+# `g216top` RDEPENDs `g216mid`, `g216mid` RDEPENDs `g216comp`,
+# `g216comp` BDEPENDs `|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )`.
+# Real's pass 1 keeps the in-graph `>=g216comp` branch live
+# (`dep_zapdeps` `preferred_in_graph`, `dep_check.py`), dead-ends on
+# the running-root self cycle (`_serialize_tasks`, `depgraph.py:10262`),
+# and re-resolves with the `circular_dependency` map to `g216boot`
+# (`backtrack: 1/20`, rc 0) with the merge list spanning both roots
+# (`default-g216top.txt`: 5 rows, dual `g216comp`;
+# `default-g216comp.txt`: 3 rows). `--backtrack=0` reports the pass-1
+# graph with the `* Error: circular dependencies:` self block (rc 1)
+# over the dual rows (`default-g216top-b0.txt`: Total 4;
+# `default-g216comp-b0.txt`: Total 2).
 app-misc/g216top
 dev-lang/g216comp
 --backtrack=0 app-misc/g216top
