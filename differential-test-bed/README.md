@@ -174,8 +174,10 @@ smoke also covers the SOURCE half of the merge-path safety gate):
 differential-test-bed/run/l3-source-parity.sh differential-test-bed/atomlists/l3-smoke.txt
 ```
 
-About 15 min at `-j28` (≈9 min building, ≈5.5 min for the two
-full-tree snapshots, run one after the other), `L3_PM=both`, no control pair. Effective build args resolve
+About 15 min at `-j28` serial (≈9 min building, ≈5.5 min for the two
+full-tree snapshots, run one after the other), `L3_PM=both`, no control pair. By default the two sides
+now run concurrently (`L3_CONCURRENT=1`, one 6-core CCX half each, wall time ≈ max(side A, side B);
+`L3_CONCURRENT=0` restores the old serial order), each at `-j${L3_JOBS:-1}` (smoke use: `L3_JOBS=12`). Effective build args resolve
 as: env `L3_BUILD_ARGS` when set → else the atom list's `# l3-build-args:`
 directive → else `--emptytree --oneshot --usepkg=n --color=n` (#280); the
 smoke list carries `# l3-build-args: --oneshot --usepkg=n --color=n`

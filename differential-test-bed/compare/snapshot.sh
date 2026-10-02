@@ -20,6 +20,12 @@
 #
 # type: f d l b c p s   (regular/dir/symlink/block/char/fifo/socket)
 # mtimes are deliberately NOT in files.tsv (see docs/real-world-testing.md §4.3).
+#
+# Env:
+#   SNAPSHOT_JOBS=N   hash workers (default 8; 1 = the old serial loop
+#                     verbatim). Byte-identical for any N: worker outputs
+#                     are concatenated and re-sorted by the LC_ALL=C
+#                     sort -u -o below.
 
 set -euo pipefail
 trap 'echo "snapshot.sh: FAILED at line $LINENO (exit $?)" >&2' ERR
@@ -119,14 +125,24 @@ emit_null() {  # feed to the stat loop below
 }
 
 # find + stat; sha256 only for regular files; xattrs sorted & base64'd.
-emit_null |
-LC_ALL=C sort -z -u |
-while IFS= read -r -d '' f; do
+#
+# The per-path computation lives in hash_one() so the walk can run
+# sharded over SNAPSHOT_JOBS workers (default 8; 1 = the old serial
+# loop verbatim). Parallelism needs no external tool: the sorted NUL
+# stream is round-robin sharded (serial, no forks) and each shard is
+# hashed by a background bash worker into its own file pair; the union
+# of worker outputs is then canonicalised by the pre-existing
+# `LC_ALL=C sort -u -o` below, which is the ONLY ordering guarantee the
+# format needs -- files.tsv/mtimes.tsv lines carry no worker id or
+# timestamp, so the byte output is worker-count independent.
+hash_one() {  # <abs-path>: append one manifest line pair; outputs via
+              # $FILES_OUT / $MTIMES_OUT (set by the caller per worker).
+  local f=$1 rel sr kind mode uid gid size mtime t sha link xa
   rel=${f#"$ROOT"}; rel=${rel:-/}
   # `%F` is multi-word ("regular file", "symbolic link") -- use a `|`
   # delimiter, not whitespace. %a octal mode, %u %g %s %Y.
   sr=$(stat -c '%F|%a|%u|%g|%s|%Y' "$f" 2>/dev/null) || sr=
-  [ -n "$sr" ] || continue   # vanished mid-walk
+  [ -n "$sr" ] || return 0   # vanished mid-walk
   IFS='|' read -r kind mode uid gid size mtime <<<"$sr" || true
   case $kind in
     "regular file"|"regular empty file") t=f ;;
@@ -152,9 +168,78 @@ while IFS= read -r -d '' f; do
        sed -n 's/^\([^=]*\)=\(.*\)$/\1=\2/p' | LC_ALL=C sort | paste -sd, -) || xa=
   xa=${xa:--}
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$rel" "$t" "$mode" "$uid" "$gid" "$size" "$sha" "$link" "$xa" >> "$OUT.files.tsv"
-  printf '%s\t%s\n' "$rel" "$mtime" >> "$OUT.mtimes.tsv"
-done || echo "snapshot.sh: walk pipeline returned non-zero -- files.tsv may be short (continuing to VDB tar)" >&2
+    "$rel" "$t" "$mode" "$uid" "$gid" "$size" "$sha" "$link" "$xa" >> "$FILES_OUT"
+  printf '%s\t%s\n' "$rel" "$mtime" >> "$MTIMES_OUT"
+}
+
+# Worker count: unset/empty/non-numeric -> default 8; <1 -> 1 (no worker
+# may silently produce an empty manifest).
+: "${SNAPSHOT_JOBS:=8}"
+case $SNAPSHOT_JOBS in
+  ''|*[!0-9]*) SNAPSHOT_JOBS=8 ;;
+esac
+[ "$SNAPSHOT_JOBS" -ge 1 ] 2>/dev/null || SNAPSHOT_JOBS=1
+
+if [ "$SNAPSHOT_JOBS" -le 1 ]; then
+  # Serial path: exactly the old behaviour -- one loop appending
+  # straight to the outputs, no shard machinery involved.
+  FILES_OUT="$OUT.files.tsv" MTIMES_OUT="$OUT.mtimes.tsv"
+  emit_null |
+  LC_ALL=C sort -z -u |
+  while IFS= read -r -d '' f; do
+    hash_one "$f"
+  done || echo "snapshot.sh: walk pipeline returned non-zero -- files.tsv may be short (continuing to VDB tar)" >&2
+else
+  # Parallel path: enumerate once (serial, fast), round-robin the sorted
+  # NUL stream over SNAPSHOT_JOBS shard files (serial, fork-free, so the
+  # NUL separation -- and names with spaces/newlines -- survives), hash
+  # one shard per background worker, concatenate the disjoint outputs.
+  sharddir=$(mktemp -d "${TMPDIR:-/tmp}/snapshot.XXXXXX")
+  # shellcheck disable=SC2064  # $sharddir is fixed at trap-install time
+  trap "rm -rf \"$sharddir\"" EXIT
+  emit_null |
+  LC_ALL=C sort -z -u > "$sharddir/paths.nul" \
+    || echo "snapshot.sh: enumerate pipeline returned non-zero -- files.tsv may be short (continuing to VDB tar)" >&2
+  i=0
+  while IFS= read -r -d '' f; do
+    printf '%s\0' "$f" >> "$sharddir/shard.$((i % SNAPSHOT_JOBS)).nul"
+    i=$((i + 1))
+  done < "$sharddir/paths.nul"
+  pids=()
+  j=0
+  while [ "$j" -lt "$SNAPSHOT_JOBS" ]; do
+    : > "$sharddir/files.$j"
+    : > "$sharddir/mtimes.$j"
+    # Subshell: per-worker outputs stay local; the parent keeps the
+    # serial-path FILES_OUT/MTIMES_OUT (unused here). The EXIT cleanup
+    # trap is dropped here so only the main shell removes $sharddir.
+    (
+      trap - EXIT
+      FILES_OUT="$sharddir/files.$j" MTIMES_OUT="$sharddir/mtimes.$j"
+      while IFS= read -r -d '' f; do
+        hash_one "$f"
+      done < "$sharddir/shard.$j.nul"
+    ) &
+    pids+=($!)
+    j=$((j + 1))
+  done
+  worker_rc=0
+  for wpid in "${pids[@]}"; do
+    wait "$wpid" || worker_rc=$?
+  done
+  [ "$worker_rc" -eq 0 ] \
+    || echo "snapshot.sh: a hash worker exited $worker_rc -- files.tsv may be short (continuing to VDB tar)" >&2
+  : > "$OUT.files.tsv"
+  : > "$OUT.mtimes.tsv"
+  j=0
+  while [ "$j" -lt "$SNAPSHOT_JOBS" ]; do
+    cat "$sharddir/files.$j" >> "$OUT.files.tsv"
+    cat "$sharddir/mtimes.$j" >> "$OUT.mtimes.tsv"
+    j=$((j + 1))
+  done
+  rm -rf "$sharddir"
+  trap - EXIT
+fi
 
 # --paths can list a dir and a file inside it -> dedup.
 LC_ALL=C sort -u -o "$OUT.files.tsv" "$OUT.files.tsv"

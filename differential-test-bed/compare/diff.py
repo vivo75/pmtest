@@ -234,19 +234,30 @@ def hardlink_debug_tolerated(a_vdb: dict, b_vdb: dict) -> set[str]:
                     out.append(path)
         return out
 
+    # Hoisted out of the per-set loop below: each of these scans
+    # re-parses every CONTENTS file in the side's VDB, so calling them
+    # per confirmed set was O(sets x vdb) -- ~6 min on the L3 smoke pair
+    # with ~4k confirmed hardlink sets. The values are loop-invariant
+    # (neither vdb dict is mutated anywhere in this function).
+    dbg_a = debug_objs(a_vdb)
+    dbg_b = debug_objs(b_vdb)
+    bid_a = buildid_keys(a_vdb)
+    bid_b = buildid_keys(b_vdb)
+    dbg_all = dbg_a + dbg_b
+    bid_all = bid_a + bid_b
     tolerated: set[str] = set()
     for members in confirmed:
         basenames = {p.rsplit("/", 1)[-1] for p in members}
-        names_a = {_debug_stem(d) for d in debug_objs(a_vdb)
+        names_a = {_debug_stem(d) for d in dbg_a
                    if _debug_stem(d) in basenames}
-        names_b = {_debug_stem(d) for d in debug_objs(b_vdb)
+        names_b = {_debug_stem(d) for d in dbg_b
                    if _debug_stem(d) in basenames}
         if len(names_a) != 1 or len(names_b) != 1:
             continue
-        for d in debug_objs(a_vdb) + debug_objs(b_vdb):
+        for d in dbg_all:
             if _debug_stem(d) in basenames:
                 tolerated.add(d)
-        for k in buildid_keys(a_vdb) + buildid_keys(b_vdb):
+        for k in bid_all:
             target = _buildid_target(k)
             if target is not None and _debug_stem(target) in basenames:
                 tolerated.add(k)
