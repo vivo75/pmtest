@@ -74,7 +74,7 @@ def test_dispatch_via_symlink_emerge(portuale_binary, tmp_path):
         check=True,
         env=_fixture_env(),
     )
-    assert result.stdout.strip() == "[ebuild  N     ] dev-libs/newpkg-1.0"
+    assert result.stdout.strip() == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {FIXTURES_ROOT}'
 
 
 def test_dispatch_via_symlink_ebuild(portuale_binary, tmp_path):
@@ -105,7 +105,7 @@ def test_dispatch_via_path_lookup_by_bare_name(portuale_binary, tmp_path):
         check=True,
         env=env,
     )
-    assert result.stdout.strip() == "[ebuild  N     ] dev-libs/newpkg-1.0"
+    assert result.stdout.strip() == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {FIXTURES_ROOT}'
 
 
 def test_explicit_arg_fallback_dispatch(portuale_binary):
@@ -466,10 +466,10 @@ def test_solver_backends_share_the_walk_merge_order(emerge_binary, fixture_env):
         outputs.append(result.stdout)
     assert outputs[0] == outputs[1] == outputs[2]
     assert [line.rstrip() for line in outputs[0].splitlines()] == [
-        "[ebuild  N     ] dev-libs/common-1.0",
-        "[ebuild  N     ] dev-libs/shared-a-1.0",
-        "[ebuild  N     ] dev-libs/shared-b-1.0",
-        "[ebuild  N     ] dev-libs/diamond-1.0",
+        f'[ebuild  N     ] dev-libs/common-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/shared-a-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/shared-b-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/diamond-1.0 to {fixture_env["ROOT"]}',
     ]
 
 
@@ -481,7 +481,7 @@ def test_solver_backends_render_forced_flag_markers(emerge_binary, fixture_env):
     so `-pv` of `dev-libs/pkgusemaskforcepkg` matches the walk-path
     contract byte for byte (`USE="(forceflag) (-maskflag) -specflag"`)."""
     expected = (
-        '[ebuild  N     ] dev-libs/pkgusemaskforcepkg-1.0::testrepo  USE="(forceflag) (-maskflag) -specflag"\n'
+        f'[ebuild  N     ] dev-libs/pkgusemaskforcepkg-1.0::testrepo to {fixture_env["ROOT"]} USE="(forceflag) (-maskflag) -specflag" \n'
         "\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n"
     )
     for solver in ("portage", "pubgrub", "resolvo"):
@@ -515,16 +515,16 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     paths start the printed cycle at `hardcycleb` (real's
     `shortest_cycle[0]` under the single-root rendering)."""
     legacy_stdout = (
-        "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
-        "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
+        f'[ebuild  N     ] dev-libs/hardcyclea-1.0 to {fixture_env["ROOT"]}\n'
+        f'[ebuild  N     ] dev-libs/hardcycleb-1.0 to {fixture_env["ROOT"]}\n'
         "\n"
-        "[ebuild  N     ] dev-libs/hardcyclea-1.0 \n"
-        "[ebuild  N     ] dev-libs/hardcycleb-1.0 \n"
+        f'[ebuild  N     ] dev-libs/hardcyclea-1.0 to {fixture_env["ROOT"]}\n'
+        f'[ebuild  N     ] dev-libs/hardcycleb-1.0 to {fixture_env["ROOT"]}\n'
     )
     partial_stdout = (
-        "[nomerge       ] dev-libs/hardcyclea-1.0::testrepo\n"
-        "[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo  0 KiB\n"
-        "[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo  0 KiB\n"
+        f'[nomerge       ] dev-libs/hardcyclea-1.0::testrepoto {fixture_env["ROOT"]}\n'
+        f'[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        f'[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         "\n"
         "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
     )
@@ -2732,7 +2732,7 @@ def test_emerge_buildpkgonly_with_pretend_stays_dry_run(emerge_binary, tmp_path)
         check=True,
         env=env,
     )
-    assert result.stdout.strip() == "[ebuild  N     ] dev-libs/packagepkg-1.0"
+    assert result.stdout.strip() == f'[ebuild  N     ] dev-libs/packagepkg-1.0 to {FIXTURES_ROOT}'
     assert "Building binary" not in result.stdout
     assert not (Path(env["PKGDIR"]) / "dev-libs").exists()
 
@@ -2871,7 +2871,7 @@ def test_cache_less_repo_metadata_falls_back_to_the_depend_phase(
         env=env,
     )
     assert result.returncode == 0, (result.stdout, result.stderr)
-    assert result.stdout.splitlines() == ["[ebuild  N     ] porttest/docs-1.0 "]
+    assert result.stdout.splitlines() == [f'[ebuild  N     ] porttest/docs-1.0 to {FIXTURES_ROOT}']
     # The cache really was absent (the resolution above is the fallback).
     assert not cache.exists()
 
@@ -2892,7 +2892,7 @@ def test_cache_less_repo_metadata_falls_back_to_the_depend_phase(
     ]
     outputs = [p.communicate() + (p.returncode,) for p in procs]
     assert all(
-        rc == 0 and out.splitlines() == ["[ebuild  N     ] porttest/docs-1.0 "]
+        rc == 0 and out.splitlines() == [f'[ebuild  N     ] porttest/docs-1.0 to {FIXTURES_ROOT}']
         for out, _, rc in outputs
     ), outputs
 
@@ -2972,7 +2972,7 @@ def test_cache_less_repo_metadata_is_written_to_the_depcache(emerge_binary, tmp_
     # every uppercase letter).
     first = resolve()
     assert first.returncode == 0, (first.stdout, first.stderr)
-    assert first.stdout.splitlines() == ["[ebuild  N     ] porttest/docs-1.0 "]
+    assert first.stdout.splitlines() == [f'[ebuild  N     ] porttest/docs-1.0 to {FIXTURES_ROOT}']
     assert entry.is_file(), list(depcache.rglob("*"))
     body = entry.read_text()
     assert body.splitlines() == sorted(body.splitlines()), body
@@ -3081,7 +3081,7 @@ def test_stale_md5_cache_entry_is_regenerated_from_the_ebuild(emerge_binary, tmp
 
     result = resolve()
     assert result.returncode == 0, (result.stdout, result.stderr)
-    assert result.stdout.splitlines() == ["[ebuild  N     ] dev-libs/md5pkg-1.0 "]
+    assert result.stdout.splitlines() == [f'[ebuild  N     ] dev-libs/md5pkg-1.0 to {FIXTURES_ROOT}']
     body = entry.read_text()
     assert f"_md5_={hashlib.md5(ebuild.read_bytes()).hexdigest()}" in body
     assert "KEYWORDS=amd64\n" in body
@@ -3137,7 +3137,7 @@ def test_eclass_change_invalidates_the_md5_cache_entry(emerge_binary, tmp_path):
 
     result = resolve()
     assert result.returncode == 0, (result.stdout, result.stderr)
-    assert result.stdout.splitlines() == ["[ebuild  N     ] dev-libs/md5pkg-1.0 "]
+    assert result.stdout.splitlines() == [f'[ebuild  N     ] dev-libs/md5pkg-1.0 to {FIXTURES_ROOT}']
     body = entry.read_text()
     new_md5 = hashlib.md5(b"# changed\n").hexdigest()
     assert f"_eclasses_=md5eclass\t{eclass.parent}\t{new_md5}\n" in body, body
@@ -3194,7 +3194,7 @@ def test_pms_first_cache_formats_ignores_a_valid_md5_cache_entry(
     # and its metadata is written back to the depcachedir.
     result = resolve()
     assert result.returncode == 0, (result.stdout, result.stderr)
-    assert result.stdout.splitlines() == ["[ebuild  N     ] dev-libs/md5pkg-1.0 "], result.stdout
+    assert result.stdout.splitlines() == [f'[ebuild  N     ] dev-libs/md5pkg-1.0 to {FIXTURES_ROOT}'], result.stdout
     assert entry.is_file(), list(entry.parent.rglob("*"))
     assert "KEYWORDS=amd64\n" in entry.read_text()
 
@@ -3234,7 +3234,7 @@ def test_metadata_transfer_features_ignores_a_valid_md5_cache_entry(
 
     result = resolve()
     assert result.returncode == 0, (result.stdout, result.stderr)
-    assert result.stdout.splitlines() == ["[ebuild  N     ] dev-libs/md5pkg-1.0 "], result.stdout
+    assert result.stdout.splitlines() == [f'[ebuild  N     ] dev-libs/md5pkg-1.0 to {FIXTURES_ROOT}'], result.stdout
     assert entry.is_file(), list(entry.parent.rglob("*"))
     assert "KEYWORDS=amd64\n" in entry.read_text()
 
@@ -8332,7 +8332,7 @@ def test_emerge_applies_portage_scheduling_policy(emerge_binary, fixture_env):
     r = subprocess.run(base, capture_output=True, text=True, check=False, env=env)
     assert r.returncode == 0
     assert "Invalid policy" not in r.stderr
-    assert r.stdout.strip() == "[ebuild  N     ] dev-libs/newpkg-1.0"
+    assert r.stdout.strip() == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}'
 
     # An unknown policy name -> the real eerror pair, run still proceeds.
     env = dict(clean, PORTAGE_SCHEDULING_POLICY="turbo")
@@ -8340,7 +8340,7 @@ def test_emerge_applies_portage_scheduling_policy(emerge_binary, fixture_env):
     assert r.returncode == 0
     assert "Invalid policy in PORTAGE_SCHEDULING_POLICY." in r.stderr
     assert "make.conf(5)" in r.stderr
-    assert r.stdout.strip() == "[ebuild  N     ] dev-libs/newpkg-1.0"
+    assert r.stdout.strip() == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}'
 
     # An out-of-range PORTAGE_SCHEDULING_PRIORITY -> its own eerror pair.
     env = dict(clean, PORTAGE_SCHEDULING_POLICY="batch",

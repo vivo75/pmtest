@@ -81,8 +81,23 @@ fi
 # just above, so `/` carries the same installed set. Used by the
 # slotop matrix run (`FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1 ...`); every
 # other atomlist keeps the default.
+#
+# FX_HOST_RUNNING_ROOT=1 drops the `PORTAGE_RUNNING_ROOT=$FX` pin above
+# (unsets it): portuale's running root is then the container's real `/`
+# -- exactly where real portage (which has no such variable -- it is
+# portuale-only, see `running_root_from_env`) always resolved `BDEPEND`/
+# `IDEPEND`/`DEPEND` under a non-`/` ROOT. The target root's vdb/world
+# are the fixture copies written just above AND `/var/db/pkg` carries
+# the same fixture copy, so both roots resolve the same trees; only the
+# profile differs (host vs fixture), which is precisely the cross-root
+# USE paint backlog #242 Slice D pins (the blk0 missed line). Used by
+# the main atomlist only; every other list keeps the pin (single-root
+# portuale there, whose `to`-suffix adds the comparator ignores).
 if [ "${FX_HOST_ROOTS:-}" = 1 ]; then
   export PORTAGE_CONFIGROOT="$FX" ROOT="/" PORTAGE_RUNNING_ROOT="/" DISTDIR="$FX/distfiles"
+elif [ "${FX_HOST_RUNNING_ROOT:-}" = 1 ]; then
+  export PORTAGE_CONFIGROOT="$FX" ROOT="$FX" DISTDIR="$FX/distfiles"
+  unset PORTAGE_RUNNING_ROOT
 else
   export PORTAGE_CONFIGROOT="$FX" ROOT="$FX" PORTAGE_RUNNING_ROOT="$FX" DISTDIR="$FX/distfiles"
 fi

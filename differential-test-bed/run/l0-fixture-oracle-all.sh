@@ -2,9 +2,12 @@
 # L0 fixture-oracle bed, all thirteen atomlists in sequence (backlog #87).
 #
 # There are thirteen lists today (`atomlists/l0-fixture-oracle{,-host,-rdcpin,
-# -slotop,-whpin,-r25,-g210,-g212,-g213,-g214,-g215,-g216,-244}.txt`) and five env knobs (`FX_SLOTOP_BDEP`, `FX_WORLD_EXTRA`,
-# `FX_HOST_ROOTS`, `FX_PRUNE_VDB`, `FX_SOUSAT_UNSAT`, declared at `run/l0-fixture-oracle.sh`'s call site and
-# `layers/l0-fixture-oracle/in-container.sh:84`), and only the first list
+# -slotop,-whpin,-r25,-g210,-g212,-g213,-g214,-g215,-g216,-244}.txt`) and six env knobs (`FX_SLOTOP_BDEP`, `FX_WORLD_EXTRA`,
+# `FX_HOST_ROOTS`, `FX_HOST_RUNNING_ROOT` (backlog #242 Slice D: the main
+# list resolves the running root against the container host, retiring
+# `skipped-updates-cross-root-missed-line`), `FX_PRUNE_VDB`,
+# `FX_SOUSAT_UNSAT`, declared at `run/l0-fixture-oracle.sh`'s call site and
+# `layers/l0-fixture-oracle/in-container.sh`), and only the first list
 # runs by default -- so #76 B3's and #79 D1's permanent cells are
 # exercised only when a human remembers the exact `FX_*` invocation.
 # This runner closes that gap: it runs all thirteen lists with their
@@ -24,7 +27,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 # list-file-name | env assignments (quoted for eval)
 LISTS=(
-  "l0-fixture-oracle.txt|"
+  "l0-fixture-oracle.txt|FX_HOST_RUNNING_ROOT=1"
   "l0-fixture-oracle-host.txt|FX_HOST_ROOTS=1"
   "l0-fixture-oracle-rdcpin.txt|FX_WORLD_EXTRA=dev-libs/rdctarget"
   "l0-fixture-oracle-slotop.txt|FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1"

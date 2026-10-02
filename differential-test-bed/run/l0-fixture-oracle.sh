@@ -37,6 +37,7 @@ podman_run_pm "porttest-l0fx-$$" \
   -e "FX_SLOTOP_BDEP=${FX_SLOTOP_BDEP:-}" \
   -e "FX_WORLD_EXTRA=${FX_WORLD_EXTRA:-}" \
   -e "FX_HOST_ROOTS=${FX_HOST_ROOTS:-}" \
+  -e "FX_HOST_RUNNING_ROOT=${FX_HOST_RUNNING_ROOT:-}" \
   --entrypoint /bin/bash "$IMAGE" \
   /TEST/layers/l0-fixture-oracle/in-container.sh "$REL_ATOMLIST" "/TEST/logs/$RUN"
 
