@@ -3336,9 +3336,10 @@ def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
     static `These are the packages...` / `Calculating dependencies...
     done!` preamble a recorded cut.
 
-    `restarts` is portuale's own pass count minus one, so it is
-    deterministic but not expected to equal real's `N` (the two search
-    orders differ; real's triangle capture is `4/20`). `max` is
+    `restarts` is portuale's own pass count minus one (a failed
+    iteration with candidates left counts, #297), so it is deterministic
+    but not expected to equal real's `N` (the two search orders differ;
+    real's triangle capture is `4/20`). `max` is
     portuale's resolved `--backtrack` budget."""
     plain = _run(
         [str(emerge_binary)],
@@ -3347,7 +3348,7 @@ def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
     )
     assert plain.returncode == 1  # #62: the triangle records a slot conflict
     data = json.loads(plain.stdout)
-    assert data["backtrack"] == {"restarts": 2, "max": 20}
+    assert data["backtrack"] == {"restarts": 3, "max": 20}  # #297: 2 before; real 4
 
     simple = _run(
         [str(emerge_binary)],
@@ -19139,11 +19140,12 @@ def test_backtracking_good_version_first_aborts_below_the_oracle_minimum(
     emerge_binary, fixture_env
 ):
     """Backlog #295: the same `testBacktrackingGoodVersionFirst` shape at
-    `--backtrack` 1 and 2 -- real (L0 probe, 3.0.82.2) exits 1 with the
+    `--backtrack` 1..3 -- real (L0 probe, 3.0.82.2) exits 1 with the
     conflict standing because it counts restarts and the shape needs
-    four. `--backtrack=3` still diverges (real rc 1, portuale settles
-    the masked graph rc 0): filed as the #295 residue, not pinned."""
-    for n in (1, 2):
+    four. The third restart real spends is an iteration that fails
+    without feedback (the masked top-level `btgp`, `elif backtracker:
+    backtracked += 1`); #297 counts it too."""
+    for n in (1, 2, 3):
         r = _run(
             [str(emerge_binary)],
             ["--pretend", "--backtrack", str(n), "dev-libs/btgp"],
