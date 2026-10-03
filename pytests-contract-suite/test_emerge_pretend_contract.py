@@ -20348,6 +20348,47 @@ def test_oracle_296_installed_holder_in_world_holds_the_old_instance(
     assert "[uninstall" not in rust.stdout
 
 
+def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#292 pin: when one run files both a slot-conflict removal
+    (`slotconflicttarget-2.0`, the blk-style old/new consumer pair) and a
+    reverse-pin withhold (`whblocker-2.0`, installed world consumer
+    `whtarget-1.0` pinning `~whblocker-1.0`), real 3.0.82.2 renders the
+    conflict block first and the withhold block second whichever way the
+    arguments are ordered and at either budget: both are
+    `_conflict_missed_update` entries of the one solver, in solving order,
+    and `backtrack: 0/20` shows no restart behind them. Portuale used to
+    lead with the withhold at the default budget (it also reads the pin
+    off its own backtrack mask, and mask rows chain first). Container
+    probe 2026-10-03, `FX_WORLD_EXTRA=dev-libs/whtarget`, argv `--pretend
+    --update --deep --newuse --oneshot [--backtrack 0] <args>` with
+    `<args>` = `whpuller <old> <new>` and `<old> <new> whpuller`
+    (`docs/evidence/2026-10-03-292/`)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/whtarget")
+    pair = [
+        "dev-libs/slotconflictoldconsumer",
+        "dev-libs/slotconflictnewconsumer",
+    ]
+    for budget in ([], ["--backtrack=0"]):
+        for atoms in (["dev-libs/whpuller", *pair], [*pair, "dev-libs/whpuller"]):
+            args = [
+                "--pretend", "--update", "--deep", "--newuse", "--oneshot",
+                *budget, *atoms,
+            ]
+            rust = _run([str(emerge_binary)], args, env)
+            assert rust.returncode == 0, (budget, atoms)
+            out = rust.stdout
+            heads = [
+                line for line in out.splitlines() if line.endswith(":0")
+                and line.startswith("dev-libs/")
+            ]
+            assert heads == [
+                "dev-libs/slotconflicttarget:0",
+                "dev-libs/whblocker:0",
+            ], (budget, atoms, out)
+
+
 def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
     emerge_binary, fixture_env, tmp_path
 ):
