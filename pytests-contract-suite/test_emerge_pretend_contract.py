@@ -20925,6 +20925,50 @@ def test_oracle_270_mm_cells_agree_at_bt0(
     ]
 
 
+def test_oracle_288_argument_pin_vetoes_the_update_probe(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#288 pin: `=app-misc/mmprov-1 app-misc/mmcons` under
+    `--update --deep` merges NOTHING in real 3.0.82.2 (rc 0,
+    `backtrack: 0/20`): its update probe refuses every slot-1 provider
+    candidate against the ARGUMENT, a recorded parent
+    (`_slot_operator_check_reverse_dependencies`: `candidate package does
+    not match atom '=app-misc/mmprov-1'`). Same installed/tree shape as
+    the #285 pin (`mmprov-1` `0/1` + `mmprov-2` `1/1` + `mmcons-1` bound
+    `mmprov:0/1=`, tree `mmprov-3` `1/2`). Portuale used to merge
+    `[ebuild U] mmprov-3 [2]` + `[ebuild rR] mmcons-1` here because the
+    probe's parent map only held installed parents. Grounded on the
+    container probe `D-arg-pin` (real 3.0.82.2, 2026-10-03; capture
+    `docs/evidence/2026-10-03-288/`)."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    rust = _b1_run(
+        [
+            "--pretend",
+            "--update",
+            "--deep",
+            "=app-misc/mmprov-1",
+            "app-misc/mmcons",
+        ],
+        env,
+        emerge_binary,
+    )
+    assert rust.returncode == 0
+    assert _b1_merges(rust.stdout) == []
+    assert "causing rebuilds" not in rust.stdout
+
+
 @pytest.mark.parametrize("backtrack", ["3", "20"])
 def test_oracle_290_pulled_in_provider_rebuilds_installed_consumer(
     emerge_binary, fixture_env, tmp_path, backtrack
