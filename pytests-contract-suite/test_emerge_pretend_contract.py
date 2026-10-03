@@ -20296,6 +20296,43 @@ def test_oracle_289_world_slot_atom_holds_the_old_instance(
     assert "[uninstall" not in rust.stdout
 
 
+def test_oracle_296_installed_holder_in_world_holds_the_old_instance(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#296 pin: an installed `app-misc/bdhold-1` (`RDEPEND` `app-misc/bdprov:0`)
+    in world -- a vdb edge of a package the walk never visits -- holds
+    `bdprov-1` in real 3.0.82.2: `--update app-misc/bdprov` merges
+    `U bdprov-3 [2]` and leaves the soft blocker unresolved (`[blocks B]`),
+    rc 1, never uninstalling the old slot. Portuale used to enforce the
+    holder's slot-0 atom as a pin that an upgrade in slot 1 does not break,
+    withdraw the update and exit 0 with no rows. Grounded on the container
+    probe E1/E2/E3/E6 (capture `docs/evidence/2026-10-03-296/`)."""
+    installed = [
+        ("app-misc", "bdprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "bdprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "bdhold",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/bdprov:0"},
+        ),
+    ]
+    root = _b1_root(tmp_path, ["app-misc/bdhold"], installed)
+    env = _b1_env(fixture_env, root)
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "app-misc/bdprov"],
+        env,
+    )
+    assert rust.returncode == 1
+    assert _b1_merges(rust.stdout) == [
+        f"[ebuild     U  ] app-misc/bdprov-3 [2] to {root}",
+    ]
+    assert "[blocks B      ] app-misc/bdprov:0" in rust.stdout
+    assert "[uninstall" not in rust.stdout
+
+
 def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
     emerge_binary, fixture_env, tmp_path
 ):
