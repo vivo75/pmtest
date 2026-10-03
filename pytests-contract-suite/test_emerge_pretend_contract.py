@@ -20693,14 +20693,13 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     assert by_cp[("app-misc", "pcons")]["slot_operator_rebuild"] is True
     assert by_cp[("app-misc", "pprov")]["outcome"] == "upgrade"
     # --backtrack=0 control: the trigger stays off (no prune restart,
-    # no consumer rebuild) while the direct solve still reports the
-    # conflict (WARNING persists, no !!! tail). Known delta TBD-270:
-    # real also withholds the pprov upgrade itself at bt0 (same probe
-    # with `--backtrack=0`: rc 0, `backtrack: 0/0`, three rows -- no
-    # pprov/pcons at all); portuale upgrades pprov-2 as a plain U --
-    # the bt0 update-atomicity rule is a different slice, and the
-    # trigger change here cannot reach it (the scan stays off at
-    # `--backtrack=0`).
+    # no consumer rebuild) and, since #270, real's all-or-nothing rule
+    # holds: the provider update is withheld too (real 3.0.82.2, same
+    # probe with `--backtrack=0`: rc 0, `backtrack: 0/0`, three rows --
+    # no pprov/pcons at all) while the direct solve reports the
+    # conflict (WARNING persists, no !!! tail). The full row set and the
+    # second conflict block are pinned by
+    # `test_oracle_270_bt0_provider_update_is_atomic`.
     bt0 = _run(
         [str(emerge_binary)],
         ["--pretend", "--backtrack", "0", "--update", "--deep",
@@ -20713,7 +20712,217 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     assert "WARNING: One or more updates/rebuilds have been skipped" in bt0.stdout
     assert "dev-libs/slotconflicttarget:0" in bt0.stdout
     assert "triggered by backtracking" not in bt0.stdout
-    assert not any("pcons" in ln for ln in _b1_merges(bt0.stdout))
+    assert _b1_merges(bt0.stdout) == [
+        f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
+    ]
+
+
+_270_BT0_ARGS = [
+    "--pretend",
+    "--backtrack",
+    "0",
+    "--update",
+    "--deep",
+    "app-misc/pprov",
+    "app-misc/pcons",
+    "dev-libs/slotconflictoldconsumer",
+    "dev-libs/slotconflictnewconsumer",
+]
+
+
+def test_oracle_270_bt0_provider_update_is_atomic(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#270 (flipped from strict xfail by S2): the #253 `pprov`/`pcons` cell
+    at `--backtrack=0`. Real 3.0.82.2 withholds the provider update
+    (rc 0, `backtrack: 0/0`): the in-pass
+    `_solve_non_slot_operator_slot_conflicts` (`depgraph.py:1774-2115`)
+    removes `pprov-2` and keeps installed `pprov-1`, so only
+    `[slotconflicttarget-1.0, oldconsumer-1.0, newconsumer-1.0]` merge, and
+    the WARNING carries a second block for `app-misc/pprov:0`. Under
+    `--update` real's `_want_installed_pkg` returns True (selective mode,
+    `depgraph.py:7297-7298`), so `is_arg_parent` is false and the
+    installed instance stays. Portuale used to exempt the built
+    slot-operator atom as a rebuild trigger even at bt0, where the rebuild
+    scan never runs, so it merged `U pprov-2` alone. Grounded on real
+    Portage 3.0.82.2, container probe 2026-10-02 (staged fixture tree,
+    ad-hoc ROOT with EAPI-bearing vdb, `--ignore-default-opts --pretend
+    --color=n`; captures in portuale
+    `docs/evidence/2026-10-02-270/`)."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    result = _run([str(emerge_binary)], _270_BT0_ARGS, _b1_env(fixture_env, root))
+    assert result.returncode == 0
+    assert _b1_merges(result.stdout) == [
+        f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
+    ]
+    assert "WARNING: One or more updates/rebuilds have been skipped" in result.stdout
+    assert "dev-libs/slotconflicttarget:0" in result.stdout
+    assert "app-misc/pprov:0" in result.stdout
+    assert (
+        f"(app-misc/pprov-2:0/2::testrepo, ebuild scheduled for merge to '{root}')"
+        in result.stdout
+    )
+    assert ">=app-misc/pprov-1:0/1= required by (app-misc/pcons-1:0/0::testrepo, " in result.stdout
+    assert "triggered by backtracking" not in result.stdout
+
+
+def test_oracle_270_bt0_warning_block_shape(emerge_binary, fixture_env, tmp_path):
+    """#270 S3: the WARNING of the #253 `pprov`/`pcons` cell at `--backtrack=0`
+    has real's shape (container probe 2026-10-02, real 3.0.82.2;
+    `docs/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`; portuale
+    prints it on stdout, real on stderr -- a standing difference): the
+    `slotconflicttarget:0` block first (real renders its
+    `_conflict_missed_update` dict in insertion order,
+    `depgraph.py:1529-1565`), then `app-misc/pprov:0`, whose parent
+    `pcons-1` is the installed node (`installed in '<root>'`: no merge
+    entry replaces it), and whose `^` marker line covers only the
+    mismatching `:0/1=` span -- real's `format_unmatched_atom` marks the
+    operator and version only when the missed package fails the version
+    part (`output.py:925-929`; `pprov-2` satisfies `>=pprov-1`)."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    result = _run([str(emerge_binary)], _270_BT0_ARGS, _b1_env(fixture_env, root))
+    assert result.returncode == 0
+    lines = result.stdout.splitlines()
+    assert (
+        f"(app-misc/pcons-1:0/0::testrepo, installed in '{root}')" in result.stdout
+    )
+    assert result.stdout.index("dev-libs/slotconflicttarget:0") < result.stdout.index(
+        "app-misc/pprov:0"
+    )
+    req = next(
+        i
+        for i, ln in enumerate(lines)
+        if ln.startswith("    >=app-misc/pprov-1:0/1= required by")
+    )
+    assert lines[req + 1] == "    " + " " * 18 + "^" * 5
+
+
+def test_oracle_270_bt0_provider_not_requested_is_already_atomic(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#270 neutral guard: when the provider is not explicitly requested,
+    the rows stay atomic (no provider/consumer rebuild rows). Same
+    installed shape as test 1 (`pprov-1`/`pcons-1` with
+    `>=pprov-1:0/1=`), but args request only `pcons` + the two
+    slotconflict consumers (NOT `pprov`). Grounded on real Portage 3.0.82.2
+    container probe 2026-10-02, identical recipe to test 1."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    args = [
+        "--pretend",
+        "--backtrack",
+        "0",
+        "--update",
+        "--deep",
+        "app-misc/pcons",
+        "dev-libs/slotconflictoldconsumer",
+        "dev-libs/slotconflictnewconsumer",
+    ]
+    result = _run([str(emerge_binary)], args, _b1_env(fixture_env, root))
+    assert result.returncode == 0
+    assert _b1_merges(result.stdout) == [
+        f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
+    ]
+    # No pprov/pcons rows
+    assert not any("pprov" in ln for ln in _b1_merges(result.stdout))
+    assert not any("pcons" in ln for ln in _b1_merges(result.stdout))
+
+
+def test_oracle_270_mm_cells_agree_at_bt0(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#270 neutral guard: `mmprov`/`mmcons` cells (both at bt0) already
+    agree between real and portuale. Cell 1: request mmcons (not mmprov)
+    with the two slotconflict consumers, expect the same 3 rows. Cell 2:
+    request both mmprov and mmcons, expect only the mmprov upgrade row.
+    Installed: `mmprov-1` slot `0/1`, `mmprov-2` slot `1/1`, `mmcons-1`
+    slot `0` with RDEPEND `app-misc/mmprov:0/1=` (copy from
+    test_oracle_slotop_update_probe_mismatched_upgrade_entry). Grounded on
+    real Portage 3.0.82.2 container probe 2026-10-02, identical recipe to
+    tests 1 and 2."""
+    installed = [
+        ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "mmcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": "app-misc/mmprov:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+
+    # Cell 1: request mmcons (not mmprov)
+    args_cell1 = [
+        "--pretend",
+        "--backtrack",
+        "0",
+        "--update",
+        "--deep",
+        "app-misc/mmcons",
+        "dev-libs/slotconflictoldconsumer",
+        "dev-libs/slotconflictnewconsumer",
+    ]
+    result_cell1 = _run([str(emerge_binary)], args_cell1, env)
+    assert result_cell1.returncode == 0
+    assert _b1_merges(result_cell1.stdout) == [
+        f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
+    ]
+
+    # Cell 2: request both mmprov and mmcons
+    args_cell2 = [
+        "--pretend",
+        "--backtrack",
+        "0",
+        "--update",
+        "--deep",
+        "app-misc/mmprov",
+        "app-misc/mmcons",
+    ]
+    result_cell2 = _run([str(emerge_binary)], args_cell2, env)
+    assert result_cell2.returncode == 0
+    assert _b1_merges(result_cell2.stdout) == [
+        f'[ebuild     U  ] app-misc/mmprov-3 [2] to {root}',
+    ]
 
 
 def test_oracle_slotop_required_use(
