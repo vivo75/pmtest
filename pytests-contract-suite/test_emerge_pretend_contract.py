@@ -20925,6 +20925,59 @@ def test_oracle_270_mm_cells_agree_at_bt0(
     ]
 
 
+@pytest.mark.parametrize("backtrack", ["3", "20"])
+def test_oracle_290_pulled_in_provider_rebuilds_installed_consumer(
+    emerge_binary, fixture_env, tmp_path, backtrack
+):
+    """#290 pin: the #253 `pprov`/`pcons` cell with the provider NOT
+    requested (`pcons` + the two slotconflict consumers), at
+    `--backtrack` 3 and 20. Real 3.0.82.2 pulls `pprov-2` in through the
+    `:0/1=` slot-operator edge and rebuilds the installed consumer
+    (`r  U pprov-2 [1]`, `rR pcons-1`) next to the slotconflict rows, and
+    prints the "causing rebuilds" block (`pprov-2` -> `pcons-1`). Grounded
+    on the container probe `B-pprov-notreq-bt3/bt20` (real 3.0.82.2)."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    args = [
+        "--pretend",
+        "--backtrack",
+        backtrack,
+        "--update",
+        "--deep",
+        "app-misc/pcons",
+        "dev-libs/slotconflictoldconsumer",
+        "dev-libs/slotconflictnewconsumer",
+    ]
+    result = _run([str(emerge_binary)], args, _b1_env(fixture_env, root))
+    assert result.returncode == 0
+    assert _b1_merges(result.stdout) == [
+        f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
+        f'[ebuild  r  U  ] app-misc/pprov-2 [1] to {root}',
+        f'[ebuild  rR    ] app-misc/pcons-1 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
+    ]
+    assert "The following packages are causing rebuilds:" in result.stdout
+    tail = result.stdout.split("The following packages are causing rebuilds:", 1)[1]
+    assert (
+        f"(app-misc/pprov-2:0/2::testrepo, ebuild scheduled for merge to '{root}')"
+        " causes rebuilds for:" in tail
+    )
+    assert (
+        f"(app-misc/pcons-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+        in tail
+    )
+
+
 def test_oracle_slotop_required_use(
     emerge_binary, fixture_env, tmp_path
 ):
