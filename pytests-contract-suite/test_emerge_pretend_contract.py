@@ -20780,22 +20780,19 @@ def test_oracle_270_bt0_provider_update_is_atomic(
     assert "triggered by backtracking" not in result.stdout
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="#270 S3: the pprov:0 conflict block of real's bt0 WARNING shows the "
-    "consumer as `installed in '<root>'` and follows the slotconflicttarget block; "
-    "portuale shows it as `ebuild scheduled for merge` and lists it first. "
-    "Real re-resolves in-pass after `_remove_pkg` (`depgraph.py:2097-2115`); "
-    "portuale does not (candidate cause, to be confirmed in S3). See "
-    "docs/02.270-bt0-provider-atomic.opus.md S3",
-)
 def test_oracle_270_bt0_warning_block_shape(emerge_binary, fixture_env, tmp_path):
-    """#270 S3 target: same cell as `test_oracle_270_bt0_provider_update_is_atomic`.
-    Real's bt0 WARNING (stderr; portuale prints it on stdout, a standing
-    difference) lists the `slotconflicttarget:0` block first and then
-    `app-misc/pprov:0`, whose parent `pcons-1` is the installed node
-    (`installed in '<root>'`) because real's post-removal re-resolve keeps
-    it installed. Captures: `docs/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`."""
+    """#270 S3: the WARNING of the #253 `pprov`/`pcons` cell at `--backtrack=0`
+    has real's shape (container probe 2026-10-02, real 3.0.82.2;
+    `docs/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`; portuale
+    prints it on stdout, real on stderr -- a standing difference): the
+    `slotconflicttarget:0` block first (real renders its
+    `_conflict_missed_update` dict in insertion order,
+    `depgraph.py:1529-1565`), then `app-misc/pprov:0`, whose parent
+    `pcons-1` is the installed node (`installed in '<root>'`: no merge
+    entry replaces it), and whose `^` marker line covers only the
+    mismatching `:0/1=` span -- real's `format_unmatched_atom` marks the
+    operator and version only when the missed package fails the version
+    part (`output.py:925-929`; `pprov-2` satisfies `>=pprov-1`)."""
     installed = [
         ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
         (
@@ -20809,12 +20806,19 @@ def test_oracle_270_bt0_warning_block_shape(emerge_binary, fixture_env, tmp_path
     root = _b1_root(tmp_path, [], installed)
     result = _run([str(emerge_binary)], _270_BT0_ARGS, _b1_env(fixture_env, root))
     assert result.returncode == 0
+    lines = result.stdout.splitlines()
     assert (
         f"(app-misc/pcons-1:0/0::testrepo, installed in '{root}')" in result.stdout
     )
     assert result.stdout.index("dev-libs/slotconflicttarget:0") < result.stdout.index(
         "app-misc/pprov:0"
     )
+    req = next(
+        i
+        for i, ln in enumerate(lines)
+        if ln.startswith("    >=app-misc/pprov-1:0/1= required by")
+    )
+    assert lines[req + 1] == "    " + " " * 18 + "^" * 5
 
 
 def test_oracle_270_bt0_provider_not_requested_is_already_atomic(
