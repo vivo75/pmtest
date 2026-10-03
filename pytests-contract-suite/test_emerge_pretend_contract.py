@@ -20389,6 +20389,38 @@ def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
             ], (budget, atoms, out)
 
 
+def test_oracle_298_argument_subtrees_walk_last_argument_first(
+    emerge_binary, fixture_env
+):
+    """#298 pin: real adds every argument's package first and pops its
+    `_dep_stack` LIFO, so the last argument's whole subtree is walked before
+    the previous argument's deps are looked at, and the slot-conflict
+    notice lists the instances in that insertion order. With
+    `slotconflictunsolvable` (pin pair `>=2.0` / `<2.0`) and
+    `slotconflictnewconsumer` (bare dep): `<unsolvable> <newconsumer>` ->
+    `slotconflicttarget-2.0` then `-1.0`; `<newconsumer> <unsolvable>` ->
+    `-1.0` then `-2.0` (real 3.0.82.2 container probe 2026-10-03, both at
+    `--backtrack 0` and the default; `docs/evidence/2026-10-03-292/`).
+    Portuale's FIFO queue used to give `-2.0` first for both."""
+    unsolvable = "dev-libs/slotconflictunsolvable"
+    newcons = "dev-libs/slotconflictnewconsumer"
+    for budget in ([], ["--backtrack=0"]):
+        for atoms, want in (
+            ([unsolvable, newcons], ["2.0", "1.0"]),
+            ([newcons, unsolvable], ["1.0", "2.0"]),
+        ):
+            rust = _run(
+                [str(emerge_binary)], ["--pretend", *budget, *atoms], fixture_env
+            )
+            assert rust.returncode == 1, (budget, atoms)
+            got = [
+                line.split("slotconflicttarget-")[1].split(":")[0]
+                for line in (rust.stdout + rust.stderr).splitlines()
+                if line.startswith("  (dev-libs/slotconflicttarget-")
+            ]
+            assert got == want, (budget, atoms, got)
+
+
 def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
     emerge_binary, fixture_env, tmp_path
 ):
