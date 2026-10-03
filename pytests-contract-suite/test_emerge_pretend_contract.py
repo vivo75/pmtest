@@ -20693,14 +20693,13 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     assert by_cp[("app-misc", "pcons")]["slot_operator_rebuild"] is True
     assert by_cp[("app-misc", "pprov")]["outcome"] == "upgrade"
     # --backtrack=0 control: the trigger stays off (no prune restart,
-    # no consumer rebuild) while the direct solve still reports the
-    # conflict (WARNING persists, no !!! tail). Known delta TBD-270:
-    # real also withholds the pprov upgrade itself at bt0 (same probe
-    # with `--backtrack=0`: rc 0, `backtrack: 0/0`, three rows -- no
-    # pprov/pcons at all); portuale upgrades pprov-2 as a plain U --
-    # the bt0 update-atomicity rule is a different slice, and the
-    # trigger change here cannot reach it (the scan stays off at
-    # `--backtrack=0`).
+    # no consumer rebuild) and, since #270, real's all-or-nothing rule
+    # holds: the provider update is withheld too (real 3.0.82.2, same
+    # probe with `--backtrack=0`: rc 0, `backtrack: 0/0`, three rows --
+    # no pprov/pcons at all) while the direct solve reports the
+    # conflict (WARNING persists, no !!! tail). The full row set and the
+    # second conflict block are pinned by
+    # `test_oracle_270_bt0_provider_update_is_atomic`.
     bt0 = _run(
         [str(emerge_binary)],
         ["--pretend", "--backtrack", "0", "--update", "--deep",
@@ -20713,29 +20712,45 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     assert "WARNING: One or more updates/rebuilds have been skipped" in bt0.stdout
     assert "dev-libs/slotconflicttarget:0" in bt0.stdout
     assert "triggered by backtracking" not in bt0.stdout
-    assert not any("pcons" in ln for ln in _b1_merges(bt0.stdout))
+    assert _b1_merges(bt0.stdout) == [
+        f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
+        f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
+    ]
 
 
-@pytest.mark.xfail(strict=True, reason="#270: real withholds the provider update at --backtrack=0 (in-pass slot-conflict solver, depgraph.py:1774-2115, + arg skip :4985-4997 + in-pass re-resolve); portuale upgrades pprov-2 as a plain U and prints one conflict block. Flipped by S4/S5 of docs/02.270-bt0-provider-atomic.opus.md")
+_270_BT0_ARGS = [
+    "--pretend",
+    "--backtrack",
+    "0",
+    "--update",
+    "--deep",
+    "app-misc/pprov",
+    "app-misc/pcons",
+    "dev-libs/slotconflictoldconsumer",
+    "dev-libs/slotconflictnewconsumer",
+]
+
+
 def test_oracle_270_bt0_provider_update_is_atomic(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Pins the #270 xfail target cell: `pprov-1`/`pcons-1` at
-    `--backtrack=0`. Grounded on real Portage 3.0.82.2 container probe
-    2026-10-02 (staged-fixture probe of the #253/#269 recipe,
-    `--ignore-default-opts --pretend --color=n`, PORTAGE_CONFIGROOT at
-    the fixture tree, ad-hoc ROOT with EAPI-bearing vdb). Expected: rc 0;
-    three rows (`slotconflicttarget-1.0`, `slotconflictoldconsumer-1.0`,
-    `slotconflictnewconsumer-1.0`); WARNING with two conflict blocks
-    (`dev-libs/slotconflicttarget:0` and `app-misc/pprov:0`). Portuale's
-    current divergence: rows include `U pprov-2 [1]` (an upgrade this code
-    path cannot reach); conflict blocks reduced to one
-    (`slotconflicttarget:0` only). Three non-local gaps (a)(b)(c) from
-    docs/02.270-bt0-provider-atomic.opus.md §1: walk's
-    `built_slot_operator_rebuild_trigger` exemption never records at bt0;
-    `direct_solve_arg_mode` false here, so general request semantics
-    mismatch; real re-resolves inside the pass, portuale documents as
-    not-done."""
+    """#270 (flipped from strict xfail by S2): the #253 `pprov`/`pcons` cell
+    at `--backtrack=0`. Real 3.0.82.2 withholds the provider update
+    (rc 0, `backtrack: 0/0`): the in-pass
+    `_solve_non_slot_operator_slot_conflicts` (`depgraph.py:1774-2115`)
+    removes `pprov-2` and keeps installed `pprov-1`, so only
+    `[slotconflicttarget-1.0, oldconsumer-1.0, newconsumer-1.0]` merge, and
+    the WARNING carries a second block for `app-misc/pprov:0`. Under
+    `--update` real's `_want_installed_pkg` returns True (selective mode,
+    `depgraph.py:7297-7298`), so `is_arg_parent` is false and the
+    installed instance stays. Portuale used to exempt the built
+    slot-operator atom as a rebuild trigger even at bt0, where the rebuild
+    scan never runs, so it merged `U pprov-2` alone. Grounded on real
+    Portage 3.0.82.2, container probe 2026-10-02 (staged fixture tree,
+    ad-hoc ROOT with EAPI-bearing vdb, `--ignore-default-opts --pretend
+    --color=n`; captures in portuale
+    `docs/evidence/2026-10-02-270/`)."""
     installed = [
         ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
         (
@@ -20747,18 +20762,7 @@ def test_oracle_270_bt0_provider_update_is_atomic(
         ),
     ]
     root = _b1_root(tmp_path, [], installed)
-    args = [
-        "--pretend",
-        "--backtrack",
-        "0",
-        "--update",
-        "--deep",
-        "app-misc/pprov",
-        "app-misc/pcons",
-        "dev-libs/slotconflictoldconsumer",
-        "dev-libs/slotconflictnewconsumer",
-    ]
-    result = _run([str(emerge_binary)], args, _b1_env(fixture_env, root))
+    result = _run([str(emerge_binary)], _270_BT0_ARGS, _b1_env(fixture_env, root))
     assert result.returncode == 0
     assert _b1_merges(result.stdout) == [
         f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
@@ -20767,16 +20771,50 @@ def test_oracle_270_bt0_provider_update_is_atomic(
     ]
     assert "WARNING: One or more updates/rebuilds have been skipped" in result.stdout
     assert "dev-libs/slotconflicttarget:0" in result.stdout
+    assert "app-misc/pprov:0" in result.stdout
     assert (
         f"(app-misc/pprov-2:0/2::testrepo, ebuild scheduled for merge to '{root}')"
         in result.stdout
     )
-    assert (
-        f"(app-misc/pcons-1:0/0::testrepo, installed in '{root}')"
-        in result.stdout
-    )
-    assert ">=app-misc/pprov-1:0/1= required by" in result.stdout
+    assert ">=app-misc/pprov-1:0/1= required by (app-misc/pcons-1:0/0::testrepo, " in result.stdout
     assert "triggered by backtracking" not in result.stdout
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="#270 S3: the pprov:0 conflict block of real's bt0 WARNING shows the "
+    "consumer as `installed in '<root>'` and follows the slotconflicttarget block; "
+    "portuale shows it as `ebuild scheduled for merge` and lists it first. "
+    "Real re-resolves in-pass after `_remove_pkg` (`depgraph.py:2097-2115`); "
+    "portuale does not (candidate cause, to be confirmed in S3). See "
+    "docs/02.270-bt0-provider-atomic.opus.md S3",
+)
+def test_oracle_270_bt0_warning_block_shape(emerge_binary, fixture_env, tmp_path):
+    """#270 S3 target: same cell as `test_oracle_270_bt0_provider_update_is_atomic`.
+    Real's bt0 WARNING (stderr; portuale prints it on stdout, a standing
+    difference) lists the `slotconflicttarget:0` block first and then
+    `app-misc/pprov:0`, whose parent `pcons-1` is the installed node
+    (`installed in '<root>'`) because real's post-removal re-resolve keeps
+    it installed. Captures: `docs/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`."""
+    installed = [
+        ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
+        (
+            "app-misc",
+            "pcons",
+            "1",
+            "0",
+            {"EAPI": "8", "RDEPEND": ">=app-misc/pprov-1:0/1="},
+        ),
+    ]
+    root = _b1_root(tmp_path, [], installed)
+    result = _run([str(emerge_binary)], _270_BT0_ARGS, _b1_env(fixture_env, root))
+    assert result.returncode == 0
+    assert (
+        f"(app-misc/pcons-1:0/0::testrepo, installed in '{root}')" in result.stdout
+    )
+    assert result.stdout.index("dev-libs/slotconflicttarget:0") < result.stdout.index(
+        "app-misc/pprov:0"
+    )
 
 
 def test_oracle_270_bt0_provider_not_requested_is_already_atomic(
