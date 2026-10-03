@@ -3,9 +3,12 @@
 # `|| ( >=self self-bootstrap )` is reached in-graph through a
 # mid-graph consumer).
 #
-# Run under the default staging (no knob: the bed's `ROOT=$FX` with
-# `ROOT != "/"` already splits real's BDEPEND across the running root,
-# so no `FX_HOST_ROOTS=1`). Track X Slice C (#242) ships the
+# Run under default staging plus `FX_HOST_RUNNING_ROOT=1` (backlog #287):
+# the bed's `ROOT=$FX` with `ROOT != "/"` already splits real's BDEPEND
+# across the running root `/`, so no `FX_HOST_ROOTS=1`; but portuale must
+# be told the same running root (drop the `PORTAGE_RUNNING_ROOT=$FX` pin),
+# or it walks single-root and the `--backtrack=0` cells' `Total:` (real's
+# dual rows: 4 / 2) can never match. Track X Slice C (#242) ships the
 # multi-root graph modeling the old header called residual.
 # The comparator ignores `to <ROOT>` suffixes and collapses the dual
 # rows by `(type, cp, slot)` either way; suffix placement itself

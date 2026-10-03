@@ -38,7 +38,7 @@ LISTS=(
   "l0-fixture-oracle-g213.txt|FX_PRUNE_VDB=1"
   "l0-fixture-oracle-g214.txt|FX_WORLD_EXTRA='app-misc/abicons app-misc/abiforce'"
   "l0-fixture-oracle-g215.txt|FX_SOUSAT_UNSAT=1 FX_HOST_ROOTS=1"
-  "l0-fixture-oracle-g216.txt|"
+  "l0-fixture-oracle-g216.txt|FX_HOST_RUNNING_ROOT=1"
   "l0-fixture-oracle-244.txt|"
 )
 
