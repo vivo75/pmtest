@@ -20282,8 +20282,11 @@ def test_oracle_289_world_slot_atom_holds_the_old_instance(
     ]
     root = _b1_root(tmp_path, ["app-misc/bdprov:0"], installed)
     env = _b1_env(fixture_env, root)
-    rust = _b1_run(
-        ["--pretend", "--update", "app-misc/bdprov"], env, emerge_binary
+    # `_b1_run` asserts rc 0; real exits 1 here (unresolved blocker).
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "app-misc/bdprov"],
+        env,
     )
     assert rust.returncode == 1
     assert _b1_merges(rust.stdout) == [
