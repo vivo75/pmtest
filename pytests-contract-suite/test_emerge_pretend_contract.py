@@ -19117,17 +19117,13 @@ def test_backtracking_good_version_first_matches_the_upstream_oracle(
     `ResolverPlayground` on the pinned 3.0.82.2 (script + output:
     `differential-test-bed/logs/r2-blocker-20260914/`): real settles
     `[C-1, B-1, A-1]` at the default budget and at `--backtrack=4` (its
-    minimum -- `<=3` aborts), matching upstream's `mergelist`. Portuale
-    reaches the same fixpoint at `--backtrack=2`; the tighter threshold
-    is the already-documented mask-step budget accounting
-    (`--backtrack=N` budgets N mask steps directly rather than real's
-    depth formula), NOT a selection gap: the runtime-mask `!` negatives
-    are already applied during selection (`resolve_pretend`'s
-    `extra_constraints` filter)."""
+    minimum -- `<=3` aborts), matching upstream's `mergelist`. Since
+    #295 portuale counts restarts like real (depth `max(1, (N+1)//2)`
+    plus the `backtracked >= N` cap), so the `<=3` budgets are probed
+    below."""
     for args, note in (
         (["--pretend", "dev-libs/btgp"], "default budget"),
         (["--pretend", "--backtrack", "4", "dev-libs/btgp"], "real's minimum (oracle)"),
-        (["--pretend", "--backtrack", "2", "dev-libs/btgp"], "portuale's threshold"),
     ):
         r = _run([str(emerge_binary)], args, fixture_env)
         assert r.returncode == 0, (note, r.stdout, r.stderr)
@@ -19137,6 +19133,23 @@ def test_backtracking_good_version_first_matches_the_upstream_oracle(
             f'[ebuild  N     ] dev-libs/btgp-1 to {fixture_env["ROOT"]}',
         ], (note, r.stdout)
         assert "Multiple package instances" not in r.stdout, note
+
+
+def test_backtracking_good_version_first_aborts_below_the_oracle_minimum(
+    emerge_binary, fixture_env
+):
+    """Backlog #295: the same `testBacktrackingGoodVersionFirst` shape at
+    `--backtrack` 1 and 2 -- real (L0 probe, 3.0.82.2) exits 1 with the
+    conflict standing because it counts restarts and the shape needs
+    four. `--backtrack=3` still diverges (real rc 1, portuale settles
+    the masked graph rc 0): filed as the #295 residue, not pinned."""
+    for n in (1, 2):
+        r = _run(
+            [str(emerge_binary)],
+            ["--pretend", "--backtrack", str(n), "dev-libs/btgp"],
+            fixture_env,
+        )
+        assert r.returncode == 1, (n, r.stdout, r.stderr)
 
 
 def test_or_choice_avoids_downgrade_into_the_graphed_update(
