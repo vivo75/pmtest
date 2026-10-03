@@ -20263,6 +20263,39 @@ def test_oracle_slotop_pin_gate_blocker_discard_probes(
     assert "[uninstall     ] app-misc/bdprov-1 " in rust.stdout
 
 
+def test_oracle_289_world_slot_atom_holds_the_old_instance(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#289 pin: with the slot atom `app-misc/bdprov:0` in world, the
+    soft blocker `!app-misc/bdprov:0` of the slot-1 update stays
+    unresolved in real 3.0.82.2 -- the `SetArg` parent holds the old
+    instance, so it is NOT uninstalled: rc 1, rows `[ebuild U]
+    app-misc/bdprov-3 [2]` + `[blocks B] app-misc/bdprov:0`. Without the
+    world atom (the #284 pin above) the old slot is uninstalled, rc 0.
+    Grounded on the container probe E5 (`--pretend --update
+    app-misc/bdprov`, installed `bdprov-1` `0/1` + `bdprov-2` `1/1`;
+    capture `docs/evidence/2026-10-03-289/`). A bare `app-misc/bdprov`
+    world atom selects the new slot instead and holds nothing."""
+    installed = [
+        ("app-misc", "bdprov", "1", "0/1", {"EAPI": "8"}),
+        ("app-misc", "bdprov", "2", "1/1", {"EAPI": "8"}),
+    ]
+    root = _b1_root(tmp_path, ["app-misc/bdprov:0"], installed)
+    env = _b1_env(fixture_env, root)
+    # `_b1_run` asserts rc 0; real exits 1 here (unresolved blocker).
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "app-misc/bdprov"],
+        env,
+    )
+    assert rust.returncode == 1
+    assert _b1_merges(rust.stdout) == [
+        f"[ebuild     U  ] app-misc/bdprov-3 [2] to {root}",
+    ]
+    assert "[blocks B      ] app-misc/bdprov:0" in rust.stdout
+    assert "[uninstall" not in rust.stdout
+
+
 def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
     emerge_binary, fixture_env, tmp_path
 ):
