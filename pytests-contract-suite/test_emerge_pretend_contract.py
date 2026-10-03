@@ -23546,10 +23546,10 @@ def test_or_pick_backtrack0_reports_the_self_cycle(
     pass-1 graph strands on the running-root self loop with FOUR merge
     rows behind the block (dual `g216comp`), and the `Total:` counts
     both roots (`docs/evidence/2026-09-29-242-inventory/probes/
-    default-g216top-b0.txt`, real 3.0.82.2: `Total: 4`, rc 1). Row-level
-    abort-partial rendering stays owned by backlog #245 (the
-    `g216-b0-cycle-abort-tree-ancestors` bed allowlist): this pin fixes
-    rc, the verbatim block, and the Total."""
+    default-g216top-b0.txt`, real 3.0.82.2: `Total: 4`, rc 1). The row
+    rendering of the abort partial (backlog #245, closed) is pinned by the
+    fixture-oracle g216 list; this pin fixes rc, the verbatim block, and
+    the Total."""
     running = tmp_path / "running"
     running.mkdir()
     env = dict(fixture_env)
