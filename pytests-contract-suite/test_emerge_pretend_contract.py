@@ -8900,6 +8900,104 @@ def test_update_rebuilds_a_stale_consumer_instead_of_downgrading_its_provider(
     ]
 
 
+def _slotop_new_slot_tree(tmp_path):
+    """A hermetic config root for backlog #304 (`docs/backlog-tasks-2026-10.md`):
+    `dev-libs/mislot` is installed in slot 0 only (`0/1`, 1.0) while the
+    tree also carries 2.0 in slot 1 (`1/2`) -- the `ffmpeg-compat:6` /
+    `ffmpeg-compat:8` shape; the installed `dev-libs/pinned-1.0` was built against `mislot:0/1=` and
+    its current ebuild still says `RDEPEND=dev-libs/mislot:0=` -- the host
+    shape of `gnome-keyring`'s `gcr:0/1=` with `gcr:4` installed beside it
+    (and `mplayer`/`ffmpeg-compat`). Nothing about `mislot` is out of date,
+    so a world update has nothing to do. Returns the env dict."""
+    cfg = tmp_path / "cfg"
+    repo = tmp_path / "repo"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles/default").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("main\n")
+    (repo / "profiles/arch.list").write_text("amd64\n")
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\n'
+    )
+    (repo / "metadata/md5-cache/dev-libs").mkdir(parents=True)
+    for name, ver, slot, rdepend in (
+        ("mislot", "1.0", "0/1", ""),
+        ("mislot", "2.0", "1/2", ""),
+        ("pinned", "1.0", "0", "dev-libs/mislot:0="),
+    ):
+        (repo / f"dev-libs/{name}").mkdir(parents=True, exist_ok=True)
+        dep = f'RDEPEND="{rdepend}"\n' if rdepend else ""
+        ebuild = f'EAPI=8\nDESCRIPTION="new slot"\nSLOT="{slot}"\nKEYWORDS="amd64"\n{dep}'
+        (repo / f"dev-libs/{name}/{name}-{ver}.ebuild").write_text(ebuild)
+        cache = (
+            f"DEFINED_PHASES=-\nEAPI=8\nIUSE=\nKEYWORDS=amd64\nSLOT={slot}\n"
+            + (f"RDEPEND={rdepend}\n" if rdepend else "")
+            + f"_md5_={hashlib.md5(ebuild.encode()).hexdigest()}\n"
+        )
+        (repo / f"metadata/md5-cache/dev-libs/{name}-{ver}").write_text(cache)
+    for pf, slot, rdepend in (
+        ("mislot-1.0", "0/1", ""),
+        ("pinned-1.0", "0", "dev-libs/mislot:0/1="),
+    ):
+        vdb = cfg / "var/db/pkg/dev-libs" / pf
+        vdb.mkdir(parents=True)
+        (vdb / "CATEGORY").write_text("dev-libs\n")
+        (vdb / "SLOT").write_text(f"{slot}\n")
+        (vdb / "repository").write_text("main\n")
+        (vdb / "EAPI").write_text("8\n")
+        if rdepend:
+            (vdb / "RDEPEND").write_text(f"{rdepend}\n")
+    (cfg / "var/lib/portage").mkdir(parents=True)
+    (cfg / "var/lib/portage/world").write_text("dev-libs/pinned\n")
+    (cfg / "etc/portage/repos.conf").write_text(
+        f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
+    )
+    pkgdir = tmp_path / "pkgdir"
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    # The installed consumer came from a binary (BUILD_ID/BUILD_TIME in its
+    # vdb) that is still in `$PKGDIR` with the same identity -- the host's
+    # `gnome-keyring-50.0-1` / `mplayer-...-6` shape.
+    vdb = cfg / "var/db/pkg/dev-libs/pinned-1.0"
+    (vdb / "BUILD_ID").write_text("1\n")
+    (vdb / "BUILD_TIME").write_text("100\n")
+    (pkgdir / "dev-libs/pinned").mkdir(parents=True)
+    (pkgdir / "dev-libs/pinned/pinned-1.0-1.gpkg.tar").write_bytes(b"\0" * 4096)
+    (pkgdir / "Packages").write_text(
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
+        "BUILD_ID: 1\nBUILD_TIME: 100\nCPV: dev-libs/pinned-1.0\n"
+        "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+        "PATH: dev-libs/pinned/pinned-1.0-1.gpkg.tar\n"
+        "RDEPEND: dev-libs/mislot:0/1=\nREPO: main\nSIZE: 4096\nSLOT: 0\nUSE:\n\n"
+    )
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg), "PKGDIR": str(pkgdir)}
+
+
+def test_update_does_not_rebuild_a_consumer_whose_ebuild_pins_the_old_slot(
+    emerge_binary, tmp_path
+):
+    """Backlog #304. `dev-libs/mislot` is installed in slot 0 and the tree
+    also has it in slot 1. `dev-libs/pinned` (in world) is bound to
+    `mislot:0/1=` and its ebuild still says `mislot:0=`. Real's
+    `_slot_operator_update_probe(new_child_slot=True)` only reports an
+    update when a *replacement parent's* own atom accepts the new-slot
+    candidate (`replacement_candidates`/`all_candidate_pkgs`): `mislot:0=`
+    cannot pull in slot 1, so nothing is rebuilt and the update is empty
+    (confirmed on real Portage 3.0.x with this tree; on the host this was
+    `gnome-keyring` and `mplayer` re-planned as `rR` after a complete
+    upgrade). Portuale used to schedule the rebuild because it only
+    checked that the consumer has *some* tree candidate."""
+    env = _slotop_new_slot_tree(tmp_path)
+    for args in (
+        ["--pretend", "--update", "--deep", "--newuse", "--usepkg", "@world"],
+        ["--pretend", "--update", "--deep", "--usepkg", "dev-libs/pinned"],
+    ):
+        rust = _run([str(emerge_binary)], args, env)
+        assert rust.returncode == 0, (rust.stdout, rust.stderr)
+        plan = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+        assert plan == [], (args, rust.stdout)
+
+
 def test_downgrade_is_distinguished_from_upgrade(emerge_binary, fixture_env):
     """dev-libs/downgradepkg is installed at 2.0, but only 1.0 is visible
     in the tree (its own 2.0 ebuild is gone) -- real output.py's own
