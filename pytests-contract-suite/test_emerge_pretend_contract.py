@@ -8688,6 +8688,316 @@ def test_getbinpkg_multi_instance_newest_build_time_wins(
     assert rust.stdout.splitlines() == [f'[binary  N g   ] dev-libs/multiinst-1.0-3 to {fixture_env["ROOT"]}']
 
 
+def _multi_instance_tree(tmp_path, remote_builds, local_builds=()):
+    """A hermetic config root for the binpkg-multi-instance cases below
+    (portuale backlog #299/#300, `docs/backlog-tasks-2026-10.md`):
+    `dev-libs/mispectre-1.0` exists **only** as binary builds, `olddep` /
+    `newdep` are plain ebuilds, and the builds differ in their `RDEPEND`
+    -- the shape of the real `seed-desk` binhost's `libspectre-0.2.12`
+    -6/-7 (built against `ghostscript:0/10.06=` vs `0/10.08=`).
+
+    `remote_builds` / `local_builds` are `(build_id, build_time, rdepend,
+    size)` tuples, written in the order given (oldest first, like the
+    live binhost). The local ones go in `$PKGDIR/Packages` (with a
+    placeholder file of the declared size so real bintree keeps them),
+    the remote ones in a `file://` binhost. Returns the env dict."""
+    cfg = tmp_path / "cfg"
+    repo = tmp_path / "repo"
+    binhost = tmp_path / "binhost"
+    pkgdir = tmp_path / "pkgdir"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("main\n")
+    (repo / "profiles/arch.list").write_text("amd64\n")
+    # A profile real Portage accepts (it rejects a bare `profiles/` dir):
+    # `ARCH` set, EAPI declared, so the same tree is a valid oracle run.
+    (repo / "profiles/default").mkdir()
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\n'
+    )
+    (repo / "metadata/md5-cache/dev-libs").mkdir(parents=True)
+    for name in ("olddep", "newdep"):
+        (repo / f"dev-libs/{name}").mkdir(parents=True)
+        ebuild = 'EAPI=8\nDESCRIPTION="mi dep"\nSLOT="0"\nKEYWORDS="amd64"\n'
+        (repo / f"dev-libs/{name}/{name}-1.0.ebuild").write_text(ebuild)
+        (repo / f"metadata/md5-cache/dev-libs/{name}-1.0").write_text(
+            "DEFINED_PHASES=-\nEAPI=8\nIUSE=\nKEYWORDS=amd64\nSLOT=0\n"
+            f"_md5_={hashlib.md5(ebuild.encode()).hexdigest()}\n"
+        )
+    (cfg / "etc/portage/repos.conf").write_text(
+        f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    (cfg / "etc/portage/binrepos.conf").write_text(
+        f"[bh]\nsync-uri = file://{binhost}\npriority = 1\nverify-signature = false\n"
+    )
+
+    def entries(builds):
+        return "".join(
+            f"BUILD_ID: {bid}\nBUILD_TIME: {bt}\nCPV: dev-libs/mispectre-1.0\n"
+            f"DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+            f"PATH: dev-libs/mispectre/mispectre-1.0-{bid}.gpkg.tar\nRDEPEND: {rdep}\n"
+            f"REPO: main\nSIZE: {size}\nSLOT: 0\nUSE:\n\n"
+            for bid, bt, rdep, size in builds
+        )
+
+    binhost.mkdir()
+    (binhost / "Packages").write_text(
+        f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: {len(remote_builds)}\n\n{entries(remote_builds)}"
+    )
+    if local_builds:
+        (pkgdir / "dev-libs/mispectre").mkdir(parents=True)
+        for bid, _bt, _rdep, size in local_builds:
+            (pkgdir / f"dev-libs/mispectre/mispectre-1.0-{bid}.gpkg.tar").write_bytes(
+                b"\0" * size
+            )
+        (pkgdir / "Packages").write_text(
+            f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: {len(local_builds)}\n\n{entries(local_builds)}"
+        )
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg), "PKGDIR": str(pkgdir)}
+
+
+def test_getbinpkg_multi_instance_walks_the_selected_builds_own_deps(
+    emerge_binary, tmp_path
+):
+    """Backlog #299. `dev-libs/mispectre-1.0` has two remote builds, listed
+    oldest first: BUILD_ID 1 (BUILD_TIME 100, `RDEPEND=dev-libs/olddep`) and
+    BUILD_ID 2 (BUILD_TIME 200, `RDEPEND=dev-libs/newdep`). Real picks the
+    newest build (`dbapi._cmp_cpv`) and walks *that* instance's own
+    dependency metadata, so the plan carries `newdep` and never `olddep`.
+    Portuale used to read the dependency strings from the first same-`CPV`
+    `Packages` entry -- the oldest build -- while still labelling the node
+    `-2`."""
+    env = _multi_instance_tree(
+        tmp_path,
+        remote_builds=[
+            (1, 100, "dev-libs/olddep", 4096),
+            (2, 200, "dev-libs/newdep", 4096),
+        ],
+    )
+    rust = _run([str(emerge_binary)], ["--pretend", "--getbinpkg", "dev-libs/mispectre"], env)
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    assert rust.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/newdep-1.0 to {env["ROOT"]}',
+        f'[binary  N g   ] dev-libs/mispectre-1.0-2 to {env["ROOT"]}',
+    ]
+
+
+def test_getbinpkg_multi_instance_local_build_does_not_shadow_a_newer_remote_build(
+    emerge_binary, tmp_path
+):
+    """Backlog #300. `$PKGDIR` already holds BUILD_ID 1 of
+    `dev-libs/mispectre-1.0` (a stale download) while the binhost lists
+    builds 1 and 2. Real `bintree.isremote` is per instance (`cpv` +
+    `build_id` under binpkg-multi-instance), so only the remote *copy of
+    build 1* is shadowed: build 2 stays a candidate, is the newest, and
+    wins -- as a remote (`g`) binary, walking its own `newdep`. Portuale
+    used to shadow every remote build of a version the local `$PKGDIR`
+    carried, so the stale local build 1 won and dragged `olddep` in."""
+    env = _multi_instance_tree(
+        tmp_path,
+        remote_builds=[
+            (1, 100, "dev-libs/olddep", 4096),
+            (2, 200, "dev-libs/newdep", 4096),
+        ],
+        local_builds=[(1, 100, "dev-libs/olddep", 4096)],
+    )
+    rust = _run([str(emerge_binary)], ["--pretend", "--getbinpkg", "dev-libs/mispectre"], env)
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    assert rust.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/newdep-1.0 to {env["ROOT"]}',
+        f'[binary  N g   ] dev-libs/mispectre-1.0-2 to {env["ROOT"]}',
+    ]
+
+
+def _slotop_pin_tree(tmp_path):
+    """A hermetic config root for backlog #303 (`docs/backlog-tasks-2026-10.md`):
+    `dev-libs/mibar` is installed at 2.0 (`SLOT=0/2`) while the tree also
+    carries 1.0 (`SLOT=0/1`); the installed `dev-libs/miholder-1.0` was
+    built against the *old* sub-slot (`RDEPEND=dev-libs/mibar:0/1=`), so
+    its recorded pin could only be met by downgrading `mibar` to 1.0.
+    The host shape: installed `libfido2` bound to `libcbor:0/0.13=` while
+    `libcbor` 0.14 (`0/0.14`) is installed. Real Portage's first pass does
+    pick the downgrade, then backtracks on "missed slot abi update" and
+    rebuilds the consumer instead. Returns the env dict."""
+    cfg = tmp_path / "cfg"
+    repo = tmp_path / "repo"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles/default").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("main\n")
+    (repo / "profiles/arch.list").write_text("amd64\n")
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\n'
+    )
+    (repo / "metadata/md5-cache/dev-libs").mkdir(parents=True)
+    for name, ver, slot, rdepend in (
+        ("mibar", "1.0", "0/1", ""),
+        ("mibar", "2.0", "0/2", ""),
+        ("miholder", "1.0", "0", "dev-libs/mibar:="),
+    ):
+        (repo / f"dev-libs/{name}").mkdir(parents=True, exist_ok=True)
+        dep = f'RDEPEND="{rdepend}"\n' if rdepend else ""
+        ebuild = f'EAPI=8\nDESCRIPTION="slotop pin"\nSLOT="{slot}"\nKEYWORDS="amd64"\n{dep}'
+        (repo / f"dev-libs/{name}/{name}-{ver}.ebuild").write_text(ebuild)
+        cache = (
+            f"DEFINED_PHASES=-\nEAPI=8\nIUSE=\nKEYWORDS=amd64\nSLOT={slot}\n"
+            + (f"RDEPEND={rdepend}\n" if rdepend else "")
+            + f"_md5_={hashlib.md5(ebuild.encode()).hexdigest()}\n"
+        )
+        (repo / f"metadata/md5-cache/dev-libs/{name}-{ver}").write_text(cache)
+    for pf, slot, rdepend in (
+        ("mibar-2.0", "0/2", ""),
+        ("miholder-1.0", "0", "dev-libs/mibar:0/1="),
+    ):
+        vdb = cfg / "var/db/pkg/dev-libs" / pf
+        vdb.mkdir(parents=True)
+        (vdb / "CATEGORY").write_text("dev-libs\n")
+        (vdb / "SLOT").write_text(f"{slot}\n")
+        (vdb / "repository").write_text("main\n")
+        (vdb / "EAPI").write_text("8\n")
+        if rdepend:
+            (vdb / "RDEPEND").write_text(f"{rdepend}\n")
+    (cfg / "var/lib/portage").mkdir(parents=True)
+    (cfg / "var/lib/portage/world").write_text("dev-libs/miholder\n")
+    (cfg / "etc/portage/repos.conf").write_text(
+        f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["--pretend", "--update", "--deep", "dev-libs/miholder"],
+        ["--pretend", "--update", "--deep", "--newuse", "@world"],
+    ],
+    ids=["consumer-argument", "world"],
+)
+def test_update_rebuilds_a_stale_consumer_instead_of_downgrading_its_provider(
+    emerge_binary, tmp_path, args
+):
+    """Backlog #303. `dev-libs/mibar` is installed at 2.0 (`SLOT=0/2`); the
+    installed `dev-libs/miholder-1.0` was built against the old sub-slot
+    (`RDEPEND=dev-libs/mibar:0/1=`) and the tree still carries `mibar-1.0`
+    (`0/1`). Real's first pass honours the recorded pin by scheduling that
+    downgrade, then its `_slot_operator_update_probe` finds the installed
+    2.0 as the missed update and backtracks ("backtracking due to missed
+    slot abi update"): the consumer is rebuilt (`rR`) and `mibar` stays
+    put. Confirmed on real Portage 3.0.x with this exact tree; on the host
+    the same shape was `libfido2`/`libcbor` and `libcdio-paranoia`/
+    `libcdio`. Portuale used to settle on the downgrade of `mibar` and
+    leave the consumer alone."""
+    env = _slotop_pin_tree(tmp_path)
+    rust = _run([str(emerge_binary)], args, env)
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    assert rust.stdout.splitlines() == [
+        f'[ebuild  rR    ] dev-libs/miholder-1.0 to {env["ROOT"]}'
+    ]
+
+
+def _slotop_new_slot_tree(tmp_path):
+    """A hermetic config root for backlog #304 (`docs/backlog-tasks-2026-10.md`):
+    `dev-libs/mislot` is installed in slot 0 only (`0/1`, 1.0) while the
+    tree also carries 2.0 in slot 1 (`1/2`) -- the `ffmpeg-compat:6` /
+    `ffmpeg-compat:8` shape; the installed `dev-libs/pinned-1.0` was built against `mislot:0/1=` and
+    its current ebuild still says `RDEPEND=dev-libs/mislot:0=` -- the host
+    shape of `gnome-keyring`'s `gcr:0/1=` with `gcr:4` installed beside it
+    (and `mplayer`/`ffmpeg-compat`). Nothing about `mislot` is out of date,
+    so a world update has nothing to do. Returns the env dict."""
+    cfg = tmp_path / "cfg"
+    repo = tmp_path / "repo"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles/default").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("main\n")
+    (repo / "profiles/arch.list").write_text("amd64\n")
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\n'
+    )
+    (repo / "metadata/md5-cache/dev-libs").mkdir(parents=True)
+    for name, ver, slot, rdepend in (
+        ("mislot", "1.0", "0/1", ""),
+        ("mislot", "2.0", "1/2", ""),
+        ("pinned", "1.0", "0", "dev-libs/mislot:0="),
+    ):
+        (repo / f"dev-libs/{name}").mkdir(parents=True, exist_ok=True)
+        dep = f'RDEPEND="{rdepend}"\n' if rdepend else ""
+        ebuild = f'EAPI=8\nDESCRIPTION="new slot"\nSLOT="{slot}"\nKEYWORDS="amd64"\n{dep}'
+        (repo / f"dev-libs/{name}/{name}-{ver}.ebuild").write_text(ebuild)
+        cache = (
+            f"DEFINED_PHASES=-\nEAPI=8\nIUSE=\nKEYWORDS=amd64\nSLOT={slot}\n"
+            + (f"RDEPEND={rdepend}\n" if rdepend else "")
+            + f"_md5_={hashlib.md5(ebuild.encode()).hexdigest()}\n"
+        )
+        (repo / f"metadata/md5-cache/dev-libs/{name}-{ver}").write_text(cache)
+    for pf, slot, rdepend in (
+        ("mislot-1.0", "0/1", ""),
+        ("pinned-1.0", "0", "dev-libs/mislot:0/1="),
+    ):
+        vdb = cfg / "var/db/pkg/dev-libs" / pf
+        vdb.mkdir(parents=True)
+        (vdb / "CATEGORY").write_text("dev-libs\n")
+        (vdb / "SLOT").write_text(f"{slot}\n")
+        (vdb / "repository").write_text("main\n")
+        (vdb / "EAPI").write_text("8\n")
+        if rdepend:
+            (vdb / "RDEPEND").write_text(f"{rdepend}\n")
+    (cfg / "var/lib/portage").mkdir(parents=True)
+    (cfg / "var/lib/portage/world").write_text("dev-libs/pinned\n")
+    (cfg / "etc/portage/repos.conf").write_text(
+        f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
+    )
+    pkgdir = tmp_path / "pkgdir"
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    # The installed consumer came from a binary (BUILD_ID/BUILD_TIME in its
+    # vdb) that is still in `$PKGDIR` with the same identity -- the host's
+    # `gnome-keyring-50.0-1` / `mplayer-...-6` shape.
+    vdb = cfg / "var/db/pkg/dev-libs/pinned-1.0"
+    (vdb / "BUILD_ID").write_text("1\n")
+    (vdb / "BUILD_TIME").write_text("100\n")
+    (pkgdir / "dev-libs/pinned").mkdir(parents=True)
+    (pkgdir / "dev-libs/pinned/pinned-1.0-1.gpkg.tar").write_bytes(b"\0" * 4096)
+    (pkgdir / "Packages").write_text(
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
+        "BUILD_ID: 1\nBUILD_TIME: 100\nCPV: dev-libs/pinned-1.0\n"
+        "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+        "PATH: dev-libs/pinned/pinned-1.0-1.gpkg.tar\n"
+        "RDEPEND: dev-libs/mislot:0/1=\nREPO: main\nSIZE: 4096\nSLOT: 0\nUSE:\n\n"
+    )
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg), "PKGDIR": str(pkgdir)}
+
+
+def test_update_does_not_rebuild_a_consumer_whose_ebuild_pins_the_old_slot(
+    emerge_binary, tmp_path
+):
+    """Backlog #304. `dev-libs/mislot` is installed in slot 0 and the tree
+    also has it in slot 1. `dev-libs/pinned` (in world) is bound to
+    `mislot:0/1=` and its ebuild still says `mislot:0=`. Real's
+    `_slot_operator_update_probe(new_child_slot=True)` only reports an
+    update when a *replacement parent's* own atom accepts the new-slot
+    candidate (`replacement_candidates`/`all_candidate_pkgs`): `mislot:0=`
+    cannot pull in slot 1, so nothing is rebuilt and the update is empty
+    (confirmed on real Portage 3.0.x with this tree; on the host this was
+    `gnome-keyring` and `mplayer` re-planned as `rR` after a complete
+    upgrade). Portuale used to schedule the rebuild because it only
+    checked that the consumer has *some* tree candidate."""
+    env = _slotop_new_slot_tree(tmp_path)
+    for args in (
+        ["--pretend", "--update", "--deep", "--newuse", "--usepkg", "@world"],
+        ["--pretend", "--update", "--deep", "--usepkg", "dev-libs/pinned"],
+    ):
+        rust = _run([str(emerge_binary)], args, env)
+        assert rust.returncode == 0, (rust.stdout, rust.stderr)
+        plan = [ln for ln in rust.stdout.splitlines() if ln.startswith("[")]
+        assert plan == [], (args, rust.stdout)
+
+
 def test_downgrade_is_distinguished_from_upgrade(emerge_binary, fixture_env):
     """dev-libs/downgradepkg is installed at 2.0, but only 1.0 is visible
     in the tree (its own 2.0 ebuild is gone) -- real output.py's own
