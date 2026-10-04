@@ -5639,6 +5639,67 @@ def _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir):
     return env
 
 
+def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp_path):
+    """Backlog #301 (`docs/backlog-tasks-2026-10.md`). The binhost lists two
+    builds of `dev-libs/packagepkg-1.0` -- BUILD_ID 1 (BUILD_TIME 100)
+    first, BUILD_ID 2 (BUILD_TIME 200) second, like the live `seed-desk`
+    index -- each with its own `PATH`. Real fetches the instance the
+    resolver planned (the newest, `-2`) into `$PKGDIR`. Portuale used to
+    look the record up by `CPV` alone and take the *first* entry, so the
+    plan said `-2` but `-1` was downloaded -- and, sitting in `$PKGDIR`,
+    that stale build then shadowed the newer remote one on every later run
+    (#300).
+
+    The pin is the download choice, not the merge: both copies carry the
+    same gpkg bytes (built once below, BUILD_ID 1 inside), which real
+    rejects at extraction time for the renamed `-2` copy -- the file it
+    fetched is still `-2`, confirmed on real Portage 3.0.x. So only the
+    resulting `$PKGDIR` listing is asserted."""
+    import shutil
+
+    # One real gpkg to serve under both build ids.
+    root0 = tmp_path / "root0"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    env0 = _getbinpkg_500_env(tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir")
+    env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env0,
+    )
+    gpkg = root0 / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar"
+    assert gpkg.is_file()
+
+    binhost = tmp_path / "binhost"
+    (binhost / "dev-libs/packagepkg").mkdir(parents=True)
+    entries = ""
+    for bid, bt in ((1, 100), (2, 200)):
+        shutil.copy(gpkg, binhost / f"dev-libs/packagepkg/packagepkg-1.0-{bid}.gpkg.tar")
+        entries += (
+            f"BUILD_ID: {bid}\nBUILD_TIME: {bt}\nCPV: dev-libs/packagepkg-1.0\n"
+            "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+            f"PATH: dev-libs/packagepkg/packagepkg-1.0-{bid}.gpkg.tar\n"
+            f"REPO: testrepo\nSIZE: {gpkg.stat().st_size}\nSLOT: 0\nUSE:\n\n"
+        )
+    (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 2\n\n{entries}")
+
+    clientetc = _clientetc_with_500_binhost(tmp_path, 0)
+    (clientetc / "etc/portage/binrepos.conf").write_text(
+        f"[multiinst]\npriority = 1\nsync-uri = file://{binhost}\nverify-signature = false\n"
+    )
+    root1 = tmp_path / "root1"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root1 / "var")
+    pkgdir = tmp_path / "pkgdir1"
+    env = _getbinpkg_500_env(tmp_path, root1, clientetc, pkgdir)
+    (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
+    subprocess.run(
+        [str(emerge_binary), "-k", "--getbinpkgonly", "--oneshot", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    fetched = sorted(str(f.relative_to(pkgdir)) for f in pkgdir.rglob("*.gpkg.tar"))
+    assert fetched == ["dev-libs/packagepkg/packagepkg-1.0-2.gpkg.tar"], fetched
+
+
 def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_path):
     """Backlog #175 case (b): the only binhost 500s every index fetch and
     PKGDIR is empty. Real (`bintree._populate_remote`'s `except OSError`,
