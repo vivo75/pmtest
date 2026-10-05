@@ -12,7 +12,7 @@
 # Env: PORTTEST_IMAGE, PORTTEST_PODMAN, L1_REBUILD=1 (wipe the pkgcache
 #      first), L1_SKIP_BUILD=1 (reuse whatever is in the pkgcache),
 #      L1_JOBS, L1_SKIP_PORTAGE_UPGRADE, L1_CONSUME_REINSTALL=1,
-#      L1_PORTUALE_VDB=sqlite (portuale merges through mrg --vdb-backend=sqlite)
+#      L1_PORTUALE_VDB=sqlite|redb (portuale merges through mrg --vdb-backend=<kind>)
 #      (`--reinstall`: force both PMs to re-merge an already-installed
 #      set -- the merge-path safety gate's glibc/bash cell).
 #

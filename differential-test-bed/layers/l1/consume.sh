@@ -98,20 +98,21 @@ log "merging ${#atoms[@]} atoms (+deps) from \$PKGDIR with $($EM --version 2>/de
 reinstall_opts=()
 [ "${L1_CONSUME_REINSTALL:-0}" = 1 ] && reinstall_opts=(--reinstall-atoms "${atoms[*]}")
 
-# `L1_PORTUALE_VDB=sqlite` (portuale feat#157 / #305 S4.6, opt-in): the
-# portuale side converts the container's /var/db/pkg into a sqlite
-# installed-package database, merges through `mrg --vdb-backend=sqlite`,
+# `L1_PORTUALE_VDB=sqlite|redb` (portuale feat#157 / #305 S4.6 / S5.6,
+# opt-in): the portuale side converts the container's /var/db/pkg into a
+# database of that kind, merges through `mrg --vdb-backend=<kind>`,
 # and converts the result back into /var/db/pkg before the snapshot, so
-# the usual diff against real portage grades the sqlite merge. The
+# the usual diff against real portage grades the database merge. The
 # portage side and the default run are unchanged.
 merge_cmd=("$EM")
-if [ "$PM" = portuale ] && [ "${L1_PORTUALE_VDB:-files}" = sqlite ]; then
-  VDB_DB=/var/lib/portage/vdb.sqlite
-  if ! /usr/local/bin/portuale vdb convert --from files:/ --to "sqlite:$VDB_DB" 2>&1 | tee "$OUT.vdb-import.log"; then
-    log "!!! vdb convert files -> sqlite failed"; exit 1
+VDB_KIND=${L1_PORTUALE_VDB:-files}
+if [ "$PM" = portuale ] && { [ "$VDB_KIND" = sqlite ] || [ "$VDB_KIND" = redb ]; }; then
+  VDB_DB=/var/lib/portage/vdb.$VDB_KIND
+  if ! /usr/local/bin/portuale vdb convert --from files:/ --to "$VDB_KIND:$VDB_DB" 2>&1 | tee "$OUT.vdb-import.log"; then
+    log "!!! vdb convert files -> $VDB_KIND failed"; exit 1
   fi
-  merge_cmd=(/usr/local/bin/mrg --vdb-backend=sqlite "--vdb-path=$VDB_DB")
-  log "portuale merges through the sqlite VDB $VDB_DB"
+  merge_cmd=(/usr/local/bin/mrg "--vdb-backend=$VDB_KIND" "--vdb-path=$VDB_DB")
+  log "portuale merges through the $VDB_KIND VDB $VDB_DB"
   # mrg has no --oneshot (it records in world unless told otherwise, the
   # emerge default); keep the gate about the merge itself by saving the
   # world file now and restoring it after the export below.
@@ -145,10 +146,10 @@ if grep -qE '^>>> Emerging \(' "$OUT.merge.log"; then
 fi
 
 if [ -n "${VDB_DB:-}" ]; then
-  /usr/local/bin/portuale vdb status "sqlite:$VDB_DB" > "$OUT.vdb-status.log" 2>&1
-  log "sqlite VDB status rc=$? (0 = nothing pending)"
-  if ! /usr/local/bin/portuale vdb convert --force --from "sqlite:$VDB_DB" --to files:/ 2>&1 | tee "$OUT.vdb-export.log"; then
-    log "!!! vdb convert sqlite -> files failed"; MERGE_RC=1
+  /usr/local/bin/portuale vdb status "$VDB_KIND:$VDB_DB" > "$OUT.vdb-status.log" 2>&1
+  log "$VDB_KIND VDB status rc=$? (0 = nothing pending)"
+  if ! /usr/local/bin/portuale vdb convert --force --from "$VDB_KIND:$VDB_DB" --to files:/ 2>&1 | tee "$OUT.vdb-export.log"; then
+    log "!!! vdb convert $VDB_KIND -> files failed"; MERGE_RC=1
   fi
   if [ -e /var/lib/portage/world.l1-saved ]; then
     mv -f /var/lib/portage/world.l1-saved /var/lib/portage/world
