@@ -13,6 +13,8 @@
 #      first), L1_SKIP_BUILD=1 (reuse whatever is in the pkgcache),
 #      L1_JOBS, L1_SKIP_PORTAGE_UPGRADE, L1_CONSUME_REINSTALL=1,
 #      L1_PORTUALE_VDB=sqlite|redb (portuale merges through mrg --vdb-backend=<kind>)
+#      L1_PORTAGE_VDB_MOUNT=sqlite|redb (real portage merges through
+#        `portuale vdb mount --rw` over a database of that kind; #317)
 #      (`--reinstall`: force both PMs to re-merge an already-installed
 #      set -- the merge-path safety gate's glibc/bash cell).
 #
@@ -66,13 +68,20 @@ fi
 # --- consume (both PMs, identical fresh containers) --------------------
 consume() {  # pm
   local pm=$1
+  local fuse=()
+  # L1_PORTAGE_VDB_MOUNT (#317): real portage merges through a FUSE mount,
+  # which needs the device and, as container root, CAP_SYS_ADMIN (S0).
+  if [ "$pm" = portage ] && [ -n "${L1_PORTAGE_VDB_MOUNT:-}" ]; then
+    fuse=(--device /dev/fuse --cap-add SYS_ADMIN)
+  fi
   echo ">>> merging with $pm"
-  podman_run_pm "porttest-l1-$pm-$$" \
+  podman_run_pm "porttest-l1-$pm-$$" "${fuse[@]}" \
     -v "$PKGCACHE:/pkgs:ro" "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs \
     -e "L1_SKIP_PORTAGE_UPGRADE=${L1_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L1_CONSUME_REINSTALL=${L1_CONSUME_REINSTALL:-0}" \
     -e "L1_PORTUALE_VDB=${L1_PORTUALE_VDB:-files}" \
+    -e "L1_PORTAGE_VDB_MOUNT=${L1_PORTAGE_VDB_MOUNT:-}" \
     --entrypoint /bin/bash "$IMAGE" \
     /TEST/layers/l1/consume.sh "$pm" "$REL_ATOMLIST" "/TEST/logs/$RUN/$pm"
 }
