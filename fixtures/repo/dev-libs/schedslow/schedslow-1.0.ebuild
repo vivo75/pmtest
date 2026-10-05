@@ -5,7 +5,7 @@ KEYWORDS="amd64"
 S="${WORKDIR}"
 
 src_compile() {
-	sleep 20
+	sleep 120
 	touch "${T}/schedslow-slept-to-completion" || die
 }
 

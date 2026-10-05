@@ -3,4 +3,4 @@ DESCRIPTION=fixture package: Scheduler / kill-in-flight-on-hard-failure test (sc
 EAPI=8
 KEYWORDS=amd64
 SLOT=0
-_md5_=002ed4a7ed0995995ae453dca429d9af
+_md5_=eda699a92cc7c699e42dc26ab4e9fd06
