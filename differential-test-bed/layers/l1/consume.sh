@@ -121,6 +121,31 @@ fi
 oneshot=(--oneshot)
 [ -n "${VDB_DB:-}" ] && oneshot=()
 
+# `L1_PORTAGE_VDB_MOUNT=sqlite|redb` (portuale #317 S6, opt-in): the
+# *real portage* side merges through `portuale vdb mount --rw`. The
+# container's /var/db/pkg is converted into a database of that kind, the
+# directory is moved aside and the read-write FUSE view of the database is
+# mounted in its place; real emerge then merges into the database. After
+# the merge the mount is unmounted (the daemon imports world, the counter
+# and the other stores real wrote under / and exits) and the database is
+# converted back into /var/db/pkg before the snapshot, so the usual diff
+# against portuale grades real portage's merge through the mount. Needs
+# `--device /dev/fuse --cap-add SYS_ADMIN` (added by
+# run/l1-merge-from-binpkg.sh). The portuale side is unchanged.
+PMOUNT_KIND=${L1_PORTAGE_VDB_MOUNT:-}
+PMOUNT_DB=
+if [ "$PM" = portage ] && { [ "$PMOUNT_KIND" = sqlite ] || [ "$PMOUNT_KIND" = redb ]; }; then
+  PMOUNT_DB=/var/lib/portage/vdb.$PMOUNT_KIND
+  if ! /usr/local/bin/portuale vdb convert --from files:/ --to "$PMOUNT_KIND:$PMOUNT_DB" 2>&1 | tee "$OUT.vdb-import.log"; then
+    log "!!! vdb convert files -> $PMOUNT_KIND failed"; exit 1
+  fi
+  mv /var/db/pkg /var/db/pkg.l1-files && mkdir /var/db/pkg
+  if ! /usr/local/bin/portuale vdb mount --rw --root / "$PMOUNT_KIND:$PMOUNT_DB" /var/db/pkg 2>&1 | tee "$OUT.vdb-mount.log"; then
+    log "!!! vdb mount --rw failed"; exit 1
+  fi
+  log "real portage merges through portuale vdb mount --rw over $PMOUNT_KIND ($(grep ' /var/db/pkg ' /proc/mounts | cut -d' ' -f1,3))"
+fi
+
 # `-k --getbinpkg`: prefer a $PKGDIR binpkg, fall back to an ebuild (so
 # an installed dep with no binpkg is just satisfied). Both PMs run the
 # identical command. Notes (differential-test-bed/findings/l1.md):
@@ -151,6 +176,29 @@ if [ -n "${VDB_DB:-}" ]; then
   if ! /usr/local/bin/portuale vdb convert --force --from "$VDB_KIND:$VDB_DB" --to files:/ 2>&1 | tee "$OUT.vdb-export.log"; then
     log "!!! vdb convert $VDB_KIND -> files failed"; MERGE_RC=1
   fi
+  if [ -e /var/lib/portage/world.l1-saved ]; then
+    mv -f /var/lib/portage/world.l1-saved /var/lib/portage/world
+  else
+    rm -f /var/lib/portage/world
+  fi
+fi
+
+if [ -n "$PMOUNT_DB" ]; then
+  # The export below rewrites the stores; keep the world file real emerge
+  # left (--oneshot: untouched) byte- and mtime-exact for the snapshot.
+  [ -e /var/lib/portage/world ] && cp -a /var/lib/portage/world /var/lib/portage/world.l1-saved
+  umount /var/db/pkg || { log "!!! umount /var/db/pkg failed"; MERGE_RC=1; }
+  # The daemon imports the stores after the unmount, then exits and lets
+  # the database go (redb allows one process); wait for that.
+  for _ in $(seq 60); do
+    /usr/local/bin/portuale vdb status "$PMOUNT_KIND:$PMOUNT_DB" > "$OUT.vdb-status.log" 2>&1 && break
+    sleep 0.5
+  done
+  log "$PMOUNT_KIND VDB status after unmount: $(grep -E '^(installed|counter|pending):' "$OUT.vdb-status.log" | tr -s ' ' | paste -sd ';')"
+  if ! /usr/local/bin/portuale vdb convert --force --from "$PMOUNT_KIND:$PMOUNT_DB" --to files:/ 2>&1 | tee "$OUT.vdb-export.log"; then
+    log "!!! vdb convert $PMOUNT_KIND -> files failed"; MERGE_RC=1
+  fi
+  rm -rf /var/db/pkg.l1-files
   if [ -e /var/lib/portage/world.l1-saved ]; then
     mv -f /var/lib/portage/world.l1-saved /var/lib/portage/world
   else
