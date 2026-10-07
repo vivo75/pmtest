@@ -875,6 +875,48 @@ def test_mrg_remote_resolve_merges_a_binhost_binary(
     assert "testrepo" in server_ledger
 
 
+def test_mrg_remote_resolve_without_a_phase_runtime_fails_at_the_gate(
+    mrg_binary, fixture_env, tmp_path
+):
+    """portuale #322: the resolve path ships the vendored phase runtime
+    (`bin/`) with every unit, so a binary that cannot find it must say so
+    after the read-only preflight and before any unit ships -- one message naming `PORTUALE_BIN_DIR`, exit 1, no
+    panic/abort (the release profile aborts on panic; the old failure was
+    `Aborted (core dumped)` after the plan printed) and nothing written to
+    the client ROOT or its ledgers. `PORTUALE_BIN_DIR` pointing at nothing
+    stands in for a binary run outside its build tree."""
+    binhost = _write_tmp_binhost(tmp_path)
+    clientetc = _write_tmp_clientetc(tmp_path, binhost)
+    root = tmp_path / "root"
+    (root / "var" / "db" / "pkg").mkdir(parents=True)
+    env = _remote_resolve_env(fixture_env, root, clientetc)
+    env["PORTUALE_BIN_DIR"] = str(tmp_path / "no-such-runtime")
+    result = subprocess.run(
+        [str(mrg_binary),
+         "--getbinpkgonly",
+         "--remote-hostname", "localtest",
+         "--remote-transport", "local",
+         "--remote-root", str(root),
+         "--remote-workdir", str(tmp_path / "work"),
+         "--remote-etc-portage", f"server:{clientetc}",
+         "dev-libs/binpkgrmpkg"],
+        capture_output=True, text=True, check=False,
+        env=env,
+    )
+    both = result.stdout + result.stderr
+    assert result.returncode == 1, both
+    assert "PORTUALE_BIN_DIR" in result.stderr and "ebuild.sh" in result.stderr
+    for bad in ("panicked", "backtrace", "RUST_BACKTRACE"):
+        assert bad not in both
+    # The read-only client preflight (plan stage 2) runs before the
+    # resolve; no unit may have started after it.
+    assert ">>> Remote bundle" not in result.stdout, "no unit may start"
+    assert ">>> Remote merged" not in result.stdout
+    assert not (root / "usr").exists()
+    assert not (root / "var/db/pkg/dev-libs").exists()
+    assert not (clientetc / "pkgdir/remote-ledger").exists()
+
+
 def test_mrg_remote_client_etc_placement_pulls_before_resolving(
     mrg_binary, fixture_env, tmp_path
 ):
