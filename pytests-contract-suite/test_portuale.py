@@ -9732,3 +9732,24 @@ def test_ebuild_without_sandbox_tolerates_the_same_stray_write(
     )
     log = tmp_path / "pt" / _FSSANDBOX_SANDBOX_LOG
     assert not log.exists() or log.stat().st_size == 0
+
+
+def test_output_into_a_closed_pipe_is_a_quiet_141_not_an_abort(
+    emerge_binary, fixture_env
+):
+    """portuale #323: the Rust runtime ignores SIGPIPE, so `portuale ... |
+    head` used to panic on the next write and, with `panic = "abort"`, die
+    `Aborted (core dumped)` (rc 134) even after the work was done. Now the
+    one panic that means "stdout is gone" exits 141 (what a SIGPIPE death
+    shows a shell) with nothing on stderr."""
+    env = dict(fixture_env)
+    proc = subprocess.Popen(
+        [str(emerge_binary), "--list-sets"],
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env,
+    )
+    proc.stdout.close()  # the reader goes away before the first write
+    err = proc.stderr.read().decode()
+    rc = proc.wait()
+    proc.stderr.close()
+    assert "panicked" not in err and "core dumped" not in err, err
+    assert rc in (0, 141), (rc, err)
