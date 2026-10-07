@@ -56,13 +56,20 @@ PODMAN=${PORTTEST_PODMAN:-podman}
 # compile-time CARGO_MANIFEST_DIR/../.. path into that checkout, and L1+
 # phase execution reads `bin/` and `3rdparty/portage` through it. L0
 # never runs phases but the mount is harmless.
+#
+# PM_RELOCATED=1 (portuale backlog #322) mounts only the optional Portage
+# checkout instead of the whole checkout, so the build tree's `bin/` is
+# absent in the container and the binary must run from its embedded copy of
+# the phase runtime -- the relocated-binary cell of the merge-path gate.
 pm_mounts() {
-  PM_MOUNTS=(
-    -v "$PM_BIN_DIR:/usr/local/bin:ro"
-    -v "$PM_REPO:$PM_REPO:ro"
-    -v "$TEST_DIR:/TEST:ro"
-    -v "$LOGS_DIR:/TEST/logs"
-  )
+  PM_MOUNTS=(-v "$PM_BIN_DIR:/usr/local/bin:ro")
+  if [ "${PM_RELOCATED:-0}" = 1 ]; then
+    local checkout="${PORTUALE_PORTAGE_CHECKOUT:-$PM_REPO/3rdparty/portage}"
+    PM_MOUNTS+=(-v "$checkout:$checkout:ro" -e "PORTUALE_PORTAGE_CHECKOUT=$checkout")
+  else
+    PM_MOUNTS+=(-v "$PM_REPO:$PM_REPO:ro")
+  fi
+  PM_MOUNTS+=(-v "$TEST_DIR:/TEST:ro" -v "$LOGS_DIR:/TEST/logs")
 }
 
 # Resolve the PM now (paths only: sourcing this file must never build).
