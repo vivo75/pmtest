@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=porttest: dodoc + docompress of ~4 KiB text files
+EAPI=8
+HOMEPAGE=https://example.invalid/porttest
+KEYWORDS=amd64
+LICENSE=GPL-2
+SLOT=0
+_md5_=0a901801d0fe754c7716c3f76768c5d2

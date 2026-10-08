@@ -61,9 +61,17 @@ PODMAN=${PORTTEST_PODMAN:-podman}
 # checkout instead of the whole checkout, so the build tree's `bin/` is
 # absent in the container and the binary must run from its embedded copy of
 # the phase runtime -- the relocated-binary cell of the merge-path gate.
+#
+# PM_BARE=1 (portuale backlog #326, the [nopy]/[noportage] cells) mounts
+# only the PM bin dir plus the /TEST mounts -- no checkout at all, neither
+# the whole repo nor 3rdparty/portage, and no PORTUALE_PORTAGE_CHECKOUT in
+# the container env. It wins over PM_RELOCATED when both are set. The
+# binary must be fully self-sufficient in the container.
 pm_mounts() {
   PM_MOUNTS=(-v "$PM_BIN_DIR:/usr/local/bin:ro")
-  if [ "${PM_RELOCATED:-0}" = 1 ]; then
+  if [ "${PM_BARE:-0}" = 1 ]; then
+    : # bare: the PM binaries only -- no checkout, no PORTUALE_PORTAGE_CHECKOUT
+  elif [ "${PM_RELOCATED:-0}" = 1 ]; then
     local checkout="${PORTUALE_PORTAGE_CHECKOUT:-$PM_REPO/3rdparty/portage}"
     PM_MOUNTS+=(-v "$checkout:$checkout:ro" -e "PORTUALE_PORTAGE_CHECKOUT=$checkout")
   else
