@@ -107,6 +107,7 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     -v "$TEST_DIR:/TEST:ro" -v "$PKG_PORTAGE:/pkgs" -v "$DISTFILES:/distfiles" \
     "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs -e DISTDIR=/distfiles \
+    ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "L2_JOBS=${L2_JOBS:-1}" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \
@@ -121,6 +122,7 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     -v "$PKG_PORTAGE:/ref-pkgs:ro" -v "$PKG_PORTUALE:/pkgs" -v "$DISTFILES:/distfiles" \
     "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs -e DISTDIR=/distfiles \
+    ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "L2_JOBS=${L2_JOBS:-1}" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \

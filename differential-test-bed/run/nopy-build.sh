@@ -56,7 +56,7 @@ while [ $# -gt 0 ]; do
   case $1 in
     --variant) VARIANT=${2:?--variant needs nopy|noportage}; shift 2 ;;
     --bin) OPT_BIN=${2:?--bin needs a directory}; shift 2 ;;
-    --env) case ${2:-} in *=*) EXTRA_ENV+=(-e "$2") ;; *) echo "--env needs K=V" >&2; exit 2 ;; esac; shift 2 ;;
+    --env) case ${2:-} in GENTOO_MIRRORS=*) EXTRA_ENV+=(-e "GENTOO_MIRRORS=$(bed_guest_mirrors "${2#*=}")") ;; *=*) EXTRA_ENV+=(-e "$2") ;; *) echo "--env needs K=V" >&2; exit 2 ;; esac; shift 2 ;;
     --) shift; break ;;
     -*) echo "unknown option: $1 (usage: nopy-build.sh [--variant nopy|noportage] [--bin <dir>] [--env K=V]... <atom>...)" >&2; exit 2 ;;
     *) break ;;
@@ -261,6 +261,7 @@ podman_argv=("$PODMAN" run --rm --name "porttest-nopy-$$"
   -v "$DISTFILES:/distfiles"
   -e DISTDIR=/distfiles
   -e "NOPY_OUT=/TEST/logs/$RUN" -e "NOPY_STAGE_OVL=$STAGE_OVL"
+  ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"}
   "${EXTRA_ENV[@]}"
   --entrypoint /bin/bash "$IMAGE"
   "/TEST/logs/$RUN/guest.sh" "$@")

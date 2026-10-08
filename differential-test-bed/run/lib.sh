@@ -83,6 +83,26 @@ pm_mounts() {
 # Resolve the PM now (paths only: sourcing this file must never build).
 pm_env_load --no-build
 
+# A host GENTOO_MIRRORS (e.g. the owner's local caching mirror,
+# GENTOO_MIRRORS="http://<this host's eth0 IP>:8080") is forwarded to the
+# containers that fetch distfiles (l2, l3, nopy-build); unset, the image's
+# make.conf mirrors apply. Rootless podman's pasta gives the guest the
+# host's own address, so in the guest that IP is the guest itself: it is
+# rewritten to host.containers.internal, which reaches the host.
+# bed_guest_mirrors <mirrors>: the same list as seen from a guest.
+bed_guest_mirrors() {
+  local m=$1 ip
+  for ip in $(ip -o -4 addr show scope global 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4}'); do
+    m=${m//\/\/$ip:/\/\/host.containers.internal:}
+    m=${m//\/\/$ip\//\/\/host.containers.internal\/}
+  done
+  printf '%s\n' "$m"
+}
+MIRROR_ENV=()
+if [ -n "${GENTOO_MIRRORS:-}" ]; then
+  MIRROR_ENV=(-e "GENTOO_MIRRORS=$(bed_guest_mirrors "$GENTOO_MIRRORS")")
+fi
+
 # Common `podman run` args for a PM-capable throwaway container.
 podman_run_pm() {
   local name=$1; shift
