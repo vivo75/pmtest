@@ -1,0 +1,31 @@
+chmod-lite oracle case: basic
+
+Isolates the two arms of portage.util.apply_permissions as driven by
+chmod-lite.py (filemode=0644/filemask=0022 on files,
+dirmode=0755/dirmask=0022 on directories): missing read bits are added
+(0600->0644, 0640->0644), surplus write bits are stripped (0777->0755),
+and owner-execute is preserved (0700->0744), because the mask only ever
+clears 0022 and the mode only ever adds. Three levels of nesting prove
+the recursion reaches depth.
+If the native port regressed to forcing exact 0644/0755, out.manifest
+would show the 0744 entries as 0644.
+
+Run exactly as the unpack phase runs it (bin/phase-helpers.sh):
+  cd <tree>
+  find . -mindepth 1 -maxdepth 1 ! -type l \
+    -exec <checkout>/bin/chmod-lite {} +
+with PORTAGE_BIN_PATH=<checkout>/bin,
+PORTAGE_PYM_PATH=<checkout>/lib, PORTAGE_PYTHON=/usr/bin/python.
+File contents are empty (out of scope: only type/mode/path/target
+are recorded); symlink modes are always ----.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 0022
+  staging: scratch dir directly
+  generator-locale: LC_ALL=unset LC_CTYPE=unset LANG=C.utf8 charmap=UTF-8
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)
+  root-vs-user: identical

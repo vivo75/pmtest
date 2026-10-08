@@ -1,0 +1,6 @@
+d 2755 dir-setgid
+f 0644 dir-setgid/normal-inside
+d 1755 dir-sticky
+f 0644 dir-sticky/plain
+f 4755 file-setuid
+f 6755 file-srwx

@@ -544,3 +544,42 @@ No `installed-porttest.txt` (merge failed).
 | `ebuild-helpers/xattr/install:39-40` → `install.py` (only FEATURES=xattr without install-xattr) | NOT OBSERVED. All runs used `FEATURES="buildpkg -sign"` (no `xattr`); the `install.py`/`install-xattr` tokens are absent from all logs. |
 | `install-qa-check.d/90config-impl-decl:102` → `python -c 'import locale...'` (`has_utf8_ctype`) | NOT OBSERVED. The `getlocale`/`has_utf8_ctype`/`90config` tokens are absent from all 16 step logs; no run output shows that QA check running. |
 | `ebuild-ipc` (isolated-functions.sh:200, misc-functions.sh:751, phase-functions.sh:1272, phase-helpers.sh:912,929; only with PORTAGE_IPC_DAEMON) | Observed in run 16 only (WITH-S1 noportage, `PORTAGE_IPC_DAEMON=1` in the calling env): install phase, `.../bin/ebuild-ipc: No such file or directory` (9x at phase-functions.sh:1272, 1x via `env:`, 1x at isolated-functions.sh:200), then `has_version: unexpected ebuild-ipc exit code: 127` via install_qa_check → 60python-site. The token is absent from runs 1–15. |
+
+## #326 S2 — bed runs (2026-10-08)
+
+S2 binary (working tree on `backlog/326`, HEAD `46283232` + the uncommitted
+S2 change): sha256
+`890862078555c8125e09e2569cef6849ef6d3741f9c3c02706602db082de30db`
+(`rust/target/release/portuale`, built 2026-10-08T17:41:36Z; registry
+reports `46283232-dirty`). pmtest `b518207` on `backlog/326` plus the
+working-tree file `differential-test-bed/atomlists/l3-326-helpers.txt`.
+Runner exit code 0 for all 4 runs (a failing build is a result, not a
+runner error). Every run: step1 rc=1, step2 SKIP, step3 SKIP.
+
+### Run table
+
+| # | variant | atom | step1 | first failure (phase + message) | run dir |
+|---|---|---|---|---|---|
+| 1 | noportage | app-portage/eix | 1 | install (app-shells/push-3.4 dep): `portuale: no native helper for: python /tmp/portuale-rt.3/bin/doins.py --preserve_symlinks ... --helper=doins --dest=/var/tmp/portage/app-shells/push-3.4/image/usr/share/push -- bin/push.sh`, then `ERROR: app-shells/push-3.4::gentoo failed (install phase): doins failed` | nopy-20261008T190415Z |
+| 2 | noportage | porttest/helper-unpack | 1 | package: `portuale: no native helper for: python /tmp/portuale-rt.6/bin/gpkg-helper.py compress helper-unpack-1.0-1 ...`, then `ERROR: porttest/helper-unpack-1.0:: failed (package phase): Failed to create binpkg file` | nopy-20261008T190431Z |
+| 3 | noportage | porttest/helper-docompress | 1 | package: `portuale: no native helper for: python /tmp/portuale-rt.6/bin/gpkg-helper.py compress helper-docompress-1.0-1 ...`, then `ERROR: porttest/helper-docompress-1.0:: failed (package phase): Failed to create binpkg file` | nopy-20261008T190438Z |
+| 4 | nopy | app-portage/eix | 1 | pretend (app-shells/push-3.4 dep): `portuale: no native helper for: python /tmp/portuale-rt.3/bin/filter-bash-environment.py D EBUILD_PHASE_FUNC ...`, then `ERROR: app-shells/push-3.4::gentoo failed (pretend phase): filter-bash-environment.py failed` | nopy-20261008T190442Z |
+
+### Grep counts (step1-build-gpkg.log)
+
+| run | chmod-lite | ecompress-file | world writable | no native helper | filter-bash-environment |
+|---|---|---|---|---|---|
+| nopy-20261008T190415Z (noportage eix) | 0 | 0 | 0 | 1 | 0 |
+| nopy-20261008T190431Z (noportage helper-unpack) | 0 | 0 | 0 | 1 | 0 |
+| nopy-20261008T190438Z (noportage helper-docompress) | 0 | 0 | 0 | 1 | 0 |
+| nopy-20261008T190442Z (nopy eix) | 0 | 0 | 0 | 1 | 4 |
+
+### Expectations table
+
+| expectation | verdict | evidence line |
+|---|---|---|
+| noportage eix gets past src_unpack with no chmod-lite `find:` error | MET | run 1: no `chmod-lite` line at all (count 0); push-3.4 reached the install phase, so unpack (and its trailing chmod-lite) completed |
+| noportage eix next fails at doins with the 127 `no native helper` message | MET | run 1: `portuale: no native helper for: python /tmp/portuale-rt.3/bin/doins.py ...` then `failed (install phase): doins failed` (at the push-3.4 dependency; eix itself was not reached) |
+| noportage helper-unpack shows no `world writable` QA notice | MET | run 2: `world writable` count 0; install completed (`Final size of installed tree: 11 KiB`) |
+| noportage helper-docompress gets past install | MET | run 3: `Final size of installed tree: 9 KiB`; failure is in the package phase (gpkg-helper, S4) |
+| nopy eix dies in pretend at the filter with the 127 message | MET | run 4: `portuale: no native helper for: python /tmp/portuale-rt.3/bin/filter-bash-environment.py D ...` then `failed (pretend phase): filter-bash-environment.py failed` |

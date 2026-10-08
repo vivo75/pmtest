@@ -1,0 +1,29 @@
+chmod-lite oracle case: special-bits
+
+Isolates how the mask logic treats the setuid/setgid/sticky bits: real
+never forces exact 0644/0755, it only adds missing mode bits and clears
+0022, so setuid (4755), setgid (2755) and sticky (1777) inputs keep their
+special bits while losing any group/other write bits present. The 6711
+file additionally gains the missing read bits (6711->6755).
+If the native port regressed to chmod 0644/0755 semantics, the special
+bits would come out cleared (e.g. 4755 recorded as 0755).
+
+Run exactly as the unpack phase runs it (bin/phase-helpers.sh):
+  cd <tree>
+  find . -mindepth 1 -maxdepth 1 ! -type l \
+    -exec <checkout>/bin/chmod-lite {} +
+with PORTAGE_BIN_PATH=<checkout>/bin,
+PORTAGE_PYM_PATH=<checkout>/lib, PORTAGE_PYTHON=/usr/bin/python.
+File contents are empty (out of scope: only type/mode/path/target
+are recorded); symlink modes are always ----.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 0022
+  staging: scratch dir directly
+  generator-locale: LC_ALL=unset LC_CTYPE=unset LANG=C.utf8 charmap=UTF-8
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)
+  root-vs-user: identical

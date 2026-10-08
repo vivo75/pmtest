@@ -1,0 +1,29 @@
+chmod-lite oracle case: non-utf8
+
+Isolates non-UTF-8 file names (bytes 0xFF and lone 0xE9, invalid UTF-8):
+chmod-lite.py takes argv as raw bytes (surrogateescape) and re-execs
+under PYTHONUTF8 when the locale encoding is not UTF-8, so such names
+must be fixed like any other. The file inside the non-UTF-8 dir proves
+the recursion descends through it.
+If the native port regressed to decoding argv as UTF-8 str, it would
+fail on or skip these entries instead of recording 0644/0755.
+
+Run exactly as the unpack phase runs it (bin/phase-helpers.sh):
+  cd <tree>
+  find . -mindepth 1 -maxdepth 1 ! -type l \
+    -exec <checkout>/bin/chmod-lite {} +
+with PORTAGE_BIN_PATH=<checkout>/bin,
+PORTAGE_PYM_PATH=<checkout>/lib, PORTAGE_PYTHON=/usr/bin/python.
+File contents are empty (out of scope: only type/mode/path/target
+are recorded); symlink modes are always ----.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 0022
+  staging: tmpfs bind mount (host filesystem rejects non-UTF-8 names)
+  generator-locale: LC_ALL=unset LC_CTYPE=unset LANG=C.utf8 charmap=UTF-8
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)
+  root-vs-user: identical
