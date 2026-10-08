@@ -148,7 +148,7 @@ Output: `differential-test-bed/logs/l2-<timestamp>/` (`structure-*.txt`,
 `archive-<cat>-<pn>.txt`, `cross-install.txt`, `control.txt`,
 `classification.txt`, `l2-report.txt`, `l2-report.json`);
 `differential-test-bed/logs/l2-report.txt` symlinks the latest. Env: `L2_MODE`,
-`L2_BUILD_MODE`, `L2_REBUILD`, `L2_SKIP_BUILD`, `L2_JOBS`,
+`L2_BUILD_MODE`, `L2_BINPKG_FORMAT=gpkg|xpak`, `L2_REBUILD`, `L2_SKIP_BUILD`, `L2_JOBS`,
 `L2_SKIP_PORTAGE_UPGRADE`, `PORTTEST_*`.
 
 Status (2026-09-13): the **fixture track is green modulo filed

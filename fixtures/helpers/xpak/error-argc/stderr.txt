@@ -1,0 +1,2 @@
+usage: recompose <binpkg_path> <metadata_dir>
+2 arguments are required, got 1

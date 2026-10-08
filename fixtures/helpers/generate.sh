@@ -14,6 +14,8 @@
 #     from the checked-in args (argv[1], the pattern, exactly as bytes)
 #     and in (stdin bytes), via the sibling generate-filter-env.sh (which
 #     this script calls at the end).
+#   xpak/<case>/... (plan #326 S5), via the sibling generate-xpak.sh,
+#     also called at the end.
 #
 # Usage:
 #   fixtures/helpers/generate.sh
@@ -477,3 +479,7 @@ printf 'generate.sh: wrote %d chmod-lite cases and the locale table.\n' "${#CASE
 # checkout override passes through so both halves regenerate against the
 # same Portage.
 PORTAGE_CHECKOUT="$PORTAGE_CHECKOUT" "$HELPERS_DIR/generate-filter-env.sh"
+
+# --- xpak recompose oracle (plan #326 S5) ------------------------------------
+# The sibling script owns these cases; format in the generate-xpak.sh header.
+PORTAGE_CHECKOUT="$PORTAGE_CHECKOUT" "$HELPERS_DIR/generate-xpak.sh"

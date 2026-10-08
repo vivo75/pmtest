@@ -1,0 +1,2 @@
+usage: recompose <binpkg_path> <metadata_dir>
+Argument 2 is not a directory: '@TMP@/error-not-dir/pkg.tbz2'
