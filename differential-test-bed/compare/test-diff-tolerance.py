@@ -433,6 +433,81 @@ def build_261_cases(root: Path) -> None:
           and "#261-hardlink-debug-race" not in out, out)
 
 
+# --- #327: shared build-id link race (setuid triple) ----------------------
+# Three distinct stripped binaries (own .gnu_debuglink each) whose .debug
+# files are byte-identical share ONE build-id, so one .build-id/xx/yyyy link
+# pair serves three candidates; estrip's __try_symlink (bin/estrip:60-69)
+# keeps whichever job created it first (:197-198), decided by the scheduler.
+SU_BINS = ["/usr/bin/pt-setgid", "/usr/bin/pt-setuid", "/usr/bin/pt-sticky"]
+SU_DBGS = [f"/usr/lib/debug{b}.debug" for b in SU_BINS]
+
+
+def write_327_side(root: Path, name: str, owner: str | None, dbg_target: str | None = None,
+                   dbgs: list[str] | None = None, extra_links: list[str] | None = None) -> Path:
+    """One side of the #327 shape. `owner` is the binary both @buildid
+    links resolve to (None: no links). `dbg_target` overrides the .debug
+    link target; `dbgs` overrides the .debug set; `extra_links` adds
+    further @buildid keys (target == key suffix)."""
+    prefix = root / name
+    dbgs = SU_DBGS if dbgs is None else dbgs
+    bins = {b: f"{i:032x}" for i, b in enumerate(SU_BINS, 1)}
+    contents = [f"obj {b} {m} 1000" for b, m in bins.items()]
+    contents += [f"obj {d} {'7' * 32} 1000" for d in dbgs]
+    links = []
+    if owner is not None:
+        links += [owner, dbg_target or f"/usr/lib/debug{owner}.debug"]
+    links += extra_links or []
+    contents += [f"sym @buildid:{t} -> {t} 1000" for t in links]
+    lines = [f"{b}\tf\t0755\t0\t0\t10\t{i:064x}\t-\t-" for i, b in enumerate(SU_BINS, 1)]
+    lines += [f"{d}\tf\t0644\t0\t0\t11\t{'8' * 64}\t-\t-" for d in dbgs]
+    lines += [f"@buildid:{t}\tl\t0777\t0\t0\t{len(t)}\t-\t{t}\t-" for t in links]
+    (root / f"{name}.files.norm.tsv").write_text("\n".join(lines) + "\n")
+    (root / f"{name}.mtimes.tsv").write_text("")
+    vdb = prefix.parent / (prefix.name + ".vdb") / "pkg" / "porttest" / "setuid-1.0"
+    vdb.mkdir(parents=True)
+    (vdb / "CONTENTS").write_text("\n".join(contents) + "\n")
+    return prefix
+
+
+def build_327_cases(root: Path) -> None:
+    a = write_327_side(root, "sb-a", "/usr/bin/pt-sticky")
+    b = write_327_side(root, "sb-b", "/usr/bin/pt-setgid")
+    for flag in ([], ["--tolerate-payload"]):
+        rc, out = run([*flag, str(a), str(b)])
+        mode = "tolerated" if flag else "default"
+        ok = rc == 0 and out.count("#327-shared-buildid-link") >= 8 \
+            and re.search(r"unexplained\s*:\s*0", out, re.I) is not None
+        check(f"#327 shared build-id link race is explained ({mode} mode)",
+              ok, f"rc={rc}\n" + "\n".join(out.splitlines()[:40]) if not ok else "")
+
+    def stays_hard(label: str, x: Path, y: Path) -> None:
+        rc, out = run(["--tolerate-payload", str(x), str(y)])
+        check(f"#327 near-miss: {label} stays hard",
+              rc == 1 and "#327-shared-buildid-link" not in out, out)
+
+    # twin set exists on side A only
+    c = write_327_side(root, "sb-c", "/usr/bin/pt-sticky", dbgs=SU_DBGS[:1])
+    stays_hard("twin set on one side only", c, b)
+    # side B carries two @buildid link pairs into the set
+    d = write_327_side(root, "sb-d", "/usr/bin/pt-setgid",
+                       extra_links=["/usr/bin/pt-setuid",
+                                    "/usr/lib/debug/usr/bin/pt-setuid.debug"])
+    stays_hard("two links on one side", a, d)
+    # side B's .debug link targets a .debug outside the set
+    e = write_327_side(root, "sb-e", "/usr/bin/pt-setgid",
+                       dbg_target="/usr/lib/debug/usr/bin/other.debug")
+    stays_hard("link to a .debug outside the set", a, e)
+    # a non-@buildid row alongside is not swallowed
+    f = write_327_side(root, "sb-f", "/usr/bin/pt-sticky")
+    g = write_327_side(root, "sb-g", "/usr/bin/pt-setgid")
+    (root / "sb-g.files.norm.tsv").write_text(
+        (root / "sb-g.files.norm.tsv").read_text()
+        + f"/usr/share/extra\tf\t0644\t0\t0\t1\t{'9' * 64}\t-\t-\n")
+    rc, out = run(["--tolerate-payload", str(f), str(g)])
+    check("#327 near-miss: plain non-debug MISSING stays hard",
+          rc == 1 and "[MISSING] /usr/share/extra" in out, out)
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory(prefix="difftol.") as td:
         root = Path(td)
@@ -470,6 +545,8 @@ def main() -> int:
         build_size_cases(root)
 
         build_261_cases(root)
+
+        build_327_cases(root)
 
     print(f"\ntest-diff-tolerance: {'OK' if FAILED == 0 else f'{FAILED} failure(s)'}")
     return 1 if FAILED else 0
