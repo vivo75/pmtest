@@ -1,0 +1,2 @@
+declare -x café="utf8"
+declare -x MY_KEEP="k"

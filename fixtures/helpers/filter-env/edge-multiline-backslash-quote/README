@@ -1,0 +1,25 @@
+filter-env oracle case: edge-multiline-backslash-quote
+
+Isolates have_end_quote on a multi-line value whose first line ends
+in backslash-quote (`...line1\\"`): the escaped quote is not the end
+quote, so the value continues onto the next line, and both lines pass
+through (the variable is kept).
+If the native port regressed to treating `\"` as the closing quote,
+the continuation line would be parsed as a fresh (garbage) line.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=2378 in=57 out=57
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

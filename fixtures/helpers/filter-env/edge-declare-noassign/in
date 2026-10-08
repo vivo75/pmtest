@@ -1,0 +1,5 @@
+declare -- MY_KEEP
+declare MY_PLAIN
+declare -r MY_RW
+declare -- D
+declare D

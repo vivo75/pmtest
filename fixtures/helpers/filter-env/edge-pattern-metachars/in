@@ -1,0 +1,5 @@
+declare -x BASH_FUNC_foo="drop"
+declare -x BASH_FUNCX="keep"
+declare -x ___save_x="drop"
+declare -x MY_VAR="keep"
+declare -x 9LIVES="drop"

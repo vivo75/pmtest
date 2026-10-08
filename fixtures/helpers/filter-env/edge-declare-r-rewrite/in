@@ -1,0 +1,5 @@
+declare -r MY_KEEP="v"
+declare -rx MY_X="w"
+declare -ir MY_I="42"
+declare -r D="gone"
+declare -x AFTER="c"

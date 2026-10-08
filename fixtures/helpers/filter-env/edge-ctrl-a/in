@@ -1,0 +1,5 @@
+declare -x MY_KEEP="ab"
+declare -x MY_MULTI="start
+middle
+end"
+declare -x FEATURES="xy"

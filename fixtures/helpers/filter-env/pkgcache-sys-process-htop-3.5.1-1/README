@@ -1,0 +1,35 @@
+filter-env oracle case: pkgcache-sys-process-htop-3.5.1-1
+
+Isolates the end-of-phase filter (P1: the 2378-byte captured
+--filter-features pattern, byte-identical to
+captured-phases-install/args, EMERGE_FROM=ebuild so the
+mutable+saved branch, not the binary branch) over a real
+binary-package environment: the decompressed environment.bz2 from
+the L1 pkgcache sample. The input is already-filtered build output,
+so it exercises kept-variable passthrough at scale -- declare -x/-a
+arrays, declare --, readonly rewrites, integer attributes, shell
+function bodies with here-documents (<<) and multiline quoted values.
+If the native port regressed on any line kind in this dump (a kept
+variable dropped, a filtered one leaked, a continuation or here-doc
+line mishandled, a flag rewrite missed), out would differ
+byte-for-byte; the Rust test asserts byte identity (decompressing
+in.bz2/out.bz2 first when present).
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: decompressed environment.bz2 from the L1 pkgcache sample
+    differential-test-bed/logs/_l1-pkgcache/sys-process/htop/htop-3.5.1-1.gpkg.tar
+    with the captured install-phase pattern P1 (2378 bytes,
+    byte-identical to captured-phases-install/args) as args.
+    deduped: no other binpkg in the 64-file sample shares this input.
+    64 binpkgs collapse to 28 unique inputs (this case is one).
+  sizes: args=2378 in=62488 out=61175
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

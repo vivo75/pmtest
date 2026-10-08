@@ -1,0 +1,23 @@
+filter-env oracle case: edge-empty
+
+Isolates the empty input: real copies nothing, exits 0, writes no
+stdout and no stderr. It pins the trivial edge of the read loop.
+If the native port regressed to erroring on empty input, rc.txt
+would be nonzero or stderr.txt non-empty.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=2378 in=0 out=0
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

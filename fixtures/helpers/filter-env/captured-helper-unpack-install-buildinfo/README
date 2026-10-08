@@ -1,0 +1,42 @@
+filter-env oracle case: captured-helper-unpack-install-buildinfo
+
+Isolates the real build-info save inside __dyn_install
+(___save_and_filter_ebuild_env --exclude-init-phases --filter-path
+--filter-sandbox --allow-extra-vars, the same option set as the
+merge-time PORTAGE_UPDATE_ENV regen): the 2366-byte
+--allow-extra-vars pattern, which filters PATH and SANDBOX_* but lets
+the saved-readonly set (A/CATEGORY/PVR/PF/PN/PR/PV/P) through.
+HOSTNAME stays filtered -- it also arrives via bash's own dynamic
+variable list, which --allow-extra-vars does not cover. The pattern
+additionally carries LD_PRELOAD plus SANDBOX_DENY/PREDICT/READ/
+VERBOSE/WRITE as dynamic entries: this save runs sandboxed, and
+libsandbox re-injects those variables even into the `env -i` probe
+that collects bash's variables, so the "hygienic" list is not
+hygienic here (verified: `sandbox env -i bash -c '... ${!L*} ...'`
+still reports them).
+If the native port regressed to the --filter-features shape here
+(filtering the extra vars, or failing to filter PATH), out would
+differ byte-for-byte.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  capture: instrumented real Portage in bed container
+    localhost/test-portuale:latest (Portage 3.0.82.2, container python 3.14.6)
+    with bin/filter-bash-environment.py replaced by a logging
+    wrapper (argv[1] + stdin recorded per call, then the real
+    script re-executed with identical argv + stdin).
+    ebuild | command | EBUILD_PHASE: porttest/porttest/helper-unpack/helper-unpack-1.0.ebuild | install | install
+    EMERGE_FROM=ebuild (the ebuild(1) branch, same pattern
+    branch as a source merge; the binary-merge branch and the
+    preprocess --filter-locale/--filter-path/--filter-sandbox
+    option set did not occur in these runs).
+  sizes: args=2366 in=22160 out=11744
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

@@ -1,0 +1,1 @@
+declare -x CHOST="x86_64-pc-linux-gnu"

@@ -1,0 +1,7 @@
+myfunc ()
+{
+cat <<EOF
+declare -x FEATURES="not a real assignment, inside a heredoc"
+EOF
+}
+declare -x MY_KEEP="kept"

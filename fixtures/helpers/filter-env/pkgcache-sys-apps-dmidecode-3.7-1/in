@@ -1,0 +1,2311 @@
+declare -x A="dmidecode-3.7.tar.xz"
+declare -x ABI="amd64"
+declare -x ABI_MIPS=""
+declare -x ABI_S390=""
+declare -x ABI_X86="64"
+declare -x ADA_TARGET=""
+declare -x ALSA_CARDS=""
+declare -x AMDGPU_TARGETS=""
+declare -x APACHE2_MODULES=""
+declare -x APACHE2_MPMS=""
+declare -x ARCH="amd64"
+declare BDEPEND=$'\n\tvirtual/pkgconfig\n\tverify-sig? ( sec-keys/openpgp-keys-khali )\n \n\t\t\tverify-sig? (\n\t\t\t\t|| (\n\t\t\t\t\tapp-alternatives/gpg\n\t\t\t\t\tapp-crypt/gnupg[-alternatives(-)]\n\t\t\t\t)\n\t\t\t\t>=app-portage/gemato-20\n\t\t\t)\n\t\t'
+declare -x BINPKG_FORMAT="gpkg"
+declare -x BINPKG_GPG_SIGNING_BASE_COMMAND="/usr/bin/flock /run/lock/portage-binpkg-gpg.lock /usr/bin/gpg --sign --armor [PORTAGE_CONFIG]"
+declare -x BINPKG_GPG_SIGNING_DIGEST="SHA512"
+declare -x BINPKG_GPG_VERIFY_BASE_COMMAND="/usr/bin/gpg --verify --batch --no-tty --no-auto-check-trustdb --status-fd 2 [PORTAGE_CONFIG] [SIGNATURE]"
+declare -x BINPKG_GPG_VERIFY_GPG_HOME="/etc/portage/gnupg"
+declare -x BOOTSTRAP_USE="unicode pkg-config split-usr xml python_targets_python3_14 python_single_target_python3_14 multilib zstd cet systemd sysv-utils udev"
+declare -x CALLIGRA_FEATURES=""
+declare -x CAMERAS=""
+declare -x CATEGORY="sys-apps"
+declare -x CBUILD="x86_64-pc-linux-gnu"
+declare -x CFLAGS="-O2 -pipe"
+declare -x CFLAGS_amd64="-m64"
+declare -x CFLAGS_x32="-mx32"
+declare -x CFLAGS_x86="-m32 -mfpmath=sse"
+declare -x CHOST="x86_64-pc-linux-gnu"
+declare -x CHOST_amd64="x86_64-pc-linux-gnu"
+declare -x CHOST_x32="x86_64-pc-linux-gnux32"
+declare -x CHOST_x86="i686-pc-linux-gnu"
+declare -x COLLECTD_PLUGINS=""
+declare -x COMMON_FLAGS="-O2 -pipe"
+declare -x CPPFLAGS=" -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE"
+declare -x CPU_FLAGS_ARM=""
+declare -x CPU_FLAGS_PPC=""
+declare -x CPU_FLAGS_X86=""
+declare -x CURL_QUIC=""
+declare -x CURL_SSL=""
+declare -x CXXFLAGS="-O2 -pipe"
+declare -x DEFAULT_ABI="amd64"
+declare -x DEFINED_PHASES=" compile install postinst prepare unpack"
+declare DEPEND=""
+declare DESCRIPTION="DMI (Desktop Management Interface) table related utilities"
+declare -x DIROPTIONS="-m0755"
+declare -x EAPI="8"
+declare -x ELIBC="glibc"
+declare -x ENV_UNSET="CARGO_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY GDK_PIXBUF_MODULE_FILE GOBIN GOPATH PERL5LIB PERL5OPT PERLPREFIX PERL_CORE PERL_MB_OPT PERL_MM_OPT XAUTHORITY XDG_CACHE_HOME XDG_CONFIG_DIRS XDG_CONFIG_HOME XDG_DATA_DIRS XDG_DATA_HOME XDG_RUNTIME_DIR XDG_STATE_HOME"
+declare -x EXEOPTIONS="-m0755"
+declare -x FCFLAGS="-O2 -pipe"
+declare -x FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg buildpkg-live compress-index config-protect-if-modified distlocks ebuild-locks filecaps fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news noinfo observability parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox split-elog split-log splitdebug strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+declare -x FFLAGS="-O2 -pipe"
+declare -x GCC_SPECS=""
+declare -x GPG_VERIFY_GROUP_DROP="nogroup"
+declare -x GPG_VERIFY_USER_DROP="nobody"
+declare -x GPSD_PROTOCOLS=""
+declare -x GRUB_PLATFORMS=""
+declare -x GUILE_SINGLE_TARGET=""
+declare -x GUILE_TARGETS=""
+declare HOMEPAGE="https://www.nongnu.org/dmidecode/"
+declare IDEPEND=""
+declare -x INHERITED=" toolchain-funcs shell-completion bash-completion-r1 flag-o-matic eapi9-pipestatus verify-sig"
+declare -x INPUT_DEVICES=""
+declare -x INSOPTIONS="-m0644"
+declare IUSE="selinux verify-sig"
+declare -x IUSE_EFFECTIVE="abi_x86_64 alpha amd64 arm arm64 arm64-macos elibc_Darwin elibc_SunOS elibc_bionic elibc_glibc elibc_mingw elibc_musl hppa kernel_Darwin kernel_Hurd kernel_SunOS kernel_linux loong m68k mips ppc ppc64 prefix prefix-guest prefix-stack riscv s390 selinux sparc verify-sig x64-macos x64-solaris x86"
+declare -x IUSE_IMPLICIT="abi_x86_64 prefix prefix-guest prefix-stack"
+declare -x KERNEL="linux"
+declare -x KEYWORDS="-* ~alpha amd64 arm arm64 ~loong ~mips ppc ppc64 ~riscv x86"
+declare -x L10N=""
+declare -x L1_JOBS="1"
+declare -x L1_SKIP_PORTAGE_UPGRADE="0"
+declare -x LANG="C.UTF-8"
+declare -x LCD_DEVICES=""
+declare -x LC_ADDRESS="C.UTF-8"
+declare -x LC_COLLATE="C.UTF-8"
+declare -x LC_CTYPE="C.UTF-8"
+declare -x LC_IDENTIFICATION="C.UTF-8"
+declare -x LC_MEASUREMENT="C.UTF-8"
+declare -x LC_MESSAGES="C.UTF-8"
+declare -x LC_MONETARY="C.UTF-8"
+declare -x LC_NAME="C.UTF-8"
+declare -x LC_NUMERIC="C.UTF-8"
+declare -x LC_PAPER="C.UTF-8"
+declare -x LC_TELEPHONE="C.UTF-8"
+declare -x LC_TIME="C.UTF-8"
+declare -x LDFLAGS="-Wl,-O1 -Wl,--as-needed -Wl,-z,pack-relative-relocs"
+declare -x LDFLAGS_amd64="-m elf_x86_64"
+declare -x LDFLAGS_x32="-m elf32_x86_64"
+declare -x LDFLAGS_x86="-m elf_i386"
+declare -x LEX="flex"
+declare -x LIBDIR_amd64="lib64"
+declare -x LIBDIR_x32="libx32"
+declare -x LIBDIR_x86="lib"
+declare -x LIBOPTIONS="-m0644"
+declare -x LIBREOFFICE_EXTENSIONS=""
+declare -x LICENSE="GPL-2"
+declare -x LLVM_SLOT=""
+declare -x LLVM_TARGETS=""
+declare -x LUA_SINGLE_TARGET=""
+declare -x LUA_TARGETS=""
+declare -x MANPAGER="manpager"
+declare -x MULTILIB_ABIS="amd64 x86"
+declare -x MULTILIB_STRICT_DENY="64-bit.*shared object"
+declare -x MULTILIB_STRICT_DIRS="/lib32 /lib /usr/lib32 /usr/lib /usr/kde/*/lib32 /usr/kde/*/lib /usr/qt/*/lib32 /usr/qt/*/lib /usr/X11R6/lib32 /usr/X11R6/lib"
+declare -x MULTILIB_STRICT_EXEMPT="(perl5|gcc|binutils|eclipse-3|debug|portage|udev|systemd|clang|python-exec|llvm)"
+declare -x NGINX_MODULES_HTTP=""
+declare -x NGINX_MODULES_MAIL=""
+declare -x NGINX_MODULES_STREAM=""
+declare -x OFFICE_IMPLEMENTATION=""
+declare -x OPENMPI_FABRICS=""
+declare -x OPENMPI_OFED_FEATURES=""
+declare -x OPENMPI_RM=""
+declare -x P="dmidecode-3.7"
+declare -a PATCHES=()
+declare PDEPEND=""
+declare -x PERL_FEATURES=""
+declare -x PF="dmidecode-3.7"
+declare -x PHP_TARGETS=""
+declare -x PN="dmidecode"
+declare -x PORTAGE_BZIP2_COMMAND="bzip2"
+declare -x PORTAGE_COMPRESSION_COMMAND="zstd -T1"
+declare -x PORTAGE_FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg buildpkg-live compress-index config-protect-if-modified distlocks ebuild-locks filecaps fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news noinfo observability parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox split-elog split-log splitdebug strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+declare -x PORTAGE_REPO_REVISIONS="{}"
+declare -x POSTGRES_TARGETS=""
+declare -x PR="r0"
+declare -x PROFILE_ONLY_VARIABLES="ARCH ELIBC IUSE_IMPLICIT KERNEL USE_EXPAND_IMPLICIT USE_EXPAND_UNPREFIXED USE_EXPAND_VALUES_ARCH USE_EXPAND_VALUES_ELIBC USE_EXPAND_VALUES_KERNEL"
+declare -- PROPERTIES=""
+declare -x PV="3.7"
+declare -x PVR="3.7"
+declare -x PYTHONDONTWRITEBYTECODE="1"
+declare -x PYTHON_SINGLE_TARGET=""
+declare -x PYTHON_TARGETS=""
+declare RDEPEND="selinux? ( sec-policy/selinux-dmidecode ) "
+declare REPOSITORY
+declare REQUIRED_USE=""
+declare RESTRICT=""
+declare -x RUBY_TARGETS=""
+declare -x RUST_SYSROOTS=""
+declare -x SANE_BACKENDS=""
+declare -x SELINUX_POLICY_TYPES=""
+declare -- SHELL="/bin/bash"
+declare -x SLOT="0"
+declare SRC_URI=$'\n\tmirror://nongnu/dmidecode/dmidecode-3.7.tar.xz\n\tverify-sig? ( mirror://nongnu/dmidecode/dmidecode-3.7.tar.xz.sig )\n'
+declare -x SYMLINK_LIB="no"
+declare -x TWISTED_DISABLE_WRITING_OF_PLUGIN_CACHE="1"
+declare -x TZ="UTC"
+declare -a UPSTREAM_PATCH_COMMITS=()
+declare -x USE="abi_x86_64 amd64 elibc_glibc kernel_linux"
+declare -x USERLAND="GNU"
+declare -x USE_EXPAND_IMPLICIT="ARCH ELIBC KERNEL"
+declare -x USE_EXPAND_UNPREFIXED="ARCH"
+declare -x USE_EXPAND_VALUES_ARCH="alpha amd64 arm arm64 arm64-macos hppa loong m68k mips ppc ppc64 riscv s390 sparc x64-macos x64-solaris x86"
+declare -x USE_EXPAND_VALUES_ELIBC="bionic Darwin glibc mingw musl SunOS"
+declare -x USE_EXPAND_VALUES_KERNEL="Darwin Hurd linux SunOS"
+declare -x UWSGI_PLUGINS=""
+declare -- VERIFY_SIG_METHOD="openpgp"
+declare -- VERIFY_SIG_OPENPGP_KEY_PATH="/usr/share/openpgp-keys/khali.asc"
+declare -- VERIFY_SIG_OPENPGP_KEY_REFRESH="no"
+declare -x VIDEO_CARDS=""
+declare -x VOICEMAIL_STORAGE=""
+declare -x XTABLES_ADDONS=""
+declare -- _BASH_COMPLETION_R1_ECLASS="1"
+declare -- _FLAG_O_MATIC_ECLASS="1"
+declare -- _SHELL_COMPLETION_ECLASS="1"
+declare -- _TOOLCHAIN_FUNCS_ECLASS="1"
+declare -- _VERIFY_SIG_ECLASS="1"
+declare -x ac_cv_c_undeclared_builtin_options="none needed"
+declare -x container="podman"
+declare -x enable_year2038="no"
+declare -- f
+declare -x gl_cv_compiler_check_decl_option="-Werror=implicit-function-declaration"
+declare -x gl_cv_func_getcwd_path_max="yes"
+declare -- x=""
+__pipestatus () 
+{ 
+    local status=("${PIPESTATUS[@]}") s ret=0;
+    for s in "${status[@]}";
+    do
+        [[ ${s} -ne 0 ]] && ret=${s};
+    done;
+    return "${ret}"
+}
+_bash-completion-r1_get_bashcompdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    _bash-completion-r1_get_bashdir completionsdir /usr/share/bash-completion/completions
+}
+_bash-completion-r1_get_bashdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    if [[ ${EAPI} != 9 ]] && $(tc-getPKG_CONFIG) --exists bash-completion &> /dev/null; then
+        local path;
+        path=$($(tc-getPKG_CONFIG) --variable="${1}" bash-completion) || die;
+        echo "${path#"${EPREFIX}"}";
+        return;
+    fi;
+    echo "${2}"
+}
+_bash-completion-r1_get_bashhelpersdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    _bash-completion-r1_get_bashdir helpersdir /usr/share/bash-completion/helpers
+}
+_clang_fullversion () 
+{ 
+    local ver="$1";
+    shift;
+    set -- $($(tc-getCC "$@") -E -P - <<< "__clang_major__ __clang_minor__ __clang_patchlevel__");
+    eval echo "${ver}"
+}
+_filter-hardened () 
+{ 
+    local f;
+    for f in "$@";
+    do
+        case "${f}" in 
+            -fPIC | -fpic | -fPIE | -fpie | -Wl,pie | -pie)
+                if ! gcc-specs-pie && ! tc-enables-pie; then
+                    continue;
+                fi;
+                if ! is-flagq -nopie && ! is-flagq -no-pie; then
+                    if test-flags -nopie > /dev/null; then
+                        append-flags -nopie;
+                    else
+                        append-flags -no-pie;
+                    fi;
+                fi
+            ;;
+            -fstack-protector | -fstack-protector-strong)
+                if ! gcc-specs-ssp && ! tc-enables-ssp && ! tc-enables-ssp-strong; then
+                    continue;
+                fi;
+                is-flagq -fno-stack-protector || append-flags $(test-flags -fno-stack-protector)
+            ;;
+            -fstack-protector-all)
+                if ! gcc-specs-ssp-to-all && ! tc-enables-ssp-all; then
+                    continue;
+                fi;
+                is-flagq -fno-stack-protector || append-flags $(test-flags -fno-stack-protector)
+            ;;
+            -fno-strict-overflow)
+                gcc-specs-nostrict || continue;
+                is-flagq -fstrict-overflow || append-flags $(test-flags -fstrict-overflow)
+            ;;
+            -D_GLIBCXX_ASSERTIONS | -D_LIBCPP_ENABLE_ASSERTIONS | -D_LIBCPP_ENABLE_HARDENED_MODE)
+                tc-enables-cxx-assertions || continue;
+                append-cppflags -U_GLIBCXX_ASSERTIONS -U_LIBCPP_ENABLE_ASSERTIONS -U_LIBCPP_ENABLE_HARDENED_MODE
+            ;;
+            -D_FORTIFY_SOURCE=*)
+                tc-enables-fortify-source || continue;
+                append-cppflags -U_FORTIFY_SOURCE
+            ;;
+        esac;
+    done
+}
+_filter-var () 
+{ 
+    local f x var=$1 new=();
+    shift;
+    for f in ${!var};
+    do
+        for x in "$@";
+        do
+            [[ ${f} == ${x} ]] && continue 2;
+        done;
+        new+=("${f}");
+    done;
+    export ${var}="${new[*]}"
+}
+_gcc-install-dir () 
+{ 
+    echo "$(LC_ALL=C $(tc-getCC) -print-search-dirs 2> /dev/null | awk '$1=="install:" {print $2}')"
+}
+_gcc-specs-directive_raw () 
+{ 
+    local cc=$(tc-getCC);
+    local specfiles=$(LC_ALL=C ${cc} -v 2>&1 | awk '$1=="Reading" {print $NF}');
+    ${cc} -dumpspecs 2> /dev/null | cat - ${specfiles} | awk -v directive=$1 'BEGIN	{ pspec=""; spec=""; outside=1 }
+$1=="*"directive":"  { pspec=spec; spec=""; outside=0; next }
+	outside || NF==0 || ( substr($1,1,1)=="*" && substr($1,length($1),1)==":" ) { outside=1; next }
+	spec=="" && substr($0,1,1)=="+" { spec=pspec " " substr($0,2); next }
+	{ spec=spec $0 }
+END	{ print spec }';
+    return 0
+}
+_gcc-specs-exists () 
+{ 
+    [[ -f $(_gcc-install-dir)/$1 ]]
+}
+_gcc_fullversion () 
+{ 
+    local ver="$1";
+    shift;
+    set -- $($(tc-getCC "$@") -E -P - <<< "__GNUC__ __GNUC_MINOR__ __GNUC_PATCHLEVEL__");
+    eval echo "${ver}"
+}
+_gpg_verify_signed_checksums () 
+{ 
+    local checksum_file=${1};
+    local algo=${2};
+    local files=${3};
+    local key=${4};
+    verify-sig_verify_unsigned_checksums - "${algo}" "${files}" < <(verify-sig_verify_message "${checksum_file}" - "${key}"
+echo)
+}
+_is_flagq () 
+{ 
+    local x var="$1[*]";
+    for x in ${!var};
+    do
+        [[ ${x} == $2 ]] && return 0;
+    done;
+    return 1
+}
+_setup-allowed-flags () 
+{ 
+    ALLOWED_FLAGS=(-pipe -O '-O[123szg]' '-mcpu=*' '-march=*' '-mtune=*' '-mfpmath=*' -flto '-flto=*' -fno-lto -ffat-lto-objects '-fstack-protector*' -fstack-clash-protection '-fcf-protection=*' -fbounds-check -fbounds-checking -fno-PIE -fno-pie -nopie -no-pie -fharden-compares -fharden-conditional-branches -fharden-control-flow-redundancy -fno-harden-control-flow-redundancy -fhardcfr-skip-leaf -fhardcfr-check-exceptions -fhardcfr-check-returning-calls '-fhardcfr-check-noreturn-calls=*' '-mindirect-branch=*' -mindirect-branch-register '-mfunction-return=*' -mretpoline '-mharden-sls=*' '-mbranch-protection=*' -fno-unit-at-a-time -fno-strict-overflow '-fsanitize*' '-fno-sanitize*' -g '-g[0-9]' -ggdb '-ggdb[0-9]' -gdwarf '-gdwarf-*' -gstabs -gstabs+ -gz '-gz=*' -glldb '-fdebug-default-version=*' -fno-diagnostics-color '-fmessage-length=*' -fno-ident -fpermissive -frecord-gcc-switches -frecord-command-line -freport-bug '-fdiagnostics*' '-fplugin*' '-W*' -w '-[DUILR]*' '-Wl,*' '-fuse-ld=*');
+    ALLOWED_FLAGS+=('-fno-stack-protector*' '-fabi-version=*' -fno-strict-aliasing -fno-bounds-check -fno-bounds-checking -fstrict-overflow -fno-omit-frame-pointer '-fno-builtin*' -mno-omit-leaf-frame-pointer);
+    ALLOWED_FLAGS+=('-mregparm=*' -mno-app-regs -mapp-regs -mno-mmx -mno-sse -mno-sse2 -mno-sse3 -mno-ssse3 -mno-sse4 -mno-sse4.1 -mno-sse4.2 -mno-avx -mno-aes -mno-pclmul -mno-sse4a -mno-3dnow -mno-popcnt -mno-abm -mips1 -mips2 -mips3 -mips4 -mips32 -mips64 -mips16 -mplt -msoft-float -mno-soft-float -mhard-float -mno-hard-float '-mfpu=*' -mieee -mieee-with-inexact '-mschedule=*' -mfloat-gprs -mspe -mno-spe -mtls-direct-seg-refs -mno-tls-direct-seg-refs -mflat -mno-flat -mno-faster-structs -mfaster-structs -m32 -m64 -mx32 '-mabi=*' -mlittle-endian -mbig-endian -EL -EB -fPIC -mlive-g0 '-mcmodel=*' -mstack-bias -mno-stack-bias -msecure-plt '-m*-toc' '-mfloat-abi=*' '-mtls-dialect=*' -mfix-r4000 -mno-fix-r4000 -mfix-r4400 -mno-fix-r4400 -mfix-r10000 -mno-fix-r10000 '-mr10k-cache-barrier=*' -mthumb -marm -ffixed-x18 -mstrict-align -mvector-strict-align -mno-fma4 -mno-movbe -mno-xop -mno-lwp -mno-fsgsbase -mno-rdrnd -mno-f16c -mno-bmi -mno-tbm -mno-avx2 -mno-bmi2 -mno-fma -mno-lzcnt -mno-fxsr -mno-hle -mno-rtm -mno-xsave -mno-xsaveopt -mno-avx512cd -mno-avx512er -mno-avx512f -mno-avx512pf -mno-sha -mevex512 -mno-evex512);
+    ALLOWED_FLAGS+=(-mstackrealign '-mpreferred-stack-boundary=*' '-mincoming-stack-boundary=*');
+    ALLOWED_FLAGS+=('--unwindlib=*' '--rtlib=*' '--stdlib=*')
+}
+_shell-completion_get_fishcompdir () 
+{ 
+    echo "/usr/share/fish/vendor_completions.d"
+}
+_shell-completion_get_zshcompdir () 
+{ 
+    echo "/usr/share/zsh/site-functions"
+}
+_tc-getPROG () 
+{ 
+    local tuple=$1;
+    local v var vars=$2;
+    local prog=($3);
+    var=${vars%% *};
+    for v in ${vars};
+    do
+        if [[ -n ${!v} ]]; then
+            export ${var}="${!v}";
+            echo "${!v}";
+            return 0;
+        fi;
+    done;
+    local search=;
+    [[ -n $4 ]] && search=$(type -p $4-${prog[0]});
+    [[ -z ${search} && -n ${!tuple} ]] && search=$(type -p ${!tuple}-${prog[0]});
+    [[ -n ${search} ]] && prog[0]=${search##*/};
+    export ${var}="${prog[*]}";
+    echo "${!var}"
+}
+_tc-has-openmp () 
+{ 
+    local base="${T}/test-tc-openmp";
+    cat <<-EOF > "${base}.c"
+#include <omp.h>
+int main(void) {
+int nthreads, tid, ret = 0;
+#pragma omp parallel private(nthreads, tid)
+{
+tid = omp_get_thread_num();
+nthreads = omp_get_num_threads();
+ret += tid + nthreads;
+}
+return ret;
+}
+EOF
+
+    $(tc-getCC "$@") -fopenmp "${base}.c" -o "${base}" >&/dev/null;
+    local ret=$?;
+    rm -f "${base}"*;
+    return ${ret}
+}
+_test-flag-PROG () 
+{ 
+    local comp=$1;
+    local lang=$2;
+    shift 2;
+    if [[ -z ${comp} ]]; then
+        return 1;
+    fi;
+    if [[ -z $1 ]]; then
+        return 1;
+    fi;
+    comp=($(tc-get${comp}));
+    if ! type -p ${comp[0]} > /dev/null; then
+        return 1;
+    fi;
+    local in_src in_ext cmdline_extra=();
+    case "${lang}" in 
+        c)
+            in_ext='c';
+            in_src='int main(void) { return 0; }';
+            cmdline_extra+=(-xc -c)
+        ;;
+        c++)
+            in_ext='cc';
+            in_src='int main(void) { return 0; }';
+            cmdline_extra+=(-xc++ -c)
+        ;;
+        f77)
+            in_ext='f';
+            in_src='      end';
+            cmdline_extra+=(-xf77 -c)
+        ;;
+        f95)
+            in_ext='f90';
+            in_src='end';
+            cmdline_extra+=(-xf95 -c)
+        ;;
+        c+ld)
+            in_ext='c';
+            in_src='int main(void) { return 0; }';
+            if is-ldflagq -fuse-ld=*; then
+                fuse_ld_value=$(get-flag -fuse-ld=*);
+                cmdline_extra+=(${fuse_ld_value});
+            fi;
+            cmdline_extra+=(-xc)
+        ;;
+        hip)
+            in_ext='hip';
+            in_src='int main(void) { return 0; }';
+            cmdline_extra+=(-xhip -c)
+        ;;
+    esac;
+    local test_in=${T}/test-flag.${in_ext};
+    local test_out=${T}/test-flag.exe;
+    printf "%s\n" "${in_src}" > "${test_in}" || die "Failed to create '${test_in}'";
+    local cmdline=("${comp[@]}" -Werror "$@" "${cmdline_extra[@]}" "${test_in}" -o "${test_out}");
+    "${cmdline[@]}" &> /dev/null
+}
+_test-flags-PROG () 
+{ 
+    local comp=$1;
+    local flags=();
+    local x;
+    shift;
+    [[ -z ${comp} ]] && return 1;
+    while (( $# )); do
+        case "$1" in 
+            --param | -B)
+                if test-flag-${comp} "$1" "$2"; then
+                    flags+=("$1" "$2");
+                fi;
+                shift 2
+            ;;
+            *)
+                if test-flag-${comp} "$1"; then
+                    flags+=("$1");
+                fi;
+                shift 1
+            ;;
+        esac;
+    done;
+    echo "${flags[*]}";
+    [[ ${#flags[@]} -gt 0 ]]
+}
+aclocal () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'aclocal' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'aclocal' directly."
+        ;;
+    esac;
+    /usr/bin/aclocal "$@";
+    return $?
+}
+all-flag-vars () 
+{ 
+    echo {ADA,C,CPP,CXX,CCAS,F,FC,GDC,LD}FLAGS
+}
+append-atomic-flags () 
+{ 
+    test-flags-CCLD "-latomic" &> /dev/null || return;
+    append-libs "-Wl,--push-state,--as-needed,-latomic,--pop-state"
+}
+append-cflags () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    export CFLAGS+=" $*";
+    return 0
+}
+append-cppflags () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    export CPPFLAGS+=" $*";
+    return 0
+}
+append-cxxflags () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    export CXXFLAGS+=" $*";
+    return 0
+}
+append-fflags () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    export FFLAGS+=" $*";
+    export FCFLAGS+=" $*";
+    return 0
+}
+append-flags () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    case " $* " in 
+        *' '-[DIU]*)
+            eqawarn 'Please use append-cppflags for preprocessor flags'
+        ;;
+        *' '-L* | *' '-Wl,*)
+            eqawarn 'Please use append-ldflags for linker flags'
+        ;;
+    esac;
+    append-cflags "$@";
+    append-cxxflags "$@";
+    append-fflags "$@";
+    return 0
+}
+append-ldflags () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    local flag;
+    for flag in "$@";
+    do
+        [[ ${flag} == -l* ]] && eqawarn "Appending a library link instruction (${flag}); libraries to link to should not be passed through LDFLAGS";
+    done;
+    export LDFLAGS="${LDFLAGS} $*";
+    return 0
+}
+append-lfs-flags () 
+{ 
+    [[ $# -ne 0 ]] && die "append-lfs-flags takes no arguments";
+    append-cppflags -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
+}
+append-libs () 
+{ 
+    [[ $# -eq 0 ]] && return 0;
+    local flag;
+    for flag in "$@";
+    do
+        if [[ -z "${flag// }" ]]; then
+            eqawarn "Appending an empty argument to LIBS is invalid! Skipping.";
+            continue;
+        fi;
+        case $flag in 
+            -[lL]*)
+                export LIBS="${LIBS} ${flag}"
+            ;;
+            -*)
+                eqawarn "Appending non-library to LIBS (${flag}); Other linker flags should be passed via LDFLAGS";
+                export LIBS="${LIBS} ${flag}"
+            ;;
+            *)
+                export LIBS="${LIBS} -l${flag}"
+            ;;
+        esac;
+    done;
+    return 0
+}
+autoconf () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'autoconf' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'autoconf' directly."
+        ;;
+    esac;
+    /usr/bin/autoconf "$@";
+    return $?
+}
+automake () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'automake' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'automake' directly."
+        ;;
+    esac;
+    /usr/bin/automake "$@";
+    return $?
+}
+bashcomp_alias () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ ${#} -lt 2 ]] && die "Usage: ${FUNCNAME} <basename> <alias>...";
+    local base=${1} f;
+    shift;
+    for f in "$@";
+    do
+        dosym "${base}" "$(_bash-completion-r1_get_bashcompdir)/${f}" || return;
+    done
+}
+clang-fullversion () 
+{ 
+    _clang_fullversion '$1.$2.$3' "$@"
+}
+clang-major-version () 
+{ 
+    _clang_fullversion '$1' "$@"
+}
+clang-micro-version () 
+{ 
+    _clang_fullversion '$3' "$@"
+}
+clang-minor-version () 
+{ 
+    _clang_fullversion '$2' "$@"
+}
+clang-version () 
+{ 
+    _clang_fullversion '$1.$2' "$@"
+}
+dobashcomp () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    ( insopts -m 0644;
+    insinto "$(_bash-completion-r1_get_bashcompdir)";
+    doins "${@}" )
+}
+dofishcomp () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    ( insopts -m 0644;
+    insinto "$(_shell-completion_get_fishcompdir)";
+    doins "${@}" )
+}
+dozshcomp () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    ( insopts -m 0644;
+    insinto "$(_shell-completion_get_zshcompdir)";
+    doins "${@}" )
+}
+econf_build () 
+{ 
+    local CBUILD=${CBUILD:-${CHOST}};
+    tc-env_build econf "$@"
+}
+filter-flags () 
+{ 
+    _filter-hardened "$@";
+    local v;
+    for v in $(all-flag-vars);
+    do
+        _filter-var ${v} "$@";
+    done;
+    return 0
+}
+filter-ldflags () 
+{ 
+    _filter-var LDFLAGS "$@";
+    return 0
+}
+filter-lfs-flags () 
+{ 
+    [[ $# -ne 0 ]] && die "filter-lfs-flags takes no arguments";
+    filter-flags -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_TIME_BITS=64
+}
+filter-lto () 
+{ 
+    [[ $# -ne 0 ]] && die "filter-lto takes no arguments";
+    filter-flags '-flto*' -fwhole-program-vtables '-fsanitize=cfi*'
+}
+filter-mfpmath () 
+{ 
+    local orig_mfpmath new_math prune_math;
+    orig_mfpmath=$(get-flag -mfpmath);
+    new_math=$(get-flag mfpmath);
+    new_math=${new_math/both/387,sse};
+    new_math=" ${new_math//[,+]/ } ";
+    prune_math="";
+    for prune_math in "$@";
+    do
+        new_math=${new_math/ ${prune_math} / };
+    done;
+    new_math=$(echo ${new_math});
+    new_math=${new_math// /,};
+    if [[ -z ${new_math} ]]; then
+        filter-flags ${orig_mfpmath};
+    else
+        replace-flags ${orig_mfpmath} -mfpmath=${new_math};
+    fi;
+    return 0
+}
+gcc-fullversion () 
+{ 
+    _gcc_fullversion '$1.$2.$3' "$@"
+}
+gcc-major-version () 
+{ 
+    _gcc_fullversion '$1' "$@"
+}
+gcc-micro-version () 
+{ 
+    _gcc_fullversion '$3' "$@"
+}
+gcc-minor-version () 
+{ 
+    _gcc_fullversion '$2' "$@"
+}
+gcc-specs-directive () 
+{ 
+    local directive subdname subdirective;
+    directive="$(_gcc-specs-directive_raw $1)";
+    while [[ ${directive} == *%\(*\)* ]]; do
+        subdname=${directive/*%\(};
+        subdname=${subdname/\)*};
+        subdirective="$(_gcc-specs-directive_raw ${subdname})";
+        directive="${directive//\%(${subdname})/${subdirective}}";
+    done;
+    echo "${directive}";
+    return 0
+}
+gcc-specs-nostrict () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fstrict-overflow:}" != "${directive}" ]]
+}
+gcc-specs-now () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive link_command);
+    [[ "${directive/\{!nonow:}" != "${directive}" ]]
+}
+gcc-specs-pie () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!nopie:}" != "${directive}" ]]
+}
+gcc-specs-relro () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive link_command);
+    [[ "${directive/\{!norelro:}" != "${directive}" ]]
+}
+gcc-specs-ssp () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-protector:}" != "${directive}" ]]
+}
+gcc-specs-ssp-to-all () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-protector-all:}" != "${directive}" ]]
+}
+gcc-specs-stack-check () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-check:}" != "${directive}" ]]
+}
+gcc-version () 
+{ 
+    _gcc_fullversion '$1.$2' "$@"
+}
+get-flag () 
+{ 
+    [[ $# -ne 1 ]] && die "usage: <flag>";
+    local f var findflag="$1";
+    for var in $(all-flag-vars);
+    do
+        for f in ${!var};
+        do
+            if [[ ${EAPI} = [78] && -z "${_FLAG_O_MATIC_TESTS_FAKE_EAPI_NINE}" ]]; then
+                if [[ "${f/${findflag}}" != "${f}" ]]; then
+                    printf "%s\n" "${f/-${findflag}=}";
+                    return 0;
+                fi;
+            else
+                if [[ "${f#-${findflag}=}" != "${f}" ]]; then
+                    printf "%s\n" "${f#-${findflag}=}";
+                    return 0;
+                fi;
+                if [[ ${f} = -${findflag#-} || ${f%=*} = ${findflag} ]]; then
+                    printf "%s\n" "${f}";
+                    return 0;
+                fi;
+            fi;
+        done;
+    done;
+    return 1
+}
+get_bashcompdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    echo "${EPREFIX}$(_bash-completion-r1_get_bashcompdir)"
+}
+get_bashhelpersdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    echo "${EPREFIX}$(_bash-completion-r1_get_bashhelpersdir)"
+}
+get_fishcompdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    echo "${EPREFIX}$(_shell-completion_get_fishcompdir)"
+}
+get_zshcompdir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    echo "${EPREFIX}$(_shell-completion_get_zshcompdir)"
+}
+is-flag () 
+{ 
+    is-flagq "$@" && echo true
+}
+is-flagq () 
+{ 
+    [[ -n $2 ]] && die "Usage: is-flag <flag>";
+    local var;
+    for var in $(all-flag-vars);
+    do
+        _is_flagq ${var} "$1" && return 0;
+    done;
+    return 1
+}
+is-ldflag () 
+{ 
+    is-ldflagq "$@" && echo true
+}
+is-ldflagq () 
+{ 
+    [[ -n $2 ]] && die "Usage: is-ldflag <flag>";
+    _is_flagq LDFLAGS $1
+}
+libtoolize () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'libtoolize' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'libtoolize' directly."
+        ;;
+    esac;
+    /usr/bin/libtoolize "$@";
+    return $?
+}
+newbashcomp () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    ( insopts -m 0644;
+    insinto "$(_bash-completion-r1_get_bashcompdir)";
+    newins "${@}" )
+}
+newfishcomp () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    ( insopts -m 0644;
+    insinto "$(_shell-completion_get_fishcompdir)";
+    newins "${@}" )
+}
+newzshcomp () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    ( insopts -m 0644;
+    insinto "$(_shell-completion_get_zshcompdir)";
+    newins "${@}" )
+}
+no-as-needed () 
+{ 
+    [[ $# -ne 0 ]] && die "no-as-needed takes no arguments";
+    case $($(tc-getLD) -v 2>&1 < /dev/null) in 
+        *GNU*)
+            echo "-Wl,--no-as-needed"
+        ;;
+    esac
+}
+pipestatus () 
+{ 
+    local status=("${PIPESTATUS[@]}");
+    local s ret=0 verbose="";
+    [[ ${1} == -v ]] && { 
+        verbose=1;
+        shift
+    };
+    [[ $# -ne 0 ]] && die "usage: ${FUNCNAME} [-v]";
+    for s in "${status[@]}";
+    do
+        [[ ${s} -ne 0 ]] && ret=${s};
+    done;
+    [[ -n ${verbose} ]] && echo "${status[@]}";
+    return "${ret}"
+}
+pkg_nofetch () 
+{ 
+    default
+}
+pkg_postinst () 
+{ 
+    if [[ ${CHOST} == *-solaris* ]]; then
+        einfo "dmidecode needs root privileges to read /dev/xsvc";
+        einfo "To make dmidecode useful, either run as root, or chown and setuid the binary.";
+        einfo "Note that /usr/sbin/ptrconf and /usr/sbin/ptrdiag give similar";
+        einfo "information without requiring root privileges.";
+    fi
+}
+pre_source_sandbox () 
+{ 
+    export SANDBOX_ON=1;
+    export SANDBOX_PREDICT="";
+    export SANDBOX_READ="${EBUILD}:${BASH_SOURCE[1]}:${SANDBOX_LOG}";
+    export SANDBOX_WRITE="${SANDBOX_LOG}:/dev/null";
+    [[ ${PORTAGE_DEBUG} != 1 ]] || export SANDBOX_DEBUG=1;
+    local repo_location;
+    for repo_location in "${PORTAGE_ECLASS_LOCATIONS[@]}";
+    do
+        local potential_location="${repo_location}/eclass";
+        if [[ -d ${potential_location} ]]; then
+            SANDBOX_READ+=":${potential_location}";
+        fi;
+    done;
+    function adddeny () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addpredict () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addread () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addwrite () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    readonly SANDBOX_{ALLOW,ACTIVE,DENY,DEBUG,ON,PREDICT,READ,WRITE}
+}
+raw-ldflags () 
+{ 
+    local x input="$@";
+    [[ -z ${input} ]] && input=${LDFLAGS};
+    set --;
+    for x in ${input};
+    do
+        case ${x} in 
+            -Wl,*)
+                x=${x#-Wl,};
+                set -- "$@" ${x//,/ }
+            ;;
+            *)
+
+            ;;
+        esac;
+    done;
+    echo "$@"
+}
+replace-cpu-flags () 
+{ 
+    local newcpu="$#";
+    newcpu="${!newcpu}";
+    while [ $# -gt 1 ]; do
+        replace-flags "-march=${1}" "-march=${newcpu}";
+        replace-flags "-mcpu=${1}" "-mcpu=${newcpu}";
+        replace-flags "-mtune=${1}" "-mtune=${newcpu}";
+        shift;
+    done;
+    return 0
+}
+replace-flags () 
+{ 
+    [[ $# != 2 ]] && die "Usage: replace-flags <old flag> <new flag>";
+    local f var new;
+    for var in $(all-flag-vars);
+    do
+        new=();
+        for f in ${!var};
+        do
+            [[ ${f} == ${1} ]] && f=${2};
+            new+=("${f}");
+        done;
+        export ${var}="${new[*]}";
+    done;
+    return 0
+}
+replace-sparc64-flags () 
+{ 
+    [[ $# -ne 0 ]] && die "replace-sparc64-flags takes no arguments";
+    local SPARC64_CPUS="ultrasparc3 ultrasparc v9";
+    if [ "${CFLAGS/mtune}" != "${CFLAGS}" ]; then
+        for x in ${SPARC64_CPUS};
+        do
+            CFLAGS="${CFLAGS/-mcpu=${x}/-mcpu=v8}";
+        done;
+    else
+        for x in ${SPARC64_CPUS};
+        do
+            CFLAGS="${CFLAGS/-mcpu=${x}/-mcpu=v8 -mtune=${x}}";
+        done;
+    fi;
+    if [ "${CXXFLAGS/mtune}" != "${CXXFLAGS}" ]; then
+        for x in ${SPARC64_CPUS};
+        do
+            CXXFLAGS="${CXXFLAGS/-mcpu=${x}/-mcpu=v8}";
+        done;
+    else
+        for x in ${SPARC64_CPUS};
+        do
+            CXXFLAGS="${CXXFLAGS/-mcpu=${x}/-mcpu=v8 -mtune=${x}}";
+        done;
+    fi;
+    export CFLAGS CXXFLAGS
+}
+setup-allowed-flags () 
+{ 
+    [[ ${EAPI} == 7 ]] || die "Internal function ${FUNCNAME} is not available in EAPI ${EAPI}.";
+    _setup-allowed-flags "$@"
+}
+src_compile () 
+{ 
+    append-lfs-flags;
+    emake CFLAGS="${CFLAGS} ${CPPFLAGS}" LDFLAGS="${LDFLAGS}" CC="$(tc-getCC)"
+}
+src_configure () 
+{ 
+    default
+}
+src_install () 
+{ 
+    einstalldocs;
+    emake DESTDIR="${D}" compdir="$(get_bashcompdir)" install
+}
+src_prepare () 
+{ 
+    default;
+    sed -i -e "/^prefix/s:/usr/local:${EPREFIX}/usr:" -e "/^docdir/s:dmidecode:${PF}:" -e '/^PROGRAMS !=/d' Makefile || die
+}
+src_test () 
+{ 
+    default
+}
+src_unpack () 
+{ 
+    if use verify-sig; then
+        verify-sig_verify_detached "${DISTDIR}"/${P}.tar.xz{,.sig};
+    fi;
+    default
+}
+strip-flags () 
+{ 
+    [[ $# -ne 0 ]] && die "strip-flags takes no arguments";
+    local x y var;
+    local ALLOWED_FLAGS;
+    _setup-allowed-flags;
+    set -f;
+    for var in $(all-flag-vars);
+    do
+        local new=();
+        for x in ${!var};
+        do
+            for y in "${ALLOWED_FLAGS[@]}";
+            do
+                if [[ ${x} == ${y} ]]; then
+                    new+=("${x}");
+                    break;
+                fi;
+            done;
+        done;
+        if _is_flagq ${var} "-O*" && ! _is_flagq new "-O*"; then
+            new+=(-O2);
+        fi;
+        if [[ ${!var} != "${new[*]}" ]]; then
+            einfo "strip-flags: ${var}: changed '${!var}' to '${new[*]}'";
+        fi;
+        export ${var}="${new[*]}";
+    done;
+    set +f;
+    return 0
+}
+strip-unsupported-flags () 
+{ 
+    [[ $# -ne 0 ]] && die "strip-unsupported-flags takes no arguments";
+    export CFLAGS=$(test-flags-CC ${CFLAGS});
+    export CXXFLAGS=$(test-flags-CXX ${CXXFLAGS});
+    export FFLAGS=$(test-flags-F77 ${FFLAGS});
+    export FCFLAGS=$(test-flags-FC ${FCFLAGS});
+    export LDFLAGS=$(test-flags-CCLD ${LDFLAGS});
+    export HIPFLAGS=$(test-flags-HIPCXX ${HIPFLAGS})
+}
+tc-arch () 
+{ 
+    tc-ninja_magic_to_arch portage "$@"
+}
+tc-arch-kernel () 
+{ 
+    tc-ninja_magic_to_arch kern "$@"
+}
+tc-check-min_ver () 
+{ 
+    function do_check () 
+    { 
+        debug-print "Compiler version check for ${1}";
+        debug-print "Detected: ${2}";
+        debug-print "Required: ${3}";
+        if ver_test ${2} -lt ${3}; then
+            eerror "Your current compiler is too old for this package!";
+            die "Active compiler is too old for this package (found ${1} ${2}).";
+        fi
+    };
+    case ${1} in 
+        gcc)
+            tc-is-gcc || return;
+            do_check GCC $(gcc-version) ${2}
+        ;;
+        clang)
+            tc-is-clang || return;
+            do_check Clang $(clang-version) ${2}
+        ;;
+        *)
+            eerror "Unknown first parameter for ${FUNCNAME} - must be gcc or clang";
+            die "${FUNCNAME}: Parameter ${1} unknown"
+        ;;
+    esac
+}
+tc-check-openmp () 
+{ 
+    if ! _tc-has-openmp; then
+        eerror "Your current compiler does not support OpenMP!";
+        if tc-is-gcc; then
+            eerror "Enable OpenMP support by building sys-devel/gcc with USE=\"openmp\".";
+        else
+            if tc-is-clang; then
+                eerror "OpenMP support in llvm-core/clang is provided by llvm-runtimes/openmp.";
+            fi;
+        fi;
+        die "Active compiler does not have required support for OpenMP";
+    fi
+}
+tc-cpp-is-true () 
+{ 
+    local CONDITION=${1};
+    shift;
+    $(tc-getTARGET_CPP) "${@}" -P - <<-EOF > /dev/null 2>&1
+#if ${CONDITION}
+true
+#else
+#error false
+#endif
+EOF
+
+}
+tc-detect-is-softfloat () 
+{ 
+    [[ $(tc-getTARGET_CPP) == "gcc -E" ]] && return 1;
+    case ${CTARGET:-${CHOST}} in 
+        *-newlib | *-elf | *-eabi | arm64-apple-darwin*)
+            return 1
+        ;;
+        arm*)
+            if tc-cpp-is-true "defined(__ARM_PCS_VFP)"; then
+                echo "no";
+            else
+                if tc-cpp-is-true "defined(__SOFTFP__)"; then
+                    echo "yes";
+                else
+                    echo "softfp";
+                fi;
+            fi;
+            return 0
+        ;;
+        *)
+            return 1
+        ;;
+    esac
+}
+tc-enables-cxx-assertions () 
+{ 
+    tc-cpp-is-true "defined(_GLIBCXX_ASSERTIONS) || defined(_LIBCPP_ENABLE_ASSERTIONS) || defined(_LIBCPP_ENABLE_HARDENED_MODE)" ${CPPFLAGS} ${CXXFLAGS}
+}
+tc-enables-fortify-source () 
+{ 
+    tc-cpp-is-true "defined(_FORTIFY_SOURCE)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-pie () 
+{ 
+    tc-cpp-is-true "defined(__PIE__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp () 
+{ 
+    tc-cpp-is-true "defined(__SSP__) || defined(__SSP_STRONG__) || defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp-all () 
+{ 
+    tc-cpp-is-true "defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp-strong () 
+{ 
+    tc-cpp-is-true "defined(__SSP_STRONG__) || defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-endian () 
+{ 
+    local host=$1;
+    [[ -z ${host} ]] && host=${CTARGET:-${CHOST}};
+    host=${host%%-*};
+    case ${host} in 
+        aarch64*be)
+            echo big
+        ;;
+        aarch64)
+            echo little
+        ;;
+        alpha*)
+            echo little
+        ;;
+        arc*b*)
+            echo big
+        ;;
+        arc*)
+            echo little
+        ;;
+        arm*b*)
+            echo big
+        ;;
+        arm*)
+            echo little
+        ;;
+        cris*)
+            echo little
+        ;;
+        e2k*)
+            echo little
+        ;;
+        hppa*)
+            echo big
+        ;;
+        i?86*)
+            echo little
+        ;;
+        ia64*)
+            echo little
+        ;;
+        loongarch*)
+            echo little
+        ;;
+        m68*)
+            echo big
+        ;;
+        mips*l*)
+            echo little
+        ;;
+        mips*)
+            echo big
+        ;;
+        powerpc*le)
+            echo little
+        ;;
+        powerpc*)
+            echo big
+        ;;
+        riscv*)
+            echo little
+        ;;
+        s390*)
+            echo big
+        ;;
+        sh*b*)
+            echo big
+        ;;
+        sh*)
+            echo little
+        ;;
+        sparc*)
+            echo big
+        ;;
+        x86_64*)
+            echo little
+        ;;
+        *)
+            echo wtf
+        ;;
+    esac
+}
+tc-env_build () 
+{ 
+    tc-export_build_env;
+    has go-env ${INHERITED} && local -x GOAMD64=${BUILD_GOAMD64} GOARM64=${BUILD_GOARM64} GOPPC64=${BUILD_GOPPC64} GORISCV64=${BUILD_GORISCV64};
+    CFLAGS=${BUILD_CFLAGS} CXXFLAGS=${BUILD_CXXFLAGS} CPPFLAGS=${BUILD_CPPFLAGS} LDFLAGS=${BUILD_LDFLAGS} AR=$(tc-getBUILD_AR) AS=$(tc-getBUILD_AS) CC=$(tc-getBUILD_CC) CPP=$(tc-getBUILD_CPP) CXX=$(tc-getBUILD_CXX) LD=$(tc-getBUILD_LD) NM=$(tc-getBUILD_NM) PKG_CONFIG=$(tc-getBUILD_PKG_CONFIG) RANLIB=$(tc-getBUILD_RANLIB) READELF=$(tc-getBUILD_READELF) CHOST=${CBUILD:-${CHOST}} ESYSROOT=${BROOT} SYSROOT= "$@"
+}
+tc-export () 
+{ 
+    local var;
+    for var in "$@";
+    do
+        [[ $(type -t "tc-get${var}") != "function" ]] && die "tc-export: invalid export variable '${var}'";
+        "tc-get${var}" > /dev/null;
+    done
+}
+tc-export_build_env () 
+{ 
+    tc-export "$@";
+    if tc-is-cross-compiler; then
+        : "${BUILD_CFLAGS:=-O1 -pipe}";
+        : "${BUILD_CXXFLAGS:=-O1 -pipe}";
+        : "${BUILD_CPPFLAGS:= }";
+        : "${BUILD_LDFLAGS:= }";
+    else
+        : "${BUILD_CFLAGS:=${CFLAGS}}";
+        : "${BUILD_CXXFLAGS:=${CXXFLAGS}}";
+        : "${BUILD_CPPFLAGS:=${CPPFLAGS}}";
+        : "${BUILD_LDFLAGS:=${LDFLAGS}}";
+        if has go-env ${INHERITED}; then
+            : "${BUILD_GOAMD64:=${GOAMD64}}";
+            : "${BUILD_GOARM64:=${GOARM64}}";
+            : "${BUILD_GOPPC64:=${GOPPC64}}";
+            : "${BUILD_GORISCV64:=${GORISCV64}}";
+        fi;
+    fi;
+    export BUILD_{C,CXX,CPP,LD}FLAGS;
+    local v;
+    for v in BUILD_{C,CXX,CPP,LD}FLAGS;
+    do
+        export ${v#BUILD_}_FOR_BUILD="${!v}";
+    done
+}
+tc-get-build-ptr-size () 
+{ 
+    $(tc-getBUILD_CC) -E -P - <<< __SIZEOF_POINTER__ || die "Could not determine CBUILD pointer size"
+}
+tc-get-c-rtlib () 
+{ 
+    local res=$($(tc-getCC) ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -print-libgcc-file-name 2> /dev/null);
+    case ${res} in 
+        *libclang_rt*)
+            echo compiler-rt
+        ;;
+        *libgcc*)
+            echo libgcc
+        ;;
+        *)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-get-compiler-type () 
+{ 
+    local code='
+#if defined(__PATHSCALE__)
+	HAVE_PATHCC
+#elif defined(__clang__)
+	HAVE_CLANG
+#elif defined(__GNUC__)
+	HAVE_GCC
+#endif
+';
+    local res=$($(tc-getCC "$@") -E -P - <<< "${code}");
+    case ${res} in 
+        *HAVE_PATHCC*)
+            echo pathcc
+        ;;
+        *HAVE_CLANG*)
+            echo clang
+        ;;
+        *HAVE_GCC*)
+            echo gcc
+        ;;
+        *)
+            echo unknown
+        ;;
+    esac
+}
+tc-get-cxx-stdlib () 
+{ 
+    local code='
+#if __cplusplus >= 202002L
+	#include <version>
+#else
+	#include <ciso646>
+#endif
+
+#if defined(_LIBCPP_VERSION)
+	HAVE_LIBCXX
+#elif defined(__GLIBCXX__)
+	HAVE_LIBSTDCPP
+#endif
+';
+    local res=$($(tc-getCXX) ${CPPFLAGS} ${CXXFLAGS} -x c++ -E -P - <<< "${code}" 2> /dev/null);
+    case ${res} in 
+        *HAVE_LIBCXX*)
+            echo libc++
+        ;;
+        *HAVE_LIBSTDCPP*)
+            echo libstdc++
+        ;;
+        *)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-get-ptr-size () 
+{ 
+    $(tc-getCC) -E -P - <<< __SIZEOF_POINTER__ || die "Could not determine CHOST pointer size"
+}
+tc-getAR () 
+{ 
+    tc-getPROG AR ar "$@"
+}
+tc-getAS () 
+{ 
+    tc-getPROG AS as "$@"
+}
+tc-getBUILD_AR () 
+{ 
+    tc-getBUILD_PROG AR ar "$@"
+}
+tc-getBUILD_AS () 
+{ 
+    tc-getBUILD_PROG AS as "$@"
+}
+tc-getBUILD_CC () 
+{ 
+    tc-getBUILD_PROG CC gcc "$@"
+}
+tc-getBUILD_CPP () 
+{ 
+    tc-getBUILD_PROG CPP "$(tc-getBUILD_CC) -E" "$@"
+}
+tc-getBUILD_CXX () 
+{ 
+    tc-getBUILD_PROG CXX g++ "$@"
+}
+tc-getBUILD_LD () 
+{ 
+    tc-getBUILD_PROG LD ld "$@"
+}
+tc-getBUILD_NM () 
+{ 
+    tc-getBUILD_PROG NM nm "$@"
+}
+tc-getBUILD_OBJCOPY () 
+{ 
+    tc-getBUILD_PROG OBJCOPY objcopy "$@"
+}
+tc-getBUILD_PKG_CONFIG () 
+{ 
+    tc-getBUILD_PROG PKG_CONFIG pkg-config "$@"
+}
+tc-getBUILD_PROG () 
+{ 
+    local vars="BUILD_$1 $1_FOR_BUILD HOST$1";
+    tc-is-cross-compiler || vars+=" $1";
+    _tc-getPROG CBUILD "${vars}" "${@:2}"
+}
+tc-getBUILD_RANLIB () 
+{ 
+    tc-getBUILD_PROG RANLIB ranlib "$@"
+}
+tc-getBUILD_READELF () 
+{ 
+    tc-getBUILD_PROG READELF readelf "$@"
+}
+tc-getBUILD_STRINGS () 
+{ 
+    tc-getBUILD_PROG STRINGS strings "$@"
+}
+tc-getBUILD_STRIP () 
+{ 
+    tc-getBUILD_PROG STRIP strip "$@"
+}
+tc-getCC () 
+{ 
+    tc-getPROG CC gcc "$@"
+}
+tc-getCPP () 
+{ 
+    tc-getPROG CPP "${CC:-gcc} -E" "$@"
+}
+tc-getCXX () 
+{ 
+    tc-getPROG CXX g++ "$@"
+}
+tc-getDLLWRAP () 
+{ 
+    tc-getPROG DLLWRAP dllwrap "$@"
+}
+tc-getF77 () 
+{ 
+    tc-getPROG F77 gfortran "$@"
+}
+tc-getFC () 
+{ 
+    tc-getPROG FC gfortran "$@"
+}
+tc-getGCJ () 
+{ 
+    tc-getPROG GCJ gcj "$@"
+}
+tc-getGO () 
+{ 
+    tc-getPROG GO gccgo "$@"
+}
+tc-getHIPCXX () 
+{ 
+    tc-getPROG HIPCXX "$(hipconfig --hipclangpath)/clang++" "$@"
+}
+tc-getLD () 
+{ 
+    tc-getPROG LD ld "$@"
+}
+tc-getNM () 
+{ 
+    tc-getPROG NM nm "$@"
+}
+tc-getOBJCOPY () 
+{ 
+    tc-getPROG OBJCOPY objcopy "$@"
+}
+tc-getOBJDUMP () 
+{ 
+    tc-getPROG OBJDUMP objdump "$@"
+}
+tc-getPKG_CONFIG () 
+{ 
+    tc-getPROG PKG_CONFIG pkg-config "$@"
+}
+tc-getPROG () 
+{ 
+    _tc-getPROG CHOST "$@"
+}
+tc-getRANLIB () 
+{ 
+    tc-getPROG RANLIB ranlib "$@"
+}
+tc-getRC () 
+{ 
+    tc-getPROG RC windres "$@"
+}
+tc-getREADELF () 
+{ 
+    tc-getPROG READELF readelf "$@"
+}
+tc-getSTRINGS () 
+{ 
+    tc-getPROG STRINGS strings "$@"
+}
+tc-getSTRIP () 
+{ 
+    tc-getPROG STRIP strip "$@"
+}
+tc-getTARGET_CPP () 
+{ 
+    if [[ -n ${CTARGET} ]]; then
+        _tc-getPROG CTARGET TARGET_CPP "gcc -E" "$@";
+    else
+        tc-getCPP "$@";
+    fi
+}
+tc-has-64bit-time_t () 
+{ 
+    $(tc-getCC) ${CFLAGS} ${CPPFLAGS} -c -x c - -o /dev/null <<-EOF &> /dev/null
+#include <sys/types.h>
+int test[sizeof(time_t) >= 8 ? 1 : -1];
+EOF
+
+    return $?
+}
+tc-has-tls () 
+{ 
+    local base="${T}/test-tc-tls";
+    cat <<-EOF > "${base}.c"
+int foo(int *i) {
+static __thread int j = 0;
+return *i ? j : *i;
+}
+EOF
+
+    local flags
+    case $1 in 
+        -s)
+            flags="-S"
+        ;;
+        -c)
+            flags="-c"
+        ;;
+        -l)
+
+        ;;
+        -*)
+            die "Usage: tc-has-tls [-c|-l] [toolchain prefix]"
+        ;;
+    esac;
+    case "${CHOST}" in 
+        *-darwin*)
+            : ${flags:=-dynamiclib}
+        ;;
+        *)
+            : ${flags:=-fPIC -shared -Wl,-z,defs}
+        ;;
+    esac;
+    [[ $1 == -* ]] && shift;
+    $(tc-getCC "$@") ${flags} "${base}.c" -o "${base}" >&/dev/null;
+    local ret=$?;
+    rm -f "${base}"*;
+    return ${ret}
+}
+tc-is-clang () 
+{ 
+    [[ $(tc-get-compiler-type) == clang ]]
+}
+tc-is-cross-compiler () 
+{ 
+    [[ ${CBUILD:-${CHOST}} != ${CHOST} ]]
+}
+tc-is-gcc () 
+{ 
+    [[ $(tc-get-compiler-type) == gcc ]]
+}
+tc-is-lto () 
+{ 
+    local f="${T}/test-lto.o";
+    local ret=1;
+    case $(tc-get-compiler-type) in 
+        clang)
+            $(tc-getCC) ${CFLAGS} -c -o "${f}" -x c - <<< "" || die;
+            llvm-bcanalyzer "${f}" &> /dev/null && ret=0
+        ;;
+        gcc)
+            $(tc-getCC) ${CFLAGS} -c -o "${f}" -x c - <<< "" || die;
+            [[ $($(tc-getOBJDUMP) -s "${f}") == *.gnu.lto* ]] && ret=0
+        ;;
+    esac;
+    rm -f "${f}" || die;
+    return "${ret}"
+}
+tc-is-softfloat () 
+{ 
+    tc-detect-is-softfloat || tc-tuple-is-softfloat
+}
+tc-is-static-only () 
+{ 
+    local host=${CTARGET:-${CHOST}};
+    [[ ${host} == *-mint* ]]
+}
+tc-ld-disable-gold () 
+{ 
+    tc-ld-is-gold "$@" && tc-ld-force-bfd "$@"
+}
+tc-ld-force-bfd () 
+{ 
+    if tc-ld-is-bfd "$@"; then
+        return;
+    fi;
+    ewarn "Forcing usage of the BFD linker";
+    local ld=$(unset LD; tc-getLD "$@");
+    local bfd_ld="${ld}.bfd";
+    local path_ld=$(type -P "${bfd_ld}" 2> /dev/null);
+    [[ -e ${path_ld} ]] && export LD=${bfd_ld};
+    if tc-is-gcc || tc-is-clang; then
+        export CFLAGS="${CFLAGS} -fuse-ld=bfd";
+        export CXXFLAGS="${CXXFLAGS} -fuse-ld=bfd";
+        export LDFLAGS="${LDFLAGS} -fuse-ld=bfd";
+    fi
+}
+tc-ld-is-bfd () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} != "GNU ld"* ]]; then
+        return 1;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ! ${out} =~ (^|'
+')"GNU ld".* ]]; then
+        return 1;
+    fi;
+    return 0
+}
+tc-ld-is-gold () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"GNU gold"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"GNU gold"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ld-is-lld () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"LLD"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"LLD"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ld-is-mold () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"mold"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"mold"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ninja_magic_to_arch () 
+{ 
+    function _tc_echo_kernel_alias () 
+    { 
+        [[ ${type} == "kern" ]] && echo $1 || echo $2
+    };
+    local type=$1;
+    local host=$2;
+    [[ -z ${host} ]] && host=${CTARGET:-${CHOST}};
+    case ${host} in 
+        arm64*)
+            echo arm64
+        ;;
+        aarch64*)
+            echo arm64
+        ;;
+        alpha*)
+            echo alpha
+        ;;
+        arc*)
+            echo arc
+        ;;
+        arm*)
+            echo arm
+        ;;
+        avr*)
+            _tc_echo_kernel_alias avr32 avr
+        ;;
+        bfin*)
+            _tc_echo_kernel_alias blackfin bfin
+        ;;
+        c6x*)
+            echo c6x
+        ;;
+        cris*)
+            echo cris
+        ;;
+        e2k*)
+            echo e2k
+        ;;
+        frv*)
+            echo frv
+        ;;
+        hexagon*)
+            echo hexagon
+        ;;
+        hppa*)
+            _tc_echo_kernel_alias parisc hppa
+        ;;
+        i?86*)
+            echo x86
+        ;;
+        ia64*)
+            echo ia64
+        ;;
+        loongarch*)
+            _tc_echo_kernel_alias loongarch loong
+        ;;
+        m68*)
+            echo m68k
+        ;;
+        metag*)
+            echo metag
+        ;;
+        microblaze*)
+            echo microblaze
+        ;;
+        mips*)
+            echo mips
+        ;;
+        nios2*)
+            echo nios2
+        ;;
+        nios*)
+            echo nios
+        ;;
+        or1k* | or32*)
+            echo openrisc
+        ;;
+        powerpc*)
+            if [[ ${type} == "kern" ]]; then
+                echo powerpc;
+            else
+                if [[ ${host} == powerpc64* ]]; then
+                    echo ppc64;
+                else
+                    echo ppc;
+                fi;
+            fi
+        ;;
+        riscv*)
+            echo riscv
+        ;;
+        s390*)
+            echo s390
+        ;;
+        score*)
+            echo score
+        ;;
+        sh64*)
+            _tc_echo_kernel_alias sh64 sh
+        ;;
+        sh*)
+            echo sh
+        ;;
+        sparc64*)
+            _tc_echo_kernel_alias sparc64 sparc
+        ;;
+        sparc*)
+            [[ ${PROFILE_ARCH} == "sparc64" ]] && _tc_echo_kernel_alias sparc64 sparc || echo sparc
+        ;;
+        tile*)
+            echo tile
+        ;;
+        vax*)
+            echo vax
+        ;;
+        x86_64*)
+            if [[ ${type} == "kern" ]]; then
+                echo x86;
+            else
+                echo amd64;
+            fi
+        ;;
+        xtensa*)
+            echo xtensa
+        ;;
+        *)
+            echo unknown
+        ;;
+    esac
+}
+tc-stack-grows-down () 
+{ 
+    case ${ARCH} in 
+        hppa | metag)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-tuple-is-softfloat () 
+{ 
+    local CTARGET=${CTARGET:-${CHOST}};
+    case ${CTARGET//_/-} in 
+        bfin* | h8300*)
+            echo "only"
+        ;;
+        *-softfloat-*)
+            echo "yes"
+        ;;
+        *-softfp-*)
+            echo "softfp"
+        ;;
+        arm*-hardfloat-* | arm*eabihf*)
+            echo "no"
+        ;;
+        *-newlib | *-elf | *-eabi)
+            echo "no"
+        ;;
+        arm64-apple-darwin*)
+            echo "no"
+        ;;
+        arm*)
+            echo "yes"
+        ;;
+        *)
+            echo "no"
+        ;;
+    esac
+}
+test-compile () 
+{ 
+    local lang=$1;
+    local code=$2;
+    shift 2;
+    [[ -z "${lang}" ]] && return 1;
+    [[ -z "${code}" ]] && return 1;
+    local compiler filename_in filename_out args=() libs=();
+    case "${lang}" in 
+        c)
+            compiler="$(tc-getCC)";
+            filename_in="${T}/test.c";
+            filename_out="${T}/test.o";
+            args+=(${CFLAGS[@]} -xc -c)
+        ;;
+        c++)
+            compiler="$(tc-getCXX)";
+            filename_in="${T}/test.cc";
+            filename_out="${T}/test.o";
+            args+=(${CXXFLAGS[@]} -xc++ -c)
+        ;;
+        f77)
+            compiler="$(tc-getF77)";
+            filename_in="${T}/test.f";
+            filename_out="${T}/test.o";
+            args+=(${FFFLAGS[@]} -xf77 -c)
+        ;;
+        f95)
+            compiler="$(tc-getFC)";
+            filename_in="${T}/test.f90";
+            filename_out="${T}/test.o";
+            args+=(${FCFLAGS[@]} -xf95 -c)
+        ;;
+        c+ld)
+            compiler="$(tc-getCC)";
+            filename_in="${T}/test.c";
+            filename_out="${T}/test.exe";
+            args+=(${CFLAGS[@]} ${LDFLAGS[@]} -xc);
+            libs+=(${LIBS[@]})
+        ;;
+        c+++ld)
+            compiler="$(tc-getCXX)";
+            filename_in="${T}/test.cc";
+            filename_out="${T}/test.exe";
+            args+=(${CXXFLAGS[@]} ${LDFLAGS[@]} -xc++);
+            libs+=(${LIBS[@]})
+        ;;
+        f77+ld)
+            compiler="$(tc-getF77)";
+            filename_in="${T}/test.f";
+            filename_out="${T}/test.exe";
+            args+=(${FFLAGS[@]} ${LDFLAGS[@]} -xf77);
+            libs+=(${LIBS[@]})
+        ;;
+        f95+ld)
+            compiler="$(tc-getFC)";
+            filename_in="${T}/test.f90";
+            filename_out="${T}/test.exe";
+            args+=(${FCFLAGS[@]} ${LDFLAGS[@]} -xf95);
+            libs+=(${LIBS[@]})
+        ;;
+        hip)
+            compiler="$(tc-getHIPCXX)";
+            filename_in="${T}/test.hip";
+            filename_out="${T}/test.o";
+            args+=(${CFLAGS[@]} -xhip -c)
+        ;;
+        *)
+            die "Unknown compiled language ${lang}"
+        ;;
+    esac;
+    printf "%s\n" "${code}" > "${filename_in}" || die "Failed to create '${test_in}'";
+    "${compiler}" ${args[@]} "${filename_in}" -o "${filename_out}" ${libs[@]} &> /dev/null
+}
+test-flag-CC () 
+{ 
+    _test-flag-PROG CC c "$@"
+}
+test-flag-CCLD () 
+{ 
+    _test-flag-PROG CC c+ld "$@"
+}
+test-flag-CXX () 
+{ 
+    _test-flag-PROG CXX c++ "$@"
+}
+test-flag-F77 () 
+{ 
+    _test-flag-PROG F77 f77 "$@"
+}
+test-flag-FC () 
+{ 
+    _test-flag-PROG FC f95 "$@"
+}
+test-flag-HIPCXX () 
+{ 
+    _test-flag-PROG HIPCXX hip "$@"
+}
+test-flag-PROG () 
+{ 
+    [[ ${EAPI} == 7 ]] || die "Internal function ${FUNCNAME} is not available in EAPI ${EAPI}.";
+    _test-flag-PROG "$@"
+}
+test-flags () 
+{ 
+    test-flags-CC "$@"
+}
+test-flags-CC () 
+{ 
+    _test-flags-PROG CC "$@"
+}
+test-flags-CCLD () 
+{ 
+    _test-flags-PROG CCLD "$@"
+}
+test-flags-CXX () 
+{ 
+    _test-flags-PROG CXX "$@"
+}
+test-flags-F77 () 
+{ 
+    _test-flags-PROG F77 "$@"
+}
+test-flags-FC () 
+{ 
+    _test-flags-PROG FC "$@"
+}
+test-flags-HIPCXX () 
+{ 
+    _test-flags-PROG HIPCXX "$@"
+}
+test-flags-PROG () 
+{ 
+    [[ ${EAPI} == 7 ]] || die "Internal function ${FUNCNAME} is not available in EAPI ${EAPI}.";
+    _test-flags-PROG "$@"
+}
+test_version_info () 
+{ 
+    if [[ $($(tc-getCC) --version 2>&1) == *$1* ]]; then
+        return 0;
+    else
+        return 1;
+    fi
+}
+verify-sig_src_unpack () 
+{ 
+    if use verify-sig; then
+        local f suffix found;
+        local distfiles=() signatures=() nosigfound=() straysigs=();
+        for f in ${A};
+        do
+            found=;
+            for suffix in .asc .sig .minisig .sigstore;
+            do
+                if [[ ${f} == *${suffix} ]]; then
+                    signatures+=("${f}");
+                    found=sig;
+                    break;
+                else
+                    if has "${f}${suffix}" ${A}; then
+                        distfiles+=("${f}");
+                        found=dist+sig;
+                        break;
+                    fi;
+                fi;
+            done;
+            if [[ ! -n ${found} ]]; then
+                nosigfound+=("${f}");
+            fi;
+        done;
+        if [[ ${#nosigfound[@]} -gt 0 ]]; then
+            eerror "The following distfiles lack detached signatures:";
+            for f in "${nosigfound[@]}";
+            do
+                eerror "  ${f}";
+            done;
+            die "Unsigned distfiles found";
+        fi;
+        for f in "${signatures[@]}";
+        do
+            if ! has "${f%.*}" "${distfiles[@]}"; then
+                straysigs+=("${f}");
+            fi;
+        done;
+        if [[ ${#straysigs[@]} -gt 0 ]]; then
+            eerror "The following signatures do not match any distfiles:";
+            for f in "${straysigs[@]}";
+            do
+                eerror "  ${f}";
+            done;
+            die "Unused signatures found";
+        fi;
+        for f in "${signatures[@]}";
+        do
+            verify-sig_verify_detached "${DISTDIR}/${f%.*}" "${DISTDIR}/${f}";
+        done;
+    fi;
+    default_src_unpack
+}
+verify-sig_uncompress_verify_unpack () 
+{ 
+    local file=${1};
+    local unpacker;
+    case ${file} in 
+        *.tar.xz)
+            unpacker=(xz -cd)
+        ;;
+        *)
+            die "${FUNCNAME}: only .tar.xz archives are supported at the moment"
+        ;;
+    esac;
+    einfo "Unpacking ${file} ...";
+    verify-sig_verify_detached - "${@:2}" < <("${unpacker[@]}" "${file}" | tee >(tar -xf - || die)
+pipestatus || die)
+}
+verify-sig_verify_detached () 
+{ 
+    local file=${1};
+    local sig=${2};
+    local key=${3};
+    if [[ ${VERIFY_SIG_METHOD} == sigstore ]]; then
+        if [[ -n ${key:-${VERIFY_SIG_OPENPGP_KEY_PATH}} ]]; then
+            die "${FUNCNAME}: key unexpectedly specified for sigstore";
+        fi;
+        if [[ -z ${VERIFY_SIG_CERT_IDENTITY} ]]; then
+            die "${FUNCNAME}: VERIFY_SIG_CERT_IDENTITY must be specified for sigstore";
+        fi;
+        if [[ -z ${VERIFY_SIG_CERT_OIDC_ISSUER} ]]; then
+            die "${FUNCNAME}: VERIFY_SIG_CERT_OIDC_ISSUER must be specified for sigstore";
+        fi;
+    else
+        if [[ -z ${key} ]]; then
+            if [[ -z ${VERIFY_SIG_OPENPGP_KEY_PATH} ]]; then
+                die "${FUNCNAME}: no key passed and VERIFY_SIG_OPENPGP_KEY_PATH unset";
+            else
+                key="${BROOT}${VERIFY_SIG_OPENPGP_KEY_PATH}";
+            fi;
+        fi;
+    fi;
+    local extra_args=();
+    if [[ -n ${VERIFY_SIG_OPENPGP_KEYSERVER+1} ]]; then
+        [[ ${VERIFY_SIG_METHOD} == openpgp ]] || die "${FUNCNAME}: VERIFY_SIG_OPENPGP_KEYSERVER is not supported";
+        extra_args+=(--keyserver "${VERIFY_SIG_OPENPGP_KEYSERVER}");
+    fi;
+    addpredict /run/user;
+    local filename=${file##*/};
+    [[ ${file} == - ]] && filename='(stdin)';
+    einfo "Verifying ${filename} ...";
+    case ${VERIFY_SIG_METHOD} in 
+        minisig)
+            minisign "${extra_args[@]}" -V -P "$(< "${key}")" -x "${sig}" -m "${file}" || die "minisig signature verification failed"
+        ;;
+        openpgp)
+            if [[ ${VERIFY_SIG_OPENPGP_KEY_REFRESH} != yes ]]; then
+                extra_args+=(-R);
+            fi;
+            local -x TMPDIR=/tmp;
+            gemato openpgp-verify-detached -K "${key}" "${extra_args[@]}" --no-require-all-good "${sig}" "${file}" || die "PGP signature verification failed"
+        ;;
+        signify)
+            signify "${extra_args[@]}" -V -p "${key}" -m "${file}" -x "${sig}" || die "Signify signature verification failed"
+        ;;
+        sigstore)
+            if [[ ${VERIFY_SIG_OPENPGP_KEY_REFRESH} != yes ]]; then
+                extra_args+=(--offline);
+            fi;
+            cp -r "${BROOT}"/usr/share/sigstore-gentoo/{.cache,.local} "${HOME}"/ || die;
+            sigstore verify identity "${extra_args[@]}" --bundle "${sig}" --cert-identity "${VERIFY_SIG_CERT_IDENTITY}" --cert-oidc-issuer "${VERIFY_SIG_CERT_OIDC_ISSUER}" "${file}" || die "Sigstore signature verification failed"
+        ;;
+        *)
+            die "${FUNCNAME} not supported with ${VERIFY_SIG_METHOD}"
+        ;;
+    esac
+}
+verify-sig_verify_message () 
+{ 
+    local file=${1};
+    local output_file=${2};
+    local key=${3};
+    if [[ -z ${key} ]]; then
+        if [[ -z ${VERIFY_SIG_OPENPGP_KEY_PATH} ]]; then
+            die "${FUNCNAME}: no key passed and VERIFY_SIG_OPENPGP_KEY_PATH unset";
+        else
+            key="${BROOT}${VERIFY_SIG_OPENPGP_KEY_PATH}";
+        fi;
+    fi;
+    local extra_args=();
+    [[ ${VERIFY_SIG_OPENPGP_KEY_REFRESH} == yes ]] || extra_args+=(-R);
+    if [[ -n ${VERIFY_SIG_OPENPGP_KEYSERVER+1} ]]; then
+        [[ ${VERIFY_SIG_METHOD} == openpgp ]] || die "${FUNCNAME}: VERIFY_SIG_OPENPGP_KEYSERVER is not supported";
+        extra_args+=(--keyserver "${VERIFY_SIG_OPENPGP_KEYSERVER}");
+    fi;
+    addpredict /run/user;
+    local filename=${file##*/};
+    [[ ${file} == - ]] && filename='(stdin)';
+    einfo "Verifying ${filename} ...";
+    case ${VERIFY_SIG_METHOD} in 
+        minisig)
+            minisign -V -P "$(< "${key}")" -x "${sig}" -o "${output_file}" -m "${file}" || die "minisig signature verification failed"
+        ;;
+        openpgp)
+            local -x TMPDIR=/tmp;
+            gemato gpg-wrap -K "${key}" "${extra_args[@]}" -- "${GNUPG:-gpg}" --verify --output="${output_file}" "${file}" || die "PGP signature verification failed"
+        ;;
+        signify)
+            signify -V -e -p "${key}" -m "${output_file}" -x "${file}" || die "Signify signature verification failed"
+        ;;
+        *)
+            die "${FUNCNAME} not supported with ${VERIFY_SIG_METHOD}"
+        ;;
+    esac
+}
+verify-sig_verify_signed_checksums () 
+{ 
+    local checksum_file=${1};
+    local algo=${2};
+    local files=();
+    read -r -d '' -a files <<< "${3}";
+    local key=${4};
+    if [[ -z ${key} ]]; then
+        if [[ -z ${VERIFY_SIG_OPENPGP_KEY_PATH} ]]; then
+            die "${FUNCNAME}: no key passed and VERIFY_SIG_OPENPGP_KEY_PATH unset";
+        else
+            key="${BROOT}${VERIFY_SIG_OPENPGP_KEY_PATH}";
+        fi;
+    fi;
+    case ${VERIFY_SIG_METHOD} in 
+        openpgp)
+            _gpg_verify_signed_checksums "${checksum_file}" "${algo}" "${files[*]}" "${key}"
+        ;;
+        signify)
+            signify -C -p "${key}" -x "${checksum_file}" "${files[@]}" || die "Signify signature verification failed"
+        ;;
+        *)
+            die "${FUNCNAME} not supported with ${VERIFY_SIG_METHOD}"
+        ;;
+    esac
+}
+verify-sig_verify_unsigned_checksums () 
+{ 
+    local checksum_file=${1};
+    local format=${2};
+    local files=();
+    read -r -d '' -a files <<< "${3}";
+    local chksum_prog chksum_len algo=${format};
+    case ${format} in 
+        sha256)
+            chksum_len=64
+        ;;
+        openssl-dgst)
+
+        ;;
+        *)
+            die "${FUNCNAME}: unknown checksum format ${format}"
+        ;;
+    esac;
+    [[ ${checksum_file} == - ]] && checksum_file=/dev/stdin;
+    local line checksum filename junk ret=0 count=0;
+    local -A verified;
+    while read -r line; do
+        if [[ ${line} == "-----BEGIN"* ]]; then
+            die "${FUNCNAME}: PGP armor found, use verify-sig_verify_signed_checksums instead";
+        fi;
+        case ${format} in 
+            sha256)
+                read -r checksum filename junk <<< "${line}";
+                [[ ${#checksum} -ne ${chksum_len} ]] && continue;
+                [[ -n ${checksum//[0-9a-f]} ]] && continue;
+                [[ -n ${junk} ]] && continue
+            ;;
+            openssl-dgst)
+                [[ ${line} =~ ^([[:alnum:]]+)[[:space:]]*[(](.*)[)][[:space:]]*=[[:space:]]*([0-9a-fA-F]+)$ ]] || continue;
+                algo=${BASH_REMATCH[1]};
+                filename=${BASH_REMATCH[2]};
+                checksum=${BASH_REMATCH[3]}
+            ;;
+        esac;
+        if ! has "${filename}" "${files[@]}"; then
+            continue;
+        fi;
+        if "${algo,,}sum" -c --strict - <<< "${checksum} ${filename}"; then
+            verified["${filename}"]=1;
+        else
+            ret=1;
+        fi;
+    done < "${checksum_file}";
+    [[ ${ret} -eq 0 ]] || die "${FUNCNAME}: at least one file did not verify successfully";
+    [[ ${#verified[@]} -eq ${#files[@]} ]] || die "${FUNCNAME}: checksums for some of the specified files were missing"
+}

@@ -1,0 +1,32 @@
+filter-env oracle case: captured-phases-setup
+
+Isolates the real end-of-phase save after pkg_setup (same
+--filter-features call shape as pretend): the 2378-byte captured
+pattern over the setup-phase declare dump, which additionally carries
+the .pretended-stamp state and sourced pretend environment.
+If the native port regressed on any assignment form in this dump
+(multiline values, declare --, readonly flags), out would differ
+byte-for-byte.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  capture: instrumented real Portage in bed container
+    localhost/test-portuale:latest (Portage 3.0.82.2, container python 3.14.6)
+    with bin/filter-bash-environment.py replaced by a logging
+    wrapper (argv[1] + stdin recorded per call, then the real
+    script re-executed with identical argv + stdin).
+    ebuild | command | EBUILD_PHASE: porttest/porttest/phases/phases-1.0.ebuild | setup | setup
+    EMERGE_FROM=ebuild (the ebuild(1) branch, same pattern
+    branch as a source merge; the binary-merge branch and the
+    preprocess --filter-locale/--filter-path/--filter-sandbox
+    option set did not occur in these runs).
+  sizes: args=2378 in=21444 out=11080
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

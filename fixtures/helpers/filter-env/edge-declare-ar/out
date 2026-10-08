@@ -1,0 +1,2 @@
+declare -a MY_ARR=([0]="a" [1]="b")
+declare -x AFTER="c"

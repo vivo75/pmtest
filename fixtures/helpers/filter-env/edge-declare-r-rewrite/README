@@ -1,0 +1,25 @@
+filter-env oracle case: edge-declare-r-rewrite
+
+Isolates the `declare -r` rewrite (filter_declare_readonly_opt):
+`-r` alone is dropped (`declare -r` -> `declare`), other flags are
+kept (`-rx` -> `-x`, `-ir` -> `-i`), and a pattern-matching readonly
+assignment is dropped rather than rewritten.
+If the native port regressed to keeping readonly flags, out would
+still say `declare -r`.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=2378 in=107 out=82
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

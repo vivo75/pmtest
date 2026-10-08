@@ -1,0 +1,27 @@
+filter-env oracle case: edge-heredoc-in-func
+
+Isolates here-document tracking inside a function body: the
+`cat <<EOF` line arms here_doc_delim, so the following
+`declare -x FEATURES=...` line -- which matches the pattern -- passes
+through unfiltered, and filtering resumes only after the closing
+EOF. The top-level FEATURES assignment is still dropped.
+If the native port regressed to filtering inside here-documents,
+out would miss the inner line; if it lost the delimiter, lines
+after EOF would pass through unfiltered too.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=2378 in=159 out=116
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)
