@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: one file under a config-protected path, one under the env.d-added one (#333)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=049bdf319db03916fb356bd5661e4c76
