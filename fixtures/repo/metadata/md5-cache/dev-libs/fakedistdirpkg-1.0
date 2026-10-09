@@ -1,0 +1,7 @@
+DEFINED_PHASES=install unpack
+DESCRIPTION=fixture package: the phase env gets real's per-package fake DISTDIR (builddir/distdir, one symlink per file of A) and the real directory in PORTAGE_ACTUAL_DISTDIR (config.py:3403-3409, #330)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+SRC_URI=https://example.invalid/payload.bin -> fakedistdirpkg-1.0.tar.gz
+_md5_=3a0a2c1f9bff9bc64727f304eaa96a13
