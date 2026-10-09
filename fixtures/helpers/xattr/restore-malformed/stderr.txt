@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/xattr-helper.py", line 178, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ~~~~^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/xattr-helper.py", line 169, in main
+    restore_xattrs(file_in)
+    ~~~~~~~~~~~~~~^^^^^^^^^
+  File "<CHECKOUT>/bin/xattr-helper.py", line 134, in restore_xattrs
+    raise ValueError(f"line {i + 1}: malformed entry")
+ValueError: line 1: malformed entry

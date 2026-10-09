@@ -1,0 +1,2 @@
+usage: xattr-helper.py [-h] [--dump] [--restore] [paths ...]
+xattr-helper.py: error: missing action!

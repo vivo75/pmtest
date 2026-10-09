@@ -1,0 +1,17 @@
+usage: xattr-helper.py [-h] [--dump] [--restore] [paths ...]
+
+Dump and restore extended attributes. We use formats like that used by
+getfattr --dump. This is meant for shell helpers to save/restore. If you're
+looking for a python/portage API, see portage.util.movefile._copyxattr
+instead. https://en.wikipedia.org/wiki/Extended_file_attributes
+
+positional arguments:
+  paths
+
+options:
+  -h, --help  show this help message and exit
+
+Actions:
+  --dump      Dump the values of all extended attributes associated with paths
+              passed as arguments or null-separated paths read from stdin.
+  --restore   Restore extended attributes using a dump read from stdin.

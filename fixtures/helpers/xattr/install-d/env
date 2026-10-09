@@ -1,0 +1,6 @@
+LANG=C.utf8
+PATH=/usr/bin:/bin
+PORTAGE_XATTR_EXCLUDE=
+PYTHONPATH=<CHECKOUT>/lib
+__PORTAGE_HELPER_CWD=<SCRATCH>/stage-install-d
+__PORTAGE_HELPER_PATH=<CHECKOUT>/bin/ebuild-helpers/xattr/install

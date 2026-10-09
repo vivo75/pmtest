@@ -1,0 +1,23 @@
+xattr oracle case: dump-argv
+
+Isolates --dump with paths as argv instead of stdin: argv wins (stdin
+is not even read) and the dump is identical to dump-two's. This pins
+the `if options.paths: ... else: read stdin` branch.
+If the native port regressed to always reading stdin, out.txt would be
+empty here.
+
+Run shape: cwd=<stage>; real `xattr-helper.py --dump <path>` with the path as argv (no stdin at all); in.manifest + xattrs are the input tree.
+Regenerate with fixtures/helpers/generate-xattr.sh.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  worktree-commit: 73091925f35b01b8814a357c60db98334ee94648
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 022 (enforced)
+  staging: tmpfs (raw non-UTF-8 names OK: yes)
+  xattr-fs: user.* xattrs work on tmpfs
+  generator-locale: LANG=C.utf8 (enforced); charmap=UTF-8
+  date: 2026-10-09 (UTC day granularity; the only field that may change
+    between regenerations)
+  scrub: <SCRATCH>/<CHECKOUT> in args/stdin/out/stderr/stdout

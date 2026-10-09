@@ -1,0 +1,2 @@
+# file: <SCRATCH>/stage-dump-escapes/in/top/esc.txt
+user.esc="a\042b\134c\012d\000eÿÃ©"

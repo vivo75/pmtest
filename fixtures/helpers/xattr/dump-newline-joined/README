@@ -1,0 +1,23 @@
+xattr oracle case: dump-newline-joined
+
+Isolates the stdin split rule: two paths joined by `\n` (not NUL) are
+ONE path to real (`stdin.read().split(b"\0")`), so the run fails with
+FileNotFoundError naming the embedded-newline blob, rc 1.
+If the native port regressed to splitting on newlines, two sections
+would dump with rc 0.
+
+Run shape: cwd=<stage>; real `xattr-helper.py --dump` with the checked-in stdin fed raw (estrip's `--dump < <(echo -n ...)` shape); in.manifest + xattrs are the input tree.
+Regenerate with fixtures/helpers/generate-xattr.sh.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  worktree-commit: 73091925f35b01b8814a357c60db98334ee94648
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 022 (enforced)
+  staging: tmpfs (raw non-UTF-8 names OK: yes)
+  xattr-fs: user.* xattrs work on tmpfs
+  generator-locale: LANG=C.utf8 (enforced); charmap=UTF-8
+  date: 2026-10-09 (UTC day granularity; the only field that may change
+    between regenerations)
+  scrub: <SCRATCH>/<CHECKOUT> in args/stdin/out/stderr/stdout

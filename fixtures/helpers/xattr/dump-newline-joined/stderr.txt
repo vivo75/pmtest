@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/xattr-helper.py", line 178, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ~~~~^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/xattr-helper.py", line 166, in main
+    dump_xattrs(options.paths, file_out)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/xattr-helper.py", line 101, in dump_xattrs
+    attrs = xattr.list(pathname)
+  File "<CHECKOUT>/lib/portage/util/_xattr.py", line 170, in list
+    return os.listxattr(item, follow_symlinks=not nofollow)
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: b'<SCRATCH>/stage-dump-newline-joined/in/top/two.txt\n<SCRATCH>/stage-dump-newline-joined/in/top/plain.txt'

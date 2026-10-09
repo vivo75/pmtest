@@ -1,0 +1,3 @@
+d 0755 top
+f 0644 top/plain.txt |empty-file-no-xattrs
+f 0644 top/two.txt |attr-carrier

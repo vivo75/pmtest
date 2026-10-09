@@ -1,0 +1,1 @@
+install: cannot stat '<SCRATCH>/stage-install-missing/src/top/nope.txt': No such file or directory

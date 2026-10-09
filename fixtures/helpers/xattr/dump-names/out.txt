@@ -1,0 +1,4 @@
+# file: <SCRATCH>/stage-dump-names/in/top/with space.txt
+user.sp="sp-val"
+# file: <SCRATCH>/stage-dump-names/in/top/nonÿutf8
+user.n="nv"

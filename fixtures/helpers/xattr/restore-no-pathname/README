@@ -1,0 +1,20 @@
+xattr oracle case: restore-no-pathname
+
+Isolates --restore of an attr line before any `# file:` header: real
+raises `ValueError: line 1: missing pathname` (rc 1, traceback).
+
+Run shape: cwd=<stage>; real `xattr-helper.py --restore` with the checked-in stdin fed raw; in.manifest is the (fresh) dest tree.
+Regenerate with fixtures/helpers/generate-xattr.sh.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  worktree-commit: 73091925f35b01b8814a357c60db98334ee94648
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 022 (enforced)
+  staging: tmpfs (raw non-UTF-8 names OK: yes)
+  xattr-fs: user.* xattrs work on tmpfs
+  generator-locale: LANG=C.utf8 (enforced); charmap=UTF-8
+  date: 2026-10-09 (UTC day granularity; the only field that may change
+    between regenerations)
+  scrub: <SCRATCH>/<CHECKOUT> in args/stdin/out/stderr/stdout

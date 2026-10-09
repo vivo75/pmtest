@@ -1,0 +1,26 @@
+xattr oracle case: restore-roundtrip
+
+Isolates --restore: stdin is a genuine real --dump of the src tree
+(regenerated here on every run, `# file:` lines rewritten to the fresh
+dest paths, pairs order), applied to fresh files. The resulting xattrs
+are byte-identical to the sources, including the escapes value with
+its NUL, 0xff and UTF-8 bytes (see dump-escapes); file contents are
+untouched. out.xattrs records name plus value hex per file.
+If the native port regressed in unquoting (e.g. `\000`), the fresh2
+user.esc hex would differ.
+
+Run shape: cwd=<stage>; real `xattr-helper.py --restore` (no extra argv) with stdin = the real `--dump` of the src tree (src.manifest + src.xattrs, pairs order) with `# file:` lines rewritten to the fresh dest files (in.manifest); out.xattrs dumps the resulting user.* xattrs.
+Regenerate with fixtures/helpers/generate-xattr.sh.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  worktree-commit: 73091925f35b01b8814a357c60db98334ee94648
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 022 (enforced)
+  staging: tmpfs (raw non-UTF-8 names OK: yes)
+  xattr-fs: user.* xattrs work on tmpfs
+  generator-locale: LANG=C.utf8 (enforced); charmap=UTF-8
+  date: 2026-10-09 (UTC day granularity; the only field that may change
+    between regenerations)
+  scrub: <SCRATCH>/<CHECKOUT> in args/stdin/out/stderr/stdout

@@ -1,0 +1,5 @@
+# file: <SCRATCH>/stage-restore-roundtrip/in/top/fresh.txt
+user.two="beta"
+user.one="alpha"
+# file: <SCRATCH>/stage-restore-roundtrip/in/top/fresh2.txt
+user.esc="a\042b\134c\012d\000eÿÃ©"
