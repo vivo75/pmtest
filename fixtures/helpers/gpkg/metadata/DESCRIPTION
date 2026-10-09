@@ -1,0 +1,1 @@
+porttest: every pkg_* phase writes a marker (merge phase order + env)

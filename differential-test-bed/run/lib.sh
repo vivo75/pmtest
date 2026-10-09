@@ -61,9 +61,35 @@ PODMAN=${PORTTEST_PODMAN:-podman}
 # checkout instead of the whole checkout, so the build tree's `bin/` is
 # absent in the container and the binary must run from its embedded copy of
 # the phase runtime -- the relocated-binary cell of the merge-path gate.
+#
+# PM_BARE=1 (portuale backlog #326, the [nopy]/[noportage] cells) mounts
+# only the PM bin dir plus the /TEST mounts -- no checkout at all, neither
+# the whole repo nor 3rdparty/portage, and no PORTUALE_PORTAGE_CHECKOUT in
+# the container env. It wins over PM_RELOCATED when both are set. The
+# binary must be fully self-sufficient in the container.
+#
+# PM_NO_CHECKOUT=1 (portuale backlog #326 S9) mounts the whole repo as
+# usual but masks `$PM_REPO/3rdparty/portage` with an empty dir -- the
+# container sees the standard gate shape with no checkout, as if the
+# tree had none (a fresh clone or a worktree without the gitignored
+# checkout). An operator PORTUALE_PORTAGE_CHECKOUT override is pinned to
+# the masked path too, so it cannot silently defeat the mask. It wins
+# over PM_RELOCATED and loses to PM_BARE. With
+# PORTUALE_PYTHON_HELPERS=real (the oracle mode, which needs the
+# checkout) the preflight below fails loud instead of merging halfway.
 pm_mounts() {
   PM_MOUNTS=(-v "$PM_BIN_DIR:/usr/local/bin:ro")
-  if [ "${PM_RELOCATED:-0}" = 1 ]; then
+  if [ "${PM_BARE:-0}" = 1 ]; then
+    : # bare: the PM binaries only -- no checkout, no PORTUALE_PORTAGE_CHECKOUT
+  elif [ "${PM_NO_CHECKOUT:-0}" = 1 ]; then
+    PM_MOUNTS+=(-v "$PM_REPO:$PM_REPO:ro")
+    local empty="${TMPDIR:-/var/tmp/pmtest}/.pm-empty-checkout"
+    mkdir -p "$empty"
+    PM_MOUNTS+=(
+      -v "$empty:$PM_REPO/3rdparty/portage:ro"
+      -e "PORTUALE_PORTAGE_CHECKOUT=$PM_REPO/3rdparty/portage"
+    )
+  elif [ "${PM_RELOCATED:-0}" = 1 ]; then
     local checkout="${PORTUALE_PORTAGE_CHECKOUT:-$PM_REPO/3rdparty/portage}"
     PM_MOUNTS+=(-v "$checkout:$checkout:ro" -e "PORTUALE_PORTAGE_CHECKOUT=$checkout")
   else
@@ -75,6 +101,26 @@ pm_mounts() {
 # Resolve the PM now (paths only: sourcing this file must never build).
 pm_env_load --no-build
 
+# A host GENTOO_MIRRORS (e.g. the owner's local caching mirror,
+# GENTOO_MIRRORS="http://<this host's eth0 IP>:8080") is forwarded to the
+# containers that fetch distfiles (l2, l3, nopy-build); unset, the image's
+# make.conf mirrors apply. Rootless podman's pasta gives the guest the
+# host's own address, so in the guest that IP is the guest itself: it is
+# rewritten to host.containers.internal, which reaches the host.
+# bed_guest_mirrors <mirrors>: the same list as seen from a guest.
+bed_guest_mirrors() {
+  local m=$1 ip
+  for ip in $(ip -o -4 addr show scope global 2>/dev/null | awk '{sub(/\/.*/, "", $4); print $4}'); do
+    m=${m//\/\/$ip:/\/\/host.containers.internal:}
+    m=${m//\/\/$ip\//\/\/host.containers.internal\/}
+  done
+  printf '%s\n' "$m"
+}
+MIRROR_ENV=()
+if [ -n "${GENTOO_MIRRORS:-}" ]; then
+  MIRROR_ENV=(-e "GENTOO_MIRRORS=$(bed_guest_mirrors "$GENTOO_MIRRORS")")
+fi
+
 # Common `podman run` args for a PM-capable throwaway container.
 podman_run_pm() {
   local name=$1; shift
@@ -85,22 +131,24 @@ podman_run_pm() {
     "$@"
 }
 
-# portuale vendors everything bash in `bin/` -- including a
-# `portageq-wrapper` shim that execs the native `portuale portageq`, so
-# `has_version`/`best_version` need no checkout (feat#157 S6, #151). What
-# is still *not* vendored is the `.py` helpers that `import portage`
-# (`doins.py`, `dohtml.py`, `install.py`, `xpak-helper.py`,
-# `gpkg-helper.py`, ...) and the `lib/portage` they import; see portuale
-# `bin/README.md`. `ebuild_phases::bin_dir()` overlays the vendored `bin/`
-# on the gitignored Portage checkout's `bin/` only when that checkout
-# exists at `PORTUALE_PORTAGE_CHECKOUT` (unset by the bed) or
-# `<repo_root>/3rdparty/portage`. The container mounts `$PM_REPO` at its
+# portuale answers every phase helper natively since backlog #326 S2-S7
+# (the `portuale-python` dispatcher, `chmod-lite`,
+# `filter-bash-environment`, the gpkg/xpak writers, `doins`, the xattr
+# helpers; `has_version`/`best_version` through the vendored
+# `portageq-wrapper` shim since feat#157 S6 -- see portuale
+# `bin/README.md`). No checkout is needed -- except with
+# `PORTUALE_PYTHON_HELPERS=real` (the D2 oracle handle for differential
+# tests), where `ebuild_phases::bin_dir()` overlays the vendored `bin/`
+# on the gitignored Portage checkout's `bin/` and the not-vendored `.py`
+# helpers fall through to it. The container mounts `$PM_REPO` at its
 # own host path (below), so the host path this checks IS what the
-# container's phase exec sees. Without the checkout every `doins` /
-# `newins` / `dodoc` and the xpak/gpkg packaging step dies with an opaque
-# missing-helper error mid-merge; fail loud here instead.
+# container's phase exec sees. Without the checkout a `real`-mode merge
+# dies with a missing-helper error mid-merge; fail loud here instead.
+# (Before S9 this preflight ran unconditionally -- the native helpers
+# did not exist yet.)
 portuale_phase_helpers_preflight() {
   [ "$PM_NAME" = portuale ] || return 0
+  [ "${PORTUALE_PYTHON_HELPERS:-native}" = real ] || return 0
   local checkout="${PORTUALE_PORTAGE_CHECKOUT:-$PM_REPO/3rdparty/portage}"
   local missing=() f
   for f in bin/doins.py bin/dohtml.py bin/install.py bin/xpak-helper.py \
@@ -110,11 +158,14 @@ portuale_phase_helpers_preflight() {
   if [ "${#missing[@]}" -gt 0 ]; then
     echo "!!! [preflight] portuale's phase runtime can't find in $checkout:" >&2
     printf '!!!     %s\n' "${missing[@]}" >&2
-    echo "!!!   the gitignored Portage checkout (3rdparty/portage) provides the" >&2
-    echo "!!!   portage-importing .py helpers (doins, dohtml, install, xpak, gpkg)" >&2
-    echo "!!!   and lib/portage; the L1 container mounts \$PM_REPO only, so a missing" >&2
-    echo "!!!   checkout means the glibc/bash merges die in src_install (doins)" >&2
-    echo "!!!   or when packaging." >&2
+    echo "!!!   PORTUALE_PYTHON_HELPERS=real needs the gitignored Portage" >&2
+    echo "!!!   checkout (3rdparty/portage): the oracle-mode .py helpers" >&2
+    echo "!!!   (doins, dohtml, install, xpak, gpkg) and lib/portage fall" >&2
+    echo "!!!   through to it; the L1 container mounts \$PM_REPO only, so a" >&2
+    echo "!!!   missing checkout means the glibc/bash merges die in src_install" >&2
+    echo "!!!   (doins) or when packaging. Native runs (unset or" >&2
+    echo "!!!   PORTUALE_PYTHON_HELPERS=native) need no checkout and skip" >&2
+    echo "!!!   this check entirely." >&2
     echo "!!!   Fix: run 'setup.sh portage' in the portuale checkout (3rdparty/README.md)," >&2
     echo "!!!   or stage the checkout under \$PM_REPO ($PM_REPO)." >&2
     exit 2

@@ -285,6 +285,106 @@ def hardlink_debug_explained(f: dict, tolerated: set[str]) -> str | None:
     return None
 
 
+# --- #327: shared build-id link race -------------------------------------
+# Distinct stripped binaries (each with its own .gnu_debuglink naming its
+# own .debug) can still produce byte-identical .debug files, hence ONE
+# build-id and one .build-id/xx/yyyy link pair for the lot (porttest/setuid:
+# pt-setgid/pt-setuid/pt-sticky). A link has a single target:
+# __try_symlink (bin/estrip:60-69, `[[ -L ${name} ]] ||` keeps the first)
+# is called for the .debug link and the binary link at :197-198 by the job
+# that finishes first, and the jobs are forked in parallel
+# (__multijob_post_fork, :558/:667, reaped by __multijob_finish :674), so
+# the scheduler picks the owner. #261 does not match: its set is of
+# *object* paths sharing one md5 and one .debug per side. Here the objects
+# differ and the twin set is made of the .debug files.
+# Explained only when, on BOTH sides, the same >=2 .debug paths share an
+# md5 and the side holds exactly one @buildid key into those .debugs and
+# exactly one onto their binaries (the same binary), present as an obj on
+# both sides. Lone .debug, one-sided set, two links, a link outside the
+# set, and any non-@buildid row stay hard. Still no blanket ignore.
+SHARED_BUILDID_ID = "#327-shared-buildid-link"
+
+_DEBUG_PREFIX = "/usr/lib/debug"
+
+
+def _debug_binary(dbg: str) -> str | None:
+    """`/usr/lib/debug<bin>.debug` -> `<bin>`, else None."""
+    if dbg.startswith(_DEBUG_PREFIX + "/") and dbg.endswith(".debug"):
+        return dbg[len(_DEBUG_PREFIX):-len(".debug")]
+    return None
+
+
+def shared_buildid_tolerated(a_vdb: dict, b_vdb: dict) -> set[str]:
+    """@buildid keys explained by #327 (see the block comment above)."""
+    def scan(vdb: dict):
+        objs: dict[str, str] = {}
+        links: list[str] = []
+        for key, text in vdb.items():
+            if not key.endswith("/CONTENTS"):
+                continue
+            for (kind, path), val in _contents_map(text).items():
+                if kind == "obj":
+                    objs[path] = val
+                elif kind == "sym" and path.startswith("@buildid:"):
+                    links.append(path)
+        return objs, links
+
+    objs_a, links_a = scan(a_vdb)
+    objs_b, links_b = scan(b_vdb)
+
+    def twin_sets(objs: dict[str, str]) -> list[frozenset[str]]:
+        by_md5: dict[str, set[str]] = {}
+        for path, md5 in objs.items():
+            if path.endswith(".debug"):
+                by_md5.setdefault(md5, set()).add(path)
+        return [frozenset(s) for s in by_md5.values() if len(s) >= 2]
+
+    sets_b = set(twin_sets(objs_b))
+    tolerated: set[str] = set()
+    for members in twin_sets(objs_a):
+        if members not in sets_b:
+            continue
+        bins = {_debug_binary(d) for d in members}
+        if None in bins:
+            continue
+        ok = True
+        for links in (links_a, links_b):
+            tgt = [(k, k[len("@buildid:"):]) for k in links]
+            dbg_keys = [(k, t) for k, t in tgt if t in members]
+            bin_keys = [(k, t) for k, t in tgt if t in bins]
+            if len(dbg_keys) != 1 or len(bin_keys) != 1 \
+                    or _debug_binary(dbg_keys[0][1]) != bin_keys[0][1]:
+                ok = False
+                break
+            if bin_keys[0][1] not in objs_a or bin_keys[0][1] not in objs_b:
+                ok = False
+                break
+        if not ok:
+            continue
+        for links in (links_a, links_b):
+            for k in links:
+                t = k[len("@buildid:"):]
+                if t in members or t in bins:
+                    tolerated.add(k)
+    return tolerated
+
+
+def shared_buildid_explained(f: dict, tolerated: set[str]) -> str | None:
+    """Explain a #327 MISSING/CONTENTS row on a tolerated @buildid key."""
+    if f["category"] == "MISSING":
+        obj = f["path"]
+    elif f["category"] == "CONTENTS":
+        m = _ENTRY_PATH_RE.search(f["detail"]) or _MISMATCH_PATH_RE.search(f["detail"])
+        if m is None:
+            return None
+        obj = m.group(1)
+    else:
+        return None
+    if obj.startswith("@buildid:") and obj in tolerated:
+        return SHARED_BUILDID_ID
+    return None
+
+
 def _owned_paths(a_text: str | None, b_text: str | None) -> set[str]:
     """Filesystem paths a package owns, from either side's vdb CONTENTS.
 
@@ -458,6 +558,8 @@ def main(argv: list[str]) -> int:
     # #261 hardlink-set .debug race: scheduler-named, not a finding.
     # Applies to every pair (control and candidate) and every layer.
     race_tolerated = hardlink_debug_tolerated(a_vdb, b_vdb)
+    # #327 shared build-id link race (setuid triple): same treatment.
+    shared_tolerated = shared_buildid_tolerated(a_vdb, b_vdb)
 
     unexplained: list[dict] = []
     explained_hits: list[tuple[dict, str]] = []
@@ -471,6 +573,8 @@ def main(argv: list[str]) -> int:
         eid = explained(f, allow, layer, run_fs, run_backend)
         if eid is None:
             eid = hardlink_debug_explained(f, race_tolerated)
+        if eid is None:
+            eid = shared_buildid_explained(f, shared_tolerated)
         if eid:
             f["explained_by"] = eid
             explained_hits.append((f, eid))

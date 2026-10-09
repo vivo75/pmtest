@@ -1,0 +1,10 @@
+BINPKG_COMPRESS=zstd
+MAKEOPTS=-j4
+PORTAGE_BZIP2_COMMAND=bzip2
+LANG=C.utf8
+# BINPKG_COMPRESS_FLAGS and BINPKG_COMPRESS_FLAGS_ZSTD: unset (make.globals default: empty)
+FEATURES=binpkg-signing
+BINPKG_GPG_SIGNING_BASE_COMMAND=flock @SCRATCH@/portage-binpkg-gpg.lock /usr/bin/gpg --sign --armor --batch --no-tty --yes --pinentry-mode loopback --passphrase GentooTest [PORTAGE_CONFIG]
+BINPKG_GPG_SIGNING_DIGEST=SHA512
+BINPKG_GPG_SIGNING_GPG_HOME=@GNUPGHOME@
+BINPKG_GPG_SIGNING_KEY=0x8812797DDF1DD192

@@ -1,0 +1,16 @@
+Failed to copy file: _parsed_options=Namespace(group=0, owner=0, mode=493, preserve_timestamps=False), source=b'tree/file.txt', dest_dir=b'<SCRATCH>/stage-owner-root/ed/usr/lib/probe'
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/doins.py", line 208, in run
+    _set_attributes(self._parsed_options, dest)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 148, in _set_attributes
+    os.lchown(path, options.owner, options.group)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 1] Operation not permitted: b'<SCRATCH>/stage-owner-root/ed/usr/lib/probe/file.txt'
+ * ERROR: test-cat/testdoins-1.0::testrepo failed (install phase):
+ *   doins failed
+ * 
+ * If you need support, post the output of `emerge --info '=test-cat/testdoins-1.0::testrepo'`,
+ * the complete build log and the output of `emerge -pqv '=test-cat/testdoins-1.0::testrepo'`.
+ * The ebuild environment file is located at '<SCRATCH>/stage-owner-root/t/die.env'.
+ * Working directory: '<SCRATCH>/stage-owner-root/src'

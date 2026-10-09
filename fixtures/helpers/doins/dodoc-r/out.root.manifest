@@ -1,0 +1,7 @@
+d 0755 0 0 - - usr
+d 0755 0 0 - - usr/share
+d 0755 0 0 - - usr/share/doc
+d 0755 0 0 - - usr/share/doc/testdoins-1.0
+f 0644 0 0 14 sha256:f40bd408926e1627d5f3822f9ff9168a5b2c72a50930dc8cdaabf458d618894c usr/share/doc/testdoins-1.0/file.txt
+d 0755 0 0 - - usr/share/doc/testdoins-1.0/sub
+f 0644 0 0 16 sha256:4b72e82a0243c3d0a597ce7241fb68ae74db0f6b74dc4ec7ebec80fc4a51de9b usr/share/doc/testdoins-1.0/sub/nested.txt

@@ -1,0 +1,4 @@
+l ---- abs-in-dist -> @DISTDIR@/pkg.tar
+l ---- abs-outside -> @SRC@/plain.txt
+f 0644 plain.txt |plain-contents%0A
+l ---- rel-link -> plain.txt

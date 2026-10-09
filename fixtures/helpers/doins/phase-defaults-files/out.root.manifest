@@ -1,0 +1,12 @@
+d 0755 0 0 - - usr
+d 0755 0 0 - - usr/lib
+d 0755 0 0 - - usr/lib/probe
+f 0644 0 0 25 sha256:3469fda3228c6ea99341993a4b29997bd424fe26b77b006c77f116c0462d17c4 usr/lib/probe/abs-target.txt
+l ---- 0 0 - - usr/lib/probe/dangling -> no-such-target
+f 0644 0 0 14 sha256:f40bd408926e1627d5f3822f9ff9168a5b2c72a50930dc8cdaabf458d618894c usr/lib/probe/file.txt
+f 0644 0 0 18 sha256:6008349a048bf8e8875f7ca4935ae2399867ed7bb85b34d5bc9fc8372ea93cb8 usr/lib/probe/hard1
+f 0644 0 0 18 sha256:6008349a048bf8e8875f7ca4935ae2399867ed7bb85b34d5bc9fc8372ea93cb8 usr/lib/probe/hard2
+l ---- 0 0 - - usr/lib/probe/link-abs -> <SCRATCH>/stage-phase-defaults-files/src/tree/abs-target.txt
+l ---- 0 0 - - usr/lib/probe/link-rel -> file.txt
+l ---- 0 0 - - usr/lib/probe/linkdir -> sub
+f 0644 0 0 16 sha256:89afc617e4223d1636b08d6122f04897e340b24adbcb793dcfea4c5d68af2b5d usr/lib/probe/secret.txt

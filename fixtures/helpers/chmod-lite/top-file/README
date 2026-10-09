@@ -1,0 +1,27 @@
+chmod-lite oracle case: top-file
+
+Isolates the degenerate tree whose root holds only plain files (the
+WORKDIR look of a single-file fetch): each file is passed to the helper
+directly and fixed non-recursively (0600->0644, 0644 stays, 0777->0755).
+If the native port regressed to treating top-level files as
+directories, lone-0600 would come out 0755 instead of 0644.
+
+Run exactly as the unpack phase runs it (bin/phase-helpers.sh):
+  cd <tree>
+  find . -mindepth 1 -maxdepth 1 ! -type l \
+    -exec <checkout>/bin/chmod-lite {} +
+with PORTAGE_BIN_PATH=<checkout>/bin,
+PORTAGE_PYM_PATH=<checkout>/lib, PORTAGE_PYTHON=/usr/bin/python.
+File contents are empty (out of scope: only type/mode/path/target
+are recorded); symlink modes are always ----.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 0022
+  staging: scratch dir directly
+  generator-locale: LC_ALL=unset LC_CTYPE=unset LANG=C.utf8 charmap=UTF-8
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)
+  root-vs-user: identical

@@ -1,0 +1,50 @@
+# [nopy] (portuale backlog #326): everything [noportage] does, plus every
+# Python interpreter binary and launcher removed -- for ebuilds that do
+# not need Python at all.
+#
+# NOTE: the first RUN is byte-identical to
+# differential-test-bed/images/noportage/Containerfile's removal RUN; keep
+# the two in sync (both derive the set from the vdb CONTENTS, so they
+# track the pinned Portage together).
+#
+# On top of noportage, what goes:
+#   - /usr/bin/python*          (python, python3, python3.14 and -config)
+#   - /usr/lib/python-exec/*/python*
+#     (python, python3, python-config, python3-config launch shims)
+#   - /usr/bin/python-exec2*    (the python-exec2 launcher link)
+#
+# What stays: the Python library trees on disk (other packages' files) --
+# only the interpreters go.
+
+ARG PORTTEST_IMAGE=localhost/test-portuale:latest
+FROM ${PORTTEST_IMAGE}
+
+RUN set -eu; \
+    C=$(echo /var/db/pkg/sys-apps/portage-*/CONTENTS); \
+    [ -f "$C" ] || { echo "no sys-apps/portage CONTENTS under /var/db/pkg (got: $C)" >&2; exit 1; }; \
+    echo "deriving the removal set from $C"; \
+    owned=$(grep -E '^(obj|sym) ' "$C" | awk '{print $2}'); \
+    runtime=$(printf '%s\n' "$owned" | grep -E '^/(usr/lib/portage|usr/lib/python-exec|usr/lib/python3\.14/site-packages/(portage|_emerge)|usr/lib/debug|usr/bin/|usr/sbin/)' || true); \
+    [ -n "$runtime" ] || { echo "empty removal set -- refusing" >&2; exit 1; }; \
+    echo "removing $(printf '%s\n' "$runtime" | wc -l) portage-owned runtime files:"; \
+    printf '%s\n' "$runtime" | awk -F/ '{print $NF}' | LC_ALL=C sort -u | tr '\n' ' '; echo; \
+    printf '%s\n' "$runtime" | while IFS= read -r f; do rm -f "/$f"; done; \
+    rm -rf /usr/lib/portage \
+           /usr/lib/python3.14/site-packages/portage \
+           /usr/lib/python3.14/site-packages/_emerge; \
+    echo "gone: /usr/lib/portage, site-packages/portage, site-packages/_emerge"; \
+    echo "removing the interpreters (library trees stay):"; \
+    rm -fv /usr/bin/python* /usr/lib/python-exec/*/python* /usr/bin/python-exec2*
+
+# Sanity, run under bash (compgen is a bash builtin): no `portage`
+# package, no /usr/lib/portage, and no command starting with `python`
+# left on PATH -- or the image build fails here.
+RUN if python3 -c 'import portage' 2>/dev/null; then \
+        echo "[nopy] sanity: 'import portage' still works" >&2; exit 1; \
+    fi; \
+    test ! -e /usr/lib/portage || \
+        { echo "[nopy] sanity: /usr/lib/portage still present" >&2; exit 1; }; \
+    /bin/bash -c 'test -z "$(compgen -c python)"' || \
+        { echo "[nopy] sanity: python commands remain:" >&2; \
+          /bin/bash -c 'compgen -c python' | LC_ALL=C sort -u >&2; exit 1; }; \
+    echo "[nopy] sanity ok: no import portage, no /usr/lib/portage, no python commands"

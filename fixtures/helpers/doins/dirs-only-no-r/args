@@ -1,0 +1,7 @@
+--preserve_symlinks
+--helpers_can_die
+--helper=doins
+--dest=<SCRATCH>/stage-dirs-only-no-r/ed/usr/lib/probe
+--
+tree/sub
+tree/emptydir

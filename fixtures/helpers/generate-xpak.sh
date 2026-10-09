@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+# Regenerate the xpak-recompose oracle under fixtures/helpers/xpak/ by
+# RUNNING the real `bin/xpak-helper.py recompose <binpkg> <metadata_dir>`
+# (plan #326 S5, D4: expected bytes come from the real helper, never
+# from reasoning about it).
+#
+# Per case, fixtures/helpers/xpak/<case>/:
+#   in.tbz2      the binpkg handed to the helper (copied, then recomposed)
+#   bi/          the metadata (build-info) dir, checked in as plain files
+#   argv         the helper argv after `recompose`, one per line, with the
+#                tokens @TBZ2@ / @BI@ standing for the two paths (error
+#                cases use other shapes)
+#   out.tbz2     the file after the helper ran (byte-identical contract;
+#                xpak is deterministic, D3)
+#   rc.txt, stderr.txt  (stderr with the scratch dir replaced by @TMP@)
+#   README       what the case isolates + provenance
+# The `hardlinked` case also has other-link.tbz2: the bytes of the second
+# hard link after the run, and nlink.txt (link counts after the run).
+#
+# Inputs that are generated here are regenerated; the real build-info of
+# `fresh` is extracted from the L1 pkgcache gpkg when it exists, else the
+# checked-in bi/ is kept.
+#
+# Usage: fixtures/helpers/generate-xpak.sh
+#        PORTAGE_CHECKOUT=/path fixtures/helpers/generate-xpak.sh
+set -euo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null && pwd -P)"
+XPAK_DIR="$HERE/xpak"
+PMTEST_ROOT="$(cd "$HERE/../.." && pwd -P)"
+PORTAGE_CHECKOUT="${PORTAGE_CHECKOUT:-$PMTEST_ROOT/../portuale/3rdparty/portage}"
+PORTAGE_CHECKOUT="$(cd "$PORTAGE_CHECKOUT" >/dev/null && pwd -P)"
+PKGCACHE_GPKG="$PMTEST_ROOT/differential-test-bed/logs/_l1-pkgcache/sys-apps/pv/pv-1.10.4-1.gpkg.tar"
+
+mkdir -p /var/tmp/pmtest
+SCRATCH="$(mktemp -d /var/tmp/pmtest/xpak-gen.XXXXXX)"
+trap 'rm -rf "$SCRATCH"' EXIT
+
+export XPAK_DIR PORTAGE_CHECKOUT PKGCACHE_GPKG SCRATCH
+/usr/bin/python3 - <<'PYEOF'
+import bz2, datetime, os, shutil, subprocess, sys, tarfile
+
+XPAK_DIR = os.environ["XPAK_DIR"]
+CHECKOUT = os.environ["PORTAGE_CHECKOUT"]
+GPKG = os.environ["PKGCACHE_GPKG"]
+SCRATCH = os.environ["SCRATCH"]
+HELPER = os.path.join(CHECKOUT, "bin", "xpak-helper.py")
+PY = "/usr/bin/python"
+
+
+def git(*a):
+    try:
+        return subprocess.run(["git", "-C", CHECKOUT, *a], capture_output=True, text=True).stdout.strip()
+    except OSError:
+        return "?"
+
+
+PROV = (
+    f"Portage: {git('describe', '--tags', '--always')} ({git('rev-parse', 'HEAD')})\n"
+    f"Python: {subprocess.run([PY, '--version'], capture_output=True, text=True).stdout.strip()}\n"
+    f"date: {datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%d')}\n"
+)
+
+
+def write_bi(path, files):
+    """files: {relpath: bytes}; a value of None makes a directory."""
+    shutil.rmtree(path, ignore_errors=True)
+    os.makedirs(path)
+    for rel, data in files.items():
+        p = os.path.join(path, rel)
+        if data is None:
+            os.makedirs(p, exist_ok=True)
+            continue
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "wb") as f:
+            f.write(data)
+        os.chmod(p, 0o644)
+
+
+def payload(data):
+    return bz2.compress(data, 9)
+
+
+def run_real(argv):
+    env = dict(os.environ, PYTHONPATH=os.path.join(CHECKOUT, "lib"))
+    p = subprocess.run([PY, HELPER, "recompose", *argv], capture_output=True, env=env)
+    return p.returncode, p.stderr.replace(SCRATCH.encode(), b"@TMP@")
+
+
+def case(name, what, in_bytes, bi_files=None, argv=("@TBZ2@", "@BI@"), keep_bi=False):
+    d = os.path.join(XPAK_DIR, name)
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "in.tbz2"), "wb") as f:
+        f.write(in_bytes)
+    bi = os.path.join(d, "bi")
+    if bi_files is not None and not keep_bi:
+        write_bi(bi, bi_files)
+    work = os.path.join(SCRATCH, name)
+    os.makedirs(work)
+    tbz2 = os.path.join(work, "pkg.tbz2")
+    with open(tbz2, "wb") as f:
+        f.write(in_bytes)
+    sbi = os.path.join(work, "bi")
+    if os.path.isdir(bi):
+        shutil.copytree(bi, sbi)
+    real_argv = [a.replace("@TBZ2@", tbz2).replace("@BI@", sbi) for a in argv]
+    extra = {}
+    if name == "hardlinked":
+        other = os.path.join(work, "other.tbz2")
+        os.link(tbz2, other)
+        rc, err = run_real(real_argv)
+        with open(other, "rb") as f:
+            extra["other-link.tbz2"] = f.read()
+        extra["nlink.txt"] = (
+            f"pkg.tbz2 {os.stat(tbz2).st_nlink}\nother.tbz2 {os.stat(other).st_nlink}\n"
+        ).encode()
+    else:
+        rc, err = run_real(real_argv)
+    with open(tbz2, "rb") as f:
+        out = f.read()
+    files = {"out.tbz2": out, "rc.txt": f"{rc}\n".encode(), "stderr.txt": err,
+             "argv": "".join(a + "\n" for a in argv).encode(), **extra}
+    for fn, data in files.items():
+        with open(os.path.join(d, fn), "wb") as f:
+            f.write(data)
+    with open(os.path.join(d, "README"), "w") as f:
+        f.write(f"# xpak/{name}\n\n{what}\n\nGenerated by fixtures/helpers/generate-xpak.sh "
+                f"running the real {HELPER.replace(CHECKOUT, '<checkout>')}.\n{PROV}")
+    print(f"{name}: rc={rc} in={len(in_bytes)} out={len(out)}")
+    return out
+
+
+os.makedirs(XPAK_DIR, exist_ok=True)
+
+# fresh: real build-info (metadata dir of a gpkg built by real Portage).
+fresh_bi = os.path.join(XPAK_DIR, "fresh", "bi")
+if os.path.isfile(GPKG):
+    with tarfile.open(GPKG) as outer:
+        meta_m = next(m for m in outer.getmembers() if m.name.endswith("/metadata.tar.zst")
+                      or "/metadata.tar" in m.name)
+        raw = outer.extractfile(meta_m).read()
+    mt = os.path.join(SCRATCH, "meta.tar")
+    zst = os.path.join(SCRATCH, "meta.tar.zst")
+    with open(zst, "wb") as f:
+        f.write(raw)
+    subprocess.run(["zstd", "-q", "-d", "-f", zst, "-o", mt], check=True)
+    files = {}
+    with tarfile.open(mt) as t:
+        for m in t.getmembers():
+            if m.isfile():
+                files[m.name.split("/", 1)[1]] = t.extractfile(m).read()
+    files["CONTENTS"] = b"obj /usr/bin/pv 0123456789abcdef0123456789abcdef 1700000000\n"
+    write_bi(fresh_bi, files)
+fresh_payload = payload(b"pv image payload stand-in\n" * 40)
+fresh_out = case(
+    "fresh",
+    "A bzip2 payload with no XPAK yet + the real build-info of sys-apps/pv-1.10.4 "
+    "(the metadata dir of the L1 pkgcache gpkg pv-1.10.4-1, built by real Portage, "
+    "including environment.bz2), plus a CONTENTS file that xpak() must skip.",
+    fresh_payload, bi_files={}, keep_bi=True)
+
+case("raw-bytes",
+     "Values as raw bytes: no trailing newline, a non-UTF-8 value, an empty file, "
+     "and names that sort differently by byte and by case (xpak() sorts).",
+     payload(b"x" * 100),
+     {"PF": b"raw-1", "CATEGORY": b"test\n", "DESCRIPTION": b"caf\xe9 \xff\xfe\n",
+      "EMPTY": b"", "a_lower": b"1\n", "B_UPPER": b"2\n", "_under": b"3\n"})
+
+case("re-recompose",
+     "The `fresh` output recomposed again with a smaller build-info: the old XPAK "
+     "segment must be truncated (scan() + seek(-xpaksize)), not appended to.",
+     fresh_out, {"PF": b"rerun-2\n", "CATEGORY": b"test\n"})
+
+case("hardlinked",
+     "The binpkg has a second hard link (st_nlink 2): real recompose_mem breaks it "
+     "by copy + rename (xpak.py break_hardlinks), so other-link.tbz2 must still hold "
+     "the input bytes and both link counts end at 1 (nlink.txt).",
+     payload(b"linked\n"), {"PF": b"hl-1\n", "CATEGORY": b"test\n"})
+
+case("small-payload", "A 1-byte payload: pins the trailer arithmetic.",
+     payload(b"x"), {"PF": b"s-1\n"})
+
+case("nested",
+     "A build-info dir with a subdirectory: real xpak() opens it as a file and dies "
+     "with IsADirectoryError (rc 1, traceback); the binpkg is left unchanged.",
+     payload(b"n\n"), {"PF": b"n-1\n", "sub": None, "sub/X": b"x\n"})
+
+case("error-argc", "One argument instead of two: usage + count on stderr, rc 1.",
+     payload(b"e\n"), {"PF": b"e-1\n"}, argv=("@TBZ2@",))
+
+case("error-not-file", "Argument 1 is not a regular file: rc 1.",
+     payload(b"e\n"), {"PF": b"e-1\n"}, argv=("@BI@", "@BI@"))
+
+case("error-not-dir", "Argument 2 is not a directory: rc 1.",
+     payload(b"e\n"), {"PF": b"e-1\n"}, argv=("@TBZ2@", "@TBZ2@"))
+PYEOF

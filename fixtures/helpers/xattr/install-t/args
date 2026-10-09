@@ -1,0 +1,5 @@
+-m0600
+-t
+<SCRATCH>/stage-install-t/dest
+<SCRATCH>/stage-install-t/src/top/a.txt
+<SCRATCH>/stage-install-t/src/top/b.txt

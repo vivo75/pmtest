@@ -1,0 +1,26 @@
+filter-env oracle case: edge-pattern-metachars
+
+Isolates that the pattern is live Python regex, using only
+metacharacters a real caller puts there (`.` and `*` from entries
+like `BASH_FUNC_.*` and `___.*`): `BASH_FUNC_foo` and `___save_x`
+match and are dropped, `BASH_FUNCX` (missing the literal `_`) is
+kept, and the script-appended `\d.*` alternative drops `9LIVES`.
+If the native port regressed to literal or shell-glob matching, the
+kept/dropped sets would flip.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=18 in=139 out=54
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

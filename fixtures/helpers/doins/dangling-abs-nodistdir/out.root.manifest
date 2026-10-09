@@ -1,0 +1,5 @@
+d 0755 0 0 - - usr
+d 0755 0 0 - - usr/lib
+d 0755 0 0 - - usr/lib/probe
+d 0755 0 0 - - usr/lib/probe/payload
+f 0755 0 0 15 sha256:bdbd490685b3712108908f27ce49e6ed28628b0f04700cde33073e89b4622b87 usr/lib/probe/payload/plain.txt

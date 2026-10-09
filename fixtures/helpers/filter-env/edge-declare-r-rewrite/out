@@ -1,0 +1,4 @@
+declare MY_KEEP="v"
+declare -x MY_X="w"
+declare -i MY_I="42"
+declare -x AFTER="c"

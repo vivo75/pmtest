@@ -1,0 +1,2 @@
+usage: recompose <binpkg_path> <metadata_dir>
+Argument 1 is not a regular file: '@TMP@/error-not-file/bi'

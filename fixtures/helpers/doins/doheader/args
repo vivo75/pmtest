@@ -1,0 +1,7 @@
+--preserve_symlinks
+--helpers_can_die
+--insoptions=-m0644
+--helper=doins
+--dest=<SCRATCH>/stage-doheader/ed/usr/include/
+--
+tree/file.txt

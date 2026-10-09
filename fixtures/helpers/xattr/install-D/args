@@ -1,0 +1,4 @@
+-D
+-m0644
+<SCRATCH>/stage-install-D/src/top/a.txt
+<SCRATCH>/stage-install-D/dest/sub/c.txt

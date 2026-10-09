@@ -1,0 +1,26 @@
+filter-env oracle case: edge-declare-ar
+
+Isolates `declare -<flags>` assignments: the kept array loses only
+its `r` flag (`declare -ar` -> `declare -a`, the
+filter_declare_readonly_opt rewrite on the assignment path) while
+the pattern-matching array (BASH_REMATCH, a real bash_vars entry of
+the captured pattern) is dropped whole.
+If the native port regressed to keeping `-r` or to missing flagged
+assignments, out would show `declare -ar` or the dropped array.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=2378 in=93 out=57
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

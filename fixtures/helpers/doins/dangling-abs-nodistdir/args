@@ -1,0 +1,7 @@
+--recursive
+--preserve_symlinks
+--helpers_can_die
+--helper=doins
+--dest=<SCRATCH>/stage-dangling-abs-nodistdir/ed/usr/lib/probe
+--
+payload

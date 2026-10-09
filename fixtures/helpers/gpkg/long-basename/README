@@ -1,0 +1,42 @@
+gpkg compress oracle case: long-basename
+
+Isolates the container GNU switch at len(basename) >= 154 (gpkg.py:1007-1008):
+a 154-character basename makes the container (not the inner tars) GNU even
+though a 154-byte prefix would still fit USTAR's 155-byte prefix field.  If
+the native writer used USTAR here, the `container.member ... fmt=GNU pre=L`
+lines become fmt=USTAR pre=-.  Real behaviour worth knowing: only the members
+written by container.addfile (gpkg-1, Manifest) become GNU + `L` records;
+metadata.tar.<ext> and image.tar.<ext> are headed by tar_stream_writer with
+the metadata (USTAR) / image format, and a 154-byte prefix still fits the
+USTAR prefix field, so they stay USTAR without `L`.  Pair: basename-153 (one byte shorter, USTAR).
+zstd only.
+
+Run exactly as bin/ebuild-pyhelper runs gpkg-helper.py:
+  /usr/bin/python <checkout>/bin/gpkg-helper.py compress <basename> <out> <metadata_dir> <image_dir>
+with PYTHONPATH=<checkout>/lib, PORTAGE_BIN_PATH=<checkout>/bin, PORTAGE_PYM_PATH=<checkout>/lib,
+PORTAGE_PYTHON=/usr/bin/python, under `env -i`, with a hermetic empty make.conf
+(PORTAGE_CONFIGROOT=<scratch>/cfg); every setting real reads from portage.settings is
+pinned in <comp>/env.  basename: lbxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx-1.0-1 (154 chars).
+Inputs: image.manifest (this dir) materialised by ../materialise.py; metadata = ../metadata/
+(25 build-info files of a real porttest build, see ../README.md).
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004
+  python: Python 3.14.8 (/usr/bin/python)
+  compressors (cases run: zstd):
+    zstd: Zstandard CLI (64-bit) v1.5.7, by Yann Collet
+  MAKEOPTS: -j4 (zstd/xz -T4)
+  BINPKG_COMPRESS_FLAGS, BINPKG_COMPRESS_FLAGS_<NAME>: unset (make.globals default empty)
+  PORTAGE_BZIP2_COMMAND: bzip2
+  FEATURES: unset
+  global config: /usr/share/portage/config (make.globals); make.conf: empty
+  /etc/passwd (user run): vivo:x:1000:100::/home/vivo:/bin/bash
+  /etc/group  (user run): users:x:100:
+  /etc/passwd (root run): root:x:0:0:System user; root:/root:/bin/bash
+  /etc/group  (root run): root:x:0:
+  uid 4242 / gid 4243: none; none
+  staging filesystem (tmpfs; see generate-gpkg.sh header): tmpfs
+  LANG=C.utf8; locale -a: see ../locale-a.txt (the helper needs a UTF-8 locale; C.utf8 is present)
+  date: 2026-10-08 (UTC day granularity; the only field that may change between regenerations)
+  root-vs-user identical (per compressor; 1 = identical so only the user files are kept, 0 = differs so out.root.* are kept): zstd=0 

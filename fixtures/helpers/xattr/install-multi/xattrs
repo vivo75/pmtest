@@ -1,0 +1,3 @@
+top/a.txt user.drop 64726f7076616c
+top/a.txt user.keep 6b65657076616c
+top/b.txt user.keep 6b32

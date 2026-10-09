@@ -1,0 +1,8 @@
+Isolates signing: FEATURES=binpkg-signing with the pmtest test keyring
+(fixtures/helpers/gpg-keyring, key 0x8812797DDF1DD192, passphrase
+GentooTest).  Adds image/metadata `.sig` members to the container, signs the
+Manifest (clearsigned PGP block), and lists the `.sig` files in the
+Manifest.  Signature bytes and sizes are volatile (`~`/volatile=signature in
+out.fields); the structure is not.  If the native writer omitted a `.sig`
+member or left the Manifest unsigned, the member list / manifest.pgp-*
+lines differ.  zstd only; user run only.

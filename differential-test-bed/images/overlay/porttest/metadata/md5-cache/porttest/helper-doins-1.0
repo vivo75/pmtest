@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=porttest: doins -r tree, newins, insopts, dodoc, doheader, doconfd, doenvd
+EAPI=8
+HOMEPAGE=https://example.invalid/porttest
+KEYWORDS=amd64
+LICENSE=GPL-2
+SLOT=0
+_md5_=b8b0f64ea3e03bb09775f929240f1a52

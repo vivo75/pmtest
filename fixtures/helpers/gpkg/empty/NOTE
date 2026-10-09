@@ -1,0 +1,5 @@
+Isolates an image with no entries at all: the image tar holds only the
+`image/` directory header (plus end-of-archive padding to 10240), and the
+Manifest still lists the image.tar.<ext> member.  If the native writer
+skipped the image member or the root directory entry, `image.member` /
+manifest.data lines for image.tar disappear.

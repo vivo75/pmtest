@@ -1,0 +1,3 @@
+LANG=C.utf8
+PATH=/usr/bin:/bin
+PYTHONPATH=<CHECKOUT>/lib

@@ -1,0 +1,7 @@
+# longname: a 120-byte file name and a 110-byte symlink target.
+# _check_pre_image_files (gpkg.py:1988-) switches the image tar to GNU when
+# a file name or a link target is >= 100 bytes.
+d 0755 0 0 .
+d 0755 0 0 etc
+f 0644 0 0 etc/llllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllllll |long%0A
+l ---- 0 0 etc/long-link -> tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt

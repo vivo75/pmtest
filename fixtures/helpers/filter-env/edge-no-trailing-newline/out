@@ -1,0 +1,2 @@
+declare -x MY_KEEP="x"
+declare -x MY_KEEP2="y"

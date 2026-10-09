@@ -1,0 +1,10 @@
+install_dir failed.
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/doins.py", line 394, in install_dir
+    self._dir_runner.run(dest)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 315, in run
+    os.makedirs(dest)
+    ~~~~~~~~~~~^^^^^^
+  File "<frozen os>", line 236, in makedirs
+FileExistsError: [Errno 17] File exists: b'<SCRATCH>/stage-nodie-eapi3/ed/usr/lib/probe/tree/empty'

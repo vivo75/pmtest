@@ -1,0 +1,9 @@
+--recursive
+--preserve_symlinks
+--helpers_can_die
+--insoptions=-m0644
+--helper=dodoc
+--dest=<SCRATCH>/stage-dodoc-r/ed/usr/share/doc/testdoins-1.0/
+--
+tree/sub
+tree/file.txt

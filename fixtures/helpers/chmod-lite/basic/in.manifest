@@ -1,0 +1,9 @@
+d 0700 a-dir
+f 0600 a-dir/inner-0600
+d 0775 a-dir/sub
+f 0640 a-dir/sub/deep-0640
+d 0777 b-dir
+f 0600 file-0600
+f 0640 file-0640
+f 0700 file-0700
+f 0777 file-0777

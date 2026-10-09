@@ -1,0 +1,4 @@
+declare -x MY_KEEP="ab"
+declare -x MY_MULTI="start
+middle
+end"

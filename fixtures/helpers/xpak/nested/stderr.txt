@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "/home/vivo/repo/PORTUALE/portuale/3rdparty/portage/bin/xpak-helper.py", line 78, in <module>
+    rval = main(sys.argv[:])
+  File "/home/vivo/repo/PORTUALE/portuale/3rdparty/portage/bin/xpak-helper.py", line 70, in main
+    rval = command_recompose(args[1:])
+  File "/home/vivo/repo/PORTUALE/portuale/3rdparty/portage/bin/xpak-helper.py", line 45, in command_recompose
+    t.recompose(metadata_dir)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^
+  File "/home/vivo/repo/PORTUALE/portuale/3rdparty/portage/lib/portage/xpak.py", line 337, in recompose
+    xpdata = xpak(datadir)
+  File "/home/vivo/repo/PORTUALE/portuale/3rdparty/portage/lib/portage/xpak.py", line 115, in xpak
+    with open(os.path.join(rootdir, x), "rb") as f:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IsADirectoryError: [Errno 21] Is a directory: '@TMP@/nested/bi/sub/'

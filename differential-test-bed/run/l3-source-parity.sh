@@ -52,6 +52,7 @@
 #                                l3-20260930T212609Z), l3-smoke 0.9 GiB
 #                                (l3-20260930T211117Z); 8g leaves ~2.5x.
 #   L3_DISTFILES                 default $LOGS_DIR/_l2-distfiles
+#   GENTOO_MIRRORS               forwarded to both containers when set (lib.sh)
 #   L3_TIMEOUT=28800             per-container wall-clock cap
 #   L3_SKIP_PORTAGE_UPGRADE=0
 #
@@ -152,6 +153,7 @@ run_pm() {  # <label> <portage|portuale> [cpuset] [distfiles-dir]
     -v "$sidedist:/distfiles" \
     ${tmpfs_args[@]+"${tmpfs_args[@]}"} \
     -e DISTDIR=/distfiles \
+    ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "SNAPSHOT_PRUNE=$PM_REPO" \
     -e "L3_SKIP_PORTAGE_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L3_TMPFS=${L3_TMPFS:-1}" \

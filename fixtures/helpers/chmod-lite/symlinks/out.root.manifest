@@ -1,0 +1,9 @@
+d 0755 dir-a
+f 0644 dir-a/inner-0600
+l ---- dir-a/nested-dangling -> nowhere
+l ---- dir-a/nested-link -> inner-0600
+f 0644 file-top
+l ---- link-dangling -> no-such-target
+l ---- link-to-dir -> dir-a
+l ---- link-to-file -> dir-a/inner-0600
+l ---- link-top -> file-top

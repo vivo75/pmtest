@@ -1,0 +1,3 @@
+# file: <SCRATCH>/stage-dump-two/in/top/two.txt
+user.two="beta"
+user.one="alpha"

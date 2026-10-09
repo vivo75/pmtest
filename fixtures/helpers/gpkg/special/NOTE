@@ -1,0 +1,12 @@
+Isolates how TarFile.add() renders the awkward image entries: symlinks to a
+file and to a directory (type 2, mode 0777), a hardlink pair (the entry
+that sorted-listdir order meets second becomes type 1 with linkname
+`image/...`, size 0), setuid/setgid/sticky modes (4755/2755/1777 kept in
+`mode`), a non-ASCII (UTF-8) name, owners root, vivo:users and 4242:4243
+(no passwd/group entry: uname/gname are empty), and a path > 100 bytes made
+of short components (still USTAR, via the name/prefix split; image format
+stays USTAR because no single name or link is >= 100 bytes).
+If the native writer regressed (hardlink emitted as a second regular file,
+mode stripped of special bits, uname filled for an unknown uid, GNU instead
+of USTAR for the long-prefix path), the matching `image.member` line differs.
+Owners only take effect in the root run (out.root.*).

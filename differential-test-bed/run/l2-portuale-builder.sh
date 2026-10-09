@@ -12,6 +12,9 @@
 # Env: PORTTEST_IMAGE, PORTTEST_PODMAN,
 #      L2_MODE=strict|payload-tolerant  (default strict; the real set
 #          wants payload-tolerant -- compiled bytes legitimately differ)
+#      L2_BINPKG_FORMAT=gpkg|xpak  (default gpkg; xpak builds with
+#          BINPKG_FORMAT=xpak into separate `_l2-pkgcache-*-xpak` dirs and
+#          grades them with compare/xpak_diff.py; #326 S5)
 #      L2_REBUILD=1 (wipe the two pkgcaches), L2_SKIP_BUILD=1 (reuse),
 #      L2_JOBS, L2_SKIP_PORTAGE_UPGRADE, L2_KEEP_UNKNOWN=1 (report-only)
 #      L2_STALECACHE=1 (stale the porttest/docs entry: wrong _md5_ +
@@ -38,8 +41,14 @@ esac
 MODE=${L2_MODE:-strict}
 case $MODE in strict|payload-tolerant) ;; *) echo "L2_MODE must be strict|payload-tolerant" >&2; exit 2 ;; esac
 
-PKG_PORTAGE="$LOGS_DIR/_l2-pkgcache-portage"
-PKG_PORTUALE="$LOGS_DIR/_l2-pkgcache-portuale"
+FORMAT=${L2_BINPKG_FORMAT:-gpkg}
+case $FORMAT in
+  gpkg) SFX=""; BINPAT='*.gpkg.tar'; BINEXT='.gpkg.tar' ;;
+  xpak) SFX="-xpak"; BINPAT='*.xpak'; BINEXT='.xpak' ;;
+  *) echo "L2_BINPKG_FORMAT must be gpkg|xpak" >&2; exit 2 ;;
+esac
+PKG_PORTAGE="$LOGS_DIR/_l2-pkgcache-portage$SFX"
+PKG_PORTUALE="$LOGS_DIR/_l2-pkgcache-portuale$SFX"
 DISTFILES="$LOGS_DIR/_l2-distfiles"
 RUN="l2-$(timestamp)"
 OUT="$LOGS_DIR/$RUN"
@@ -77,7 +86,7 @@ classify_file() {  # <label> <findings-file>
   [ -s "$f" ] || return 0
   while IFS= read -r line; do
     case $line in
-      "[UNEXPLAINED]"*|"gpkg-diff:"*|"gpkg-structure"*) continue ;;
+      "[UNEXPLAINED]"*|"gpkg-diff:"*|"gpkg-structure"*|"xpak-diff:"*|"xpak-structure"*) continue ;;
       "[outer-name]"*|"[payload]"*) continue ;;   # informational (soft)
     esac
     case $line in
@@ -107,10 +116,12 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     -v "$TEST_DIR:/TEST:ro" -v "$PKG_PORTAGE:/pkgs" -v "$DISTFILES:/distfiles" \
     "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs -e DISTDIR=/distfiles \
+    ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "L2_JOBS=${L2_JOBS:-1}" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \
     -e "L2_BUILD_MODE=${L2_BUILD_MODE:-bpkgonly}" \
+    -e "L2_BINPKG_FORMAT=$FORMAT" \
     -e "L2_CACHELESS=${L2_CACHELESS:-0}" \
     -e "L2_STALECACHE=${L2_STALECACHE:-0}" \
     --entrypoint /bin/bash "$IMAGE" \
@@ -121,38 +132,47 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     -v "$PKG_PORTAGE:/ref-pkgs:ro" -v "$PKG_PORTUALE:/pkgs" -v "$DISTFILES:/distfiles" \
     "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs -e DISTDIR=/distfiles \
+    ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "L2_JOBS=${L2_JOBS:-1}" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \
     -e "L2_BUILD_MODE=${L2_BUILD_MODE:-bpkgonly}" \
+    -e "L2_BINPKG_FORMAT=$FORMAT" \
     -e "L2_CACHELESS=${L2_CACHELESS:-0}" \
     -e "L2_STALECACHE=${L2_STALECACHE:-0}" \
     --entrypoint /bin/bash "$IMAGE" \
     /TEST/layers/l2/build-portuale.sh "$REL_ATOMLIST" 2>&1 | tee "$OUT/build-portuale.log"
 else
-  echo ">>> L2_SKIP_BUILD: reusing $(find "$PKG_PORTAGE" -name '*.gpkg.tar' | wc -l) portage + $(find "$PKG_PORTUALE" -name '*.gpkg.tar' | wc -l) portuale archives"
+  echo ">>> L2_SKIP_BUILD: reusing $(find "$PKG_PORTAGE" -name "$BINPAT" | wc -l) portage + $(find "$PKG_PORTUALE" -name "$BINPAT" | wc -l) portuale archives"
 fi
 
 # --- structural validation ----------------------------------------------
-echo ">>> gpkg-structure over both pkgdirs"
+echo ">>> $FORMAT structure over both pkgdirs"
+if [ "$FORMAT" = xpak ]; then
+  STRUCTURE=(python3 "$TEST_DIR/compare/xpak_diff.py" --structure)
+  DIFFER=(python3 "$TEST_DIR/compare/xpak_diff.py")
+else
+  STRUCTURE=("$TEST_DIR/compare/gpkg-structure.sh")
+  DIFFER=("$TEST_DIR/compare/gpkg-diff.sh")
+fi
 set +e
-"$TEST_DIR/compare/gpkg-structure.sh" --dir "$PKG_PORTAGE" --packages > "$OUT/structure-portage.txt" 2>&1
+"${STRUCTURE[@]}" --dir "$PKG_PORTAGE" --packages > "$OUT/structure-portage.txt" 2>&1
 rc_p=$?
-"$TEST_DIR/compare/gpkg-structure.sh" --dir "$PKG_PORTUALE" --packages > "$OUT/structure-portuale.txt" 2>&1
+"${STRUCTURE[@]}" --dir "$PKG_PORTUALE" --packages > "$OUT/structure-portuale.txt" 2>&1
 rc_u=$?
 set -e
 classify_file "structure-portage" "$OUT/structure-portage.txt"
 classify_file "structure-portuale" "$OUT/structure-portuale.txt"
 
 # --- archive-vs-archive pairs -------------------------------------------
-echo ">>> gpkg-diff portage-built vs portuale-built per atom"
+echo ">>> $FORMAT diff portage-built vs portuale-built per atom"
 : > "$OUT/archive-diffs.txt"
 while IFS= read -r line || [ -n "$line" ]; do
   atom=${line%%#*}; atom=$(printf '%s' "$atom" | tr -d '[:space:]')
   [ -n "$atom" ] || continue
   cat=${atom%%/*}; pn=${atom#*/}
-  a=$(find "$PKG_PORTAGE/$cat" -name "$pn-*.gpkg.tar" 2>/dev/null | LC_ALL=C sort | head -1 || true)
-  b=$(find "$PKG_PORTUALE/$cat" -name "$pn-*.gpkg.tar" 2>/dev/null | LC_ALL=C sort | head -1 || true)
+  a=$(find "$PKG_PORTAGE/$cat" -name "$pn-*$BINEXT" 2>/dev/null | LC_ALL=C sort | head -1 || true)
+  b=$(find "$PKG_PORTUALE/$cat" -name "$pn-*$BINEXT" 2>/dev/null | LC_ALL=C sort | head -1 || true)
   pair_out="$OUT/archive-$cat-$pn.txt"
   {
     echo "### $atom"
@@ -161,7 +181,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   } > "$pair_out"
   if [ -n "$a" ] && [ -n "$b" ]; then
     set +e
-    "$TEST_DIR/compare/gpkg-diff.sh" --mode "$MODE" "$a" "$b" >> "$pair_out" 2>&1
+    "${DIFFER[@]}" --mode "$MODE" "$a" "$b" >> "$pair_out" 2>&1
     set -e
     cat "$pair_out" >> "$OUT/archive-diffs.txt"
     classify_file "archive-diff:$atom" "$pair_out"
@@ -211,17 +231,18 @@ set -e
   echo "# L2 report -- portuale as builder"
   echo
   echo "atoms   : $REL_ATOMLIST"
+  echo "format  : $FORMAT"
   echo "mode    : $MODE"
   echo "dates   : $(date -u +%FT%TZ)"
-  echo "portage : $PKG_PORTAGE ($(find "$PKG_PORTAGE" -name '*.gpkg.tar' | wc -l) archives)"
-  echo "portuale: $PKG_PORTUALE ($(find "$PKG_PORTUALE" -name '*.gpkg.tar' | wc -l) archives)"
+  echo "portage : $PKG_PORTAGE ($(find "$PKG_PORTAGE" -name "$BINPAT" | wc -l) archives)"
+  echo "portuale: $PKG_PORTUALE ($(find "$PKG_PORTUALE" -name "$BINPAT" | wc -l) archives)"
   echo
   echo "## structure"
   echo "  portage findings : $(grep -cE '^\[' "$OUT/structure-portage.txt" || true)"
   echo "  portuale findings: $(grep -cE '^\[' "$OUT/structure-portuale.txt" || true)"
   echo
   echo "## archive diffs (portage-built vs portuale-built)"
-  grep -E '^gpkg-diff:' "$OUT/archive-diffs.txt" || true
+  grep -E "^$FORMAT-diff:" "$OUT/archive-diffs.txt" || true
   echo
   echo "## cross-install (real Portage merges portuale-built)"
   sed -n '/^## summary/,/^$/p' "$OUT/cross-install.txt"

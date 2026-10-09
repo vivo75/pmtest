@@ -1,0 +1,8 @@
+--recursive
+--preserve_symlinks
+--helpers_can_die
+--diroptions=-m0700
+--helper=doins
+--dest=<SCRATCH>/stage-diropts-mode/ed/usr/lib/probe
+--
+tree

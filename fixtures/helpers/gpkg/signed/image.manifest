@@ -1,0 +1,6 @@
+# (copy of plain/image.manifest) a directory and two regular files (one executable). Owners 0:0.
+d 0755 0 0 .
+d 0755 0 0 opt
+d 0755 0 0 opt/gpkgplain
+f 0644 0 0 opt/gpkgplain/hello.txt |hello%20world%0A
+f 0755 0 0 opt/gpkgplain/run.sh |%23%21/bin/sh%0Aexit%200%0A

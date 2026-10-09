@@ -1,0 +1,8 @@
+DEFINED_PHASES=install unpack
+DESCRIPTION=porttest: unpack odd-mode tarball, record WORKDIR modes after chmod-lite
+EAPI=8
+HOMEPAGE=https://example.invalid/porttest
+KEYWORDS=amd64
+LICENSE=GPL-2
+SLOT=0
+_md5_=1edebc62607da0e4b5a07732453f7bfa

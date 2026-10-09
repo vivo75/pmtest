@@ -1,0 +1,26 @@
+filter-env oracle case: edge-declare-noassign
+
+Isolates `declare` without assignment (var_declare_re, including the
+`declare -- x` form real `declare -p` output contains): kept names
+pass through byte-identical, `declare -r x` still loses its `r`
+(`declare -r MY_RW` -> `declare MY_RW`), and pattern-matching names
+(D, with and without `--`) are dropped.
+If the native port regressed to requiring `=` on declare lines,
+these lines would vanish or pass through unfiltered.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: hand-written (see the case name); args is the captured
+    install-phase pattern (2378 bytes) except edge-pattern-metachars
+    (its own minimal real-caller-vocabulary pattern) and
+    error-bad-pattern (the single byte `(`).
+  sizes: args=2378 in=76 out=50
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

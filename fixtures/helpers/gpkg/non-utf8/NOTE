@@ -1,0 +1,8 @@
+Isolates real's refusal of non-UTF-8 file names in the image:
+_check_pre_image_files raises UnicodeEncodeError (gpkg.py, the
+`f.encode("utf-8", "strict")` check) BEFORE any container is created, so
+there is no out.gpkg.tar and rc is non-zero with the traceback in
+stderr.txt.  If the native writer silently accepted the name, it would exit
+0 and produce an archive where real produces none.  Staged on tmpfs because
+this host's zfs rejects such names.  zstd only; user run only (same result as
+root).

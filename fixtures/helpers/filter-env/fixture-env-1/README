@@ -1,0 +1,24 @@
+filter-env oracle case: fixture-env-1
+
+Isolates the filter on the smallest real vdb environment in the
+fixtures (fixtures/var/db/pkg/dev-libs/infoenvpkg-1.0, a bare
+`declare -x CHOST` dump): the captured install-phase pattern
+(2378 bytes) must leave the single declaration untouched.
+If the native port regressed to dropping plain `declare -x` lines,
+out would be empty instead of echoing the input.
+
+Run exactly as the phase runtime runs it:
+  /usr/bin/python <checkout>/bin/filter-bash-environment.py "$(cat args)" < in > out 2> stderr.txt
+Byte-exact: the args file bytes are argv[1] (no trailing newline
+added, none present); the in file bytes are stdin verbatim.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  input: decompressed fixtures/var/db/pkg/dev-libs/infoenvpkg-1.0/environment.bz2
+    with the captured install-phase pattern (2378 bytes,
+    byte-identical to captured-phases-install/args) as args.
+  sizes: args=2378 in=39 out=39
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)

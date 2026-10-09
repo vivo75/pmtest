@@ -1,0 +1,6 @@
+BINPKG_COMPRESS=gzip
+MAKEOPTS=-j4
+PORTAGE_BZIP2_COMMAND=bzip2
+LANG=C.utf8
+# BINPKG_COMPRESS_FLAGS and BINPKG_COMPRESS_FLAGS_GZIP: unset (make.globals default: empty)
+# FEATURES: unset (no binpkg-signing)

@@ -1,0 +1,1 @@
+dodoc -r tree/sub tree/file.txt

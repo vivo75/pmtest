@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=porttest: trivial image for gpkg/xpak package-format isolation
+EAPI=8
+HOMEPAGE=https://example.invalid/porttest
+KEYWORDS=amd64
+LICENSE=GPL-2
+SLOT=0
+_md5_=4a0739927e2faf3f855f25ef9107dc81

@@ -1,0 +1,16 @@
+# #326 S2 [L3] cell — the P0 helper probes plus eix.
+#
+# Intended atoms were porttest/helper-unpack, porttest/helper-doins,
+# porttest/helper-docompress, porttest/helper-package and app-portage/eix.
+# The porttest probes are DROPPED here: run/l3-source-parity.sh mounts no
+# overlay and layers/l3/build-and-merge.sh stages none (unlike layers/l1/
+# consume.sh and the nopy guest driver), so an L3 container only sees the
+# porttest repo baked into localhost/test-portuale:latest at image build
+# time (2026-09-30) — which predates the P0 helper ebuilds (pmtest
+# b518207, 2026-10-08). Only app-portage/eix remains.
+#
+#   differential-test-bed/run/l3-source-parity.sh differential-test-bed/atomlists/l3-326-helpers.txt
+#
+# l3-build-args: --oneshot --usepkg=n --color=n
+
+app-portage/eix

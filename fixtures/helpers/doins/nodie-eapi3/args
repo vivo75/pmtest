@@ -1,0 +1,5 @@
+--recursive
+--helper=doins
+--dest=<SCRATCH>/stage-nodie-eapi3/ed/usr/lib/probe
+--
+tree

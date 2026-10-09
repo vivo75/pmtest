@@ -1,0 +1,2167 @@
+declare -x ABI="amd64"
+declare -x ABI_MIPS=""
+declare -x ABI_S390=""
+declare -x ABI_X86="64"
+declare -x ADA_TARGET=""
+declare -x ALSA_CARDS=""
+declare -x AMDGPU_TARGETS=""
+declare -x APACHE2_MODULES=""
+declare -x APACHE2_MPMS=""
+declare -x ARCH="amd64"
+declare BDEPEND=""
+declare -x BINPKG_FORMAT="gpkg"
+declare -x BINPKG_GPG_SIGNING_BASE_COMMAND="/usr/bin/flock /run/lock/portage-binpkg-gpg.lock /usr/bin/gpg --sign --armor [PORTAGE_CONFIG]"
+declare -x BINPKG_GPG_SIGNING_DIGEST="SHA512"
+declare -x BINPKG_GPG_VERIFY_BASE_COMMAND="/usr/bin/gpg --verify --batch --no-tty --no-auto-check-trustdb --status-fd 2 [PORTAGE_CONFIG] [SIGNATURE]"
+declare -x BINPKG_GPG_VERIFY_GPG_HOME="/etc/portage/gnupg"
+declare -x BOOTSTRAP_USE="unicode pkg-config split-usr xml python_targets_python3_14 python_single_target_python3_14 multilib zstd cet systemd sysv-utils udev"
+declare -x CALLIGRA_FEATURES=""
+declare -x CAMERAS=""
+declare -x CBUILD="x86_64-pc-linux-gnu"
+declare -x CFLAGS="-O2 -pipe"
+declare -x CFLAGS_amd64="-m64"
+declare -x CFLAGS_default
+declare -x CFLAGS_x32="-mx32"
+declare -x CFLAGS_x86="-m32 -mfpmath=sse"
+declare -x CHOST="x86_64-pc-linux-gnu"
+declare -x CHOST_amd64="x86_64-pc-linux-gnu"
+declare -x CHOST_default="x86_64-pc-linux-gnu"
+declare -x CHOST_x32="x86_64-pc-linux-gnux32"
+declare -x CHOST_x86="i686-pc-linux-gnu"
+declare -x COLLECTD_PLUGINS=""
+declare -x COMMON_FLAGS="-O2 -pipe"
+declare -x CONF_PREFIX="/usr"
+declare -x CPU_FLAGS_ARM=""
+declare -x CPU_FLAGS_PPC=""
+declare -x CPU_FLAGS_X86=""
+declare -x CTARGET_default="x86_64-pc-linux-gnu"
+declare -x CURL_QUIC=""
+declare -x CURL_SSL=""
+declare -x CXXFLAGS="-O2 -pipe"
+declare -x DEFAULT_ABI="amd64"
+declare -x DEFINED_PHASES=" compile configure install prepare test"
+declare DEPEND=""
+declare DESCRIPTION="Regular expression library for different character encodings"
+declare -x DIROPTIONS="-m0755"
+declare -a DOCS=([0]="AUTHORS" [1]="HISTORY" [2]="README" [3]="README_japanese" [4]="doc/API" [5]="doc/API.ja" [6]="doc/CALLOUTS.API" [7]="doc/CALLOUTS.API.ja" [8]="doc/CALLOUTS.BUILTIN" [9]="doc/CALLOUTS.BUILTIN.ja" [10]="doc/FAQ" [11]="doc/FAQ.ja" [12]="doc/RE" [13]="doc/RE.ja" [14]="doc/SYNTAX.md" [15]="doc/UNICODE_PROPERTIES")
+declare -x EAPI="8"
+declare -x ELIBC="glibc"
+declare -x ENV_UNSET="CARGO_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY GDK_PIXBUF_MODULE_FILE GOBIN GOPATH PERL5LIB PERL5OPT PERLPREFIX PERL_CORE PERL_MB_OPT PERL_MM_OPT XAUTHORITY XDG_CACHE_HOME XDG_CONFIG_DIRS XDG_CONFIG_HOME XDG_DATA_DIRS XDG_DATA_HOME XDG_RUNTIME_DIR XDG_STATE_HOME"
+declare -x EXEOPTIONS="-m0755"
+declare -x FCFLAGS="-O2 -pipe"
+declare -x FFLAGS="-O2 -pipe"
+declare -x GCC_SPECS=""
+declare -x GPG_VERIFY_GROUP_DROP="nogroup"
+declare -x GPG_VERIFY_USER_DROP="nobody"
+declare -x GPSD_PROTOCOLS=""
+declare -x GRUB_PLATFORMS=""
+declare -x GUILE_SINGLE_TARGET=""
+declare -x GUILE_TARGETS=""
+declare HOMEPAGE="https://github.com/kkos/oniguruma"
+declare IDEPEND=""
+declare -x INHERITED=" out-of-source-utils multibuild toolchain-funcs multilib multilib-build multilib-minimal"
+declare -x INPUT_DEVICES=""
+declare -x INSOPTIONS="-m0644"
+declare IUSE="crnl-as-line-terminator static-libs abi_x86_32 abi_x86_64 abi_x86_x32 abi_mips_n32 abi_mips_n64 abi_mips_o32 abi_s390_32 abi_s390_64"
+declare -x IUSE_EFFECTIVE="abi_mips_n32 abi_mips_n64 abi_mips_o32 abi_s390_32 abi_s390_64 abi_x86_32 abi_x86_64 abi_x86_x32 alpha amd64 arm arm64 arm64-macos crnl-as-line-terminator elibc_Darwin elibc_SunOS elibc_bionic elibc_glibc elibc_mingw elibc_musl hppa kernel_Darwin kernel_Hurd kernel_SunOS kernel_linux loong m68k mips ppc ppc64 prefix prefix-guest prefix-stack riscv s390 sparc static-libs x64-macos x64-solaris x86"
+declare -x IUSE_IMPLICIT="abi_x86_64 prefix prefix-guest prefix-stack"
+declare -x KERNEL="linux"
+declare -x KERNEL_ABI="amd64"
+declare -x KEYWORDS="~alpha amd64 arm arm64 ~hppa ~loong ~mips ppc ppc64 ~riscv ~s390 ~sparc x86 ~arm64-macos ~x64-macos ~x64-solaris"
+declare -x L10N=""
+declare -x L1_JOBS="1"
+declare -x L1_SKIP_PORTAGE_UPGRADE="0"
+declare -x LANG="C.UTF-8"
+declare -x LCD_DEVICES=""
+declare -x LC_ADDRESS="C.UTF-8"
+declare -x LC_COLLATE="C.UTF-8"
+declare -x LC_CTYPE="C.UTF-8"
+declare -x LC_IDENTIFICATION="C.UTF-8"
+declare -x LC_MEASUREMENT="C.UTF-8"
+declare -x LC_MESSAGES="C.UTF-8"
+declare -x LC_MONETARY="C.UTF-8"
+declare -x LC_NAME="C.UTF-8"
+declare -x LC_NUMERIC="C.UTF-8"
+declare -x LC_PAPER="C.UTF-8"
+declare -x LC_TELEPHONE="C.UTF-8"
+declare -x LC_TIME="C.UTF-8"
+declare -x LDFLAGS="-Wl,-O1 -Wl,--as-needed -Wl,-z,pack-relative-relocs"
+declare -x LDFLAGS_amd64="-m elf_x86_64"
+declare -x LDFLAGS_default
+declare -x LDFLAGS_x32="-m elf32_x86_64"
+declare -x LDFLAGS_x86="-m elf_i386"
+declare -x LEX="flex"
+declare -x LIBDIR_amd64="lib64"
+declare -x LIBDIR_default="lib"
+declare -x LIBDIR_x32="libx32"
+declare -x LIBDIR_x86="lib"
+declare -x LIBOPTIONS="-m0644"
+declare -x LIBREOFFICE_EXTENSIONS=""
+declare -x LICENSE="BSD-2"
+declare -x LLVM_SLOT=""
+declare -x LLVM_TARGETS=""
+declare -x LUA_SINGLE_TARGET=""
+declare -x LUA_TARGETS=""
+declare -x MANPAGER="manpager"
+declare -x MULTILIB_ABIS="amd64 x86"
+declare -x MULTILIB_STRICT_DENY="64-bit.*shared object"
+declare -x MULTILIB_STRICT_DIRS="/lib32 /lib /usr/lib32 /usr/lib /usr/kde/*/lib32 /usr/kde/*/lib /usr/qt/*/lib32 /usr/qt/*/lib /usr/X11R6/lib32 /usr/X11R6/lib"
+declare -x MULTILIB_STRICT_EXEMPT="(perl5|gcc|binutils|eclipse-3|debug|portage|udev|systemd|clang|python-exec|llvm)"
+declare -- MULTILIB_USEDEP="abi_x86_32(-)?,abi_x86_64(-)?,abi_x86_x32(-)?,abi_mips_n32(-)?,abi_mips_n64(-)?,abi_mips_o32(-)?,abi_s390_32(-)?,abi_s390_64(-)?"
+declare -x NGINX_MODULES_HTTP=""
+declare -x NGINX_MODULES_MAIL=""
+declare -x NGINX_MODULES_STREAM=""
+declare -x OFFICE_IMPLEMENTATION=""
+declare -x OPENMPI_FABRICS=""
+declare -x OPENMPI_OFED_FEATURES=""
+declare -x OPENMPI_RM=""
+declare PDEPEND=""
+declare -x PERL_FEATURES=""
+declare -x PHP_TARGETS=""
+declare -x PORTAGE_BZIP2_COMMAND="bzip2"
+declare -x PORTAGE_COMPRESSION_COMMAND="zstd -T1"
+declare -x PORTAGE_REPO_REVISIONS="{}"
+declare -x POSTGRES_TARGETS=""
+declare -x PROFILE_ONLY_VARIABLES="ARCH ELIBC IUSE_IMPLICIT KERNEL USE_EXPAND_IMPLICIT USE_EXPAND_UNPREFIXED USE_EXPAND_VALUES_ARCH USE_EXPAND_VALUES_ELIBC USE_EXPAND_VALUES_KERNEL"
+declare -- PROPERTIES=""
+declare -x PYTHONDONTWRITEBYTECODE="1"
+declare -x PYTHON_SINGLE_TARGET=""
+declare -x PYTHON_TARGETS=""
+declare RDEPEND=""
+declare REPOSITORY
+declare REQUIRED_USE=""
+declare RESTRICT=""
+declare -x RUBY_TARGETS=""
+declare -x RUST_SYSROOTS=""
+declare -x SANE_BACKENDS=""
+declare -x SELINUX_POLICY_TYPES=""
+declare -- SHELL="/bin/bash"
+declare -x SLOT="0/5"
+declare SRC_URI="https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz"
+declare -x SYMLINK_LIB="no"
+declare -x TWISTED_DISABLE_WRITING_OF_PLUGIN_CACHE="1"
+declare -x TZ="UTC"
+declare -x USE="abi_x86_64 amd64 elibc_glibc kernel_linux"
+declare -x USERLAND="GNU"
+declare -x USE_EXPAND_IMPLICIT="ARCH ELIBC KERNEL"
+declare -x USE_EXPAND_UNPREFIXED="ARCH"
+declare -x USE_EXPAND_VALUES_ARCH="alpha amd64 arm arm64 arm64-macos hppa loong m68k mips ppc ppc64 riscv s390 sparc x64-macos x64-solaris x86"
+declare -x USE_EXPAND_VALUES_ELIBC="bionic Darwin glibc mingw musl SunOS"
+declare -x USE_EXPAND_VALUES_KERNEL="Darwin Hurd linux SunOS"
+declare -x UWSGI_PLUGINS=""
+declare -x VIDEO_CARDS=""
+declare -x VOICEMAIL_STORAGE=""
+declare -x XTABLES_ADDONS=""
+declare -- _MULTIBUILD_ECLASS="1"
+declare -- _MULTILIB_BUILD_ECLASS="1"
+declare -- _MULTILIB_ECLASS="1"
+declare -a _MULTILIB_FLAGS=([0]="abi_x86_32:x86,x86_fbsd,x86_freebsd,x86_linux,x86_macos,x86_solaris" [1]="abi_x86_64:amd64,amd64_fbsd,x64_freebsd,amd64_linux,x64_macos,x64_solaris" [2]="abi_x86_x32:x32" [3]="abi_mips_n32:n32" [4]="abi_mips_n64:n64" [5]="abi_mips_o32:o32" [6]="abi_s390_32:s390" [7]="abi_s390_64:s390x")
+declare -- _MULTILIB_MINIMAL_ECLASS="1"
+declare -- _OUT_OF_SOURCE_UTILS_ECLASS="1"
+declare -- _TOOLCHAIN_FUNCS_ECLASS="1"
+declare -x ac_cv_c_undeclared_builtin_options="none needed"
+declare -x container="podman"
+declare -x enable_year2038="no"
+declare -- f
+declare -x gl_cv_compiler_check_decl_option="-Werror=implicit-function-declaration"
+declare -x gl_cv_func_getcwd_path_max="yes"
+declare -- x=""
+__pipestatus () 
+{ 
+    local status=("${PIPESTATUS[@]}") s ret=0;
+    for s in "${status[@]}";
+    do
+        [[ ${s} -ne 0 ]] && ret=${s};
+    done;
+    return "${ret}"
+}
+_clang_fullversion () 
+{ 
+    local ver="$1";
+    shift;
+    set -- $($(tc-getCC "$@") -E -P - <<< "__clang_major__ __clang_minor__ __clang_patchlevel__");
+    eval echo "${ver}"
+}
+_gcc-install-dir () 
+{ 
+    echo "$(LC_ALL=C $(tc-getCC) -print-search-dirs 2> /dev/null | awk '$1=="install:" {print $2}')"
+}
+_gcc-specs-directive_raw () 
+{ 
+    local cc=$(tc-getCC);
+    local specfiles=$(LC_ALL=C ${cc} -v 2>&1 | awk '$1=="Reading" {print $NF}');
+    ${cc} -dumpspecs 2> /dev/null | cat - ${specfiles} | awk -v directive=$1 'BEGIN	{ pspec=""; spec=""; outside=1 }
+$1=="*"directive":"  { pspec=spec; spec=""; outside=0; next }
+	outside || NF==0 || ( substr($1,1,1)=="*" && substr($1,length($1),1)==":" ) { outside=1; next }
+	spec=="" && substr($0,1,1)=="+" { spec=pspec " " substr($0,2); next }
+	{ spec=spec $0 }
+END	{ print spec }';
+    return 0
+}
+_gcc-specs-exists () 
+{ 
+    [[ -f $(_gcc-install-dir)/$1 ]]
+}
+_gcc_fullversion () 
+{ 
+    local ver="$1";
+    shift;
+    set -- $($(tc-getCC "$@") -E -P - <<< "__GNUC__ __GNUC_MINOR__ __GNUC_PATCHLEVEL__");
+    eval echo "${ver}"
+}
+_multibuild_run () 
+{ 
+    local i=1;
+    while [[ ${!i} == _* ]]; do
+        (( i += 1 ));
+    done;
+    [[ ${i} -le ${#} ]] && einfo "${v}: running ${@:${i}}";
+    "${@}"
+}
+_multilib_multibuild_wrapper () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local ABI=${MULTIBUILD_VARIANT#*.};
+    local -r MULTILIB_ABI_FLAG=${MULTIBUILD_VARIANT%.*};
+    multilib_toolchain_setup "${ABI}";
+    readonly ABI;
+    "${@}"
+}
+_tc-getPROG () 
+{ 
+    local tuple=$1;
+    local v var vars=$2;
+    local prog=($3);
+    var=${vars%% *};
+    for v in ${vars};
+    do
+        if [[ -n ${!v} ]]; then
+            export ${var}="${!v}";
+            echo "${!v}";
+            return 0;
+        fi;
+    done;
+    local search=;
+    [[ -n $4 ]] && search=$(type -p $4-${prog[0]});
+    [[ -z ${search} && -n ${!tuple} ]] && search=$(type -p ${!tuple}-${prog[0]});
+    [[ -n ${search} ]] && prog[0]=${search##*/};
+    export ${var}="${prog[*]}";
+    echo "${!var}"
+}
+_tc-has-openmp () 
+{ 
+    local base="${T}/test-tc-openmp";
+    cat <<-EOF > "${base}.c"
+#include <omp.h>
+int main(void) {
+int nthreads, tid, ret = 0;
+#pragma omp parallel private(nthreads, tid)
+{
+tid = omp_get_thread_num();
+nthreads = omp_get_num_threads();
+ret += tid + nthreads;
+}
+return ret;
+}
+EOF
+
+    $(tc-getCC "$@") -fopenmp "${base}.c" -o "${base}" >&/dev/null;
+    local ret=$?;
+    rm -f "${base}"*;
+    return ${ret}
+}
+aclocal () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'aclocal' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'aclocal' directly."
+        ;;
+    esac;
+    /usr/bin/aclocal "$@";
+    return $?
+}
+autoconf () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'autoconf' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'autoconf' directly."
+        ;;
+    esac;
+    /usr/bin/autoconf "$@";
+    return $?
+}
+automake () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'automake' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'automake' directly."
+        ;;
+    esac;
+    /usr/bin/automake "$@";
+    return $?
+}
+clang-fullversion () 
+{ 
+    _clang_fullversion '$1.$2.$3' "$@"
+}
+clang-major-version () 
+{ 
+    _clang_fullversion '$1' "$@"
+}
+clang-micro-version () 
+{ 
+    _clang_fullversion '$3' "$@"
+}
+clang-minor-version () 
+{ 
+    _clang_fullversion '$2' "$@"
+}
+clang-version () 
+{ 
+    _clang_fullversion '$1.$2' "$@"
+}
+econf_build () 
+{ 
+    local CBUILD=${CBUILD:-${CHOST}};
+    tc-env_build econf "$@"
+}
+gcc-fullversion () 
+{ 
+    _gcc_fullversion '$1.$2.$3' "$@"
+}
+gcc-major-version () 
+{ 
+    _gcc_fullversion '$1' "$@"
+}
+gcc-micro-version () 
+{ 
+    _gcc_fullversion '$3' "$@"
+}
+gcc-minor-version () 
+{ 
+    _gcc_fullversion '$2' "$@"
+}
+gcc-specs-directive () 
+{ 
+    local directive subdname subdirective;
+    directive="$(_gcc-specs-directive_raw $1)";
+    while [[ ${directive} == *%\(*\)* ]]; do
+        subdname=${directive/*%\(};
+        subdname=${subdname/\)*};
+        subdirective="$(_gcc-specs-directive_raw ${subdname})";
+        directive="${directive//\%(${subdname})/${subdirective}}";
+    done;
+    echo "${directive}";
+    return 0
+}
+gcc-specs-nostrict () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fstrict-overflow:}" != "${directive}" ]]
+}
+gcc-specs-now () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive link_command);
+    [[ "${directive/\{!nonow:}" != "${directive}" ]]
+}
+gcc-specs-pie () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!nopie:}" != "${directive}" ]]
+}
+gcc-specs-relro () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive link_command);
+    [[ "${directive/\{!norelro:}" != "${directive}" ]]
+}
+gcc-specs-ssp () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-protector:}" != "${directive}" ]]
+}
+gcc-specs-ssp-to-all () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-protector-all:}" != "${directive}" ]]
+}
+gcc-specs-stack-check () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-check:}" != "${directive}" ]]
+}
+gcc-version () 
+{ 
+    _gcc_fullversion '$1.$2' "$@"
+}
+get_abi_CFLAGS () 
+{ 
+    get_abi_var CFLAGS "$@"
+}
+get_abi_CHOST () 
+{ 
+    get_abi_var CHOST "$@"
+}
+get_abi_CTARGET () 
+{ 
+    get_abi_var CTARGET "$@"
+}
+get_abi_FAKE_TARGETS () 
+{ 
+    get_abi_var FAKE_TARGETS "$@"
+}
+get_abi_LDFLAGS () 
+{ 
+    get_abi_var LDFLAGS "$@"
+}
+get_abi_LIBDIR () 
+{ 
+    get_abi_var LIBDIR "$@"
+}
+get_abi_var () 
+{ 
+    local flag=$1;
+    local abi=${2:-${ABI:-${DEFAULT_ABI:-default}}};
+    local var="${flag}_${abi}";
+    echo ${!var}
+}
+get_all_abis () 
+{ 
+    local x order="" mvar dvar;
+    mvar="MULTILIB_ABIS";
+    dvar="DEFAULT_ABI";
+    if [[ -n $1 ]]; then
+        mvar="$1_${mvar}";
+        dvar="$1_${dvar}";
+    fi;
+    if [[ -z ${!mvar} ]]; then
+        echo "default";
+        return 0;
+    fi;
+    for x in ${!mvar};
+    do
+        if [[ ${x} != ${!dvar} ]]; then
+            order="${order:+${order} }${x}";
+        fi;
+    done;
+    order="${order:+${order} }${!dvar}";
+    echo ${order};
+    return 0
+}
+get_all_libdirs () 
+{ 
+    local libdirs abi;
+    for abi in ${MULTILIB_ABIS};
+    do
+        libdirs+=" $(get_abi_LIBDIR ${abi})";
+    done;
+    [[ " ${libdirs} " != *" lib "* ]] && libdirs+=" lib";
+    echo "${libdirs}"
+}
+get_exeext () 
+{ 
+    case ${CHOST} in 
+        mingw* | *-mingw*)
+            echo ".exe"
+        ;;
+    esac
+}
+get_install_abis () 
+{ 
+    local x order="";
+    if [[ -z ${MULTILIB_ABIS} ]]; then
+        echo "default";
+        return 0;
+    fi;
+    if [[ ${EMULTILIB_PKG} == "true" ]]; then
+        for x in ${MULTILIB_ABIS};
+        do
+            if [[ ${x} != "${DEFAULT_ABI}" ]]; then
+                has ${x} ${ABI_DENY} || order="${order} ${x}";
+            fi;
+        done;
+        has ${DEFAULT_ABI} ${ABI_DENY} || order="${order} ${DEFAULT_ABI}";
+        if [[ -n ${ABI_ALLOW} ]]; then
+            local ordera="";
+            for x in ${order};
+            do
+                if has ${x} ${ABI_ALLOW}; then
+                    ordera="${ordera} ${x}";
+                fi;
+            done;
+            order=${ordera};
+        fi;
+    else
+        order=${DEFAULT_ABI};
+    fi;
+    if [[ -z ${order} ]]; then
+        die "The ABI list is empty.  Are you using a proper multilib profile?  Perhaps your USE flags or MULTILIB_ABIS are too restrictive for this package.";
+    fi;
+    echo ${order};
+    return 0
+}
+get_libname () 
+{ 
+    local libname;
+    local ver=$1;
+    case ${CHOST} in 
+        mingw* | *-mingw*)
+            libname="dll"
+        ;;
+        *-darwin*)
+            libname="dylib"
+        ;;
+        *)
+            libname="so"
+        ;;
+    esac;
+    if [[ -z $* ]]; then
+        echo ".${libname}";
+    else
+        for ver in "$@";
+        do
+            case ${CHOST} in 
+                *-darwin*)
+                    echo ".${ver}.${libname}"
+                ;;
+                *)
+                    echo ".${libname}.${ver}"
+                ;;
+            esac;
+        done;
+    fi
+}
+get_modname () 
+{ 
+    local modname;
+    local ver=$1;
+    case ${CHOST} in 
+        *-darwin*)
+            modname="bundle"
+        ;;
+        *)
+            modname="so"
+        ;;
+    esac;
+    echo ".${modname}"
+}
+has_multilib_profile () 
+{ 
+    [ -n "${MULTILIB_ABIS}" -a "${MULTILIB_ABIS}" != "${MULTILIB_ABIS/ /}" ]
+}
+is_final_abi () 
+{ 
+    has_multilib_profile || return 0;
+    set -- $(get_install_abis);
+    local LAST_ABI=$#;
+    [[ ${!LAST_ABI} == ${ABI} ]]
+}
+libtoolize () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'libtoolize' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'libtoolize' directly."
+        ;;
+    esac;
+    /usr/bin/libtoolize "$@";
+    return $?
+}
+multibuild_copy_sources () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local _MULTIBUILD_INITIAL_BUILD_DIR=${BUILD_DIR:-${S}};
+    einfo "Will copy sources from ${_MULTIBUILD_INITIAL_BUILD_DIR}";
+    function _multibuild_create_source_copy () 
+    { 
+        einfo "${MULTIBUILD_VARIANT}: copying to ${BUILD_DIR}";
+        cp -p -R "${_MULTIBUILD_INITIAL_BUILD_DIR}" "${BUILD_DIR}" || die
+    };
+    multibuild_foreach_variant _multibuild_create_source_copy
+}
+multibuild_for_best_variant () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ -n ${MULTIBUILD_VARIANTS} ]] || die "MULTIBUILD_VARIANTS need to be set";
+    local MULTIBUILD_VARIANTS=("${MULTIBUILD_VARIANTS[-1]}");
+    multibuild_foreach_variant "${@}"
+}
+multibuild_foreach_variant () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ -n ${MULTIBUILD_VARIANTS} ]] || die "MULTIBUILD_VARIANTS need to be set";
+    local bdir=${BUILD_DIR:-${S}};
+    [[ ${bdir%%/} == ${WORKDIR%%/} ]] && bdir=${WORKDIR}/build;
+    local prev_id=${MULTIBUILD_ID:+${MULTIBUILD_ID}-};
+    local ret=0 lret=0 v;
+    debug-print "${FUNCNAME}: initial build_dir = ${bdir}";
+    for v in "${MULTIBUILD_VARIANTS[@]}";
+    do
+        local MULTIBUILD_VARIANT=${v};
+        local MULTIBUILD_ID=${prev_id}${v};
+        local BUILD_DIR=${bdir%%/}-${v};
+        function _multibuild_run () 
+        { 
+            local i=1;
+            while [[ ${!i} == _* ]]; do
+                (( i += 1 ));
+            done;
+            [[ ${i} -le ${#} ]] && einfo "${v}: running ${@:${i}}";
+            "${@}"
+        };
+        _multibuild_run "${@}" > >(exec tee -a "${T}/build-${MULTIBUILD_ID}.log") 2>&1;
+        lret=${?};
+        [[ ${ret} -eq 0 && ${lret} -ne 0 ]] && ret=${lret};
+    done;
+    return ${ret}
+}
+multibuild_merge_root () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local src=${1};
+    local dest=${2};
+    cp -a "${src}"/. "${dest}"/ || die "${MULTIBUILD_VARIANT:-(unknown)}: merging image failed";
+    rm -rf "${src}" || die
+}
+multilib-minimal_abi_src_compile () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    pushd "${BUILD_DIR}" > /dev/null || die;
+    if declare -f multilib_src_compile > /dev/null; then
+        multilib_src_compile;
+    else
+        default_src_compile;
+    fi;
+    popd > /dev/null || die
+}
+multilib-minimal_abi_src_configure () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    mkdir -p "${BUILD_DIR}" || die;
+    pushd "${BUILD_DIR}" > /dev/null || die;
+    if declare -f multilib_src_configure > /dev/null; then
+        multilib_src_configure;
+    else
+        default_src_configure;
+    fi;
+    popd > /dev/null || die
+}
+multilib-minimal_abi_src_install () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    pushd "${BUILD_DIR}" > /dev/null || die;
+    if declare -f multilib_src_install > /dev/null; then
+        multilib_src_install;
+    else
+        if [[ -f Makefile || -f GNUmakefile || -f makefile ]]; then
+            emake DESTDIR="${D}" install;
+        fi;
+    fi;
+    multilib_prepare_wrappers;
+    multilib_check_headers;
+    popd > /dev/null || die
+}
+multilib-minimal_src_compile () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    function multilib-minimal_abi_src_compile () 
+    { 
+        debug-print-function ${FUNCNAME} "$@";
+        pushd "${BUILD_DIR}" > /dev/null || die;
+        if declare -f multilib_src_compile > /dev/null; then
+            multilib_src_compile;
+        else
+            default_src_compile;
+        fi;
+        popd > /dev/null || die
+    };
+    multilib_foreach_abi multilib-minimal_abi_src_compile
+}
+multilib-minimal_src_configure () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    function multilib-minimal_abi_src_configure () 
+    { 
+        debug-print-function ${FUNCNAME} "$@";
+        mkdir -p "${BUILD_DIR}" || die;
+        pushd "${BUILD_DIR}" > /dev/null || die;
+        if declare -f multilib_src_configure > /dev/null; then
+            multilib_src_configure;
+        else
+            default_src_configure;
+        fi;
+        popd > /dev/null || die
+    };
+    multilib_foreach_abi multilib-minimal_abi_src_configure
+}
+multilib-minimal_src_install () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    function multilib-minimal_abi_src_install () 
+    { 
+        debug-print-function ${FUNCNAME} "$@";
+        pushd "${BUILD_DIR}" > /dev/null || die;
+        if declare -f multilib_src_install > /dev/null; then
+            multilib_src_install;
+        else
+            if [[ -f Makefile || -f GNUmakefile || -f makefile ]]; then
+                emake DESTDIR="${D}" install;
+            fi;
+        fi;
+        multilib_prepare_wrappers;
+        multilib_check_headers;
+        popd > /dev/null || die
+    };
+    multilib_foreach_abi multilib-minimal_abi_src_install;
+    multilib_install_wrappers;
+    if declare -f multilib_src_install_all > /dev/null; then
+        multilib_src_install_all;
+    else
+        einstalldocs;
+    fi
+}
+multilib-minimal_src_test () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    function multilib-minimal_abi_src_test () 
+    { 
+        debug-print-function ${FUNCNAME} "$@";
+        pushd "${BUILD_DIR}" > /dev/null || die;
+        if declare -f multilib_src_test > /dev/null; then
+            multilib_src_test;
+        else
+            default_src_test;
+        fi;
+        popd > /dev/null || die
+    };
+    multilib_foreach_abi multilib-minimal_abi_src_test
+}
+multilib_check_headers () 
+{ 
+    function _multilib_header_cksum () 
+    { 
+        set -o pipefail;
+        if [[ -d ${ED}/usr/include ]]; then
+            find "${ED}"/usr/include -type f -exec cksum {} + | sort -k2;
+        fi
+    };
+    local cksum cksum_prev;
+    local cksum_file=${T}/.multilib_header_cksum;
+    cksum=$(_multilib_header_cksum) || die;
+    unset -f _multilib_header_cksum;
+    if [[ -f ${cksum_file} ]]; then
+        cksum_prev=$(< "${cksum_file}") || die;
+        if [[ ${cksum} != ${cksum_prev} ]]; then
+            echo "${cksum}" > "${cksum_file}.new" || die;
+            eerror "Header files have changed between ABIs.";
+            if type -p diff &> /dev/null; then
+                eerror "$(diff -du "${cksum_file}" "${cksum_file}.new")";
+            else
+                eerror "Old checksums in: ${cksum_file}";
+                eerror "New checksums in: ${cksum_file}.new";
+            fi;
+            die "Header checksum mismatch, aborting.";
+        fi;
+    else
+        echo "${cksum}" > "${cksum_file}" || die;
+    fi
+}
+multilib_copy_sources () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local MULTIBUILD_VARIANTS=($(multilib_get_enabled_abi_pairs));
+    multibuild_copy_sources
+}
+multilib_env () 
+{ 
+    local CTARGET=${1:-${CTARGET}};
+    local cpu=${CTARGET%%*-};
+    case ${CTARGET} in 
+        *-musl*)
+            : "${MULTILIB_ABIS=default}";
+            : "${DEFAULT_ABI=default}";
+            export MULTILIB_ABIS DEFAULT_ABI;
+            return
+        ;;
+        *)
+
+        ;;
+    esac;
+    case ${cpu} in 
+        aarch64*)
+            export CFLAGS_arm=${CFLAGS_arm-};
+            case ${cpu} in 
+                aarch64*be)
+                    export CHOST_arm="armv8b-${CTARGET#*-}"
+                ;;
+                *)
+                    export CHOST_arm="armv8l-${CTARGET#*-}"
+                ;;
+            esac;
+            CHOST_arm=${CHOST_arm/%-gnu/-gnueabi};
+            export CTARGET_arm=${CHOST_arm};
+            export LIBDIR_arm="lib";
+            export CFLAGS_arm64=${CFLAGS_arm64-};
+            export CHOST_arm64=${CTARGET};
+            export CTARGET_arm64=${CHOST_arm64};
+            export LIBDIR_arm64="lib64";
+            : "${MULTILIB_ABIS=arm64}";
+            : "${DEFAULT_ABI=arm64}"
+        ;;
+        x86_64*)
+            export CFLAGS_x86=${CFLAGS_x86--m32};
+            export CHOST_x86=${CTARGET/x86_64/i686};
+            CHOST_x86=${CHOST_x86/%-gnux32/-gnu};
+            export CTARGET_x86=${CHOST_x86};
+            if [[ ${SYMLINK_LIB} == "yes" ]]; then
+                export LIBDIR_x86="lib32";
+            else
+                export LIBDIR_x86="lib";
+            fi;
+            export CFLAGS_amd64=${CFLAGS_amd64--m64};
+            export CHOST_amd64=${CTARGET/%-gnux32/-gnu};
+            export CTARGET_amd64=${CHOST_amd64};
+            export LIBDIR_amd64="lib64";
+            export CFLAGS_x32=${CFLAGS_x32--mx32};
+            export CHOST_x32=${CTARGET/%-gnu/-gnux32};
+            export CTARGET_x32=${CHOST_x32};
+            export LIBDIR_x32="libx32";
+            case ${CTARGET} in 
+                *-gnux32)
+                    : "${MULTILIB_ABIS=x32 amd64 x86}";
+                    : "${DEFAULT_ABI=x32}"
+                ;;
+                *)
+                    : "${MULTILIB_ABIS=amd64 x86}";
+                    : "${DEFAULT_ABI=amd64}"
+                ;;
+            esac
+        ;;
+        loongarch64*)
+            export CFLAGS_lp64d=${CFLAGS_lp64d--mabi=lp64d};
+            export CHOST_lp64d=${CTARGET};
+            export CTARGET_lp64d=${CTARGET};
+            export LIBDIR_lp64d=${LIBDIR_lp64d-lib64};
+            : "${MULTILIB_ABIS=lp64d}";
+            : "${DEFAULT_ABI=lp64d}"
+        ;;
+        mips64* | mipsisa64*)
+            export CFLAGS_o32=${CFLAGS_o32--mabi=32};
+            export CHOST_o32=${CTARGET/mips64/mips};
+            export CHOST_o32=${CHOST_o32/mipsisa64/mipsisa32};
+            export CTARGET_o32=${CHOST_o32};
+            export LIBDIR_o32="lib";
+            export CFLAGS_n32=${CFLAGS_n32--mabi=n32};
+            export CHOST_n32=${CTARGET};
+            export CTARGET_n32=${CHOST_n32};
+            export LIBDIR_n32="lib32";
+            export CFLAGS_n64=${CFLAGS_n64--mabi=64};
+            export CHOST_n64=${CTARGET};
+            export CTARGET_n64=${CHOST_n64};
+            export LIBDIR_n64="lib64";
+            : "${MULTILIB_ABIS=n64 n32 o32}";
+            : "${DEFAULT_ABI=n32}"
+        ;;
+        powerpc64*)
+            export CFLAGS_ppc=${CFLAGS_ppc--m32};
+            export CHOST_ppc=${CTARGET/powerpc64/powerpc};
+            export CTARGET_ppc=${CHOST_ppc};
+            export LIBDIR_ppc="lib";
+            export CFLAGS_ppc64=${CFLAGS_ppc64--m64};
+            export CHOST_ppc64=${CTARGET};
+            export CTARGET_ppc64=${CHOST_ppc64};
+            export LIBDIR_ppc64="lib64";
+            : "${MULTILIB_ABIS=ppc64 ppc}";
+            : "${DEFAULT_ABI=ppc64}"
+        ;;
+        riscv64*)
+            : "${MULTILIB_ABIS=lp64d lp64 ilp32d ilp32}";
+            : "${DEFAULT_ABI=lp64d}";
+            local _libdir_riscvdefaultabi_variable="LIBDIR_${DEFAULT_ABI}";
+            local _libdir_riscvdefaultabi=${!_libdir_riscvdefaultabi_variable};
+            export ${_libdir_riscvdefaultabi_variable}=${_libdir_riscvdefaultabi:-lib64};
+            export CFLAGS_lp64d=${CFLAGS_lp64d--mabi=lp64d -march=rv64gc};
+            export CHOST_lp64d=${CTARGET};
+            export CTARGET_lp64d=${CTARGET};
+            export LIBDIR_lp64d=${LIBDIR_lp64d-lib64/lp64d};
+            export CFLAGS_lp64=${CFLAGS_lp64--mabi=lp64 -march=rv64imac};
+            export CHOST_lp64=${CTARGET};
+            export CTARGET_lp64=${CTARGET};
+            export LIBDIR_lp64=${LIBDIR_lp64-lib64/lp64};
+            export CFLAGS_ilp32d=${CFLAGS_ilp32d--mabi=ilp32d -march=rv32imafdc};
+            export CHOST_ilp32d=${CTARGET/riscv64/riscv32};
+            export CTARGET_ilp32d=${CTARGET/riscv64/riscv32};
+            export LIBDIR_ilp32d=${LIBDIR_ilp32d-lib32/ilp32d};
+            export CFLAGS_ilp32=${CFLAGS_ilp32--mabi=ilp32 -march=rv32imac};
+            export CHOST_ilp32=${CTARGET/riscv64/riscv32};
+            export CTARGET_ilp32=${CTARGET/riscv64/riscv32};
+            export LIBDIR_ilp32=${LIBDIR_ilp32-lib32/ilp32}
+        ;;
+        riscv32*)
+            : "${MULTILIB_ABIS=ilp32d ilp32}";
+            : "${DEFAULT_ABI=ilp32d}";
+            local _libdir_riscvdefaultabi_variable="LIBDIR_${DEFAULT_ABI}";
+            local _libdir_riscvdefaultabi=${!_libdir_riscvdefaultabi_variable};
+            export ${_libdir_riscvdefaultabi_variable}=${_libdir_riscvdefaultabi:-lib};
+            export CFLAGS_ilp32d=${CFLAGS_ilp32d--mabi=ilp32d -march=rv32imafdc};
+            export CHOST_ilp32d=${CTARGET};
+            export CTARGET_ilp32d=${CTARGET};
+            export LIBDIR_ilp32d=${LIBDIR_ilp32d-lib32/ilp32d};
+            export CFLAGS_ilp32=${CFLAGS_ilp32--mabi=ilp32 -march=rv32imac};
+            export CHOST_ilp32=${CTARGET};
+            export CTARGET_ilp32=${CTARGET};
+            export LIBDIR_ilp32=${LIBDIR_ilp32-lib32/ilp32}
+        ;;
+        s390x*)
+            export CFLAGS_s390=${CFLAGS_s390--m31};
+            export CHOST_s390=${CTARGET/s390x/s390};
+            export CTARGET_s390=${CHOST_s390};
+            export LIBDIR_s390="lib";
+            export CFLAGS_s390x=${CFLAGS_s390x--m64};
+            export CHOST_s390x=${CTARGET};
+            export CTARGET_s390x=${CHOST_s390x};
+            export LIBDIR_s390x="lib64";
+            : "${MULTILIB_ABIS=s390x s390}";
+            : "${DEFAULT_ABI=s390x}"
+        ;;
+        sparc64*)
+            export CFLAGS_sparc32=${CFLAGS_sparc32--m32};
+            export CHOST_sparc32=${CTARGET/sparc64/sparc};
+            export CTARGET_sparc32=${CHOST_sparc32};
+            export LIBDIR_sparc32="lib";
+            export CFLAGS_sparc64=${CFLAGS_sparc64--m64};
+            export CHOST_sparc64=${CTARGET};
+            export CTARGET_sparc64=${CHOST_sparc64};
+            export LIBDIR_sparc64="lib64";
+            : "${MULTILIB_ABIS=sparc64 sparc32}";
+            : "${DEFAULT_ABI=sparc64}"
+        ;;
+        *)
+            : "${MULTILIB_ABIS=default}";
+            : "${DEFAULT_ABI=default}"
+        ;;
+    esac;
+    export MULTILIB_ABIS DEFAULT_ABI
+}
+multilib_foreach_abi () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local MULTIBUILD_VARIANTS=($(multilib_get_enabled_abi_pairs));
+    multibuild_foreach_variant _multilib_multibuild_wrapper "${@}"
+}
+multilib_get_enabled_abi_pairs () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local abis=($(get_all_abis));
+    local abi i found;
+    for abi in "${abis[@]}";
+    do
+        for i in "${_MULTILIB_FLAGS[@]}";
+        do
+            local m_abis=${i#*:} m_abi;
+            local m_flag=${i%:*};
+            for m_abi in ${m_abis//,/ };
+            do
+                if [[ ${m_abi} == ${abi} ]] && { 
+                    [[ ! -n "${MULTILIB_COMPAT[@]}" ]] || has "${m_flag}" "${MULTILIB_COMPAT[@]}"
+                } && use "${m_flag}"; then
+                    echo "${m_flag}.${abi}";
+                    found=1;
+                    break 2;
+                fi;
+            done;
+        done;
+    done;
+    if [[ ! -n ${found} ]]; then
+        local abi=${ABI:-${DEFAULT_ABI}};
+        debug-print "${FUNCNAME}: no ABIs enabled, fallback to ${abi}";
+        debug-print "${FUNCNAME}: ABI=${ABI}, DEFAULT_ABI=${DEFAULT_ABI}";
+        echo ".${abi}";
+    fi
+}
+multilib_get_enabled_abis () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local pairs=($(multilib_get_enabled_abi_pairs));
+    echo "${pairs[@]#*.}"
+}
+multilib_install_wrappers () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ ${#} -le 1 ]] || die "${FUNCNAME}: too many arguments";
+    [[ ${COMPLETE_MULTILIB} == yes ]] && return;
+    local root=${1:-${ED}};
+    if [[ -d ${ED}/tmp/multilib-include ]]; then
+        multibuild_merge_root "${ED}"/tmp/multilib-include "${root}"/usr/include;
+        rmdir "${ED}"/tmp &> /dev/null;
+    fi
+}
+multilib_is_native_abi () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ ${#} -eq 0 ]] || die "${FUNCNAME}: too many arguments";
+    [[ ${COMPLETE_MULTILIB} == yes || ${ABI} == ${DEFAULT_ABI} ]]
+}
+multilib_native_enable () 
+{ 
+    if multilib_is_native_abi; then
+        echo "--enable-${1}${2+=${2}}";
+    else
+        echo "--disable-${1}";
+    fi
+}
+multilib_native_use () 
+{ 
+    multilib_is_native_abi && use "$@"
+}
+multilib_native_use_enable () 
+{ 
+    if multilib_is_native_abi; then
+        use_enable "${@}";
+    else
+        echo "--disable-${2:-${1}}";
+    fi
+}
+multilib_native_use_with () 
+{ 
+    if multilib_is_native_abi; then
+        use_with "${@}";
+    else
+        echo "--without-${2:-${1}}";
+    fi
+}
+multilib_native_usev () 
+{ 
+    multilib_is_native_abi && usev "$@"
+}
+multilib_native_usex () 
+{ 
+    if multilib_is_native_abi; then
+        usex "${@}";
+    else
+        echo "${3-no}${5}";
+    fi
+}
+multilib_native_with () 
+{ 
+    if multilib_is_native_abi; then
+        echo "--with-${1}${2+=${2}}";
+    else
+        echo "--without-${1}";
+    fi
+}
+multilib_parallel_foreach_abi () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ ${EAPI} != [78] ]] && die "${FUNCNAME} is banned since EAPI 9";
+    local MULTIBUILD_VARIANTS=($(multilib_get_enabled_abi_pairs));
+    multibuild_foreach_variant _multilib_multibuild_wrapper "${@}"
+}
+multilib_prepare_wrappers () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    [[ ${#} -le 1 ]] || die "${FUNCNAME}: too many arguments";
+    local root=${1:-${ED}};
+    local f;
+    if [[ ${COMPLETE_MULTILIB} == yes ]]; then
+        for f in "${MULTILIB_CHOST_TOOLS[@]}";
+        do
+            f=${f#/};
+            local dir=${f%/*};
+            local fn=${f##*/};
+            ln -s "${fn}" "${root}/${dir}/${CHOST}-${fn}" || die;
+        done;
+        return;
+    fi;
+    for f in "${MULTILIB_CHOST_TOOLS[@]}";
+    do
+        f=${f#/};
+        local dir=${f%/*};
+        local fn=${f##*/};
+        if [[ -L ${root}/${f} ]]; then
+            local target;
+            target=$(readlink "${root}/${f}") || die;
+            local target_dir target_fn=${target##*/};
+            [[ ${target} == */* ]] && target_dir=${target%/*};
+            ln -f -s "${target_dir+${target_dir}/}${CHOST}-${target_fn}" "${root}/${f}" || die;
+        fi;
+        mv "${root}/${f}" "${root}/${dir}/${CHOST}-${fn}" || die;
+        if multilib_is_native_abi; then
+            ln -s "${CHOST}-${fn}" "${root}/${f}" || die;
+        fi;
+    done;
+    if [[ -n ${MULTILIB_WRAPPED_HEADERS[@]} ]]; then
+        if [[ -n ${MULTILIB_ABI_FLAG} ]]; then
+            for f in "${MULTILIB_WRAPPED_HEADERS[@]}";
+            do
+                f=${f#/};
+                if [[ ${f} != usr/include/* ]]; then
+                    die "Wrapping headers outside of /usr/include is not supported at the moment.";
+                fi;
+                f=${f#usr/include};
+                local dir=${f%/*};
+                if [[ -f ${root}/usr/include${f} ]]; then
+                    local wrapper=${ED}/tmp/multilib-include${f};
+                    if [[ ! -f ${ED}/tmp/multilib-include${f} ]]; then
+                        dodir "/tmp/multilib-include${dir}";
+                        cat > "${wrapper}" <<_EOF_ || 
+/* This file is auto-generated by multilib-build.eclass
+ * as a multilib-friendly wrapper. For the original content,
+ * please see the files that are #included below.
+ */
+
+#if defined(__x86_64__) /* amd64 */
+#	if defined(__ILP32__) /* x32 ABI */
+#		error "abi_x86_x32 not supported by the package."
+#	else /* 64-bit ABI */
+#		error "abi_x86_64 not supported by the package."
+#	endif
+#elif defined(__i386__) /* plain x86 */
+#	error "abi_x86_32 not supported by the package."
+#elif defined(__mips__)
+#	if(_MIPS_SIM == _ABIN32) /* n32 */
+#		error "abi_mips_n32 not supported by the package."
+#	elif(_MIPS_SIM == _ABI64) /* n64 */
+#		error "abi_mips_n64 not supported by the package."
+#	elif(_MIPS_SIM == _ABIO32) /* o32 */
+#		error "abi_mips_o32 not supported by the package."
+#	endif
+#elif defined(__sparc__)
+#	if defined(__arch64__)
+#		error "abi_sparc_64 not supported by the package."
+#	else
+#		error "abi_sparc_32 not supported by the package."
+#	endif
+#elif defined(__s390__)
+#	if defined(__s390x__)
+#		error "abi_s390_64 not supported by the package."
+#	else
+#		error "abi_s390_32 not supported by the package."
+#	endif
+#elif defined(__powerpc__) || defined(__ppc__)
+#	if defined(__powerpc64__) || defined(__ppc64__)
+#		error "abi_ppc_64 not supported by the package."
+#	else
+#		error "abi_ppc_32 not supported by the package."
+#	endif
+#elif defined(SWIG) /* https://sourceforge.net/p/swig/bugs/799/ */
+#	error "Native ABI not supported by the package."
+#else
+#	error "No ABI matched, please report a bug to bugs.gentoo.org"
+#endif
+_EOF_
+ die;
+                    fi
+                    if ! grep -q "${MULTILIB_ABI_FLAG} " "${wrapper}"; then
+                        die "Flag ${MULTILIB_ABI_FLAG} not listed in wrapper template. Please report a bug to https://bugs.gentoo.org.";
+                    fi;
+                    dodir "/tmp/multilib-include/${CHOST}${dir}";
+                    mv "${root}/usr/include${f}" "${ED}/tmp/multilib-include/${CHOST}${dir}/" || die;
+                    sed -e "/${MULTILIB_ABI_FLAG} /s&error.*&include <${CHOST}${f}>&" -i "${wrapper}" || die;
+                    if multilib_is_native_abi; then
+                        sed -e "/Native ABI/s&error.*&include <${CHOST}${f}>&" -i "${wrapper}" || die;
+                    fi;
+                fi;
+            done;
+        fi;
+    fi
+}
+multilib_src_configure () 
+{ 
+    ECONF_SOURCE="${S}" econf --enable-posix-api $(use_enable crnl-as-line-terminator) $(use_enable static-libs static)
+}
+multilib_src_install_all () 
+{ 
+    einstalldocs;
+    find "${ED}" -name "*.la" -delete || die
+}
+multilib_toolchain_setup () 
+{ 
+    local v vv;
+    export ABI=$1;
+    local save_restore_variables=(CBUILD CHOST BUILD_AR BUILD_CC BUILD_CXX BUILD_LD BUILD_NM BUILD_OBJCOPY BUILD_PKG_CONFIG BUILD_RANLIB BUILD_READELF BUILD_STRINGS BUILD_STRIP AR CC CXX F77 FC LD NM OBJCOPY OBJDUMP PKG_CONFIG RANLIB READELF STRINGS STRIP PKG_CONFIG_LIBDIR PKG_CONFIG_PATH PKG_CONFIG_SYSTEM_INCLUDE_PATH PKG_CONFIG_SYSTEM_LIBRARY_PATH);
+    if [[ ${_DEFAULT_ABI_SAVED} == "true" ]]; then
+        for v in "${save_restore_variables[@]}";
+        do
+            vv="_abi_saved_${v}";
+            [[ ${!vv+set} == "set" ]] && export ${v}="${!vv}" || unset ${v};
+            unset ${vv};
+        done;
+        unset _DEFAULT_ABI_SAVED;
+    fi;
+    if [[ ${ABI} != ${DEFAULT_ABI} ]]; then
+        for v in "${save_restore_variables[@]}";
+        do
+            vv="_abi_saved_${v}";
+            [[ ${!v+set} == "set" ]] && export ${vv}="${!v}" || unset ${vv};
+        done;
+        export _DEFAULT_ABI_SAVED="true";
+        export CHOST=$(get_abi_CHOST ${DEFAULT_ABI});
+        if [[ "${_abi_saved_CBUILD:-${_abi_saved_CHOST}}" == "${_abi_saved_CHOST}" ]]; then
+            export CBUILD=${CHOST};
+        fi;
+        export BUILD_AR="$(tc-getBUILD_AR)";
+        export BUILD_CC="$(tc-getBUILD_CC)";
+        export BUILD_CXX="$(tc-getBUILD_CXX)";
+        export BUILD_LD="$(tc-getBUILD_LD)";
+        export BUILD_NM="$(tc-getBUILD_NM)";
+        export BUILD_OBJCOPY="$(tc-getBUILD_OBJCOPY)";
+        export BUILD_PKG_CONFIG="$(tc-getBUILD_PKG_CONFIG)";
+        export BUILD_RANLIB="$(tc-getBUILD_RANLIB)";
+        export BUILD_READELF="$(tc-getBUILD_READELF)";
+        export BUILD_STRINGS="$(tc-getBUILD_STRINGS)";
+        export BUILD_STRIP="$(tc-getBUILD_STRIP)";
+        export AR="$(tc-getAR)";
+        export CC="$(tc-getCC) $(get_abi_CFLAGS)";
+        export CXX="$(tc-getCXX) $(get_abi_CFLAGS)";
+        export F77="$(tc-getF77) $(get_abi_CFLAGS)";
+        export FC="$(tc-getFC) $(get_abi_CFLAGS)";
+        export LD="$(tc-getLD) $(get_abi_LDFLAGS)";
+        export NM="$(tc-getNM)";
+        export OBJCOPY="$(tc-getOBJCOPY)";
+        export OBJDUMP="$(tc-getOBJDUMP)";
+        export PKG_CONFIG="$(tc-getPKG_CONFIG)";
+        export RANLIB="$(tc-getRANLIB)";
+        export READELF="$(tc-getREADELF)";
+        export STRINGS="$(tc-getSTRINGS)";
+        export STRIP="$(tc-getSTRIP)";
+        export CHOST=$(get_abi_CHOST $1);
+        export PKG_CONFIG_LIBDIR=${ESYSROOT}/usr/$(get_libdir)/pkgconfig;
+        export PKG_CONFIG_PATH=${ESYSROOT}/usr/share/pkgconfig;
+        export PKG_CONFIG_SYSTEM_INCLUDE_PATH=${ESYSROOT}/usr/include;
+        export PKG_CONFIG_SYSTEM_LIBRARY_PATH=${ESYSROOT}/$(get_libdir):${ESYSROOT}/usr/$(get_libdir);
+        if [[ "${_abi_saved_CBUILD:-${_abi_saved_CHOST}}" == "${_abi_saved_CHOST}" ]]; then
+            export CBUILD=${CHOST};
+        fi;
+    fi
+}
+number_abis () 
+{ 
+    set -- `get_install_abis`;
+    echo $#
+}
+pkg_nofetch () 
+{ 
+    default
+}
+pre_source_sandbox () 
+{ 
+    export SANDBOX_ON=1;
+    export SANDBOX_PREDICT="";
+    export SANDBOX_READ="${EBUILD}:${BASH_SOURCE[1]}:${SANDBOX_LOG}";
+    export SANDBOX_WRITE="${SANDBOX_LOG}:/dev/null";
+    [[ ${PORTAGE_DEBUG} != 1 ]] || export SANDBOX_DEBUG=1;
+    local repo_location;
+    for repo_location in "${PORTAGE_ECLASS_LOCATIONS[@]}";
+    do
+        local potential_location="${repo_location}/eclass";
+        if [[ -d ${potential_location} ]]; then
+            SANDBOX_READ+=":${potential_location}";
+        fi;
+    done;
+    function adddeny () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addpredict () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addread () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addwrite () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    readonly SANDBOX_{ALLOW,ACTIVE,DENY,DEBUG,ON,PREDICT,READ,WRITE}
+}
+run_in_build_dir () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local ret;
+    [[ ${#} -eq 0 ]] && die "${FUNCNAME}: no command specified.";
+    [[ -z ${BUILD_DIR} ]] && die "${FUNCNAME}: BUILD_DIR not set.";
+    mkdir -p "${BUILD_DIR}" || die;
+    pushd "${BUILD_DIR}" > /dev/null || die;
+    "${@}";
+    ret=${?};
+    popd > /dev/null || die;
+    return ${ret}
+}
+src_compile () 
+{ 
+    multilib-minimal_src_compile "$@"
+}
+src_configure () 
+{ 
+    multilib-minimal_src_configure "$@"
+}
+src_install () 
+{ 
+    multilib-minimal_src_install "$@"
+}
+src_prepare () 
+{ 
+    default;
+    if [[ "${PV}" == "9999" ]]; then
+        eautoreconf;
+    fi
+}
+src_test () 
+{ 
+    multilib-minimal_src_test "$@"
+}
+src_unpack () 
+{ 
+    default
+}
+tc-arch () 
+{ 
+    tc-ninja_magic_to_arch portage "$@"
+}
+tc-arch-kernel () 
+{ 
+    tc-ninja_magic_to_arch kern "$@"
+}
+tc-check-min_ver () 
+{ 
+    function do_check () 
+    { 
+        debug-print "Compiler version check for ${1}";
+        debug-print "Detected: ${2}";
+        debug-print "Required: ${3}";
+        if ver_test ${2} -lt ${3}; then
+            eerror "Your current compiler is too old for this package!";
+            die "Active compiler is too old for this package (found ${1} ${2}).";
+        fi
+    };
+    case ${1} in 
+        gcc)
+            tc-is-gcc || return;
+            do_check GCC $(gcc-version) ${2}
+        ;;
+        clang)
+            tc-is-clang || return;
+            do_check Clang $(clang-version) ${2}
+        ;;
+        *)
+            eerror "Unknown first parameter for ${FUNCNAME} - must be gcc or clang";
+            die "${FUNCNAME}: Parameter ${1} unknown"
+        ;;
+    esac
+}
+tc-check-openmp () 
+{ 
+    if ! _tc-has-openmp; then
+        eerror "Your current compiler does not support OpenMP!";
+        if tc-is-gcc; then
+            eerror "Enable OpenMP support by building sys-devel/gcc with USE=\"openmp\".";
+        else
+            if tc-is-clang; then
+                eerror "OpenMP support in llvm-core/clang is provided by llvm-runtimes/openmp.";
+            fi;
+        fi;
+        die "Active compiler does not have required support for OpenMP";
+    fi
+}
+tc-cpp-is-true () 
+{ 
+    local CONDITION=${1};
+    shift;
+    $(tc-getTARGET_CPP) "${@}" -P - <<-EOF > /dev/null 2>&1
+#if ${CONDITION}
+true
+#else
+#error false
+#endif
+EOF
+
+}
+tc-detect-is-softfloat () 
+{ 
+    [[ $(tc-getTARGET_CPP) == "gcc -E" ]] && return 1;
+    case ${CTARGET:-${CHOST}} in 
+        *-newlib | *-elf | *-eabi | arm64-apple-darwin*)
+            return 1
+        ;;
+        arm*)
+            if tc-cpp-is-true "defined(__ARM_PCS_VFP)"; then
+                echo "no";
+            else
+                if tc-cpp-is-true "defined(__SOFTFP__)"; then
+                    echo "yes";
+                else
+                    echo "softfp";
+                fi;
+            fi;
+            return 0
+        ;;
+        *)
+            return 1
+        ;;
+    esac
+}
+tc-enables-cxx-assertions () 
+{ 
+    tc-cpp-is-true "defined(_GLIBCXX_ASSERTIONS) || defined(_LIBCPP_ENABLE_ASSERTIONS) || defined(_LIBCPP_ENABLE_HARDENED_MODE)" ${CPPFLAGS} ${CXXFLAGS}
+}
+tc-enables-fortify-source () 
+{ 
+    tc-cpp-is-true "defined(_FORTIFY_SOURCE)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-pie () 
+{ 
+    tc-cpp-is-true "defined(__PIE__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp () 
+{ 
+    tc-cpp-is-true "defined(__SSP__) || defined(__SSP_STRONG__) || defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp-all () 
+{ 
+    tc-cpp-is-true "defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp-strong () 
+{ 
+    tc-cpp-is-true "defined(__SSP_STRONG__) || defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-endian () 
+{ 
+    local host=$1;
+    [[ -z ${host} ]] && host=${CTARGET:-${CHOST}};
+    host=${host%%-*};
+    case ${host} in 
+        aarch64*be)
+            echo big
+        ;;
+        aarch64)
+            echo little
+        ;;
+        alpha*)
+            echo little
+        ;;
+        arc*b*)
+            echo big
+        ;;
+        arc*)
+            echo little
+        ;;
+        arm*b*)
+            echo big
+        ;;
+        arm*)
+            echo little
+        ;;
+        cris*)
+            echo little
+        ;;
+        e2k*)
+            echo little
+        ;;
+        hppa*)
+            echo big
+        ;;
+        i?86*)
+            echo little
+        ;;
+        ia64*)
+            echo little
+        ;;
+        loongarch*)
+            echo little
+        ;;
+        m68*)
+            echo big
+        ;;
+        mips*l*)
+            echo little
+        ;;
+        mips*)
+            echo big
+        ;;
+        powerpc*le)
+            echo little
+        ;;
+        powerpc*)
+            echo big
+        ;;
+        riscv*)
+            echo little
+        ;;
+        s390*)
+            echo big
+        ;;
+        sh*b*)
+            echo big
+        ;;
+        sh*)
+            echo little
+        ;;
+        sparc*)
+            echo big
+        ;;
+        x86_64*)
+            echo little
+        ;;
+        *)
+            echo wtf
+        ;;
+    esac
+}
+tc-env_build () 
+{ 
+    tc-export_build_env;
+    has go-env ${INHERITED} && local -x GOAMD64=${BUILD_GOAMD64} GOARM64=${BUILD_GOARM64} GOPPC64=${BUILD_GOPPC64} GORISCV64=${BUILD_GORISCV64};
+    CFLAGS=${BUILD_CFLAGS} CXXFLAGS=${BUILD_CXXFLAGS} CPPFLAGS=${BUILD_CPPFLAGS} LDFLAGS=${BUILD_LDFLAGS} AR=$(tc-getBUILD_AR) AS=$(tc-getBUILD_AS) CC=$(tc-getBUILD_CC) CPP=$(tc-getBUILD_CPP) CXX=$(tc-getBUILD_CXX) LD=$(tc-getBUILD_LD) NM=$(tc-getBUILD_NM) PKG_CONFIG=$(tc-getBUILD_PKG_CONFIG) RANLIB=$(tc-getBUILD_RANLIB) READELF=$(tc-getBUILD_READELF) CHOST=${CBUILD:-${CHOST}} ESYSROOT=${BROOT} SYSROOT= "$@"
+}
+tc-export () 
+{ 
+    local var;
+    for var in "$@";
+    do
+        [[ $(type -t "tc-get${var}") != "function" ]] && die "tc-export: invalid export variable '${var}'";
+        "tc-get${var}" > /dev/null;
+    done
+}
+tc-export_build_env () 
+{ 
+    tc-export "$@";
+    if tc-is-cross-compiler; then
+        : "${BUILD_CFLAGS:=-O1 -pipe}";
+        : "${BUILD_CXXFLAGS:=-O1 -pipe}";
+        : "${BUILD_CPPFLAGS:= }";
+        : "${BUILD_LDFLAGS:= }";
+    else
+        : "${BUILD_CFLAGS:=${CFLAGS}}";
+        : "${BUILD_CXXFLAGS:=${CXXFLAGS}}";
+        : "${BUILD_CPPFLAGS:=${CPPFLAGS}}";
+        : "${BUILD_LDFLAGS:=${LDFLAGS}}";
+        if has go-env ${INHERITED}; then
+            : "${BUILD_GOAMD64:=${GOAMD64}}";
+            : "${BUILD_GOARM64:=${GOARM64}}";
+            : "${BUILD_GOPPC64:=${GOPPC64}}";
+            : "${BUILD_GORISCV64:=${GORISCV64}}";
+        fi;
+    fi;
+    export BUILD_{C,CXX,CPP,LD}FLAGS;
+    local v;
+    for v in BUILD_{C,CXX,CPP,LD}FLAGS;
+    do
+        export ${v#BUILD_}_FOR_BUILD="${!v}";
+    done
+}
+tc-get-build-ptr-size () 
+{ 
+    $(tc-getBUILD_CC) -E -P - <<< __SIZEOF_POINTER__ || die "Could not determine CBUILD pointer size"
+}
+tc-get-c-rtlib () 
+{ 
+    local res=$($(tc-getCC) ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -print-libgcc-file-name 2> /dev/null);
+    case ${res} in 
+        *libclang_rt*)
+            echo compiler-rt
+        ;;
+        *libgcc*)
+            echo libgcc
+        ;;
+        *)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-get-compiler-type () 
+{ 
+    local code='
+#if defined(__PATHSCALE__)
+	HAVE_PATHCC
+#elif defined(__clang__)
+	HAVE_CLANG
+#elif defined(__GNUC__)
+	HAVE_GCC
+#endif
+';
+    local res=$($(tc-getCC "$@") -E -P - <<< "${code}");
+    case ${res} in 
+        *HAVE_PATHCC*)
+            echo pathcc
+        ;;
+        *HAVE_CLANG*)
+            echo clang
+        ;;
+        *HAVE_GCC*)
+            echo gcc
+        ;;
+        *)
+            echo unknown
+        ;;
+    esac
+}
+tc-get-cxx-stdlib () 
+{ 
+    local code='
+#if __cplusplus >= 202002L
+	#include <version>
+#else
+	#include <ciso646>
+#endif
+
+#if defined(_LIBCPP_VERSION)
+	HAVE_LIBCXX
+#elif defined(__GLIBCXX__)
+	HAVE_LIBSTDCPP
+#endif
+';
+    local res=$($(tc-getCXX) ${CPPFLAGS} ${CXXFLAGS} -x c++ -E -P - <<< "${code}" 2> /dev/null);
+    case ${res} in 
+        *HAVE_LIBCXX*)
+            echo libc++
+        ;;
+        *HAVE_LIBSTDCPP*)
+            echo libstdc++
+        ;;
+        *)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-get-ptr-size () 
+{ 
+    $(tc-getCC) -E -P - <<< __SIZEOF_POINTER__ || die "Could not determine CHOST pointer size"
+}
+tc-getAR () 
+{ 
+    tc-getPROG AR ar "$@"
+}
+tc-getAS () 
+{ 
+    tc-getPROG AS as "$@"
+}
+tc-getBUILD_AR () 
+{ 
+    tc-getBUILD_PROG AR ar "$@"
+}
+tc-getBUILD_AS () 
+{ 
+    tc-getBUILD_PROG AS as "$@"
+}
+tc-getBUILD_CC () 
+{ 
+    tc-getBUILD_PROG CC gcc "$@"
+}
+tc-getBUILD_CPP () 
+{ 
+    tc-getBUILD_PROG CPP "$(tc-getBUILD_CC) -E" "$@"
+}
+tc-getBUILD_CXX () 
+{ 
+    tc-getBUILD_PROG CXX g++ "$@"
+}
+tc-getBUILD_LD () 
+{ 
+    tc-getBUILD_PROG LD ld "$@"
+}
+tc-getBUILD_NM () 
+{ 
+    tc-getBUILD_PROG NM nm "$@"
+}
+tc-getBUILD_OBJCOPY () 
+{ 
+    tc-getBUILD_PROG OBJCOPY objcopy "$@"
+}
+tc-getBUILD_PKG_CONFIG () 
+{ 
+    tc-getBUILD_PROG PKG_CONFIG pkg-config "$@"
+}
+tc-getBUILD_PROG () 
+{ 
+    local vars="BUILD_$1 $1_FOR_BUILD HOST$1";
+    tc-is-cross-compiler || vars+=" $1";
+    _tc-getPROG CBUILD "${vars}" "${@:2}"
+}
+tc-getBUILD_RANLIB () 
+{ 
+    tc-getBUILD_PROG RANLIB ranlib "$@"
+}
+tc-getBUILD_READELF () 
+{ 
+    tc-getBUILD_PROG READELF readelf "$@"
+}
+tc-getBUILD_STRINGS () 
+{ 
+    tc-getBUILD_PROG STRINGS strings "$@"
+}
+tc-getBUILD_STRIP () 
+{ 
+    tc-getBUILD_PROG STRIP strip "$@"
+}
+tc-getCC () 
+{ 
+    tc-getPROG CC gcc "$@"
+}
+tc-getCPP () 
+{ 
+    tc-getPROG CPP "${CC:-gcc} -E" "$@"
+}
+tc-getCXX () 
+{ 
+    tc-getPROG CXX g++ "$@"
+}
+tc-getDLLWRAP () 
+{ 
+    tc-getPROG DLLWRAP dllwrap "$@"
+}
+tc-getF77 () 
+{ 
+    tc-getPROG F77 gfortran "$@"
+}
+tc-getFC () 
+{ 
+    tc-getPROG FC gfortran "$@"
+}
+tc-getGCJ () 
+{ 
+    tc-getPROG GCJ gcj "$@"
+}
+tc-getGO () 
+{ 
+    tc-getPROG GO gccgo "$@"
+}
+tc-getHIPCXX () 
+{ 
+    tc-getPROG HIPCXX "$(hipconfig --hipclangpath)/clang++" "$@"
+}
+tc-getLD () 
+{ 
+    tc-getPROG LD ld "$@"
+}
+tc-getNM () 
+{ 
+    tc-getPROG NM nm "$@"
+}
+tc-getOBJCOPY () 
+{ 
+    tc-getPROG OBJCOPY objcopy "$@"
+}
+tc-getOBJDUMP () 
+{ 
+    tc-getPROG OBJDUMP objdump "$@"
+}
+tc-getPKG_CONFIG () 
+{ 
+    tc-getPROG PKG_CONFIG pkg-config "$@"
+}
+tc-getPROG () 
+{ 
+    _tc-getPROG CHOST "$@"
+}
+tc-getRANLIB () 
+{ 
+    tc-getPROG RANLIB ranlib "$@"
+}
+tc-getRC () 
+{ 
+    tc-getPROG RC windres "$@"
+}
+tc-getREADELF () 
+{ 
+    tc-getPROG READELF readelf "$@"
+}
+tc-getSTRINGS () 
+{ 
+    tc-getPROG STRINGS strings "$@"
+}
+tc-getSTRIP () 
+{ 
+    tc-getPROG STRIP strip "$@"
+}
+tc-getTARGET_CPP () 
+{ 
+    if [[ -n ${CTARGET} ]]; then
+        _tc-getPROG CTARGET TARGET_CPP "gcc -E" "$@";
+    else
+        tc-getCPP "$@";
+    fi
+}
+tc-has-64bit-time_t () 
+{ 
+    $(tc-getCC) ${CFLAGS} ${CPPFLAGS} -c -x c - -o /dev/null <<-EOF &> /dev/null
+#include <sys/types.h>
+int test[sizeof(time_t) >= 8 ? 1 : -1];
+EOF
+
+    return $?
+}
+tc-has-tls () 
+{ 
+    local base="${T}/test-tc-tls";
+    cat <<-EOF > "${base}.c"
+int foo(int *i) {
+static __thread int j = 0;
+return *i ? j : *i;
+}
+EOF
+
+    local flags
+    case $1 in 
+        -s)
+            flags="-S"
+        ;;
+        -c)
+            flags="-c"
+        ;;
+        -l)
+
+        ;;
+        -*)
+            die "Usage: tc-has-tls [-c|-l] [toolchain prefix]"
+        ;;
+    esac;
+    case "${CHOST}" in 
+        *-darwin*)
+            : ${flags:=-dynamiclib}
+        ;;
+        *)
+            : ${flags:=-fPIC -shared -Wl,-z,defs}
+        ;;
+    esac;
+    [[ $1 == -* ]] && shift;
+    $(tc-getCC "$@") ${flags} "${base}.c" -o "${base}" >&/dev/null;
+    local ret=$?;
+    rm -f "${base}"*;
+    return ${ret}
+}
+tc-is-clang () 
+{ 
+    [[ $(tc-get-compiler-type) == clang ]]
+}
+tc-is-cross-compiler () 
+{ 
+    [[ ${CBUILD:-${CHOST}} != ${CHOST} ]]
+}
+tc-is-gcc () 
+{ 
+    [[ $(tc-get-compiler-type) == gcc ]]
+}
+tc-is-lto () 
+{ 
+    local f="${T}/test-lto.o";
+    local ret=1;
+    case $(tc-get-compiler-type) in 
+        clang)
+            $(tc-getCC) ${CFLAGS} -c -o "${f}" -x c - <<< "" || die;
+            llvm-bcanalyzer "${f}" &> /dev/null && ret=0
+        ;;
+        gcc)
+            $(tc-getCC) ${CFLAGS} -c -o "${f}" -x c - <<< "" || die;
+            [[ $($(tc-getOBJDUMP) -s "${f}") == *.gnu.lto* ]] && ret=0
+        ;;
+    esac;
+    rm -f "${f}" || die;
+    return "${ret}"
+}
+tc-is-softfloat () 
+{ 
+    tc-detect-is-softfloat || tc-tuple-is-softfloat
+}
+tc-is-static-only () 
+{ 
+    local host=${CTARGET:-${CHOST}};
+    [[ ${host} == *-mint* ]]
+}
+tc-ld-disable-gold () 
+{ 
+    tc-ld-is-gold "$@" && tc-ld-force-bfd "$@"
+}
+tc-ld-force-bfd () 
+{ 
+    if tc-ld-is-bfd "$@"; then
+        return;
+    fi;
+    ewarn "Forcing usage of the BFD linker";
+    local ld=$(unset LD; tc-getLD "$@");
+    local bfd_ld="${ld}.bfd";
+    local path_ld=$(type -P "${bfd_ld}" 2> /dev/null);
+    [[ -e ${path_ld} ]] && export LD=${bfd_ld};
+    if tc-is-gcc || tc-is-clang; then
+        export CFLAGS="${CFLAGS} -fuse-ld=bfd";
+        export CXXFLAGS="${CXXFLAGS} -fuse-ld=bfd";
+        export LDFLAGS="${LDFLAGS} -fuse-ld=bfd";
+    fi
+}
+tc-ld-is-bfd () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} != "GNU ld"* ]]; then
+        return 1;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ! ${out} =~ (^|'
+')"GNU ld".* ]]; then
+        return 1;
+    fi;
+    return 0
+}
+tc-ld-is-gold () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"GNU gold"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"GNU gold"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ld-is-lld () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"LLD"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"LLD"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ld-is-mold () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"mold"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"mold"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ninja_magic_to_arch () 
+{ 
+    function _tc_echo_kernel_alias () 
+    { 
+        [[ ${type} == "kern" ]] && echo $1 || echo $2
+    };
+    local type=$1;
+    local host=$2;
+    [[ -z ${host} ]] && host=${CTARGET:-${CHOST}};
+    case ${host} in 
+        arm64*)
+            echo arm64
+        ;;
+        aarch64*)
+            echo arm64
+        ;;
+        alpha*)
+            echo alpha
+        ;;
+        arc*)
+            echo arc
+        ;;
+        arm*)
+            echo arm
+        ;;
+        avr*)
+            _tc_echo_kernel_alias avr32 avr
+        ;;
+        bfin*)
+            _tc_echo_kernel_alias blackfin bfin
+        ;;
+        c6x*)
+            echo c6x
+        ;;
+        cris*)
+            echo cris
+        ;;
+        e2k*)
+            echo e2k
+        ;;
+        frv*)
+            echo frv
+        ;;
+        hexagon*)
+            echo hexagon
+        ;;
+        hppa*)
+            _tc_echo_kernel_alias parisc hppa
+        ;;
+        i?86*)
+            echo x86
+        ;;
+        ia64*)
+            echo ia64
+        ;;
+        loongarch*)
+            _tc_echo_kernel_alias loongarch loong
+        ;;
+        m68*)
+            echo m68k
+        ;;
+        metag*)
+            echo metag
+        ;;
+        microblaze*)
+            echo microblaze
+        ;;
+        mips*)
+            echo mips
+        ;;
+        nios2*)
+            echo nios2
+        ;;
+        nios*)
+            echo nios
+        ;;
+        or1k* | or32*)
+            echo openrisc
+        ;;
+        powerpc*)
+            if [[ ${type} == "kern" ]]; then
+                echo powerpc;
+            else
+                if [[ ${host} == powerpc64* ]]; then
+                    echo ppc64;
+                else
+                    echo ppc;
+                fi;
+            fi
+        ;;
+        riscv*)
+            echo riscv
+        ;;
+        s390*)
+            echo s390
+        ;;
+        score*)
+            echo score
+        ;;
+        sh64*)
+            _tc_echo_kernel_alias sh64 sh
+        ;;
+        sh*)
+            echo sh
+        ;;
+        sparc64*)
+            _tc_echo_kernel_alias sparc64 sparc
+        ;;
+        sparc*)
+            [[ ${PROFILE_ARCH} == "sparc64" ]] && _tc_echo_kernel_alias sparc64 sparc || echo sparc
+        ;;
+        tile*)
+            echo tile
+        ;;
+        vax*)
+            echo vax
+        ;;
+        x86_64*)
+            if [[ ${type} == "kern" ]]; then
+                echo x86;
+            else
+                echo amd64;
+            fi
+        ;;
+        xtensa*)
+            echo xtensa
+        ;;
+        *)
+            echo unknown
+        ;;
+    esac
+}
+tc-stack-grows-down () 
+{ 
+    case ${ARCH} in 
+        hppa | metag)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-tuple-is-softfloat () 
+{ 
+    local CTARGET=${CTARGET:-${CHOST}};
+    case ${CTARGET//_/-} in 
+        bfin* | h8300*)
+            echo "only"
+        ;;
+        *-softfloat-*)
+            echo "yes"
+        ;;
+        *-softfp-*)
+            echo "softfp"
+        ;;
+        arm*-hardfloat-* | arm*eabihf*)
+            echo "no"
+        ;;
+        *-newlib | *-elf | *-eabi)
+            echo "no"
+        ;;
+        arm64-apple-darwin*)
+            echo "no"
+        ;;
+        arm*)
+            echo "yes"
+        ;;
+        *)
+            echo "no"
+        ;;
+    esac
+}

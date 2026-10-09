@@ -1,0 +1,2 @@
+declare -x MY_KEEP="k"
+declare -x D="v"

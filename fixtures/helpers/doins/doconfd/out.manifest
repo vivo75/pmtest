@@ -1,0 +1,3 @@
+d 0755 1000 100 - - etc
+d 0755 1000 100 - - etc/conf.d
+f 0644 1000 100 14 sha256:f40bd408926e1627d5f3822f9ff9168a5b2c72a50930dc8cdaabf458d618894c etc/conf.d/file.txt

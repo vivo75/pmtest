@@ -1,0 +1,24 @@
+# #326 Z close-out, leg (a) [nopy]: the Python-free list.
+#
+# app-portage/eix and app-shells/bash (no python-any-r1 in their build
+# closure) plus the P0 probe ebuilds (one per vendored-runtime helper
+# family: unpack/chmod-lite, doins, docompress/ecompress-file,
+# package/gpkg+xpak). Every atom builds from source with --buildpkg
+# (gpkg), then re-merges with --usepkgonly, in the [nopy] image (no
+# sys-apps/portage, no python interpreters) with PM_BARE=1 mounts:
+#
+#   differential-test-bed/run/nopy-build.sh --variant nopy --reinstall \
+#       $(grep -v '^#' differential-test-bed/atomlists/z326-nopy.txt | grep -v '^$')
+#
+# (or the whole close-out through run/z326-closeout.sh).
+#
+# app-shells/bash is already installed in the image at the resolved
+# version, so the --reinstall flag matters: without it emerge treats
+# bash as satisfied and no bash binpkg is produced.
+
+app-portage/eix
+app-shells/bash
+porttest/helper-unpack
+porttest/helper-doins
+porttest/helper-docompress
+porttest/helper-package

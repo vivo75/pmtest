@@ -1,0 +1,319 @@
+declare -x A="miscfiles-1.5.tar.gz UnicodeData-10.0.0.txt.xz"
+declare -x ABI="amd64"
+declare -x ABI_MIPS=""
+declare -x ABI_S390=""
+declare -x ABI_X86="64"
+declare -x ADA_TARGET=""
+declare -x ALSA_CARDS=""
+declare -x AMDGPU_TARGETS=""
+declare -x APACHE2_MODULES=""
+declare -x APACHE2_MPMS=""
+declare -x ARCH="amd64"
+declare BDEPEND=""
+declare -x BINPKG_FORMAT="gpkg"
+declare -x BINPKG_GPG_SIGNING_BASE_COMMAND="/usr/bin/flock /run/lock/portage-binpkg-gpg.lock /usr/bin/gpg --sign --armor [PORTAGE_CONFIG]"
+declare -x BINPKG_GPG_SIGNING_DIGEST="SHA512"
+declare -x BINPKG_GPG_VERIFY_BASE_COMMAND="/usr/bin/gpg --verify --batch --no-tty --no-auto-check-trustdb --status-fd 2 [PORTAGE_CONFIG] [SIGNATURE]"
+declare -x BINPKG_GPG_VERIFY_GPG_HOME="/etc/portage/gnupg"
+declare -x BOOTSTRAP_USE="unicode pkg-config split-usr xml python_targets_python3_14 python_single_target_python3_14 multilib zstd cet systemd sysv-utils udev"
+declare -x CALLIGRA_FEATURES=""
+declare -x CAMERAS=""
+declare -x CATEGORY="sys-apps"
+declare -x CBUILD="x86_64-pc-linux-gnu"
+declare -x CFLAGS="-O2 -pipe"
+declare -x CFLAGS_amd64="-m64"
+declare -x CFLAGS_x32="-mx32"
+declare -x CFLAGS_x86="-m32 -mfpmath=sse"
+declare -x CHOST="x86_64-pc-linux-gnu"
+declare -x CHOST_amd64="x86_64-pc-linux-gnu"
+declare -x CHOST_x32="x86_64-pc-linux-gnux32"
+declare -x CHOST_x86="i686-pc-linux-gnu"
+declare -x COLLECTD_PLUGINS=""
+declare -x COMMON_FLAGS="-O2 -pipe"
+declare -x CONF_PREFIX="/usr"
+declare -x CPU_FLAGS_ARM=""
+declare -x CPU_FLAGS_PPC=""
+declare -x CPU_FLAGS_X86=""
+declare -x CURL_QUIC=""
+declare -x CURL_SSL=""
+declare -x CXXFLAGS="-O2 -pipe"
+declare -x DEFAULT_ABI="amd64"
+declare -x DEFINED_PHASES=" configure install postinst prepare"
+declare DEPEND=""
+declare DESCRIPTION="Miscellaneous files"
+declare -x DIROPTIONS="-m0755"
+declare -x EAPI="7"
+declare -- ECONF_SOURCE="."
+declare -x ELIBC="glibc"
+declare -x ENV_UNSET="CARGO_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY GDK_PIXBUF_MODULE_FILE GOBIN GOPATH PERL5LIB PERL5OPT PERLPREFIX PERL_CORE PERL_MB_OPT PERL_MM_OPT XAUTHORITY XDG_CACHE_HOME XDG_CONFIG_DIRS XDG_CONFIG_HOME XDG_DATA_DIRS XDG_DATA_HOME XDG_RUNTIME_DIR XDG_STATE_HOME"
+declare -x EXEOPTIONS="-m0755"
+declare -x FCFLAGS="-O2 -pipe"
+declare -x FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg buildpkg-live compress-index config-protect-if-modified distlocks ebuild-locks filecaps fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news noinfo observability parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox split-elog split-log splitdebug strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+declare -x FFLAGS="-O2 -pipe"
+declare -x GCC_SPECS=""
+declare -x GPG_VERIFY_GROUP_DROP="nogroup"
+declare -x GPG_VERIFY_USER_DROP="nobody"
+declare -x GPSD_PROTOCOLS=""
+declare -x GRUB_PLATFORMS=""
+declare -x GUILE_SINGLE_TARGET=""
+declare -x GUILE_TARGETS=""
+declare HOMEPAGE="https://savannah.gnu.org/projects/miscfiles/"
+declare IDEPEND=""
+declare INHERITED
+declare -x INPUT_DEVICES=""
+declare -x INSOPTIONS="-m0644"
+declare IUSE="minimal "
+declare -x IUSE_EFFECTIVE="abi_x86_64 alpha amd64 arm arm64 arm64-macos elibc_Darwin elibc_SunOS elibc_bionic elibc_glibc elibc_mingw elibc_musl hppa kernel_Darwin kernel_Hurd kernel_SunOS kernel_linux loong m68k minimal mips ppc ppc64 prefix prefix-guest prefix-stack riscv s390 sparc x64-macos x64-solaris x86"
+declare -x IUSE_IMPLICIT="abi_x86_64 prefix prefix-guest prefix-stack"
+declare -x KERNEL="linux"
+declare -x KEYWORDS="~alpha amd64 arm arm64 ~hppa ~loong ~m68k ~mips ppc ppc64 ~riscv ~s390 ~sparc x86 ~x64-macos"
+declare -x L10N=""
+declare -x L1_JOBS="1"
+declare -x L1_SKIP_PORTAGE_UPGRADE="0"
+declare -x LANG="C.UTF-8"
+declare -x LCD_DEVICES=""
+declare -x LC_ADDRESS="C.UTF-8"
+declare -x LC_COLLATE="C.UTF-8"
+declare -x LC_CTYPE="C.UTF-8"
+declare -x LC_IDENTIFICATION="C.UTF-8"
+declare -x LC_MEASUREMENT="C.UTF-8"
+declare -x LC_MESSAGES="C.UTF-8"
+declare -x LC_MONETARY="C.UTF-8"
+declare -x LC_NAME="C.UTF-8"
+declare -x LC_NUMERIC="C.UTF-8"
+declare -x LC_PAPER="C.UTF-8"
+declare -x LC_TELEPHONE="C.UTF-8"
+declare -x LC_TIME="C.UTF-8"
+declare -x LDFLAGS="-Wl,-O1 -Wl,--as-needed -Wl,-z,pack-relative-relocs"
+declare -x LDFLAGS_amd64="-m elf_x86_64"
+declare -x LDFLAGS_x32="-m elf32_x86_64"
+declare -x LDFLAGS_x86="-m elf_i386"
+declare -x LEX="flex"
+declare -x LIBDIR_amd64="lib64"
+declare -x LIBDIR_x32="libx32"
+declare -x LIBDIR_x86="lib"
+declare -x LIBOPTIONS="-m0644"
+declare -x LIBREOFFICE_EXTENSIONS=""
+declare -x LICENSE="GPL-2 unicode"
+declare -x LLVM_SLOT=""
+declare -x LLVM_TARGETS=""
+declare -x LUA_SINGLE_TARGET=""
+declare -x LUA_TARGETS=""
+declare -x MANPAGER="manpager"
+declare -x MULTILIB_ABIS="amd64 x86"
+declare -x MULTILIB_STRICT_DENY="64-bit.*shared object"
+declare -x MULTILIB_STRICT_DIRS="/lib32 /lib /usr/lib32 /usr/lib /usr/kde/*/lib32 /usr/kde/*/lib /usr/qt/*/lib32 /usr/qt/*/lib /usr/X11R6/lib32 /usr/X11R6/lib"
+declare -x MULTILIB_STRICT_EXEMPT="(perl5|gcc|binutils|eclipse-3|debug|portage|udev|systemd|clang|python-exec|llvm)"
+declare -x NGINX_MODULES_HTTP=""
+declare -x NGINX_MODULES_MAIL=""
+declare -x NGINX_MODULES_STREAM=""
+declare -x OFFICE_IMPLEMENTATION=""
+declare -x OPENMPI_FABRICS=""
+declare -x OPENMPI_OFED_FEATURES=""
+declare -x OPENMPI_RM=""
+declare -x P="miscfiles-1.5"
+declare PDEPEND=""
+declare -x PERL_FEATURES=""
+declare -x PF="miscfiles-1.5-r4"
+declare -x PHP_TARGETS=""
+declare -x PN="miscfiles"
+declare -x PORTAGE_BZIP2_COMMAND="bzip2"
+declare -x PORTAGE_COMPRESSION_COMMAND="zstd -T1"
+declare -x PORTAGE_FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg buildpkg-live compress-index config-protect-if-modified distlocks ebuild-locks filecaps fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news noinfo observability parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox split-elog split-log splitdebug strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+declare -x PORTAGE_REPO_REVISIONS="{}"
+declare -x POSTGRES_TARGETS=""
+declare -x PR="r4"
+declare -x PROFILE_ONLY_VARIABLES="ARCH ELIBC IUSE_IMPLICIT KERNEL USE_EXPAND_IMPLICIT USE_EXPAND_UNPREFIXED USE_EXPAND_VALUES_ARCH USE_EXPAND_VALUES_ELIBC USE_EXPAND_VALUES_KERNEL"
+declare -- PROPERTIES=""
+declare -x PV="1.5"
+declare -x PVR="1.5-r4"
+declare -x PYTHONDONTWRITEBYTECODE="1"
+declare -x PYTHON_SINGLE_TARGET=""
+declare -x PYTHON_TARGETS=""
+declare RDEPEND=""
+declare REPOSITORY
+declare REQUIRED_USE=""
+declare RESTRICT=""
+declare -x RUBY_TARGETS=""
+declare -x RUST_SYSROOTS=""
+declare -x SANE_BACKENDS=""
+declare -x SELINUX_POLICY_TYPES=""
+declare -- SHELL="/bin/bash"
+declare -x SLOT="0"
+declare SRC_URI=$'mirror://gnu/miscfiles/miscfiles-1.5.tar.gz\n\tmirror://gentoo/0b/UnicodeData-10.0.0.txt.xz'
+declare -x SYMLINK_LIB="no"
+declare -x TWISTED_DISABLE_WRITING_OF_PLUGIN_CACHE="1"
+declare -x TZ="UTC"
+declare -- UNI_PV="10.0.0"
+declare -x USE="abi_x86_64 amd64 elibc_glibc kernel_linux"
+declare -x USERLAND="GNU"
+declare -x USE_EXPAND_IMPLICIT="ARCH ELIBC KERNEL"
+declare -x USE_EXPAND_UNPREFIXED="ARCH"
+declare -x USE_EXPAND_VALUES_ARCH="alpha amd64 arm arm64 arm64-macos hppa loong m68k mips ppc ppc64 riscv s390 sparc x64-macos x64-solaris x86"
+declare -x USE_EXPAND_VALUES_ELIBC="bionic Darwin glibc mingw musl SunOS"
+declare -x USE_EXPAND_VALUES_KERNEL="Darwin Hurd linux SunOS"
+declare -x UWSGI_PLUGINS=""
+declare -x VIDEO_CARDS=""
+declare -x VOICEMAIL_STORAGE=""
+declare -x XTABLES_ADDONS=""
+declare -x ac_cv_c_undeclared_builtin_options="none needed"
+declare -x container="podman"
+declare -x enable_year2038="no"
+declare -- f
+declare -x gl_cv_compiler_check_decl_option="-Werror=implicit-function-declaration"
+declare -x gl_cv_func_getcwd_path_max="yes"
+declare -- x=""
+__pipestatus () 
+{ 
+    local status=("${PIPESTATUS[@]}") s ret=0;
+    for s in "${status[@]}";
+    do
+        [[ ${s} -ne 0 ]] && ret=${s};
+    done;
+    return "${ret}"
+}
+aclocal () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'aclocal' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'aclocal' directly."
+        ;;
+    esac;
+    /usr/bin/aclocal "$@";
+    return $?
+}
+autoconf () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'autoconf' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'autoconf' directly."
+        ;;
+    esac;
+    /usr/bin/autoconf "$@";
+    return $?
+}
+automake () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'automake' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'automake' directly."
+        ;;
+    esac;
+    /usr/bin/automake "$@";
+    return $?
+}
+libtoolize () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'libtoolize' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'libtoolize' directly."
+        ;;
+    esac;
+    /usr/bin/libtoolize "$@";
+    return $?
+}
+pkg_nofetch () 
+{ 
+    default
+}
+pkg_postinst () 
+{ 
+    if [[ -z ${ROOT} ]] && type -P create-cracklib-dict > /dev/null; then
+        ebegin "Regenerating cracklib dictionary";
+        create-cracklib-dict "${EPREFIX}"/usr/share/dict/* > /dev/null;
+        eend $?;
+    fi;
+    return 0
+}
+pre_source_sandbox () 
+{ 
+    export SANDBOX_ON=1;
+    export SANDBOX_PREDICT="";
+    export SANDBOX_READ="${EBUILD}:${BASH_SOURCE[1]}:${SANDBOX_LOG}";
+    export SANDBOX_WRITE="${SANDBOX_LOG}:/dev/null";
+    [[ ${PORTAGE_DEBUG} != 1 ]] || export SANDBOX_DEBUG=1;
+    local repo_location;
+    for repo_location in "${PORTAGE_ECLASS_LOCATIONS[@]}";
+    do
+        local potential_location="${repo_location}/eclass";
+        if [[ -d ${potential_location} ]]; then
+            SANDBOX_READ+=":${potential_location}";
+        fi;
+    done;
+    function adddeny () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addpredict () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addread () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addwrite () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    readonly SANDBOX_{ALLOW,ACTIVE,DENY,DEBUG,ON,PREDICT,READ,WRITE}
+}
+src_compile () 
+{ 
+    default
+}
+src_configure () 
+{ 
+    econf --datadir="${EPREFIX}"/usr/share/misc
+}
+src_install () 
+{ 
+    emake install DESTDIR="${D}";
+    dodoc NEWS ORIGIN README dict-README;
+    dodir /usr/share/dict;
+    cd "${ED}"/usr/share/misc || die;
+    mv $(awk '$1=="dictfiles"{$1="";$2="";print}' "${S}"/Makefile) ../dict/ || die;
+    cd ../dict || die;
+    ln -s web2 words || die;
+    ln -s web2a extra.words || die;
+    if use minimal; then
+        pushd "${ED}"/usr/share/dict || die;
+        rm -f words extra.words || die;
+        gzip -9 * || die;
+        ln -s web2.gz words || die;
+        ln -s web2a.gz extra.words || die;
+        ln -s connectives{.gz,} || die;
+        ln -s propernames{.gz,} || die;
+        popd || die;
+        rm -r "${ED}"/usr/share/misc || die;
+    fi
+}
+src_prepare () 
+{ 
+    default;
+    mv "${WORKDIR}"/UnicodeData-${UNI_PV}.txt unicode || die
+}
+src_test () 
+{ 
+    default
+}
+src_unpack () 
+{ 
+    default
+}

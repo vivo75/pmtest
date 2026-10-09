@@ -1,0 +1,33 @@
+chmod-lite oracle case: symlinks
+
+Isolates symlink handling on both levels: the find driver never passes
+top-level symlinks to the helper (! -type l), and inside a processed
+tree apply_secpass_permissions leaves symlinks alone (follow_links is
+False, "mode doesn't matter for symlinks") and os.walk does not descend
+into symlinked dirs. The dir-a subtree is still fixed through its real
+path; every symlink keeps its target, including the dangling ones, and
+the top-level links are byte-identical before and after.
+If the native port regressed to following symlinks, the walk would
+descend through link-to-dir and dangling links would error; if it lost
+the find-side skip, the top-level links would vanish from out.manifest
+or gain modes.
+
+Run exactly as the unpack phase runs it (bin/phase-helpers.sh):
+  cd <tree>
+  find . -mindepth 1 -maxdepth 1 ! -type l \
+    -exec <checkout>/bin/chmod-lite {} +
+with PORTAGE_BIN_PATH=<checkout>/bin,
+PORTAGE_PYM_PATH=<checkout>/lib, PORTAGE_PYTHON=/usr/bin/python.
+File contents are empty (out of scope: only type/mode/path/target
+are recorded); symlink modes are always ----.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 0022
+  staging: scratch dir directly
+  generator-locale: LC_ALL=unset LC_CTYPE=unset LANG=C.utf8 charmap=UTF-8
+  date: 2026-10-08 (UTC day granularity; the only field that may change
+    between regenerations)
+  root-vs-user: identical

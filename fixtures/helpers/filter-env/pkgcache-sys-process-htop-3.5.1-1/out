@@ -1,0 +1,2116 @@
+declare -x ABI="amd64"
+declare -x ABI_MIPS=""
+declare -x ABI_S390=""
+declare -x ABI_X86="64"
+declare -x ADA_TARGET=""
+declare -x ALSA_CARDS=""
+declare -x AMDGPU_TARGETS=""
+declare -x APACHE2_MODULES=""
+declare -x APACHE2_MPMS=""
+declare -x ARCH="amd64"
+declare BDEPEND="virtual/pkgconfig "
+declare -x BINPKG_FORMAT="gpkg"
+declare -x BINPKG_GPG_SIGNING_BASE_COMMAND="/usr/bin/flock /run/lock/portage-binpkg-gpg.lock /usr/bin/gpg --sign --armor [PORTAGE_CONFIG]"
+declare -x BINPKG_GPG_SIGNING_DIGEST="SHA512"
+declare -x BINPKG_GPG_VERIFY_BASE_COMMAND="/usr/bin/gpg --verify --batch --no-tty --no-auto-check-trustdb --status-fd 2 [PORTAGE_CONFIG] [SIGNATURE]"
+declare -x BINPKG_GPG_VERIFY_GPG_HOME="/etc/portage/gnupg"
+declare -x BOOTSTRAP_USE="unicode pkg-config split-usr xml python_targets_python3_14 python_single_target_python3_14 multilib zstd cet systemd sysv-utils udev"
+declare -x CALLIGRA_FEATURES=""
+declare -x CAMERAS=""
+declare -x CBUILD="x86_64-pc-linux-gnu"
+declare -x CFLAGS="-O2 -pipe"
+declare -x CFLAGS_amd64="-m64"
+declare -x CFLAGS_x32="-mx32"
+declare -x CFLAGS_x86="-m32 -mfpmath=sse"
+declare -- CHECKCONFIG_DONOTHING=""
+declare -x CHOST="x86_64-pc-linux-gnu"
+declare -x CHOST_amd64="x86_64-pc-linux-gnu"
+declare -x CHOST_x32="x86_64-pc-linux-gnux32"
+declare -x CHOST_x86="i686-pc-linux-gnu"
+declare -x COLLECTD_PLUGINS=""
+declare -x COMMON_FLAGS="-O2 -pipe"
+declare -- CONFIG_CHECK="~TASKSTATS ~TASK_XACCT ~TASK_IO_ACCOUNTING ~CGROUPS"
+declare -x CONF_PREFIX="/usr"
+declare -x CPU_FLAGS_ARM=""
+declare -x CPU_FLAGS_PPC=""
+declare -x CPU_FLAGS_X86=""
+declare -x CURL_QUIC=""
+declare -x CURL_SSL=""
+declare -x CXXFLAGS="-O2 -pipe"
+declare -x DEFAULT_ABI="amd64"
+declare -x DEFINED_PHASES=" configure postinst postrm prepare setup"
+declare DEPEND=$'\n\tsys-libs/ncurses:=[unicode(+)?]\n\tbfd? ( sys-libs/binutils-libs:= )\n\thwloc? ( sys-apps/hwloc:= )\n\tunwind? (\n\t\t!llvm-libunwind? ( sys-libs/libunwind:= )\n\t\tllvm-libunwind? ( llvm-runtimes/libunwind:= )\n\t)\n\tkernel_linux? (\n\t\tcaps? ( sys-libs/libcap )\n\t\tdelayacct? ( dev-libs/libnl:3 )\n\t\tlm-sensors? ( sys-apps/lm-sensors )\n\t)\n '
+declare DESCRIPTION="Interactive process viewer"
+declare -- DESKTOP_DATABASE_DIR="/usr/share/applications"
+declare -x DIROPTIONS="-m0755"
+declare -a DOCS=([0]="ChangeLog" [1]="README.md")
+declare -x EAPI="8"
+declare -- ECONF_SOURCE="."
+declare -x ELIBC="glibc"
+declare -x ENV_UNSET="CARGO_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY GDK_PIXBUF_MODULE_FILE GOBIN GOPATH PERL5LIB PERL5OPT PERLPREFIX PERL_CORE PERL_MB_OPT PERL_MM_OPT XAUTHORITY XDG_CACHE_HOME XDG_CONFIG_DIRS XDG_CONFIG_HOME XDG_DATA_DIRS XDG_DATA_HOME XDG_RUNTIME_DIR XDG_STATE_HOME"
+declare -x EXEOPTIONS="-m0755"
+declare -- E_IDEPEND="filecaps? ( sys-libs/libcap )"
+declare -x FCFLAGS="-O2 -pipe"
+declare -x FFLAGS="-O2 -pipe"
+declare -x GCC_SPECS=""
+declare -x GPG_VERIFY_GROUP_DROP="nogroup"
+declare -x GPG_VERIFY_USER_DROP="nobody"
+declare -x GPSD_PROTOCOLS=""
+declare -x GRUB_PLATFORMS=""
+declare -x GUILE_SINGLE_TARGET=""
+declare -x GUILE_TARGETS=""
+declare HOMEPAGE="https://htop.dev/ https://github.com/htop-dev/htop"
+declare IDEPEND="filecaps? ( sys-libs/libcap )"
+declare -x INHERITED=" fcaps toolchain-funcs linux-info optfeature xdg-utils"
+declare -x INPUT_DEVICES=""
+declare -x INSOPTIONS="-m0644"
+declare IUSE="bfd caps debug delayacct hwloc lm-sensors llvm-libunwind openvz unicode unwind vserver +filecaps"
+declare -x IUSE_EFFECTIVE="abi_x86_64 alpha amd64 arm arm64 arm64-macos bfd caps debug delayacct elibc_Darwin elibc_SunOS elibc_bionic elibc_glibc elibc_mingw elibc_musl filecaps hppa hwloc kernel_Darwin kernel_Hurd kernel_SunOS kernel_linux llvm-libunwind lm-sensors loong m68k mips openvz ppc ppc64 prefix prefix-guest prefix-stack riscv s390 sparc unicode unwind vserver x64-macos x64-solaris x86"
+declare -x IUSE_IMPLICIT="abi_x86_64 prefix prefix-guest prefix-stack"
+declare -x KERNEL="linux"
+declare -- KERNEL_DIR="/usr/src/linux"
+declare -- KERNEL_MAKEFILE=""
+declare -x KEYWORDS="~alpha amd64 arm arm64 ~hppa ~loong ~mips ppc ppc64 ~riscv ~s390 ~sparc x86 ~arm64-macos ~x64-macos"
+declare -- KV_EXTRA="-serv"
+declare -- KV_FULL="6.18.39-serv"
+declare -- KV_MAJOR="6"
+declare -- KV_MINOR="18"
+declare -- KV_PATCH="39"
+declare -x L10N=""
+declare -x L1_JOBS="1"
+declare -x L1_SKIP_PORTAGE_UPGRADE="0"
+declare -x LANG="C.UTF-8"
+declare -x LCD_DEVICES=""
+declare -x LC_ADDRESS="C.UTF-8"
+declare -x LC_COLLATE="C.UTF-8"
+declare -x LC_CTYPE="C.UTF-8"
+declare -x LC_IDENTIFICATION="C.UTF-8"
+declare -x LC_MEASUREMENT="C.UTF-8"
+declare -x LC_MESSAGES="C.UTF-8"
+declare -x LC_MONETARY="C.UTF-8"
+declare -x LC_NAME="C.UTF-8"
+declare -x LC_NUMERIC="C.UTF-8"
+declare -x LC_PAPER="C.UTF-8"
+declare -x LC_TELEPHONE="C.UTF-8"
+declare -x LC_TIME="C.UTF-8"
+declare -x LDFLAGS="-Wl,-O1 -Wl,--as-needed -Wl,-z,pack-relative-relocs"
+declare -x LDFLAGS_amd64="-m elf_x86_64"
+declare -x LDFLAGS_x32="-m elf32_x86_64"
+declare -x LDFLAGS_x86="-m elf_i386"
+declare -x LEX="flex"
+declare -x LIBDIR_amd64="lib64"
+declare -x LIBDIR_x32="libx32"
+declare -x LIBDIR_x86="lib"
+declare -x LIBOPTIONS="-m0644"
+declare -x LIBREOFFICE_EXTENSIONS=""
+declare -x LICENSE="GPL-2+"
+declare -x LINUX_CONFIG_EXISTS_DONE=""
+declare -x LLVM_SLOT=""
+declare -x LLVM_TARGETS=""
+declare -x LUA_SINGLE_TARGET=""
+declare -x LUA_TARGETS=""
+declare -x MANPAGER="manpager"
+declare -- MIMEINFO_DATABASE_DIR="/usr/share/mime"
+declare -x MULTILIB_ABIS="amd64 x86"
+declare -x MULTILIB_STRICT_DENY="64-bit.*shared object"
+declare -x MULTILIB_STRICT_DIRS="/lib32 /lib /usr/lib32 /usr/lib /usr/kde/*/lib32 /usr/kde/*/lib /usr/qt/*/lib32 /usr/qt/*/lib /usr/X11R6/lib32 /usr/X11R6/lib"
+declare -x MULTILIB_STRICT_EXEMPT="(perl5|gcc|binutils|eclipse-3|debug|portage|udev|systemd|clang|python-exec|llvm)"
+declare -x NGINX_MODULES_HTTP=""
+declare -x NGINX_MODULES_MAIL=""
+declare -x NGINX_MODULES_STREAM=""
+declare -x OFFICE_IMPLEMENTATION=""
+declare -x OPENMPI_FABRICS=""
+declare -x OPENMPI_OFED_FEATURES=""
+declare -x OPENMPI_RM=""
+declare PDEPEND=""
+declare -x PERL_FEATURES=""
+declare -x PHP_TARGETS=""
+declare -x PORTAGE_BZIP2_COMMAND="bzip2"
+declare -x PORTAGE_COMPRESSION_COMMAND="zstd -T1"
+declare -x PORTAGE_REPO_REVISIONS="{}"
+declare -x POSTGRES_TARGETS=""
+declare -x PROFILE_ONLY_VARIABLES="ARCH ELIBC IUSE_IMPLICIT KERNEL USE_EXPAND_IMPLICIT USE_EXPAND_UNPREFIXED USE_EXPAND_VALUES_ARCH USE_EXPAND_VALUES_ELIBC USE_EXPAND_VALUES_KERNEL"
+declare -- PROPERTIES=""
+declare -x PYTHONDONTWRITEBYTECODE="1"
+declare -x PYTHON_SINGLE_TARGET=""
+declare -x PYTHON_TARGETS=""
+declare -a QA_CONFIG_IMPL_DECL_SKIP=([0]="typeof")
+declare RDEPEND=$'\n\tsys-libs/ncurses:=[unicode(+)?]\n\tbfd? ( sys-libs/binutils-libs:= )\n\thwloc? ( sys-apps/hwloc:= )\n\tunwind? (\n\t\t!llvm-libunwind? ( sys-libs/libunwind:= )\n\t\tllvm-libunwind? ( llvm-runtimes/libunwind:= )\n\t)\n\tkernel_linux? (\n\t\tcaps? ( sys-libs/libcap )\n\t\tdelayacct? ( dev-libs/libnl:3 )\n\t\tlm-sensors? ( sys-apps/lm-sensors )\n\t)\n '
+declare REPOSITORY
+declare REQUIRED_USE=""
+declare RESTRICT=""
+declare -x RUBY_TARGETS=""
+declare -x RUST_SYSROOTS=""
+declare -x SANE_BACKENDS=""
+declare -x SELINUX_POLICY_TYPES=""
+declare -- SHELL="/bin/bash"
+declare -- SKIP_KERNEL_CHECK=""
+declare -x SLOT="0"
+declare SRC_URI="https://github.com/htop-dev/htop/releases/download/3.5.1/htop-3.5.1.tar.xz"
+declare -x SYMLINK_LIB="no"
+declare -x TWISTED_DISABLE_WRITING_OF_PLUGIN_CACHE="1"
+declare -x TZ="UTC"
+declare -x USE="abi_x86_64 amd64 elibc_glibc filecaps kernel_linux unicode"
+declare -x USERLAND="GNU"
+declare -x USE_EXPAND_IMPLICIT="ARCH ELIBC KERNEL"
+declare -x USE_EXPAND_UNPREFIXED="ARCH"
+declare -x USE_EXPAND_VALUES_ARCH="alpha amd64 arm arm64 arm64-macos hppa loong m68k mips ppc ppc64 riscv s390 sparc x64-macos x64-solaris x86"
+declare -x USE_EXPAND_VALUES_ELIBC="bionic Darwin glibc mingw musl SunOS"
+declare -x USE_EXPAND_VALUES_KERNEL="Darwin Hurd linux SunOS"
+declare -x UWSGI_PLUGINS=""
+declare -x VIDEO_CARDS=""
+declare -x VOICEMAIL_STORAGE=""
+declare -- WARNING_CGROUPS="CONFIG_CGROUPS is required for the cgroups column in htop"
+declare -x XTABLES_ADDONS=""
+declare -- _FCAPS_ECLASS="1"
+declare -x _LINUX_CONFIG_EXISTS_DONE="1"
+declare -- _LINUX_INFO_ECLASS="1"
+declare -- _OPTFEATURE_DEFAULT_HEADER="Install additional packages for optional runtime features:"
+declare -- _OPTFEATURE_DOHEADER="true"
+declare -- _OPTFEATURE_ECLASS="1"
+declare -- _OPTFEATURE_HEADER=""
+declare -- _TOOLCHAIN_FUNCS_ECLASS="1"
+declare -x ac_cv_c_undeclared_builtin_options="none needed"
+declare -x container="podman"
+declare -x enable_year2038="no"
+declare -- f
+declare -- get_version_warning_done="1"
+declare -x gl_cv_compiler_check_decl_option="-Werror=implicit-function-declaration"
+declare -x gl_cv_func_getcwd_path_max="yes"
+declare -- x=""
+__pipestatus () 
+{ 
+    local status=("${PIPESTATUS[@]}") s ret=0;
+    for s in "${status[@]}";
+    do
+        [[ ${s} -ne 0 ]] && ret=${s};
+    done;
+    return "${ret}"
+}
+_clang_fullversion () 
+{ 
+    local ver="$1";
+    shift;
+    set -- $($(tc-getCC "$@") -E -P - <<< "__clang_major__ __clang_minor__ __clang_patchlevel__");
+    eval echo "${ver}"
+}
+_gcc-install-dir () 
+{ 
+    echo "$(LC_ALL=C $(tc-getCC) -print-search-dirs 2> /dev/null | awk '$1=="install:" {print $2}')"
+}
+_gcc-specs-directive_raw () 
+{ 
+    local cc=$(tc-getCC);
+    local specfiles=$(LC_ALL=C ${cc} -v 2>&1 | awk '$1=="Reading" {print $NF}');
+    ${cc} -dumpspecs 2> /dev/null | cat - ${specfiles} | awk -v directive=$1 'BEGIN	{ pspec=""; spec=""; outside=1 }
+$1=="*"directive":"  { pspec=spec; spec=""; outside=0; next }
+	outside || NF==0 || ( substr($1,1,1)=="*" && substr($1,length($1),1)==":" ) { outside=1; next }
+	spec=="" && substr($0,1,1)=="+" { spec=pspec " " substr($0,2); next }
+	{ spec=spec $0 }
+END	{ print spec }';
+    return 0
+}
+_gcc-specs-exists () 
+{ 
+    [[ -f $(_gcc-install-dir)/$1 ]]
+}
+_gcc_fullversion () 
+{ 
+    local ver="$1";
+    shift;
+    set -- $($(tc-getCC "$@") -E -P - <<< "__GNUC__ __GNUC_MINOR__ __GNUC_PATCHLEVEL__");
+    eval echo "${ver}"
+}
+_tc-getPROG () 
+{ 
+    local tuple=$1;
+    local v var vars=$2;
+    local prog=($3);
+    var=${vars%% *};
+    for v in ${vars};
+    do
+        if [[ -n ${!v} ]]; then
+            export ${var}="${!v}";
+            echo "${!v}";
+            return 0;
+        fi;
+    done;
+    local search=;
+    [[ -n $4 ]] && search=$(type -p $4-${prog[0]});
+    [[ -z ${search} && -n ${!tuple} ]] && search=$(type -p ${!tuple}-${prog[0]});
+    [[ -n ${search} ]] && prog[0]=${search##*/};
+    export ${var}="${prog[*]}";
+    echo "${!var}"
+}
+_tc-has-openmp () 
+{ 
+    local base="${T}/test-tc-openmp";
+    cat <<-EOF > "${base}.c"
+#include <omp.h>
+int main(void) {
+int nthreads, tid, ret = 0;
+#pragma omp parallel private(nthreads, tid)
+{
+tid = omp_get_thread_num();
+nthreads = omp_get_num_threads();
+ret += tid + nthreads;
+}
+return ret;
+}
+EOF
+
+    $(tc-getCC "$@") -fopenmp "${base}.c" -o "${base}" >&/dev/null;
+    local ret=$?;
+    rm -f "${base}"*;
+    return ${ret}
+}
+aclocal () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'aclocal' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'aclocal' directly."
+        ;;
+    esac;
+    /usr/bin/aclocal "$@";
+    return $?
+}
+autoconf () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'autoconf' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'autoconf' directly."
+        ;;
+    esac;
+    /usr/bin/autoconf "$@";
+    return $?
+}
+automake () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'automake' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'automake' directly."
+        ;;
+    esac;
+    /usr/bin/automake "$@";
+    return $?
+}
+check_extra_config () 
+{ 
+    use kernel_linux || return;
+    local config negate die error reworkmodulenames;
+    local soft_errors_count=0 hard_errors_count=0 config_required=0;
+    local old_LINUX_CONFIG_EXISTS_DONE="${_LINUX_CONFIG_EXISTS_DONE}";
+    linux-info_get_any_version;
+    for config in ${CONFIG_CHECK};
+    do
+        if [[ "${config:0:1}" != "~" ]]; then
+            config_required=1;
+            break;
+        fi;
+    done;
+    if [[ ${config_required} == 0 ]]; then
+        if ! linux_config_exists; then
+            ewarn "Unable to check for the following kernel config options due";
+            ewarn "to absence of any configured kernel sources or compiled";
+            ewarn "config:";
+            for config in ${CONFIG_CHECK};
+            do
+                config=${config#\~};
+                config=${config#\!};
+                local_error="ERROR_${config}";
+                msg="${!local_error}";
+                if [[ -z ${msg} ]]; then
+                    local_error="WARNING_${config}";
+                    msg="${!local_error}";
+                fi;
+                ewarn " - ${config}${msg:+ - }${msg}";
+            done;
+            ewarn "You're on your own to make sure they are set if needed.";
+            export LINUX_CONFIG_EXISTS_DONE="${old_LINUX_CONFIG_EXISTS_DONE}";
+            return 0;
+        fi;
+    else
+        if ! linux_config_exists; then
+            qeerror "Could not find a neither a usable .config in the kernel source directory";
+            qeerror "nor a /proc/config.gz file,";
+            qeerror "Please ensure that ${KERNEL_DIR} points to a configured set of Linux sources.";
+            qeerror "If you are using KBUILD_OUTPUT, please set the environment var so that";
+            qeerror "it points to the necessary object directory so that it might find .config";
+            qeerror "or have a properly configured kernel to produce a config.gz file. (CONFIG_IKCONFIG).";
+            die "Kernel not configured; no .config found in ${KV_OUT_DIR} or /proc/config.gz found";
+        fi;
+    fi;
+    ebegin "Checking for suitable kernel configuration options";
+    for config in ${CONFIG_CHECK};
+    do
+        die=1;
+        error=0;
+        negate=0;
+        reworkmodulenames=0;
+        if [[ ${config:0:1} == "~" ]]; then
+            die=0;
+            config=${config:1};
+        else
+            if [[ ${config:0:1} == "@" ]]; then
+                die=0;
+                reworkmodulenames=1;
+                config=${config:1};
+            fi;
+        fi;
+        if [[ ${config:0:1} == "!" ]]; then
+            negate=1;
+            config=${config:1};
+        fi;
+        if [[ ${negate} == 1 ]]; then
+            linux_chkconfig_present ${config} && error=2;
+        else
+            if [[ ${reworkmodulenames} == 1 ]]; then
+                local temp_config="${config//*:}" i n;
+                config="${config//:*}";
+                if linux_chkconfig_present ${config}; then
+                    for i in ${MODULE_NAMES};
+                    do
+                        n="${i//${temp_config}}";
+                        [[ -z ${n//\(*} ]] && MODULE_IGNORE="${MODULE_IGNORE} ${temp_config}";
+                    done;
+                    error=2;
+                fi;
+            else
+                linux_chkconfig_present ${config} || error=1;
+            fi;
+        fi;
+        if [[ ${error} -gt 0 ]]; then
+            local report_func="eerror" local_error;
+            local_error="ERROR_${config}";
+            local_error="${!local_error}";
+            if [[ -z "${local_error}" ]]; then
+                local_error="${config}_ERROR";
+                local_error="${!local_error}";
+            fi;
+            if [[ ${die} == 0 && -z "${local_error}" ]]; then
+                local_error="WARNING_${config}";
+                local_error="${!local_error}";
+                if [[ -n "${local_error}" ]]; then
+                    report_func="ewarn";
+                fi;
+            fi;
+            if [[ -z "${local_error}" ]]; then
+                [[ ${error} == 1 ]] && local_error="is not set when it should be." || local_error="should not be set. But it is.";
+                local_error="CONFIG_${config}:\t ${local_error}";
+            fi;
+            if [[ ${die} == 0 ]]; then
+                ${report_func} "  ${local_error}";
+                soft_errors_count=$[soft_errors_count + 1];
+            else
+                ${report_func} "  ${local_error}";
+                hard_errors_count=$[hard_errors_count + 1];
+            fi;
+        fi;
+    done;
+    if [[ ${hard_errors_count} -gt 0 ]]; then
+        eend 1;
+        eerror "Please check to make sure these options are set correctly.";
+        eerror "Failure to do so may cause unexpected problems.";
+        eerror "Once you have satisfied these options, please try merging";
+        eerror "this package again.";
+        export LINUX_CONFIG_EXISTS_DONE="${old_LINUX_CONFIG_EXISTS_DONE}";
+        die "Incorrect kernel configuration options";
+    else
+        if [[ ${soft_errors_count} -gt 0 ]]; then
+            eend 1;
+            ewarn "Please check to make sure these options are set correctly.";
+            ewarn "Failure to do so may cause unexpected problems.";
+        else
+            eend 0;
+        fi;
+    fi;
+    export LINUX_CONFIG_EXISTS_DONE="${old_LINUX_CONFIG_EXISTS_DONE}"
+}
+check_kernel_built () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    require_configured_kernel;
+    local versionh_path;
+    if kernel_is -ge 3 7; then
+        versionh_path="include/generated/uapi/linux/version.h";
+    else
+        versionh_path="include/linux/version.h";
+    fi;
+    if [[ ! -f "${KV_OUT_DIR}/${versionh_path}" ]]; then
+        eerror "These sources have not yet been prepared.";
+        eerror "We cannot build against an unprepared tree.";
+        eerror "To resolve this, please type the following:";
+        eerror;
+        eerror "# cd ${KV_DIR}";
+        eerror "# make oldconfig";
+        eerror "# make modules_prepare";
+        eerror;
+        eerror "Then please try merging this module again.";
+        die "Kernel sources need compiling first";
+    fi
+}
+check_modules_supported () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    require_configured_kernel;
+    if ! linux_chkconfig_builtin "MODULES"; then
+        eerror "These sources do not support loading external modules.";
+        eerror "to be able to use this module please enable \"Loadable modules support\"";
+        eerror "in your kernel, recompile and then try merging this module again.";
+        die "No support for external modules in ${KV_FULL} config";
+    fi
+}
+check_zlibinflate () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    require_configured_kernel;
+    local INFLATE;
+    local DEFLATE;
+    einfo "Determining the usability of ZLIB_INFLATE support in your kernel";
+    ebegin "checking ZLIB_INFLATE";
+    linux_chkconfig_builtin CONFIG_ZLIB_INFLATE;
+    eend $? || die;
+    ebegin "checking ZLIB_DEFLATE";
+    linux_chkconfig_builtin CONFIG_ZLIB_DEFLATE;
+    eend $? || die;
+    local LINENO_START;
+    local LINENO_END;
+    local SYMBOLS;
+    local x;
+    LINENO_END="$(grep -n 'CONFIG_ZLIB_INFLATE y' ${KV_DIR}/lib/Config.in | cut -d : -f 1)";
+    LINENO_START="$(head -n $LINENO_END ${KV_DIR}/lib/Config.in | grep -n 'if \[' | tail -n 1 | cut -d : -f 1)";
+    (( LINENO_AMOUNT = ${LINENO_END} - ${LINENO_START} ));
+    (( LINENO_END = ${LINENO_END} - 1 ));
+    SYMBOLS="$(head -n $LINENO_END ${KV_DIR}/lib/Config.in | tail -n $LINENO_AMOUNT | sed -e 's/^.*\(CONFIG_[^\" ]*\).*/\1/g;')";
+    for x in ${SYMBOLS};
+    do
+        if [[ "${!x}" = "y" ]]; then
+            einfo "${x} ensures zlib is linked into your kernel - excellent";
+            return 0;
+        fi;
+    done;
+    eerror;
+    eerror "This kernel module requires ZLIB library support.";
+    eerror "You have enabled zlib support in your kernel, but haven't enabled";
+    eerror "enabled any option that will ensure that zlib is linked into your";
+    eerror "kernel.";
+    eerror;
+    eerror "Please ensure that you enable at least one of these options:";
+    eerror;
+    for x in ${SYMBOLS};
+    do
+        eerror "  * $x";
+    done;
+    eerror;
+    eerror "Please remember to recompile and install your kernel, and reboot";
+    eerror "into your new kernel before attempting to load this kernel module.";
+    die "Kernel doesn't include zlib support"
+}
+clang-fullversion () 
+{ 
+    _clang_fullversion '$1.$2.$3' "$@"
+}
+clang-major-version () 
+{ 
+    _clang_fullversion '$1' "$@"
+}
+clang-micro-version () 
+{ 
+    _clang_fullversion '$3' "$@"
+}
+clang-minor-version () 
+{ 
+    _clang_fullversion '$2' "$@"
+}
+clang-version () 
+{ 
+    _clang_fullversion '$1.$2' "$@"
+}
+econf_build () 
+{ 
+    local CBUILD=${CBUILD:-${CHOST}};
+    tc-env_build econf "$@"
+}
+fcaps () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    if [[ ${EUID} -ne 0 ]]; then
+        einfo "Insufficient privileges to execute ${FUNCNAME}, skipping.";
+        return 0;
+    fi;
+    local owner=;
+    local group=;
+    local mode=;
+    local caps_mode=;
+    while [[ $# -gt 0 ]]; do
+        case $1 in 
+            -o)
+                owner=$2;
+                shift
+            ;;
+            -g)
+                group=$2;
+                shift
+            ;;
+            -m)
+                mode=$2;
+                shift
+            ;;
+            -M)
+                caps_mode=$2;
+                shift
+            ;;
+            *)
+                break
+            ;;
+        esac;
+        shift;
+    done;
+    [[ $# -lt 2 ]] && die "${FUNCNAME}: wrong arg count";
+    local caps=$1;
+    [[ ${caps} == *[-=+]* ]] || caps+="=ep";
+    shift;
+    local root;
+    case ${EBUILD_PHASE} in 
+        compile | install | preinst)
+            root=${ED:-${D}}
+        ;;
+        postinst)
+            root=${EROOT:-${ROOT}}
+        ;;
+    esac;
+    root=${root%/};
+    local file;
+    for file in "$@";
+    do
+        [[ ${file} != /* ]] && file="${root}/${file}";
+        if [[ -n ${FCAPS_DENY_WORLD_READ} ]]; then
+            chmod go-r "${file}" || die;
+        fi;
+        if use filecaps; then
+            debug-print "${FUNCNAME}: setting caps '${caps}' on '${file}'";
+            if [[ -n ${caps_mode} ]]; then
+                chmod ${caps_mode} "${file}" || die;
+            fi;
+            if ! out=$(LC_ALL=C setcap "${caps}" "${file}" 2>&1); then
+                case ${out} in 
+                    *"Not supported"* | *"Operation not supported"*)
+                        local fstype=$(stat -f -c %T "${file}");
+                        ewarn "Could not set caps on '${file}' due to missing filesystem support:";
+                        ewarn "* enable XATTR support for '${fstype}' in your kernel (if configurable)";
+                        ewarn "* mount the fs with the user_xattr option (if not the default)";
+                        ewarn "* enable the relevant FS_SECURITY option (if configurable)"
+                    ;;
+                    *)
+                        eerror "Setting caps '${caps}' on file '${file}' failed:";
+                        eerror "${out}";
+                        die "could not set caps"
+                    ;;
+                esac;
+            else
+                setcap -v "${caps}" "${file}" > /dev/null || die "Checking caps '${caps}' on '${file}' failed";
+                continue;
+            fi;
+        fi;
+        if [[ -n ${owner} || -n ${group} ]]; then
+            debug-print "${FUNCNAME}: setting owner on '${file}'";
+            chown "${owner}${group:+:}${group}" "${file}" || die;
+        fi;
+        if [[ -n ${mode} ]]; then
+            debug-print "${FUNCNAME}: setting mode on '${file}'";
+            chmod ${mode} "${file}" || die;
+        fi;
+    done
+}
+fcaps_pkg_postinst () 
+{ 
+    local arg args=();
+    for arg in "${FILECAPS[@]}" "--";
+    do
+        if [[ ${arg} == "--" ]]; then
+            fcaps "${args[@]}";
+            args=();
+        else
+            args+=("${arg}");
+        fi;
+    done
+}
+gcc-fullversion () 
+{ 
+    _gcc_fullversion '$1.$2.$3' "$@"
+}
+gcc-major-version () 
+{ 
+    _gcc_fullversion '$1' "$@"
+}
+gcc-micro-version () 
+{ 
+    _gcc_fullversion '$3' "$@"
+}
+gcc-minor-version () 
+{ 
+    _gcc_fullversion '$2' "$@"
+}
+gcc-specs-directive () 
+{ 
+    local directive subdname subdirective;
+    directive="$(_gcc-specs-directive_raw $1)";
+    while [[ ${directive} == *%\(*\)* ]]; do
+        subdname=${directive/*%\(};
+        subdname=${subdname/\)*};
+        subdirective="$(_gcc-specs-directive_raw ${subdname})";
+        directive="${directive//\%(${subdname})/${subdirective}}";
+    done;
+    echo "${directive}";
+    return 0
+}
+gcc-specs-nostrict () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fstrict-overflow:}" != "${directive}" ]]
+}
+gcc-specs-now () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive link_command);
+    [[ "${directive/\{!nonow:}" != "${directive}" ]]
+}
+gcc-specs-pie () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!nopie:}" != "${directive}" ]]
+}
+gcc-specs-relro () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive link_command);
+    [[ "${directive/\{!norelro:}" != "${directive}" ]]
+}
+gcc-specs-ssp () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-protector:}" != "${directive}" ]]
+}
+gcc-specs-ssp-to-all () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-protector-all:}" != "${directive}" ]]
+}
+gcc-specs-stack-check () 
+{ 
+    local directive;
+    directive=$(gcc-specs-directive cc1);
+    [[ "${directive/\{!fno-stack-check:}" != "${directive}" ]]
+}
+gcc-version () 
+{ 
+    _gcc_fullversion '$1.$2' "$@"
+}
+get_running_version () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    local kv=$(uname -r);
+    if [[ -f ${ROOT}/lib/modules/${kv}/source/Makefile ]]; then
+        KERNEL_DIR=$(readlink -f "${ROOT}/lib/modules/${kv}/source");
+        if [[ -f ${ROOT}/lib/modules/${kv}/build/Makefile ]]; then
+            KBUILD_OUTPUT=$(readlink -f "${ROOT}/lib/modules/${kv}/build");
+        fi;
+        get_version && return 0;
+    fi;
+    KV_FULL=${kv};
+    local kv_full=${KV_FULL//[-+_]*};
+    KV_MAJOR=$(ver_cut 1 ${kv_full});
+    KV_MINOR=$(ver_cut 2 ${kv_full});
+    KV_PATCH=$(ver_cut 3 ${kv_full});
+    KV_EXTRA="${KV_FULL#${KV_MAJOR}.${KV_MINOR}${KV_PATCH:+.${KV_PATCH}}}";
+    : "${KV_PATCH:=0}";
+    return 0
+}
+get_version () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    [[ -n "${KV_FULL}" ]] && return 0;
+    unset KV_DIR;
+    [[ -z "${get_version_warning_done}" ]] && qeinfo "Determining the location of the kernel source code";
+    [[ -d "${KERNEL_DIR}" ]] && KV_DIR="${KERNEL_DIR}";
+    if [[ -z "${KV_DIR}" ]]; then
+        if [[ -z "${get_version_warning_done}" ]]; then
+            get_version_warning_done=1;
+            qewarn "Unable to find kernel sources at ${KERNEL_DIR}";
+            if [[ "${KERNEL_DIR}" == "/usr/src/linux" ]]; then
+                qeinfo "Please make sure that ${KERNEL_DIR} points at your running kernel, ";
+                qeinfo "(or the kernel you wish to build against).";
+                qeinfo "Alternatively, set the KERNEL_DIR environment variable to the kernel sources location";
+            else
+                qeinfo "Please ensure that the KERNEL_DIR environment variable points at full Linux sources of the kernel you wish to compile against.";
+            fi;
+        fi;
+        return 1;
+    fi;
+    if [[ -z "${KBUILD_OUTPUT}" && -L "${KERNEL_DIR}/source" ]]; then
+        KBUILD_OUTPUT=${KERNEL_DIR};
+        KERNEL_DIR=$(readlink -f "${KERNEL_DIR}/source");
+        KV_DIR=${KERNEL_DIR};
+    fi;
+    if [[ -z "${get_version_warning_done}" ]]; then
+        qeinfo "Found kernel source directory:";
+        qeinfo "    ${KV_DIR}";
+    fi;
+    kernel_get_makefile;
+    if [[ ! -s ${KERNEL_MAKEFILE} ]]; then
+        if [[ -z "${get_version_warning_done}" ]]; then
+            get_version_warning_done=1;
+            qeerror "Could not find a Makefile in the kernel source directory.";
+            qeerror "Please ensure that ${KERNEL_DIR} points to a complete set of Linux sources";
+        fi;
+        return 1;
+    fi;
+    KV_MAJOR=$(getfilevar VERSION "${KERNEL_MAKEFILE}");
+    KV_MINOR=$(getfilevar PATCHLEVEL "${KERNEL_MAKEFILE}");
+    KV_PATCH=$(getfilevar SUBLEVEL "${KERNEL_MAKEFILE}");
+    KV_EXTRA=$(getfilevar EXTRAVERSION "${KERNEL_MAKEFILE}");
+    if [[ -z "${KV_MAJOR}" || -z "${KV_MINOR}" || -z "${KV_PATCH}" ]]; then
+        if [[ -z "${get_version_warning_done}" ]]; then
+            get_version_warning_done=1;
+            qeerror "Could not detect kernel version.";
+            qeerror "Please ensure that ${KERNEL_DIR} points to a complete set of Linux sources.";
+        fi;
+        return 1;
+    fi;
+    KV_FULL=${KV_MAJOR}.${KV_MINOR}.${KV_PATCH}${KV_EXTRA};
+    if [[ -n ${KBUILD_OUTPUT} ]]; then
+        if [[ -d ${KBUILD_OUTPUT} ]]; then
+            KV_OUT_DIR=${KBUILD_OUTPUT};
+        else
+            die "KBUILD_OUTPUT is set to ${KBUILD_OUTPUT} but it doesn't exist";
+        fi;
+    else
+        for KV_OUT_DIR in "${SYSROOT}" "${ROOT}" "";
+        do
+            KV_OUT_DIR+="/lib/modules/${KV_FULL}/build";
+            KV_OUT_DIR=$(realpath -q -e "${KV_OUT_DIR}") && break;
+        done;
+    fi;
+    if [[ -d ${KV_OUT_DIR} ]]; then
+        qeinfo "Found kernel object directory:";
+        qeinfo "    ${KV_OUT_DIR}";
+    else
+        KV_OUT_DIR=${KV_DIR};
+    fi;
+    if [[ -s "${KV_OUT_DIR}"/include/config/kernel.release ]]; then
+        KV_LOCAL=$(< "${KV_OUT_DIR}"/include/config/kernel.release);
+    else
+        if [[ -s "${KV_OUT_DIR}"/.kernelrelease ]]; then
+            KV_LOCAL=$(< "${KV_OUT_DIR}"/.kernelrelease);
+        else
+            KV_LOCAL=;
+        fi;
+    fi;
+    local tmplocal=${KV_LOCAL#"${KV_FULL}"};
+    if [[ "${KV_LOCAL}" = "${tmplocal}" ]]; then
+        KV_LOCAL=;
+    else
+        KV_LOCAL=${tmplocal};
+    fi;
+    KV_FULL+=${KV_LOCAL};
+    qeinfo "Found sources for kernel version:";
+    qeinfo "    ${KV_FULL}";
+    return 0
+}
+getfilevar () 
+{ 
+    local ERROR basefname basedname;
+    ERROR=0;
+    [[ -z "${1}" ]] && ERROR=1;
+    [[ ! -f "${2}" ]] && ERROR=1;
+    if [[ "${ERROR}" = 1 ]]; then
+        echo -e "\n";
+        eerror "getfilevar requires 2 variables, with the second a valid file.";
+        eerror "   getfilevar <VARIABLE> <CONFIGFILE>";
+    else
+        basefname="$(basename ${2})";
+        basedname="$(dirname ${2})";
+        echo -e "e:\\n\\t@echo \$(${1})\\ninclude ${basefname}" | nonfatal emake -C "${basedname}" --no-print-directory M="${T}" KBUILD_OUTPUT= ARCH="$(tc-arch-kernel)" dot-config=0 need-config= need-compiler= -s -f - 2> /dev/null;
+    fi
+}
+getfilevar_noexec () 
+{ 
+    local ERROR basefname basedname mycat;
+    ERROR=0;
+    mycat='cat';
+    [[ -z "${1}" ]] && ERROR=1;
+    [[ ! -f "${2}" ]] && ERROR=1;
+    [[ "${2%.gz}" != "${2}" ]] && mycat='zcat';
+    if [[ "${ERROR}" = 1 ]]; then
+        echo -e "\n";
+        eerror "getfilevar_noexec requires 2 variables, with the second a valid file.";
+        eerror "   getfilevar_noexec <VARIABLE> <CONFIGFILE>";
+    else
+        ${mycat} "${2}" | sed -n -e "/^[[:space:]]*${1}[[:space:]]*:\\?=[[:space:]]*\(.*\)\$/{
+			s,^[^=]*[[:space:]]*=[[:space:]]*,,g ;
+			s,[[:space:]]*\$,,g ;
+			p
+		}";
+    fi
+}
+kernel_get_makefile () 
+{ 
+    [[ -s ${KV_DIR}/GNUMakefile ]] && KERNEL_MAKEFILE="${KV_DIR}/GNUMakefile" && return;
+    [[ -s ${KV_DIR}/makefile ]] && KERNEL_MAKEFILE="${KV_DIR}/makefile" && return;
+    [[ -s ${KV_DIR}/Makefile ]] && KERNEL_MAKEFILE="${KV_DIR}/Makefile" && return
+}
+kernel_is () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    linux-info_get_any_version;
+    local operator;
+    case ${1#-} in 
+        lt)
+            operator="-lt";
+            shift
+        ;;
+        gt)
+            operator="-gt";
+            shift
+        ;;
+        le)
+            operator="-le";
+            shift
+        ;;
+        ge)
+            operator="-ge";
+            shift
+        ;;
+        eq)
+            operator="-eq";
+            shift
+        ;;
+        *)
+            operator="-eq"
+        ;;
+    esac;
+    [[ $# -gt 3 ]] && die "Error in ${ECLASS}_${FUNCNAME}(): too many parameters";
+    ver_test "${KV_MAJOR:-0}.${KV_MINOR:-0}.${KV_PATCH:-0}" "${operator}" "${1:-${KV_MAJOR:-0}}.${2:-${KV_MINOR:-0}}.${3:-${KV_PATCH:-0}}"
+}
+libtoolize () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'libtoolize' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'libtoolize' directly."
+        ;;
+    esac;
+    /usr/bin/libtoolize "$@";
+    return $?
+}
+linux-info_get_any_version () 
+{ 
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    if [[ ${MERGE_TYPE} == binary && -z ${SKIP_KERNEL_BINPKG_ENV_RESET} ]]; then
+        unset KV_FULL _LINUX_CONFIG_EXISTS_DONE KV_OUT_DIR;
+        SKIP_KERNEL_BINPKG_ENV_RESET=1;
+    fi;
+    if ! get_version; then
+        ewarn "Unable to calculate Linux Kernel version for build, attempting to use running version";
+    fi;
+    if [[ -z ${KV_FULL} ]] && ! get_running_version; then
+        die "Unable to determine any Linux Kernel version, please report a bug";
+    fi
+}
+linux-info_pkg_setup () 
+{ 
+    use kernel_linux || return;
+    linux-info_get_any_version;
+    [[ -n "${CONFIG_CHECK}" && -z ${CHECKCONFIG_DONOTHING} ]] && check_extra_config
+}
+linux_chkconfig_builtin () 
+{ 
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    linux_config_qa_check linux_chkconfig_builtin;
+    [[ $(getfilevar_noexec "CONFIG_$1" "$(linux_config_path)") == y ]]
+}
+linux_chkconfig_module () 
+{ 
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    linux_config_qa_check linux_chkconfig_module;
+    [[ $(getfilevar_noexec "CONFIG_$1" "$(linux_config_path)") == m ]]
+}
+linux_chkconfig_present () 
+{ 
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    linux_config_qa_check linux_chkconfig_present;
+    [[ $(getfilevar_noexec "CONFIG_$1" "$(linux_config_path)") == [my] ]]
+}
+linux_chkconfig_string () 
+{ 
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    linux_config_qa_check linux_chkconfig_string;
+    getfilevar_noexec "CONFIG_$1" "$(linux_config_path)"
+}
+linux_config_bin_exists () 
+{ 
+    export _LINUX_CONFIG_EXISTS_DONE=1;
+    use kernel_linux && [[ -s /proc/config.gz ]]
+}
+linux_config_exists () 
+{ 
+    linux_config_src_exists || linux_config_bin_exists
+}
+linux_config_path () 
+{ 
+    if linux_config_src_exists; then
+        echo "${KV_OUT_DIR}/.config";
+    else
+        if linux_config_bin_exists; then
+            echo "/proc/config.gz";
+        else
+            return 1;
+        fi;
+    fi
+}
+linux_config_qa_check () 
+{ 
+    local f="$1";
+    if [[ -z "${_LINUX_CONFIG_EXISTS_DONE}" ]]; then
+        ewarn "QA: You called $f before any linux_config_exists!";
+        ewarn "QA: The return value of $f will NOT guaranteed later!";
+    fi;
+    if ! use kernel_linux; then
+        die "$f called on non-Linux system, please fix the ebuild";
+    fi
+}
+linux_config_src_exists () 
+{ 
+    export _LINUX_CONFIG_EXISTS_DONE=1;
+    use kernel_linux && [[ -n ${KV_OUT_DIR} && -s ${KV_OUT_DIR}/.config ]]
+}
+optfeature () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    local i j msg;
+    local -a arr;
+    local desc=$1;
+    local flag=0;
+    shift;
+    for i in "$@";
+    do
+        read -r -d '' -a arr <<< "${i}";
+        for j in "${arr[@]}";
+        do
+            if has_version "${j}"; then
+                flag=1;
+            else
+                flag=0;
+                break;
+            fi;
+        done;
+        if [[ ${flag} -eq 1 ]]; then
+            break;
+        fi;
+    done;
+    if [[ ${flag} -eq 0 ]]; then
+        if [[ ${_OPTFEATURE_DOHEADER} == true ]]; then
+            elog ${_OPTFEATURE_HEADER:-${_OPTFEATURE_DEFAULT_HEADER}};
+            _OPTFEATURE_DOHEADER=false;
+        fi;
+        for i in "$@";
+        do
+            read -r -d '' -a arr <<< "${i}";
+            msg=" ";
+            for j in "${arr[@]}";
+            do
+                msg+=" ${j} and";
+            done;
+            msg="${msg:0: -4} for ${desc}";
+            elog "${msg}";
+        done;
+    fi
+}
+optfeature_header () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    _OPTFEATURE_HEADER="${1}";
+    _OPTFEATURE_DOHEADER=true
+}
+pkg_nofetch () 
+{ 
+    default
+}
+pkg_postinst () 
+{ 
+    xdg_desktop_database_update;
+    xdg_icon_cache_update;
+    fcaps -m '' cap_sys_ptrace usr/bin/htop;
+    optfeature "Viewing processes accessing certain files" sys-process/lsof;
+    optfeature "Tracing system calls and signals of processes" dev-debug/strace
+}
+pkg_postrm () 
+{ 
+    xdg_desktop_database_update;
+    xdg_icon_cache_update
+}
+pkg_setup () 
+{ 
+    linux-info_pkg_setup "$@"
+}
+pre_source_sandbox () 
+{ 
+    export SANDBOX_ON=1;
+    export SANDBOX_PREDICT="";
+    export SANDBOX_READ="${EBUILD}:${BASH_SOURCE[1]}:${SANDBOX_LOG}";
+    export SANDBOX_WRITE="${SANDBOX_LOG}:/dev/null";
+    [[ ${PORTAGE_DEBUG} != 1 ]] || export SANDBOX_DEBUG=1;
+    local repo_location;
+    for repo_location in "${PORTAGE_ECLASS_LOCATIONS[@]}";
+    do
+        local potential_location="${repo_location}/eclass";
+        if [[ -d ${potential_location} ]]; then
+            SANDBOX_READ+=":${potential_location}";
+        fi;
+    done;
+    function adddeny () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addpredict () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addread () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addwrite () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    readonly SANDBOX_{ALLOW,ACTIVE,DENY,DEBUG,ON,PREDICT,READ,WRITE}
+}
+qeerror () 
+{ 
+    qout eerror "${@}"
+}
+qeinfo () 
+{ 
+    qout einfo "${@}"
+}
+qewarn () 
+{ 
+    qout ewarn "${@}"
+}
+qout () 
+{ 
+    local outputmsg type;
+    type=${1};
+    shift;
+    outputmsg="${@}";
+    case "${EBUILD_PHASE}" in 
+        depend)
+            unset outputmsg
+        ;;
+        clean)
+            unset outputmsg
+        ;;
+        preinst)
+            unset outputmsg
+        ;;
+    esac;
+    [[ -n "${outputmsg}" ]] && ${type} "${outputmsg}"
+}
+require_configured_kernel () 
+{ 
+    [[ -n ${SKIP_KERNEL_CHECK} ]] && return;
+    if ! use kernel_linux; then
+        die "${FUNCNAME}() called on non-Linux system, please fix the ebuild";
+    fi;
+    if ! linux_config_src_exists; then
+        qeerror "Could not find a usable .config in the kernel source directory.";
+        qeerror "Please ensure that ${KERNEL_DIR} points to a configured set of Linux sources.";
+        qeerror "If you are using KBUILD_OUTPUT, please set the environment var so that";
+        qeerror "it points to the necessary object directory so that it might find .config.";
+        die "Kernel not configured; no .config found in ${KV_OUT_DIR}";
+    fi;
+    get_version || die "Unable to determine configured kernel version"
+}
+set_arch_to_kernel () 
+{ 
+    export ARCH=$(tc-arch-kernel)
+}
+set_arch_to_pkgmgr () 
+{ 
+    export ARCH=$(tc-arch)
+}
+src_compile () 
+{ 
+    default
+}
+src_configure () 
+{ 
+    if [[ ${CBUILD} != ${CHOST} ]]; then
+        export ac_cv_file__proc_{meminfo,stat}=yes;
+    fi;
+    local myeconfargs=(--enable-unicode $(use_enable bfd demangling libiberty) $(use_enable debug) $(use_enable hwloc) $(use_enable !hwloc affinity) $(use_enable openvz) $(use_enable unicode) $(use_enable unwind backtrace) $(use_with unwind libunwind) $(use_enable vserver));
+    if use kernel_linux; then
+        myeconfargs+=($(use_enable caps capabilities) $(use_enable delayacct) $(use_enable lm-sensors sensors));
+    else
+        if use kernel_Darwin; then
+            myeconfargs+=(--disable-affinity);
+        fi;
+        myeconfargs+=(--disable-capabilities --disable-delayacct --disable-sensors);
+    fi;
+    econf "${myeconfargs[@]}"
+}
+src_install () 
+{ 
+    default
+}
+src_prepare () 
+{ 
+    default;
+    if [[ ${PV} == 9999 ]]; then
+        eautoreconf;
+    fi
+}
+src_test () 
+{ 
+    default
+}
+src_unpack () 
+{ 
+    default
+}
+tc-arch () 
+{ 
+    tc-ninja_magic_to_arch portage "$@"
+}
+tc-arch-kernel () 
+{ 
+    tc-ninja_magic_to_arch kern "$@"
+}
+tc-check-min_ver () 
+{ 
+    function do_check () 
+    { 
+        debug-print "Compiler version check for ${1}";
+        debug-print "Detected: ${2}";
+        debug-print "Required: ${3}";
+        if ver_test ${2} -lt ${3}; then
+            eerror "Your current compiler is too old for this package!";
+            die "Active compiler is too old for this package (found ${1} ${2}).";
+        fi
+    };
+    case ${1} in 
+        gcc)
+            tc-is-gcc || return;
+            do_check GCC $(gcc-version) ${2}
+        ;;
+        clang)
+            tc-is-clang || return;
+            do_check Clang $(clang-version) ${2}
+        ;;
+        *)
+            eerror "Unknown first parameter for ${FUNCNAME} - must be gcc or clang";
+            die "${FUNCNAME}: Parameter ${1} unknown"
+        ;;
+    esac
+}
+tc-check-openmp () 
+{ 
+    if ! _tc-has-openmp; then
+        eerror "Your current compiler does not support OpenMP!";
+        if tc-is-gcc; then
+            eerror "Enable OpenMP support by building sys-devel/gcc with USE=\"openmp\".";
+        else
+            if tc-is-clang; then
+                eerror "OpenMP support in llvm-core/clang is provided by llvm-runtimes/openmp.";
+            fi;
+        fi;
+        die "Active compiler does not have required support for OpenMP";
+    fi
+}
+tc-cpp-is-true () 
+{ 
+    local CONDITION=${1};
+    shift;
+    $(tc-getTARGET_CPP) "${@}" -P - <<-EOF > /dev/null 2>&1
+#if ${CONDITION}
+true
+#else
+#error false
+#endif
+EOF
+
+}
+tc-detect-is-softfloat () 
+{ 
+    [[ $(tc-getTARGET_CPP) == "gcc -E" ]] && return 1;
+    case ${CTARGET:-${CHOST}} in 
+        *-newlib | *-elf | *-eabi | arm64-apple-darwin*)
+            return 1
+        ;;
+        arm*)
+            if tc-cpp-is-true "defined(__ARM_PCS_VFP)"; then
+                echo "no";
+            else
+                if tc-cpp-is-true "defined(__SOFTFP__)"; then
+                    echo "yes";
+                else
+                    echo "softfp";
+                fi;
+            fi;
+            return 0
+        ;;
+        *)
+            return 1
+        ;;
+    esac
+}
+tc-enables-cxx-assertions () 
+{ 
+    tc-cpp-is-true "defined(_GLIBCXX_ASSERTIONS) || defined(_LIBCPP_ENABLE_ASSERTIONS) || defined(_LIBCPP_ENABLE_HARDENED_MODE)" ${CPPFLAGS} ${CXXFLAGS}
+}
+tc-enables-fortify-source () 
+{ 
+    tc-cpp-is-true "defined(_FORTIFY_SOURCE)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-pie () 
+{ 
+    tc-cpp-is-true "defined(__PIE__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp () 
+{ 
+    tc-cpp-is-true "defined(__SSP__) || defined(__SSP_STRONG__) || defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp-all () 
+{ 
+    tc-cpp-is-true "defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-enables-ssp-strong () 
+{ 
+    tc-cpp-is-true "defined(__SSP_STRONG__) || defined(__SSP_ALL__)" ${CPPFLAGS} ${CFLAGS} ${CXXFLAGS}
+}
+tc-endian () 
+{ 
+    local host=$1;
+    [[ -z ${host} ]] && host=${CTARGET:-${CHOST}};
+    host=${host%%-*};
+    case ${host} in 
+        aarch64*be)
+            echo big
+        ;;
+        aarch64)
+            echo little
+        ;;
+        alpha*)
+            echo little
+        ;;
+        arc*b*)
+            echo big
+        ;;
+        arc*)
+            echo little
+        ;;
+        arm*b*)
+            echo big
+        ;;
+        arm*)
+            echo little
+        ;;
+        cris*)
+            echo little
+        ;;
+        e2k*)
+            echo little
+        ;;
+        hppa*)
+            echo big
+        ;;
+        i?86*)
+            echo little
+        ;;
+        ia64*)
+            echo little
+        ;;
+        loongarch*)
+            echo little
+        ;;
+        m68*)
+            echo big
+        ;;
+        mips*l*)
+            echo little
+        ;;
+        mips*)
+            echo big
+        ;;
+        powerpc*le)
+            echo little
+        ;;
+        powerpc*)
+            echo big
+        ;;
+        riscv*)
+            echo little
+        ;;
+        s390*)
+            echo big
+        ;;
+        sh*b*)
+            echo big
+        ;;
+        sh*)
+            echo little
+        ;;
+        sparc*)
+            echo big
+        ;;
+        x86_64*)
+            echo little
+        ;;
+        *)
+            echo wtf
+        ;;
+    esac
+}
+tc-env_build () 
+{ 
+    tc-export_build_env;
+    has go-env ${INHERITED} && local -x GOAMD64=${BUILD_GOAMD64} GOARM64=${BUILD_GOARM64} GOPPC64=${BUILD_GOPPC64} GORISCV64=${BUILD_GORISCV64};
+    CFLAGS=${BUILD_CFLAGS} CXXFLAGS=${BUILD_CXXFLAGS} CPPFLAGS=${BUILD_CPPFLAGS} LDFLAGS=${BUILD_LDFLAGS} AR=$(tc-getBUILD_AR) AS=$(tc-getBUILD_AS) CC=$(tc-getBUILD_CC) CPP=$(tc-getBUILD_CPP) CXX=$(tc-getBUILD_CXX) LD=$(tc-getBUILD_LD) NM=$(tc-getBUILD_NM) PKG_CONFIG=$(tc-getBUILD_PKG_CONFIG) RANLIB=$(tc-getBUILD_RANLIB) READELF=$(tc-getBUILD_READELF) CHOST=${CBUILD:-${CHOST}} ESYSROOT=${BROOT} SYSROOT= "$@"
+}
+tc-export () 
+{ 
+    local var;
+    for var in "$@";
+    do
+        [[ $(type -t "tc-get${var}") != "function" ]] && die "tc-export: invalid export variable '${var}'";
+        "tc-get${var}" > /dev/null;
+    done
+}
+tc-export_build_env () 
+{ 
+    tc-export "$@";
+    if tc-is-cross-compiler; then
+        : "${BUILD_CFLAGS:=-O1 -pipe}";
+        : "${BUILD_CXXFLAGS:=-O1 -pipe}";
+        : "${BUILD_CPPFLAGS:= }";
+        : "${BUILD_LDFLAGS:= }";
+    else
+        : "${BUILD_CFLAGS:=${CFLAGS}}";
+        : "${BUILD_CXXFLAGS:=${CXXFLAGS}}";
+        : "${BUILD_CPPFLAGS:=${CPPFLAGS}}";
+        : "${BUILD_LDFLAGS:=${LDFLAGS}}";
+        if has go-env ${INHERITED}; then
+            : "${BUILD_GOAMD64:=${GOAMD64}}";
+            : "${BUILD_GOARM64:=${GOARM64}}";
+            : "${BUILD_GOPPC64:=${GOPPC64}}";
+            : "${BUILD_GORISCV64:=${GORISCV64}}";
+        fi;
+    fi;
+    export BUILD_{C,CXX,CPP,LD}FLAGS;
+    local v;
+    for v in BUILD_{C,CXX,CPP,LD}FLAGS;
+    do
+        export ${v#BUILD_}_FOR_BUILD="${!v}";
+    done
+}
+tc-get-build-ptr-size () 
+{ 
+    $(tc-getBUILD_CC) -E -P - <<< __SIZEOF_POINTER__ || die "Could not determine CBUILD pointer size"
+}
+tc-get-c-rtlib () 
+{ 
+    local res=$($(tc-getCC) ${CPPFLAGS} ${CFLAGS} ${LDFLAGS} -print-libgcc-file-name 2> /dev/null);
+    case ${res} in 
+        *libclang_rt*)
+            echo compiler-rt
+        ;;
+        *libgcc*)
+            echo libgcc
+        ;;
+        *)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-get-compiler-type () 
+{ 
+    local code='
+#if defined(__PATHSCALE__)
+	HAVE_PATHCC
+#elif defined(__clang__)
+	HAVE_CLANG
+#elif defined(__GNUC__)
+	HAVE_GCC
+#endif
+';
+    local res=$($(tc-getCC "$@") -E -P - <<< "${code}");
+    case ${res} in 
+        *HAVE_PATHCC*)
+            echo pathcc
+        ;;
+        *HAVE_CLANG*)
+            echo clang
+        ;;
+        *HAVE_GCC*)
+            echo gcc
+        ;;
+        *)
+            echo unknown
+        ;;
+    esac
+}
+tc-get-cxx-stdlib () 
+{ 
+    local code='
+#if __cplusplus >= 202002L
+	#include <version>
+#else
+	#include <ciso646>
+#endif
+
+#if defined(_LIBCPP_VERSION)
+	HAVE_LIBCXX
+#elif defined(__GLIBCXX__)
+	HAVE_LIBSTDCPP
+#endif
+';
+    local res=$($(tc-getCXX) ${CPPFLAGS} ${CXXFLAGS} -x c++ -E -P - <<< "${code}" 2> /dev/null);
+    case ${res} in 
+        *HAVE_LIBCXX*)
+            echo libc++
+        ;;
+        *HAVE_LIBSTDCPP*)
+            echo libstdc++
+        ;;
+        *)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-get-ptr-size () 
+{ 
+    $(tc-getCC) -E -P - <<< __SIZEOF_POINTER__ || die "Could not determine CHOST pointer size"
+}
+tc-getAR () 
+{ 
+    tc-getPROG AR ar "$@"
+}
+tc-getAS () 
+{ 
+    tc-getPROG AS as "$@"
+}
+tc-getBUILD_AR () 
+{ 
+    tc-getBUILD_PROG AR ar "$@"
+}
+tc-getBUILD_AS () 
+{ 
+    tc-getBUILD_PROG AS as "$@"
+}
+tc-getBUILD_CC () 
+{ 
+    tc-getBUILD_PROG CC gcc "$@"
+}
+tc-getBUILD_CPP () 
+{ 
+    tc-getBUILD_PROG CPP "$(tc-getBUILD_CC) -E" "$@"
+}
+tc-getBUILD_CXX () 
+{ 
+    tc-getBUILD_PROG CXX g++ "$@"
+}
+tc-getBUILD_LD () 
+{ 
+    tc-getBUILD_PROG LD ld "$@"
+}
+tc-getBUILD_NM () 
+{ 
+    tc-getBUILD_PROG NM nm "$@"
+}
+tc-getBUILD_OBJCOPY () 
+{ 
+    tc-getBUILD_PROG OBJCOPY objcopy "$@"
+}
+tc-getBUILD_PKG_CONFIG () 
+{ 
+    tc-getBUILD_PROG PKG_CONFIG pkg-config "$@"
+}
+tc-getBUILD_PROG () 
+{ 
+    local vars="BUILD_$1 $1_FOR_BUILD HOST$1";
+    tc-is-cross-compiler || vars+=" $1";
+    _tc-getPROG CBUILD "${vars}" "${@:2}"
+}
+tc-getBUILD_RANLIB () 
+{ 
+    tc-getBUILD_PROG RANLIB ranlib "$@"
+}
+tc-getBUILD_READELF () 
+{ 
+    tc-getBUILD_PROG READELF readelf "$@"
+}
+tc-getBUILD_STRINGS () 
+{ 
+    tc-getBUILD_PROG STRINGS strings "$@"
+}
+tc-getBUILD_STRIP () 
+{ 
+    tc-getBUILD_PROG STRIP strip "$@"
+}
+tc-getCC () 
+{ 
+    tc-getPROG CC gcc "$@"
+}
+tc-getCPP () 
+{ 
+    tc-getPROG CPP "${CC:-gcc} -E" "$@"
+}
+tc-getCXX () 
+{ 
+    tc-getPROG CXX g++ "$@"
+}
+tc-getDLLWRAP () 
+{ 
+    tc-getPROG DLLWRAP dllwrap "$@"
+}
+tc-getF77 () 
+{ 
+    tc-getPROG F77 gfortran "$@"
+}
+tc-getFC () 
+{ 
+    tc-getPROG FC gfortran "$@"
+}
+tc-getGCJ () 
+{ 
+    tc-getPROG GCJ gcj "$@"
+}
+tc-getGO () 
+{ 
+    tc-getPROG GO gccgo "$@"
+}
+tc-getHIPCXX () 
+{ 
+    tc-getPROG HIPCXX "$(hipconfig --hipclangpath)/clang++" "$@"
+}
+tc-getLD () 
+{ 
+    tc-getPROG LD ld "$@"
+}
+tc-getNM () 
+{ 
+    tc-getPROG NM nm "$@"
+}
+tc-getOBJCOPY () 
+{ 
+    tc-getPROG OBJCOPY objcopy "$@"
+}
+tc-getOBJDUMP () 
+{ 
+    tc-getPROG OBJDUMP objdump "$@"
+}
+tc-getPKG_CONFIG () 
+{ 
+    tc-getPROG PKG_CONFIG pkg-config "$@"
+}
+tc-getPROG () 
+{ 
+    _tc-getPROG CHOST "$@"
+}
+tc-getRANLIB () 
+{ 
+    tc-getPROG RANLIB ranlib "$@"
+}
+tc-getRC () 
+{ 
+    tc-getPROG RC windres "$@"
+}
+tc-getREADELF () 
+{ 
+    tc-getPROG READELF readelf "$@"
+}
+tc-getSTRINGS () 
+{ 
+    tc-getPROG STRINGS strings "$@"
+}
+tc-getSTRIP () 
+{ 
+    tc-getPROG STRIP strip "$@"
+}
+tc-getTARGET_CPP () 
+{ 
+    if [[ -n ${CTARGET} ]]; then
+        _tc-getPROG CTARGET TARGET_CPP "gcc -E" "$@";
+    else
+        tc-getCPP "$@";
+    fi
+}
+tc-has-64bit-time_t () 
+{ 
+    $(tc-getCC) ${CFLAGS} ${CPPFLAGS} -c -x c - -o /dev/null <<-EOF &> /dev/null
+#include <sys/types.h>
+int test[sizeof(time_t) >= 8 ? 1 : -1];
+EOF
+
+    return $?
+}
+tc-has-tls () 
+{ 
+    local base="${T}/test-tc-tls";
+    cat <<-EOF > "${base}.c"
+int foo(int *i) {
+static __thread int j = 0;
+return *i ? j : *i;
+}
+EOF
+
+    local flags
+    case $1 in 
+        -s)
+            flags="-S"
+        ;;
+        -c)
+            flags="-c"
+        ;;
+        -l)
+
+        ;;
+        -*)
+            die "Usage: tc-has-tls [-c|-l] [toolchain prefix]"
+        ;;
+    esac;
+    case "${CHOST}" in 
+        *-darwin*)
+            : ${flags:=-dynamiclib}
+        ;;
+        *)
+            : ${flags:=-fPIC -shared -Wl,-z,defs}
+        ;;
+    esac;
+    [[ $1 == -* ]] && shift;
+    $(tc-getCC "$@") ${flags} "${base}.c" -o "${base}" >&/dev/null;
+    local ret=$?;
+    rm -f "${base}"*;
+    return ${ret}
+}
+tc-is-clang () 
+{ 
+    [[ $(tc-get-compiler-type) == clang ]]
+}
+tc-is-cross-compiler () 
+{ 
+    [[ ${CBUILD:-${CHOST}} != ${CHOST} ]]
+}
+tc-is-gcc () 
+{ 
+    [[ $(tc-get-compiler-type) == gcc ]]
+}
+tc-is-lto () 
+{ 
+    local f="${T}/test-lto.o";
+    local ret=1;
+    case $(tc-get-compiler-type) in 
+        clang)
+            $(tc-getCC) ${CFLAGS} -c -o "${f}" -x c - <<< "" || die;
+            llvm-bcanalyzer "${f}" &> /dev/null && ret=0
+        ;;
+        gcc)
+            $(tc-getCC) ${CFLAGS} -c -o "${f}" -x c - <<< "" || die;
+            [[ $($(tc-getOBJDUMP) -s "${f}") == *.gnu.lto* ]] && ret=0
+        ;;
+    esac;
+    rm -f "${f}" || die;
+    return "${ret}"
+}
+tc-is-softfloat () 
+{ 
+    tc-detect-is-softfloat || tc-tuple-is-softfloat
+}
+tc-is-static-only () 
+{ 
+    local host=${CTARGET:-${CHOST}};
+    [[ ${host} == *-mint* ]]
+}
+tc-ld-disable-gold () 
+{ 
+    tc-ld-is-gold "$@" && tc-ld-force-bfd "$@"
+}
+tc-ld-force-bfd () 
+{ 
+    if tc-ld-is-bfd "$@"; then
+        return;
+    fi;
+    ewarn "Forcing usage of the BFD linker";
+    local ld=$(unset LD; tc-getLD "$@");
+    local bfd_ld="${ld}.bfd";
+    local path_ld=$(type -P "${bfd_ld}" 2> /dev/null);
+    [[ -e ${path_ld} ]] && export LD=${bfd_ld};
+    if tc-is-gcc || tc-is-clang; then
+        export CFLAGS="${CFLAGS} -fuse-ld=bfd";
+        export CXXFLAGS="${CXXFLAGS} -fuse-ld=bfd";
+        export LDFLAGS="${LDFLAGS} -fuse-ld=bfd";
+    fi
+}
+tc-ld-is-bfd () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} != "GNU ld"* ]]; then
+        return 1;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ! ${out} =~ (^|'
+')"GNU ld".* ]]; then
+        return 1;
+    fi;
+    return 0
+}
+tc-ld-is-gold () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"GNU gold"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"GNU gold"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ld-is-lld () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"LLD"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"LLD"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ld-is-mold () 
+{ 
+    local out;
+    local -x LC_ALL=C;
+    out=$($(tc-getLD "$@") --version 2>&1);
+    if [[ ${out} == *"mold"* ]]; then
+        return 0;
+    fi;
+    local base="${T}/test-tc-linker";
+    cat <<-EOF > "${base}.c"
+int main(void) { return 0; }
+EOF
+
+    out=$($(tc-getCC "$@") ${CFLAGS} ${CPPFLAGS} ${LDFLAGS} -Wl,--version "${base}.c" -o "${base}" 2>&1)
+    rm -f "${base}"*;
+    if [[ ${out} == *"mold"* ]]; then
+        return 0;
+    fi;
+    return 1
+}
+tc-ninja_magic_to_arch () 
+{ 
+    function _tc_echo_kernel_alias () 
+    { 
+        [[ ${type} == "kern" ]] && echo $1 || echo $2
+    };
+    local type=$1;
+    local host=$2;
+    [[ -z ${host} ]] && host=${CTARGET:-${CHOST}};
+    case ${host} in 
+        arm64*)
+            echo arm64
+        ;;
+        aarch64*)
+            echo arm64
+        ;;
+        alpha*)
+            echo alpha
+        ;;
+        arc*)
+            echo arc
+        ;;
+        arm*)
+            echo arm
+        ;;
+        avr*)
+            _tc_echo_kernel_alias avr32 avr
+        ;;
+        bfin*)
+            _tc_echo_kernel_alias blackfin bfin
+        ;;
+        c6x*)
+            echo c6x
+        ;;
+        cris*)
+            echo cris
+        ;;
+        e2k*)
+            echo e2k
+        ;;
+        frv*)
+            echo frv
+        ;;
+        hexagon*)
+            echo hexagon
+        ;;
+        hppa*)
+            _tc_echo_kernel_alias parisc hppa
+        ;;
+        i?86*)
+            echo x86
+        ;;
+        ia64*)
+            echo ia64
+        ;;
+        loongarch*)
+            _tc_echo_kernel_alias loongarch loong
+        ;;
+        m68*)
+            echo m68k
+        ;;
+        metag*)
+            echo metag
+        ;;
+        microblaze*)
+            echo microblaze
+        ;;
+        mips*)
+            echo mips
+        ;;
+        nios2*)
+            echo nios2
+        ;;
+        nios*)
+            echo nios
+        ;;
+        or1k* | or32*)
+            echo openrisc
+        ;;
+        powerpc*)
+            if [[ ${type} == "kern" ]]; then
+                echo powerpc;
+            else
+                if [[ ${host} == powerpc64* ]]; then
+                    echo ppc64;
+                else
+                    echo ppc;
+                fi;
+            fi
+        ;;
+        riscv*)
+            echo riscv
+        ;;
+        s390*)
+            echo s390
+        ;;
+        score*)
+            echo score
+        ;;
+        sh64*)
+            _tc_echo_kernel_alias sh64 sh
+        ;;
+        sh*)
+            echo sh
+        ;;
+        sparc64*)
+            _tc_echo_kernel_alias sparc64 sparc
+        ;;
+        sparc*)
+            [[ ${PROFILE_ARCH} == "sparc64" ]] && _tc_echo_kernel_alias sparc64 sparc || echo sparc
+        ;;
+        tile*)
+            echo tile
+        ;;
+        vax*)
+            echo vax
+        ;;
+        x86_64*)
+            if [[ ${type} == "kern" ]]; then
+                echo x86;
+            else
+                echo amd64;
+            fi
+        ;;
+        xtensa*)
+            echo xtensa
+        ;;
+        *)
+            echo unknown
+        ;;
+    esac
+}
+tc-stack-grows-down () 
+{ 
+    case ${ARCH} in 
+        hppa | metag)
+            return 1
+        ;;
+    esac;
+    return 0
+}
+tc-tuple-is-softfloat () 
+{ 
+    local CTARGET=${CTARGET:-${CHOST}};
+    case ${CTARGET//_/-} in 
+        bfin* | h8300*)
+            echo "only"
+        ;;
+        *-softfloat-*)
+            echo "yes"
+        ;;
+        *-softfp-*)
+            echo "softfp"
+        ;;
+        arm*-hardfloat-* | arm*eabihf*)
+            echo "no"
+        ;;
+        *-newlib | *-elf | *-eabi)
+            echo "no"
+        ;;
+        arm64-apple-darwin*)
+            echo "no"
+        ;;
+        arm*)
+            echo "yes"
+        ;;
+        *)
+            echo "no"
+        ;;
+    esac
+}
+xdg_desktop_database_update () 
+{ 
+    if [[ ${EBUILD_PHASE} != post* ]]; then
+        die "xdg_desktop_database_update must be used in pkg_post* phases.";
+    fi;
+    if ! type update-desktop-database &> /dev/null; then
+        debug-print "update-desktop-database is not found";
+        return;
+    fi;
+    ebegin "Updating .desktop files database";
+    update-desktop-database -q "${EROOT}${DESKTOP_DATABASE_DIR}";
+    eend $?
+}
+xdg_environment_reset () 
+{ 
+    export XDG_DATA_HOME="${HOME}/.local/share";
+    export XDG_CONFIG_HOME="${HOME}/.config";
+    export XDG_CACHE_HOME="${HOME}/.cache";
+    export XDG_STATE_HOME="${HOME}/.local/state";
+    export XDG_RUNTIME_DIR="${T}/run";
+    mkdir -p "${XDG_DATA_HOME}" "${XDG_CONFIG_HOME}" "${XDG_CACHE_HOME}" "${XDG_STATE_HOME}" "${XDG_RUNTIME_DIR}" || die;
+    chmod 0700 "${XDG_RUNTIME_DIR}" || die;
+    unset DBUS_SESSION_BUS_ADDRESS
+}
+xdg_icon_cache_update () 
+{ 
+    if [[ ${EBUILD_PHASE} != post* ]]; then
+        die "xdg_icon_cache_update must be used in pkg_post* phases.";
+    fi;
+    if ! type gtk-update-icon-cache &> /dev/null; then
+        debug-print "gtk-update-icon-cache is not found";
+        return;
+    fi;
+    ebegin "Updating icons cache";
+    local dir retval=0;
+    local fails=();
+    for dir in "${EROOT}"/usr/share/icons/*;
+    do
+        if [[ -f ${dir}/index.theme ]]; then
+            if ! gtk-update-icon-cache -qf "${dir}"; then
+                debug-print "Updating cache failed on ${dir}";
+                fails+=("${dir}");
+                retval=2;
+            fi;
+        else
+            if [[ $(ls "${dir}") = icon-theme.cache ]]; then
+                rm "${dir}/icon-theme.cache";
+            fi;
+        fi;
+        if [[ -z $(ls "${dir}") ]]; then
+            rmdir "${dir}";
+        fi;
+    done;
+    eend ${retval};
+    for dir in "${fails[@]}";
+    do
+        eerror "Failed to update cache with icon ${dir}";
+    done
+}
+xdg_mimeinfo_database_update () 
+{ 
+    if [[ ${EBUILD_PHASE} != post* ]]; then
+        die "xdg_mimeinfo_database_update must be used in pkg_post* phases.";
+    fi;
+    if ! type update-mime-database &> /dev/null; then
+        debug-print "update-mime-database is not found";
+        return;
+    fi;
+    local -x PKGSYSTEM_ENABLE_FSYNC=0;
+    ebegin "Updating shared mime info database";
+    update-mime-database "${EROOT}${MIMEINFO_DATABASE_DIR}";
+    eend $?
+}

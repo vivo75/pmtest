@@ -1,0 +1,13 @@
+Test GnuPG home for signed-gpkg oracles (plan #326 S4).
+
+Copied verbatim from portuale 3rdparty/portage/lib/portage/tests/.gnupg
+(Portage 3.0.82.2), the keyring real Portage's own gpkg signing tests use.
+Two keys, both with passphrase "GentooTest":
+- 0x5D90EA06352177F6, trusted: portuale's signed-output acceptance test
+  signs with it;
+- 0x8812797DDF1DD192, of undefined trust: the gpkg/signed oracle signs
+  with it (the field dump does not depend on the key), and verify refuses
+  it ("known key of undefined trust").
+portuale's binpkg.rs verify tests sign with both; emerge_getbinpkg.rs
+verifies a committed signed fixture against this keyring.
+Test-only: never trust either key.

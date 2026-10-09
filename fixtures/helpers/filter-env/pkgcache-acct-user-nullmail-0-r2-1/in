@@ -1,0 +1,748 @@
+declare -x A=""
+declare -x ABI="amd64"
+declare -x ABI_MIPS=""
+declare -x ABI_S390=""
+declare -x ABI_X86="64"
+declare -- ACCT_USER_COMMENT="A user for the nullmailer"
+declare -- ACCT_USER_ENFORCE_ID=""
+declare -a ACCT_USER_GROUPS=([0]="nullmail")
+declare -- ACCT_USER_HOME="/var/spool/nullmailer"
+declare -- ACCT_USER_HOME_PERMS="0755"
+declare -- ACCT_USER_ID="88"
+declare -- ACCT_USER_NAME="nullmail"
+declare -- ACCT_USER_NO_MODIFY=""
+declare -- ACCT_USER_SHELL="/sbin/nologin"
+declare -x ADA_TARGET=""
+declare -x ALSA_CARDS=""
+declare -x AMDGPU_TARGETS=""
+declare -x APACHE2_MODULES=""
+declare -x APACHE2_MPMS=""
+declare -x ARCH="amd64"
+declare BDEPEND=""
+declare -x BINPKG_FORMAT="gpkg"
+declare -x BINPKG_GPG_SIGNING_BASE_COMMAND="/usr/bin/flock /run/lock/portage-binpkg-gpg.lock /usr/bin/gpg --sign --armor [PORTAGE_CONFIG]"
+declare -x BINPKG_GPG_SIGNING_DIGEST="SHA512"
+declare -x BINPKG_GPG_VERIFY_BASE_COMMAND="/usr/bin/gpg --verify --batch --no-tty --no-auto-check-trustdb --status-fd 2 [PORTAGE_CONFIG] [SIGNATURE]"
+declare -x BINPKG_GPG_VERIFY_GPG_HOME="/etc/portage/gnupg"
+declare -x BOOTSTRAP_USE="unicode pkg-config split-usr xml python_targets_python3_14 python_single_target_python3_14 multilib zstd cet systemd sysv-utils udev"
+declare -x CALLIGRA_FEATURES=""
+declare -x CAMERAS=""
+declare -x CATEGORY="acct-user"
+declare -x CBUILD="x86_64-pc-linux-gnu"
+declare -x CFLAGS="-O2 -pipe"
+declare -x CFLAGS_amd64="-m64"
+declare -x CFLAGS_x32="-mx32"
+declare -x CFLAGS_x86="-m32 -mfpmath=sse"
+declare -x CHOST="x86_64-pc-linux-gnu"
+declare -x CHOST_amd64="x86_64-pc-linux-gnu"
+declare -x CHOST_x32="x86_64-pc-linux-gnux32"
+declare -x CHOST_x86="i686-pc-linux-gnu"
+declare -x COLLECTD_PLUGINS=""
+declare -x COMMON_FLAGS="-O2 -pipe"
+declare -x CPU_FLAGS_ARM=""
+declare -x CPU_FLAGS_PPC=""
+declare -x CPU_FLAGS_X86=""
+declare -x CURL_QUIC=""
+declare -x CURL_SSL=""
+declare -x CXXFLAGS="-O2 -pipe"
+declare -x DEFAULT_ABI="amd64"
+declare -x DEFINED_PHASES=" install postinst preinst prerm pretend"
+declare DEPEND=""
+declare DESCRIPTION="A user for the nullmailer"
+declare -x DIROPTIONS="-m0755"
+declare -x EAPI="8"
+declare -x ELIBC="glibc"
+declare -x ENV_UNSET="CARGO_HOME DBUS_SESSION_BUS_ADDRESS DISPLAY GDK_PIXBUF_MODULE_FILE GOBIN GOPATH PERL5LIB PERL5OPT PERLPREFIX PERL_CORE PERL_MB_OPT PERL_MM_OPT XAUTHORITY XDG_CACHE_HOME XDG_CONFIG_DIRS XDG_CONFIG_HOME XDG_DATA_DIRS XDG_DATA_HOME XDG_RUNTIME_DIR XDG_STATE_HOME"
+declare -x EXEOPTIONS="-m0755"
+declare -x FCFLAGS="-O2 -pipe"
+declare -x FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg buildpkg-live compress-index config-protect-if-modified distlocks ebuild-locks filecaps fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news noinfo observability parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox split-elog split-log splitdebug strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+declare -x FFLAGS="-O2 -pipe"
+declare -x GCC_SPECS=""
+declare -x GPG_VERIFY_GROUP_DROP="nogroup"
+declare -x GPG_VERIFY_USER_DROP="nobody"
+declare -x GPSD_PROTOCOLS=""
+declare -x GRUB_PLATFORMS=""
+declare -x GUILE_SINGLE_TARGET=""
+declare -x GUILE_TARGETS=""
+declare HOMEPAGE
+declare IDEPEND=""
+declare -x INHERITED=" user-info edo acct-user"
+declare -x INPUT_DEVICES=""
+declare -x INSOPTIONS="-m0644"
+declare IUSE=""
+declare -x IUSE_EFFECTIVE="abi_x86_64 alpha amd64 arm arm64 arm64-macos elibc_Darwin elibc_SunOS elibc_bionic elibc_glibc elibc_mingw elibc_musl hppa kernel_Darwin kernel_Hurd kernel_SunOS kernel_linux loong m68k mips ppc ppc64 prefix prefix-guest prefix-stack riscv s390 sparc x64-macos x64-solaris x86"
+declare -x IUSE_IMPLICIT="abi_x86_64 prefix prefix-guest prefix-stack"
+declare -x KERNEL="linux"
+declare -x KEYWORDS="~alpha amd64 arm arm64 ~hppa ~loong ~m68k ~mips ppc ppc64 ~riscv ~s390 ~sparc x86 ~arm64-macos ~x64-macos ~x64-solaris"
+declare -x L10N=""
+declare -x L1_JOBS="1"
+declare -x L1_SKIP_PORTAGE_UPGRADE="0"
+declare -x LANG="C.UTF-8"
+declare -x LCD_DEVICES=""
+declare -x LC_ADDRESS="C.UTF-8"
+declare -x LC_COLLATE="C.UTF-8"
+declare -x LC_CTYPE="C.UTF-8"
+declare -x LC_IDENTIFICATION="C.UTF-8"
+declare -x LC_MEASUREMENT="C.UTF-8"
+declare -x LC_MESSAGES="C.UTF-8"
+declare -x LC_MONETARY="C.UTF-8"
+declare -x LC_NAME="C.UTF-8"
+declare -x LC_NUMERIC="C.UTF-8"
+declare -x LC_PAPER="C.UTF-8"
+declare -x LC_TELEPHONE="C.UTF-8"
+declare -x LC_TIME="C.UTF-8"
+declare -x LDFLAGS="-Wl,-O1 -Wl,--as-needed -Wl,-z,pack-relative-relocs"
+declare -x LDFLAGS_amd64="-m elf_x86_64"
+declare -x LDFLAGS_x32="-m elf32_x86_64"
+declare -x LDFLAGS_x86="-m elf_i386"
+declare -x LEX="flex"
+declare -x LIBDIR_amd64="lib64"
+declare -x LIBDIR_x32="libx32"
+declare -x LIBDIR_x86="lib"
+declare -x LIBOPTIONS="-m0644"
+declare -x LIBREOFFICE_EXTENSIONS=""
+declare -x LICENSE=""
+declare -x LLVM_SLOT=""
+declare -x LLVM_TARGETS=""
+declare -x LUA_SINGLE_TARGET=""
+declare -x LUA_TARGETS=""
+declare -x MANPAGER="manpager"
+declare -x MULTILIB_ABIS="amd64 x86"
+declare -x MULTILIB_STRICT_DENY="64-bit.*shared object"
+declare -x MULTILIB_STRICT_DIRS="/lib32 /lib /usr/lib32 /usr/lib /usr/kde/*/lib32 /usr/kde/*/lib /usr/qt/*/lib32 /usr/qt/*/lib /usr/X11R6/lib32 /usr/X11R6/lib"
+declare -x MULTILIB_STRICT_EXEMPT="(perl5|gcc|binutils|eclipse-3|debug|portage|udev|systemd|clang|python-exec|llvm)"
+declare -x NGINX_MODULES_HTTP=""
+declare -x NGINX_MODULES_MAIL=""
+declare -x NGINX_MODULES_STREAM=""
+declare -x OFFICE_IMPLEMENTATION=""
+declare -x OPENMPI_FABRICS=""
+declare -x OPENMPI_OFED_FEATURES=""
+declare -x OPENMPI_RM=""
+declare -x P="nullmail-0"
+declare PDEPEND=""
+declare -x PERL_FEATURES=""
+declare -x PF="nullmail-0-r2"
+declare -x PHP_TARGETS=""
+declare -x PN="nullmail"
+declare -x PORTAGE_BZIP2_COMMAND="bzip2"
+declare -x PORTAGE_COMPRESSION_COMMAND="zstd -T1"
+declare -x PORTAGE_FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs binpkg-multi-instance buildpkg buildpkg-live compress-index config-protect-if-modified distlocks ebuild-locks filecaps fixlafiles ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox news noinfo observability parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs protect-owned qa-unresolved-soname-deps sandbox split-elog split-log splitdebug strict unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv usersandbox usersync xattr"
+declare -x PORTAGE_REPO_REVISIONS="{}"
+declare -x POSTGRES_TARGETS=""
+declare -x PR="r2"
+declare -x PROFILE_ONLY_VARIABLES="ARCH ELIBC IUSE_IMPLICIT KERNEL USE_EXPAND_IMPLICIT USE_EXPAND_UNPREFIXED USE_EXPAND_VALUES_ARCH USE_EXPAND_VALUES_ELIBC USE_EXPAND_VALUES_KERNEL"
+declare -- PROPERTIES=""
+declare -x PV="0"
+declare -x PVR="0-r2"
+declare -x PYTHONDONTWRITEBYTECODE="1"
+declare -x PYTHON_SINGLE_TARGET=""
+declare -x PYTHON_TARGETS=""
+declare RDEPEND=" acct-group/nullmail "
+declare REPOSITORY
+declare REQUIRED_USE=""
+declare RESTRICT=""
+declare -x RUBY_TARGETS=""
+declare -x RUST_SYSROOTS=""
+declare -x SANE_BACKENDS=""
+declare -x SELINUX_POLICY_TYPES=""
+declare -- SHELL="/bin/bash"
+declare -x SLOT="0"
+declare SRC_URI
+declare -x SYMLINK_LIB="no"
+declare -x TWISTED_DISABLE_WRITING_OF_PLUGIN_CACHE="1"
+declare -x TZ="UTC"
+declare -x USE="abi_x86_64 amd64 elibc_glibc kernel_linux"
+declare -x USERLAND="GNU"
+declare -x USE_EXPAND_IMPLICIT="ARCH ELIBC KERNEL"
+declare -x USE_EXPAND_UNPREFIXED="ARCH"
+declare -x USE_EXPAND_VALUES_ARCH="alpha amd64 arm arm64 arm64-macos hppa loong m68k mips ppc ppc64 riscv s390 sparc x64-macos x64-solaris x86"
+declare -x USE_EXPAND_VALUES_ELIBC="bionic Darwin glibc mingw musl SunOS"
+declare -x USE_EXPAND_VALUES_KERNEL="Darwin Hurd linux SunOS"
+declare -x UWSGI_PLUGINS=""
+declare -x VIDEO_CARDS=""
+declare -x VOICEMAIL_STORAGE=""
+declare -x XTABLES_ADDONS=""
+declare -- _ACCT_USER_ADD_DEPS_CALLED="1"
+declare -- _ACCT_USER_COMMENT="A user for the nullmailer"
+declare -- _ACCT_USER_ECLASS="1"
+declare -- _ACCT_USER_GROUPS="nullmail"
+declare -- _ACCT_USER_HOME="/var/spool/nullmailer"
+declare -- _ACCT_USER_HOME_OWNER=""
+declare -- _ACCT_USER_HOME_PERMS="0755"
+declare -- _ACCT_USER_ID="88"
+declare -- _ACCT_USER_SHELL="/sbin/nologin"
+declare -- _EDO_ECLASS="1"
+declare -- _USER_INFO_ECLASS="1"
+declare -x ac_cv_c_undeclared_builtin_options="none needed"
+declare -x container="podman"
+declare -x enable_year2038="no"
+declare -- f
+declare -x gl_cv_compiler_check_decl_option="-Werror=implicit-function-declaration"
+declare -x gl_cv_func_getcwd_path_max="yes"
+declare -- x=""
+__pipestatus () 
+{ 
+    local status=("${PIPESTATUS[@]}") s ret=0;
+    for s in "${status[@]}";
+    do
+        [[ ${s} -ne 0 ]] && ret=${s};
+    done;
+    return "${ret}"
+}
+acct-user_add_deps () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    if [[ $(declare -p ACCT_USER_GROUPS) != "declare -a"* ]]; then
+        die 'ACCT_USER_GROUPS must be an array.';
+    else
+        if [[ ${#ACCT_USER_GROUPS[@]} -eq 0 ]]; then
+            die 'ACCT_USER_GROUPS must not be empty.';
+        fi;
+    fi;
+    RDEPEND+=${ACCT_USER_GROUPS[*]/#/ acct-group/};
+    local user group;
+    case ${ACCT_USER_HOME_OWNER} in 
+        *:*)
+            user=${ACCT_USER_HOME_OWNER%:*};
+            group=${ACCT_USER_HOME_OWNER#*:}
+        ;;
+        *)
+            user=${ACCT_USER_HOME_OWNER};
+            group=
+        ;;
+    esac;
+    [[ -n ${user} && ${user} != "${ACCT_USER_NAME}" ]] && RDEPEND+=" acct-user/${user}";
+    [[ -n ${group} ]] && ! has "${group}" "${ACCT_USER_GROUPS[@]}" && RDEPEND+=" acct-group/${group}";
+    _ACCT_USER_ADD_DEPS_CALLED=1
+}
+acct-user_pkg_postinst () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    if [[ -n ${_ACCT_USER_ADDED} ]]; then
+        return;
+    fi;
+    if [[ ${EUID} -ne 0 || -n ${EPREFIX} ]]; then
+        einfo "Insufficient privileges to execute ${FUNCNAME[0]}";
+        return;
+    fi;
+    if [[ -n ${ACCT_USER_NO_MODIFY} ]]; then
+        ewarn "User ${ACCT_USER_NAME} already exists; Not touching existing user";
+        ewarn "due to set ACCT_USER_NO_MODIFY.";
+        return;
+    fi;
+    local groups=(${_ACCT_USER_GROUPS});
+    local aux_groups=${groups[*]:1};
+    local opts=(--comment "${_ACCT_USER_COMMENT}" --home "${_ACCT_USER_HOME}" --shell "${_ACCT_USER_SHELL}" --gid "${groups[0]}" --groups "${aux_groups// /,}" --expiredate "");
+    local pwhash=$(egetent shadow "${ACCT_USER_NAME}" | cut -d: -f2);
+    if [[ ${pwhash} != '!' && ${pwhash} = '!'* ]]; then
+        opts+=(--unlock);
+    fi;
+    if [[ -n ${ROOT} ]]; then
+        opts+=(--prefix "${ROOT}");
+    fi;
+    local g old_groups del_groups="";
+    old_groups=$(egetgroups "${ACCT_USER_NAME}");
+    for g in ${old_groups//,/ };
+    do
+        has "${g}" "${groups[@]}" || del_groups+="${del_groups:+, }${g}";
+    done;
+    if [[ -n ${del_groups} ]]; then
+        local override_name=${PN^^};
+        override_name=${override_name//-/_};
+        ewarn "Removing user ${ACCT_USER_NAME} from group(s): ${del_groups}";
+        ewarn "To retain the user's group membership in the local system";
+        ewarn "config, override with ACCT_USER_${override_name}_GROUPS or";
+        ewarn "ACCT_USER_${override_name}_GROUPS_ADD in make.conf.";
+        ewarn "Documentation reference:";
+        ewarn "https://wiki.gentoo.org/wiki/Practical_guide_to_the_GLEP_81_migration#Override_user_groups";
+    fi;
+    elog "Updating user ${ACCT_USER_NAME}";
+    nonfatal edo usermod "${opts[@]}" "${ACCT_USER_NAME}";
+    local status=$?;
+    if [[ ${status} -eq 8 ]]; then
+        eerror "Failed to update user ${ACCT_USER_NAME}";
+        eerror "This user currently has one or more running processes.";
+        eerror "Please update this user manually with the following command:";
+        local q="'";
+        local optsq=("${opts[@]/#/${q}}");
+        optsq=("${optsq[@]/%/${q}}");
+        eerror "  usermod ${optsq[*]} ${ACCT_USER_NAME}";
+    else
+        if [[ ${status} -ne 0 ]]; then
+            die "usermod failed with status ${status}";
+        fi;
+    fi
+}
+acct-user_pkg_preinst () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    unset _ACCT_USER_ADDED;
+    if [[ ${EUID} -ne 0 || -n ${EPREFIX} ]]; then
+        einfo "Insufficient privileges to execute ${FUNCNAME[0]}";
+        return;
+    fi;
+    local groups=(${_ACCT_USER_GROUPS});
+    if egetent passwd "${ACCT_USER_NAME}" > /dev/null; then
+        elog "User ${ACCT_USER_NAME} already exists";
+    else
+        local aux_groups=${groups[*]:1};
+        local opts=(--system --no-create-home --no-user-group --comment "${_ACCT_USER_COMMENT}" --home-dir "${_ACCT_USER_HOME}" --shell "${_ACCT_USER_SHELL}" --gid "${groups[0]}" --groups "${aux_groups// /,}");
+        if [[ ${_ACCT_USER_ID} -ne -1 ]] && ! egetent passwd "${_ACCT_USER_ID}" > /dev/null; then
+            opts+=(--uid "${_ACCT_USER_ID}");
+        fi;
+        if [[ -n ${ROOT} ]]; then
+            opts+=(--prefix "${ROOT}");
+        fi;
+        elog "Adding user ${ACCT_USER_NAME}";
+        nonfatal edo useradd "${opts[@]}" "${ACCT_USER_NAME}" || die "useradd failed with status $?";
+        _ACCT_USER_ADDED=1;
+    fi;
+    if [[ ${_ACCT_USER_HOME} != /dev/null ]]; then
+        local user=${ACCT_USER_NAME};
+        local group=${groups[0]};
+        if [[ -n ${ROOT} ]]; then
+            if [[ ${_ACCT_USER_HOME_OWNER} == *:* ]]; then
+                user=${_ACCT_USER_HOME_OWNER%:*};
+                group=${_ACCT_USER_HOME_OWNER#*:};
+            else
+                if [[ -n ${_ACCT_USER_HOME_OWNER} ]]; then
+                    user=${_ACCT_USER_HOME_OWNER};
+                    group=;
+                fi;
+            fi;
+            local euid= egid=;
+            if [[ -n ${user} ]]; then
+                euid=$(egetent passwd "${user}" | cut -d: -f3);
+                if [[ -z ${group} ]]; then
+                    egid=$(egetent passwd "${user}" | cut -d: -f4);
+                fi;
+            fi;
+            if [[ -n ${group} ]]; then
+                egid=$(egetent group "${group}" | cut -d: -f3);
+            fi;
+            _ACCT_USER_HOME_OWNER=${euid}:${egid};
+        else
+            if [[ -z ${_ACCT_USER_HOME_OWNER} ]]; then
+                _ACCT_USER_HOME_OWNER=${user}:${group};
+            fi;
+        fi;
+        if [[ ! -e "${ED}/${_ACCT_USER_HOME#/}" ]]; then
+            eerror "Home directory is missing from the installation image:";
+            eerror "  ${_ACCT_USER_HOME}";
+            eerror "Check INSTALL_MASK for entries that would cause this.";
+            die "${_ACCT_USER_HOME} does not exist";
+        fi;
+        fowners "${_ACCT_USER_HOME_OWNER}" "${_ACCT_USER_HOME}";
+        fperms "${_ACCT_USER_HOME_PERMS}" "${_ACCT_USER_HOME}";
+    fi
+}
+acct-user_pkg_prerm () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    if [[ -n ${REPLACED_BY_VERSION} ]]; then
+        return;
+    fi;
+    if [[ ${EUID} -ne 0 || -n ${EPREFIX} ]]; then
+        einfo "Insufficient privileges to execute ${FUNCNAME[0]}";
+        return;
+    fi;
+    if [[ ${ACCT_USER_ID} -eq 0 ]]; then
+        elog "Refusing to lock out the superuser (UID 0)";
+        return;
+    fi;
+    if [[ -n ${ACCT_USER_NO_MODIFY} ]]; then
+        elog "Not locking user ${ACCT_USER_NAME} due to ACCT_USER_NO_MODIFY";
+        return;
+    fi;
+    if ! egetent passwd "${ACCT_USER_NAME}" > /dev/null; then
+        ewarn "User account not found: ${ACCT_USER_NAME}";
+        ewarn "Locking process will be skipped.";
+        return;
+    fi;
+    local opts=(--expiredate 1 --lock --comment "$(egetcomment "${ACCT_USER_NAME}"); user account removed @ $(date +%Y-%m-%d)" --shell /sbin/nologin);
+    if [[ -n ${ROOT} ]]; then
+        opts+=(--prefix "${ROOT}");
+    fi;
+    elog "Locking user ${ACCT_USER_NAME}";
+    nonfatal edo usermod "${opts[@]}" "${ACCT_USER_NAME}" || die "usermod failed with status $?"
+}
+acct-user_pkg_pretend () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    if [[ -z ${_ACCT_USER_ADD_DEPS_CALLED} ]]; then
+        die "Ebuild error: acct-user_add_deps must have been called in global scope!";
+    fi;
+    [[ -n ${ACCT_USER_ID} ]] || die "Ebuild error: ACCT_USER_ID must be set!";
+    [[ ${ACCT_USER_ID} -ge -1 ]] || die "Ebuild error: ACCT_USER_ID=${ACCT_USER_ID} invalid!";
+    local user_id=${ACCT_USER_ID};
+    local override_name=${PN^^};
+    local override_var=ACCT_USER_${override_name//-/_}_ID;
+    if [[ -n ${!override_var} ]]; then
+        user_id=${!override_var};
+        [[ ${user_id} -ge -1 ]] || die "${override_var}=${user_id} invalid!";
+    fi;
+    if [[ ${user_id} -ne -1 && -n ${ACCT_USER_ENFORCE_ID} ]]; then
+        local user_by_id=$(egetusername "${user_id}");
+        local user_by_name=$(egetent passwd "${ACCT_USER_NAME}");
+        if [[ -n ${user_by_id} ]]; then
+            if [[ ${user_by_id} != ${ACCT_USER_NAME} ]]; then
+                eerror "The required UID is already taken by another user.";
+                eerror "  UID: ${user_id}";
+                eerror "  needed for: ${ACCT_USER_NAME}";
+                eerror "  current user: ${user_by_id}";
+                die "UID ${user_id} taken already";
+            fi;
+        else
+            if [[ -n ${user_by_name} ]]; then
+                eerror "The requested user exists already with wrong UID.";
+                eerror "  username: ${ACCT_USER_NAME}";
+                eerror "  requested UID: ${user_id}";
+                eerror "  current entry: ${user_by_name}";
+                die "Username ${ACCT_USER_NAME} exists with wrong UID";
+            fi;
+        fi;
+    fi
+}
+acct-user_src_install () 
+{ 
+    debug-print-function ${FUNCNAME} "$@";
+    : "${ACCT_USER_COMMENT:=${DESCRIPTION//[:,=]/;}}";
+    local ACCT_USER_GROUPS=${ACCT_USER_GROUPS[*]};
+    local override_name=${PN^^};
+    override_name=${override_name//-/_};
+    local var;
+    for var in ACCT_USER_{ID,COMMENT,SHELL,HOME{,_OWNER,_PERMS},GROUPS};
+    do
+        local var_name=ACCT_USER_${override_name}_${var#ACCT_USER_};
+        if [[ -n ${!var_name} ]]; then
+            ewarn "${var_name}=${!var_name} override in effect, support will not be provided.";
+        else
+            var_name=${var};
+        fi;
+        declare -g "_${var}=${!var_name}";
+    done;
+    var_name=ACCT_USER_${override_name}_GROUPS_ADD;
+    if [[ -n ${!var_name} ]]; then
+        ewarn "${var_name}=${!var_name} override in effect, support will not be provided.";
+        _ACCT_USER_GROUPS+=" ${!var_name}";
+    fi;
+    if [[ -n ${_ACCT_USER_COMMENT//[^:,=]} ]]; then
+        die "Invalid characters in user comment: '${_ACCT_USER_COMMENT//[^:,=]}'";
+    fi;
+    local groups=(${_ACCT_USER_GROUPS});
+    if [[ ${_ACCT_USER_HOME} != /dev/null ]]; then
+        keepdir "${_ACCT_USER_HOME}";
+    fi;
+    insinto /usr/lib/sysusers.d;
+    newins - ${CATEGORY}-${ACCT_USER_NAME}.conf < <(printf "u\t%q\t%q\t%q\t%q\t%q\n" "${ACCT_USER_NAME}" "${_ACCT_USER_ID/#-*/-}:${groups[0]}" "${_ACCT_USER_COMMENT}" "${_ACCT_USER_HOME}" "${_ACCT_USER_SHELL/#-*/-}"
+if [[ ${#groups[@]} -gt 1 ]]; then
+    printf "m\t${ACCT_USER_NAME}\t%q\n" "${groups[@]:1}";
+fi)
+}
+aclocal () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'aclocal' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'aclocal' directly."
+        ;;
+    esac;
+    /usr/bin/aclocal "$@";
+    return $?
+}
+autoconf () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'autoconf' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'autoconf' directly."
+        ;;
+    esac;
+    /usr/bin/autoconf "$@";
+    return $?
+}
+automake () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'automake' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'automake' directly."
+        ;;
+    esac;
+    /usr/bin/automake "$@";
+    return $?
+}
+edo () 
+{ 
+    local a out regex='[] '\''"\|&;()<>!{}*[?^$`]|^[#~]|[=:]~';
+    [[ $# -ge 1 ]] || die "edo: at least one argument needed";
+    if [[ ${EAPI} = 7 ]]; then
+        out=" $*";
+    else
+        for a in "$@";
+        do
+            [[ ${a} =~ ${regex} || ! ${a} =~ ^[[:print:]]+$ ]] && a=${a@Q};
+            out+=" ${a}";
+        done;
+    fi;
+    einfon;
+    printf '%s\n' "${out:1}" 1>&2;
+    "$@" || die -n "Failed to run command: ${1}"
+}
+edob () 
+{ 
+    local message;
+    local log_name;
+    while true; do
+        case "${1}" in 
+            -l | -m)
+                [[ $# -lt 2 ]] && die "Must provide an argument to ${1}";
+                case "${1}" in 
+                    -l)
+                        log_name="${2}"
+                    ;;
+                    -m)
+                        message="${2}"
+                    ;;
+                esac;
+                shift 2
+            ;;
+            *)
+                break
+            ;;
+        esac;
+    done;
+    [[ -z ${message} ]] && message="Running $@";
+    [[ -z ${log_name} ]] && log_name="$(basename ${1})";
+    local log_file="${T}/${log_name}.log";
+    ebegin "${message}";
+    "$@" &> "${log_file}";
+    local ret=$?;
+    if ! eend $ret; then
+        cat "${log_file}";
+        die -n "Command \"$@\" failed with exit status $ret";
+    fi
+}
+egetcomment () 
+{ 
+    local pos;
+    [[ $# -eq 1 ]] || die "usage: egetcomment <user>";
+    case ${CHOST} in 
+        *-freebsd* | *-dragonfly*)
+            pos=8
+        ;;
+        *)
+            pos=5
+        ;;
+    esac;
+    egetent passwd "$1" | cut -d: -f${pos}
+}
+egetent () 
+{ 
+    local db=$1 key=$2;
+    [[ $# -ge 3 ]] && die "usage: egetent <database> <key>";
+    case ${db} in 
+        group | passwd | shadow)
+
+        ;;
+        *)
+            die "sorry, database '${db}' not yet supported; file a bug"
+        ;;
+    esac;
+    case ${CHOST} in 
+        *-freebsd* | *-dragonfly*)
+            case ${db} in 
+                passwd)
+                    db="user"
+                ;;
+                *)
+
+                ;;
+            esac;
+            local opts;
+            if [[ ${key} == [[:digit:]]* ]]; then
+                [[ ${db} == "user" ]] && opts=(-u) || opts=(-g);
+            fi;
+            [[ -n ${ROOT} ]] && opts+=(-R "${ROOT}");
+            pw show ${db} ${opts} "${key}" -q
+        ;;
+        *-openbsd*)
+            grep "${key}:\*:" "${EROOT}/etc/${db}"
+        ;;
+        *)
+            if [[ -z ${ROOT} ]]; then
+                type -p nscd > /dev/null && nscd -i "${db}" 2> /dev/null;
+                getent "${db}" "${key}";
+            else
+                if [[ ${db} != shadow && ${key} =~ ^[[:digit:]]+$ ]]; then
+                    grep -E "^([^:]*:){2}${key}:" "${ROOT}/etc/${db}";
+                else
+                    grep "^${key}:" "${ROOT}/etc/${db}";
+                fi;
+            fi
+        ;;
+    esac
+}
+egetgroupname () 
+{ 
+    [[ $# -eq 1 ]] || die "usage: egetgroupname <gid>";
+    egetent group "$1" | cut -d: -f1
+}
+egetgroups () 
+{ 
+    [[ $# -eq 1 ]] || die "usage: egetgroups <user>";
+    local egroups_arr;
+    if [[ -n "${ROOT}" ]]; then
+        local pgid=$(egetent passwd "$1" | cut -d: -f4);
+        local pgroup=$(egetent group "${pgid}" | cut -d: -f1);
+        local sgroups=($(grep -E ":([^:]*,)?$1(,[^:]*)?$" "${ROOT}/etc/group" | cut -d: -f1));
+        egroups_arr=("${pgroup}");
+        local sg;
+        for sg in "${sgroups[@]}";
+        do
+            if [[ ${sg} != ${pgroup} ]]; then
+                egroups_arr+=("${sg}");
+            fi;
+        done;
+    else
+        read -r -a egroups_arr < <(id -G -n "$1");
+    fi;
+    local g groups=${egroups_arr[0]};
+    while read -r g; do
+        [[ -n ${g} ]] && groups+=",${g}";
+    done < <(printf '%s\n' "${egroups_arr[@]:1}" | sort);
+    echo "${groups}"
+}
+egethome () 
+{ 
+    local pos;
+    [[ $# -eq 1 ]] || die "usage: egethome <user>";
+    case ${CHOST} in 
+        *-freebsd* | *-dragonfly*)
+            pos=9
+        ;;
+        *)
+            pos=6
+        ;;
+    esac;
+    egetent passwd "$1" | cut -d: -f${pos}
+}
+egetshell () 
+{ 
+    local pos;
+    [[ $# -eq 1 ]] || die "usage: egetshell <user>";
+    case ${CHOST} in 
+        *-freebsd* | *-dragonfly*)
+            pos=10
+        ;;
+        *)
+            pos=7
+        ;;
+    esac;
+    egetent passwd "$1" | cut -d: -f${pos}
+}
+egetusername () 
+{ 
+    [[ $# -eq 1 ]] || die "usage: egetusername <uid>";
+    egetent passwd "$1" | cut -d: -f1
+}
+libtoolize () 
+{ 
+    case ${FUNCNAME[1]} in 
+        eautoreconf | eaclocal | _elibtoolize | eautoheader | eautoconf | eautomake | autotools_run_tool | autotools_check_macro | autotools_get_subdirs | autotools_get_auxdir)
+
+        ;;
+        *)
+            eqawarn "QA Notice: 'libtoolize' called by ${FUNCNAME[1]}: ${CATEGORY}/${PF}";
+            eqawarn "Use autotools.eclass instead of calling 'libtoolize' directly."
+        ;;
+    esac;
+    /usr/bin/libtoolize "$@";
+    return $?
+}
+pkg_nofetch () 
+{ 
+    default
+}
+pkg_postinst () 
+{ 
+    acct-user_pkg_postinst "$@"
+}
+pkg_preinst () 
+{ 
+    acct-user_pkg_preinst "$@"
+}
+pkg_prerm () 
+{ 
+    acct-user_pkg_prerm "$@"
+}
+pkg_pretend () 
+{ 
+    acct-user_pkg_pretend "$@"
+}
+pre_source_sandbox () 
+{ 
+    export SANDBOX_ON=1;
+    export SANDBOX_PREDICT="";
+    export SANDBOX_READ="${EBUILD}:${BASH_SOURCE[1]}:${SANDBOX_LOG}";
+    export SANDBOX_WRITE="${SANDBOX_LOG}:/dev/null";
+    [[ ${PORTAGE_DEBUG} != 1 ]] || export SANDBOX_DEBUG=1;
+    local repo_location;
+    for repo_location in "${PORTAGE_ECLASS_LOCATIONS[@]}";
+    do
+        local potential_location="${repo_location}/eclass";
+        if [[ -d ${potential_location} ]]; then
+            SANDBOX_READ+=":${potential_location}";
+        fi;
+    done;
+    function adddeny () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addpredict () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addread () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    function addwrite () 
+    { 
+        die "External commands disallowed while sourcing ebuild: ${FUNCNAME}"
+    };
+    readonly SANDBOX_{ALLOW,ACTIVE,DENY,DEBUG,ON,PREDICT,READ,WRITE}
+}
+src_compile () 
+{ 
+    default
+}
+src_configure () 
+{ 
+    default
+}
+src_install () 
+{ 
+    acct-user_src_install "$@"
+}
+src_prepare () 
+{ 
+    default
+}
+src_test () 
+{ 
+    default
+}
+src_unpack () 
+{ 
+    default
+}

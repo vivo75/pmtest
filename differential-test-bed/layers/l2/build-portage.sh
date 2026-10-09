@@ -11,6 +11,7 @@
 #   L2_PORTAGE_PIN=3.0.82.2    portage version portuale mirrors
 #   L2_JOBS=1                  MAKEOPTS -j / --jobs
 #   L2_SKIP_PORTAGE_UPGRADE=0
+#   L2_BINPKG_FORMAT=gpkg|xpak  (default gpkg; exported as BINPKG_FORMAT)
 #   L2_BUILD_MODE=bpkgonly|deep
 #     bpkgonly -- `--buildpkgonly` (archive-only), for sets whose deps are
 #                 already installed (the porttest fixtures);
@@ -36,7 +37,7 @@ export EMERGE_DEFAULT_OPTS=""
 # (PackageOptions::binpkg_multi_instance), so pinning it in the process
 # env keeps the two archive layouts identical.
 export FEATURES="buildpkg binpkg-multi-instance splitdebug xattr filecaps -cgroup -ccache -distcc -sign parallel-fetch"
-export BINPKG_FORMAT="gpkg"
+export BINPKG_FORMAT="${L2_BINPKG_FORMAT:-gpkg}"
 umask 022
 mkdir -p "$PKGDIR" "$DISTDIR"
 
@@ -109,6 +110,7 @@ if ! /usr/sbin/emerge "${emerge_args[@]}" "${atoms[@]}"; then
   exit 1
 fi
 
-count=$(find "$PKGDIR" -name '*.gpkg.tar' | wc -l)
+case $BINPKG_FORMAT in xpak) pat='*.xpak' ;; *) pat='*.gpkg.tar' ;; esac
+count=$(find "$PKGDIR" -name "$pat" | wc -l)
 log "done: $count binpkgs in $PKGDIR"
 [ "$count" -gt 0 ]

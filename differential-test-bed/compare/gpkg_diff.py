@@ -74,6 +74,51 @@ def open_inner(container_dir: Path, member: str) -> tarfile.TarFile:
     return tarfile.open(fileobj=io.BytesIO(data))
 
 
+def collect_meta(mt: tarfile.TarFile) -> dict[str, bytes]:
+    """`metadata/<KEY>` members of a gpkg metadata tar -> {KEY: bytes}."""
+    meta: dict[str, bytes] = {}
+    for m in mt.getmembers():
+        if not m.isfile() or not m.name.startswith("metadata/"):
+            continue
+        f = mt.extractfile(m)
+        if f is not None:
+            meta[m.name.split("/", 1)[1]] = f.read()
+    return meta
+
+
+def collect_image(it: tarfile.TarFile, roots: tuple[str, ...] = ("image", "image/"),
+                  strip: tuple[str, ...] = ("image/",)) -> dict[str, tuple]:
+    """Image tar -> {relative path: (kind, mode, uid, gid, link target,
+    sha256)}. `roots` are the member names of the image root itself
+    (skipped), `strip` the prefixes removed from every other name; the
+    gpkg defaults are `image/`, xpak_diff passes `.`/`./`."""
+    image: dict[str, tuple] = {}
+    for m in it.getmembers():
+        if m.name in roots:
+            continue
+        rel = m.name
+        for pre in strip:
+            if rel.startswith(pre):
+                rel = rel[len(pre):]
+                break
+        if m.isdir():
+            kind = "d"
+        elif m.issym():
+            kind = "l"
+        elif m.isfile():
+            kind = "f"
+        else:
+            kind = "o"
+        sha = ""
+        if kind == "f":
+            f = it.extractfile(m)
+            if f is not None:
+                sha = hashlib.sha256(f.read()).hexdigest()
+        image[rel] = (kind, f"{m.mode:04o}", m.uid, m.gid,
+                      m.linkname if kind == "l" else "", sha)
+    return image
+
+
 class Side:
     def __init__(self, archive: Path, mode: str, tmpdir: Path) -> None:
         self.prefix = ""
@@ -95,32 +140,9 @@ class Side:
         self.meta_member, self.image_member = meta_name, image_name
 
         with open_inner(cdir, meta_name) as mt:
-            for m in mt.getmembers():
-                if not m.isfile() or not m.name.startswith("metadata/"):
-                    continue
-                f = mt.extractfile(m)
-                if f is not None:
-                    self.meta[m.name.split("/", 1)[1]] = f.read()
+            self.meta = collect_meta(mt)
         with open_inner(cdir, image_name) as it:
-            for m in it.getmembers():
-                if m.name in ("image", "image/"):
-                    continue
-                rel = m.name[len("image/"):] if m.name.startswith("image/") else m.name
-                if m.isdir():
-                    kind = "d"
-                elif m.issym():
-                    kind = "l"
-                elif m.isfile():
-                    kind = "f"
-                else:
-                    kind = "o"
-                sha = ""
-                if kind == "f":
-                    f = it.extractfile(m)
-                    if f is not None:
-                        sha = hashlib.sha256(f.read()).hexdigest()
-                self.image[rel] = (kind, f"{m.mode:04o}", m.uid, m.gid,
-                                   m.linkname if kind == "l" else "", sha)
+            self.image = collect_image(it)
         mf = cdir / "Manifest"
         if mf.is_file():
             for line in mf.read_text(errors="replace").splitlines():
@@ -144,6 +166,39 @@ def norm_meta(key: str, data: bytes, mode: str) -> str:
     return text
 
 
+def compare_metadata(am: dict[str, bytes], bm: dict[str, bytes], mode: str) -> None:
+    for key in sorted(set(am) | set(bm)):
+        if key not in am:
+            hard("metadata", f"missing in a: metadata/{key}")
+            continue
+        if key not in bm:
+            hard("metadata", f"missing in b: metadata/{key}")
+            continue
+        va = norm_meta(key, am[key], mode)
+        vb = norm_meta(key, bm[key], mode)
+        if va != vb:
+            label = "payload" if key == "SIZE" and mode == "payload-tolerant" else "metadata"
+            (soft if label == "payload" else hard)(
+                label, f"metadata/{key} differs: a={va[:120]!r} b={vb[:120]!r}")
+
+
+def compare_image(ai: dict[str, tuple], bi: dict[str, tuple], mode: str) -> None:
+    for rel in sorted(set(ai) | set(bi)):
+        if rel not in ai:
+            hard("image:paths", f"only in b: {rel}")
+            continue
+        if rel not in bi:
+            hard("image:paths", f"only in a: {rel}")
+            continue
+        ta, tb = ai[rel], bi[rel]
+        if ta[:5] != tb[:5]:
+            hard("image:paths", f"{rel}: a={ta[:5]} b={tb[:5]}")
+        elif ta[5] != tb[5]:
+            label = "payload" if mode == "payload-tolerant" else "image:paths"
+            detail = f"{rel}: sha256 {ta[5][:12]} vs {tb[5][:12]}"
+            (soft if label == "payload" else hard)(label, f"payload differs: {detail}")
+
+
 def diff(a: Side, b: Side, mode: str) -> None:
     # outer member kinds (names relative to the prefix)
     def kinds_meta(s: Side) -> set[str]:
@@ -156,36 +211,8 @@ def diff(a: Side, b: Side, mode: str) -> None:
     if a.prefix != b.prefix:
         soft("outer-name", f"prefix differs: {a.prefix} vs {b.prefix}")
 
-    # metadata
-    for key in sorted(set(a.meta) | set(b.meta)):
-        if key not in a.meta:
-            hard("metadata", f"missing in a: metadata/{key}")
-            continue
-        if key not in b.meta:
-            hard("metadata", f"missing in b: metadata/{key}")
-            continue
-        va = norm_meta(key, a.meta[key], mode)
-        vb = norm_meta(key, b.meta[key], mode)
-        if va != vb:
-            label = "payload" if key == "SIZE" and mode == "payload-tolerant" else "metadata"
-            (soft if label == "payload" else hard)(
-                label, f"metadata/{key} differs: a={va[:120]!r} b={vb[:120]!r}")
-
-    # image paths + attributes
-    for rel in sorted(set(a.image) | set(b.image)):
-        if rel not in a.image:
-            hard("image:paths", f"only in b: {rel}")
-            continue
-        if rel not in b.image:
-            hard("image:paths", f"only in a: {rel}")
-            continue
-        ta, tb = a.image[rel], b.image[rel]
-        if ta[:5] != tb[:5]:
-            hard("image:paths", f"{rel}: a={ta[:5]} b={tb[:5]}")
-        elif ta[5] != tb[5]:
-            label = "payload" if mode == "payload-tolerant" else "image:paths"
-            detail = f"{rel}: sha256 {ta[5][:12]} vs {tb[5][:12]}"
-            (soft if label == "payload" else hard)(label, f"payload differs: {detail}")
+    compare_metadata(a.meta, b.meta, mode)
+    compare_image(a.image, b.image, mode)
 
     # manifest: record names only (prefix-insensitive)
     def names(s: Side) -> set[str]:

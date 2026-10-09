@@ -92,6 +92,12 @@ portuale-vs-portage merge never reports them:
   for the other); the parent line already exists, so the collapse only
   ever dedupes a row both sides already emit.
 
+The normaliser cannot canonicalise a build-id shared by *non-identical*
+binaries whose `.debug` files happen to be byte-identical (the setuid
+triple: the objects differ, so no twin family forms).  `diff.py` explains
+that residue as `#327-shared-buildid-link` (first-finisher owns the link,
+`bin/estrip:60-69,197-198`); see `findings/l2.md`.
+
 ## VDB entry (`/var/db/pkg/<cat>/<pf>/`, L1+)
 
 Applied by `normalize.py` to the unpacked `vdb.tar`:

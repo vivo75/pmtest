@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/xattr-helper.py", line 178, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ~~~~^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/xattr-helper.py", line 169, in main
+    restore_xattrs(file_in)
+    ~~~~~~~~~~~~~~^^^^^^^^^
+  File "<CHECKOUT>/bin/xattr-helper.py", line 132, in restore_xattrs
+    xattr.set(pathname, attr, value)
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+  File "<CHECKOUT>/lib/portage/util/_xattr.py", line 162, in set
+    return os.setxattr(item, name, value, flags=flags)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: b'<SCRATCH>/stage-restore-missing-file/in/top/does-not-exist'

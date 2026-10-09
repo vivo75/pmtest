@@ -1,0 +1,40 @@
+gpkg compress oracle case: non-utf8
+
+Isolates real's refusal of non-UTF-8 file names in the image:
+_check_pre_image_files raises UnicodeEncodeError (gpkg.py, the
+`f.encode("utf-8", "strict")` check) BEFORE any container is created, so
+there is no out.gpkg.tar and rc is non-zero with the traceback in
+stderr.txt.  If the native writer silently accepted the name, it would exit
+0 and produce an archive where real produces none.  Staged on tmpfs because
+this host's zfs rejects such names.  zstd only; user run only (same result as
+root).
+
+Run exactly as bin/ebuild-pyhelper runs gpkg-helper.py:
+  /usr/bin/python <checkout>/bin/gpkg-helper.py compress <basename> <out> <metadata_dir> <image_dir>
+with PYTHONPATH=<checkout>/lib, PORTAGE_BIN_PATH=<checkout>/bin, PORTAGE_PYM_PATH=<checkout>/lib,
+PORTAGE_PYTHON=/usr/bin/python, under `env -i`, with a hermetic empty make.conf
+(PORTAGE_CONFIGROOT=<scratch>/cfg); every setting real reads from portage.settings is
+pinned in <comp>/env.  basename: non-utf8-1.0-1 (14 chars).
+Inputs: image.manifest (this dir) materialised by ../materialise.py; metadata = ../metadata/
+(25 build-info files of a real porttest build, see ../README.md).
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004
+  python: Python 3.14.8 (/usr/bin/python)
+  compressors (cases run: zstd):
+    zstd: Zstandard CLI (64-bit) v1.5.7, by Yann Collet
+  MAKEOPTS: -j4 (zstd/xz -T4)
+  BINPKG_COMPRESS_FLAGS, BINPKG_COMPRESS_FLAGS_<NAME>: unset (make.globals default empty)
+  PORTAGE_BZIP2_COMMAND: bzip2
+  FEATURES: unset
+  global config: /usr/share/portage/config (make.globals); make.conf: empty
+  /etc/passwd (user run): vivo:x:1000:100::/home/vivo:/bin/bash
+  /etc/group  (user run): users:x:100:
+  /etc/passwd (root run): root:x:0:0:System user; root:/root:/bin/bash
+  /etc/group  (root run): root:x:0:
+  uid 4242 / gid 4243: none; none
+  staging filesystem (tmpfs; see generate-gpkg.sh header): tmpfs
+  LANG=C.utf8; locale -a: see ../locale-a.txt (the helper needs a UTF-8 locale; C.utf8 is present)
+  date: 2026-10-08 (UTC day granularity; the only field that may change between regenerations)
+  root-vs-user identical (per compressor; 1 = identical so only the user files are kept, 0 = differs so out.root.* are kept): zstd=1 

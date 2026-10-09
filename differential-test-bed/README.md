@@ -148,7 +148,7 @@ Output: `differential-test-bed/logs/l2-<timestamp>/` (`structure-*.txt`,
 `archive-<cat>-<pn>.txt`, `cross-install.txt`, `control.txt`,
 `classification.txt`, `l2-report.txt`, `l2-report.json`);
 `differential-test-bed/logs/l2-report.txt` symlinks the latest. Env: `L2_MODE`,
-`L2_BUILD_MODE`, `L2_REBUILD`, `L2_SKIP_BUILD`, `L2_JOBS`,
+`L2_BUILD_MODE`, `L2_BINPKG_FORMAT=gpkg|xpak`, `L2_REBUILD`, `L2_SKIP_BUILD`, `L2_JOBS`,
 `L2_SKIP_PORTAGE_UPGRADE`, `PORTTEST_*`.
 
 Status (2026-09-13): the **fixture track is green modulo filed
@@ -195,23 +195,160 @@ and metrics: `docs/real-world-testing.md` §§2–8 (extracted from
 `docs/history/real-world-testing.md`, whose §14 slice history and §1
 methodology critique stay there).
 
+### L31b — remote merge into a separate bare client (portuale #326 S8)
+
+The two-container companion to `run/l31-remote-merge.sh` (l31, whose
+candidate merges over a loopback sshd into a far ROOT inside the *same*
+container). L31b is the cell portuale's S8a change needs: the server
+installs and verifies its own binary on the client, which only a
+separate bare machine can prove.
+
+```sh
+differential-test-bed/images/build-mrg-client.sh   # once: localhost/test-mrg-client:latest
+differential-test-bed/run/l31b-two-container.sh                       # default atomlists/l31-s0.txt
+L31B_SKIP_BUILD=1 differential-test-bed/run/l31b-two-container.sh     # reuse the shared _l31-pkgcache
+```
+
+What it proves: a `test-mrg-client` container (the nopy image asserted
+at build time — bash ≥ 5.3, the §6 tool floor, sshd, NO portuale, NO
+Python, NO repo mount, NO `/opt/bin`) is reached over a dedicated
+podman network (created per run, removed on exit) and merged into its
+own `/` through one `mrg --remote-binpkg` per atom — the same trial
+path l31 uses for the same atom list, so the pkgcache
+(`logs/_l31-pkgcache`) is shared with l31 and "the same gpkgs" is
+literal. The client snapshot is diffed against real Portage's consume
+of those gpkgs with the same normalise/diff tooling and no allowlist.
+Green iff 0 hard / 0 unexplained **and** the install-bin assertions in
+`<run>/install-bin.txt` hold:
+
+- first pass: exactly one `portuale-remote: install-bin 0` line, and
+  the client holds `/usr/local/bin/portuale-<hash>` (`/opt/bin` is
+  absent from the client image, so the D5 search deterministically
+  lands there) with the server binary's SHA-256 and mode 0755;
+- re-run against the same client: no `install-bin` line, same path,
+  same digest, same inode/mtime.
+
+Two bed-side orderings matter, both documented in the scripts: the
+parity snapshot is taken after the *first* pass (the trial path
+re-executes hooks on a re-merge, so a post-re-run snapshot would carry
+both passes' `phase.log` lines), and the bed `INSTALL_MASK` is staged
+in the client's `make.conf` by `layers/l31b/client-init.sh` (the
+client merge resolves it from the client's own config, as real
+Portage would; l31 gets this for free because its client and server
+are one container).
+
+Env: `PORTTEST_MRG_CLIENT_IMAGE` (default
+`localhost/test-mrg-client:latest`), `L31B_SKIP_BUILD=1`,
+`L31B_REBUILD=1` (wipes the *shared* `_l31-pkgcache`), `L31B_JOBS`,
+`L31B_SINGLE=1` (one pass only; skips the re-run assertions),
+`L31B_KEEP=1` (leave the client + network up for forensics),
+`L1_SKIP_PORTAGE_UPGRADE`. Exit: 0 green, 1 divergence or assertion
+failure, 2 setup error. Output: `differential-test-bed/logs/l31b-<timestamp>/`
+(`reference.*` / `client.*` snapshots, per-atom `*.first/second.*`
+mrg logs, `install-bin.txt`, `l31b-report.txt`);
+`differential-test-bed/logs/l31b-report.txt` symlinks the latest.
+The non-root (`--remote-portuale-dir`) and arch-mismatch
+(`--remote-portuale-binary`) variants are unit-tested in portuale;
+the bed cell covers the root login only.
+
+### Z326 close-out — nopy / noportage builds vs real Portage (portuale #326 Z)
+
+```sh
+differential-test-bed/run/z326-closeout.sh [--jobs N]
+    [--skip-leg-a] [--skip-leg-b] [--skip-ref] [--skip-gate] [--skip-l31b]
+    [--leg-a-dir <run>] [--leg-b-dir <run>]
+```
+
+- **(a) [nopy]** `nopy-build.sh --variant nopy --reinstall` over
+  `atomlists/z326-nopy.txt` (eix, bash, the P0 probe ebuilds):
+  `--buildpkg` (gpkg), `--usepkgonly` re-merge, xpak rebuild.
+- **(b) [noportage]** the same over `atomlists/l1-merge-gate.txt`
+  (glibc + bash). A phase-env audit (`compare/z326-audit.py`)
+  asserts over both legs that `portuale-python` was the only
+  interpreter any Portage helper invoked (census + live `ps`
+  sampler + log scan; build-system python is allowed and counted).
+- **(c) reference** real Portage builds both lists from source in the
+  normal image (`layers/z326/ref-build-merge-snapshot.sh`, the l1
+  build path plus the same xpak step), then `normalize.py` +
+  `diff.py` (strict, existing allowlist only) on vdb + installed
+  files and `gpkg_diff.py --mode strict` per gpkg pair.
+- Then **[gate]** (`l1-merge-from-binpkg.sh` on the gate list, plus
+  `L1_SKIP_BUILD=1 L1_CONSUME_REINSTALL=1`) and **l31b**
+  (`L31B_SKIP_BUILD=1 l31b-two-container.sh`).
+
+Requires `GENTOO_MIRRORS="http://<eth0 IP>:8080"` (refused without
+it). Output: `logs/z326-<timestamp>/` (`legs.tsv`, reference
+snapshots, `diff-*` / `gpkg-*` / `audit-*` reports,
+`z326-report.txt`); reference binpkgs persist in
+`logs/_z326-pkgcache-{nopy,noportage}/`. Findings:
+`findings/z326-closeout.md`. Exit: 0 green, 1 divergence/step
+failure, 2 setup error.
+
+`nopy-build.sh` options beyond P0: `--reinstall` (force rebuild +
+re-merge of already-installed atoms), `NOPY_JOBS` (guest MAKEOPTS),
+`NOPY_SNAPSHOT=1` (restricted merge snapshot for the (c) diff),
+`NOPY_AUDIT=1` (audit capture). Env passthrough and the variant
+images are unchanged from P0 (`NOPY_IMAGE` / `NOPORTAGE_IMAGE`,
+`PM_BARE=1` mounts).
+
+### Container mount modes (`PM_RELOCATED`, `PM_BARE`, `PM_NO_CHECKOUT`)
+
+Every `run/` orchestrator mounts the PM through `run/lib.sh`'s
+`pm_mounts` (one directory as the container's `/usr/local/bin`, the bed
+itself at `/TEST`). What else is mounted is an env knob:
+
+| mode | repo mount | checkout mount | proves |
+|---|---|---|---|
+| default | `$PM_REPO` at its host path | inside the repo mount when present | the standard gate shape |
+| `PM_RELOCATED=1` | none (`bin/` comes from the binary's embedded copy, backlog #322) | `$PM_REPO/3rdparty/portage` only | the relocated binary, with the checkout available |
+| `PM_BARE=1` | none | none (and no `PORTUALE_PORTAGE_CHECKOUT` in the container env) | full self-sufficiency: the [nopy]/[noportage] cells (backlog #326 P0) |
+| `PM_NO_CHECKOUT=1` | `$PM_REPO` at its host path | masked with an empty dir (and `PORTUALE_PORTAGE_CHECKOUT` pinned to the masked path, so an operator override cannot silently defeat the mask) | the standard gate shape with no checkout — as if the tree had none (backlog #326 S9) |
+
+`PM_BARE` wins over `PM_NO_CHECKOUT`, which wins over
+`PM_RELOCATED`. The L1 merge gate runs green under
+`PM_NO_CHECKOUT=1` from a tree *with* the checkout, and as-is from a
+tree without it (a fresh clone, a worktree — the checkout is
+gitignored).
+
+Companion check: `portuale_phase_helpers_preflight` (`run/lib.sh`)
+requires the checkout **only with
+`PORTUALE_PYTHON_HELPERS=real`** (the D2 oracle handle, where
+`bin_dir()` overlays `bin/` on the checkout's `bin/`); native runs
+(the default) skip it. Combining `PM_NO_CHECKOUT=1` with `=real`
+fails loud in the preflight instead of dying mid-merge.
+
+```sh
+PM_NO_CHECKOUT=1 differential-test-bed/run/l1-merge-from-binpkg.sh \
+  differential-test-bed/atomlists/l1-merge-gate.txt
+```
+
 ### Layout
 
 ```
 run/          host orchestrators (l0-resolver.sh, l0-fixture-oracle.sh,
               l1-merge-from-binpkg.sh, l2-portuale-builder.sh,
-              l3-source-parity.sh, lib.sh)
+              l3-source-parity.sh, l31-remote-merge.sh,
+              l31b-two-container.sh, nopy-build.sh, z326-closeout.sh,
+              lib.sh)
 layers/l0/    in-container.sh — the per-atom probe driver
 layers/l0-fixture-oracle/  stage.sh + in-container.sh (real emerge on fixtures)
 layers/l1/    build.sh (Portage, from source) + consume.sh (one PM, merge + snapshot)
 layers/l2/    build-portage.sh + build-portuale.sh (archive-only / deep)
 layers/l3/    source-build parity (build-and-merge.sh)
-atomlists/    curated atom / package lists
+layers/l31/   consume-remote.sh (one-container remote merge over loopback sshd)
+layers/l31b/  client-init.sh + server-merge.sh + client-snapshot.sh
+              (two-container remote merge over a dedicated network)
+layers/z326/  merged-snapshot-lib.sh (shared restricted snapshot) +
+              ref-build-merge-snapshot.sh (reference from-source build
+              + snapshot for the #326 Z close-out)
+atomlists/    curated atom / package lists (incl. z326-nopy.txt)
 compare/      resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
-              gpkg-structure.sh + gpkg-diff.sh (L2), test-*.sh, normalize.md,
+              gpkg-structure.sh + gpkg-diff.sh (L2), z326-audit.py (the #326 Z
+              phase-env audit), test-*.sh, normalize.md,
               known-divergences.yaml, known-divergences-fixture-oracle.yaml
 net/          up.sh / down.sh
 images/       Containerfile material + overlay/porttest/ (incl. metadata/md5-cache)
+              + mrg-client/ (the l31b bare-client recipe) + build-*.sh
 logs/         run output (git-ignored)  — incl. _l1-pkgcache/, _l2-*
 ```
 

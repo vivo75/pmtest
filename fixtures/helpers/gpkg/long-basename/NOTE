@@ -1,0 +1,10 @@
+Isolates the container GNU switch at len(basename) >= 154 (gpkg.py:1007-1008):
+a 154-character basename makes the container (not the inner tars) GNU even
+though a 154-byte prefix would still fit USTAR's 155-byte prefix field.  If
+the native writer used USTAR here, the `container.member ... fmt=GNU pre=L`
+lines become fmt=USTAR pre=-.  Real behaviour worth knowing: only the members
+written by container.addfile (gpkg-1, Manifest) become GNU + `L` records;
+metadata.tar.<ext> and image.tar.<ext> are headed by tar_stream_writer with
+the metadata (USTAR) / image format, and a 154-byte prefix still fits the
+USTAR prefix field, so they stay USTAR without `L`.  Pair: basename-153 (one byte shorter, USTAR).
+zstd only.

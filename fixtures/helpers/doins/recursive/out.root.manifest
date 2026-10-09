@@ -1,0 +1,19 @@
+d 0755 0 0 - - usr
+d 0755 0 0 - - usr/lib
+d 0755 0 0 - - usr/lib/probe
+d 0755 0 0 - - usr/lib/probe/tree
+f 0755 0 0 25 sha256:3469fda3228c6ea99341993a4b29997bd424fe26b77b006c77f116c0462d17c4 usr/lib/probe/tree/abs-target.txt
+d 0755 0 0 - - usr/lib/probe/tree/adir
+f 0755 0 0 19 sha256:0e06a3af4b48634a8b2964844c2c52a7e31ff378a5d3ea30a85aa4f3597d7dcc usr/lib/probe/tree/adir/y.txt
+l ---- 0 0 - - usr/lib/probe/tree/dangling -> no-such-target
+d 0755 0 0 - - usr/lib/probe/tree/emptydir
+f 0755 0 0 14 sha256:f40bd408926e1627d5f3822f9ff9168a5b2c72a50930dc8cdaabf458d618894c usr/lib/probe/tree/file.txt
+f 0755 0 0 18 sha256:6008349a048bf8e8875f7ca4935ae2399867ed7bb85b34d5bc9fc8372ea93cb8 usr/lib/probe/tree/hard1
+f 0755 0 0 18 sha256:6008349a048bf8e8875f7ca4935ae2399867ed7bb85b34d5bc9fc8372ea93cb8 usr/lib/probe/tree/hard2
+f 0755 0 0 25 sha256:3469fda3228c6ea99341993a4b29997bd424fe26b77b006c77f116c0462d17c4 usr/lib/probe/tree/link-abs
+l ---- 0 0 - - usr/lib/probe/tree/link-rel -> file.txt
+l ---- 0 0 - - usr/lib/probe/tree/linkdir -> sub
+f 0755 0 0 16 sha256:89afc617e4223d1636b08d6122f04897e340b24adbcb793dcfea4c5d68af2b5d usr/lib/probe/tree/secret.txt
+d 0755 0 0 - - usr/lib/probe/tree/sub
+f 0755 0 0 16 sha256:4b72e82a0243c3d0a597ce7241fb68ae74db0f6b74dc4ec7ebec80fc4a51de9b usr/lib/probe/tree/sub/nested.txt
+f 0755 0 0 23 sha256:cfdd77ca12f94ee780bbfd2a56e11e19a794dd74f86e298d9ff462c79afbdb3a usr/lib/probe/tree/we%FFird.bin

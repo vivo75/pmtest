@@ -1,0 +1,12 @@
+--recursive
+--preserve_symlinks
+--helpers_can_die
+--insoptions=-m0644
+--diroptions=-m0755
+--distdir=<SCRATCH>/stage-phase-defaults-r/dist
+--enable_copy_xattr
+--xattr_exclude=bcachefs.* bcachefs_effective.* btrfs.* security.evm security.ima security.selinux system.nfs4_acl user.apache_handler user.Beagle.* user.dublincore.* user.mime_encoding user.xdg.*
+--helper=doins
+--dest=<SCRATCH>/stage-phase-defaults-r/ed/usr/lib/probe
+--
+tree

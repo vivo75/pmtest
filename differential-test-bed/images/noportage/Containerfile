@@ -1,0 +1,51 @@
+# [noportage] (portuale backlog #326): the normal bed image with the
+# Portage Python package and its runtime removed, but Python itself kept.
+# For packages whose ebuilds need Python.
+#
+# What goes (all derived from the vdb CONTENTS of sys-apps/portage in the
+# RUN below, so the list tracks the pinned Portage, never a hand copy):
+#   - /usr/lib/portage/                       (phase helpers, qa checks)
+#   - /usr/lib/python3.14/site-packages/portage/ + _emerge/
+#     (the `portage` and `_emerge` Python packages, incl. __pycache__)
+#   - the python-exec launch scripts portage owns under
+#     /usr/lib/python-exec/python3.14/ (emerge, ebuild, portageq,
+#     egencache, quickpkg, emaint, ... -- other packages' scripts such as
+#     cython/meson/gemato stay)
+#   - the /usr/bin + /usr/sbin entry-point symlinks portage owns
+#     (emerge, ebuild, portageq, egencache, quickpkg, emaint, gpkg-sign,
+#     glsa-check, emirrordist, dispatch-conf, env-update, fixpackages,
+#     archive-conf, regenworld), plus the /usr/bin/emerge-webrsync file
+#   - the .build-id symlinks portage owns (they point at the removed .so)
+#
+# What stays: /var/db/pkg itself (the vdb must keep describing the
+# system), /etc config, man pages, docs, /usr/share/portage/config
+# (make.globals and friends -- the PM still reads them), tmpfiles conf.
+
+ARG PORTTEST_IMAGE=localhost/test-portuale:latest
+FROM ${PORTTEST_IMAGE}
+
+RUN set -eu; \
+    C=$(echo /var/db/pkg/sys-apps/portage-*/CONTENTS); \
+    [ -f "$C" ] || { echo "no sys-apps/portage CONTENTS under /var/db/pkg (got: $C)" >&2; exit 1; }; \
+    echo "deriving the removal set from $C"; \
+    owned=$(grep -E '^(obj|sym) ' "$C" | awk '{print $2}'); \
+    runtime=$(printf '%s\n' "$owned" | grep -E '^/(usr/lib/portage|usr/lib/python-exec|usr/lib/python3\.14/site-packages/(portage|_emerge)|usr/lib/debug|usr/bin/|usr/sbin/)' || true); \
+    [ -n "$runtime" ] || { echo "empty removal set -- refusing" >&2; exit 1; }; \
+    echo "removing $(printf '%s\n' "$runtime" | wc -l) portage-owned runtime files:"; \
+    printf '%s\n' "$runtime" | awk -F/ '{print $NF}' | LC_ALL=C sort -u | tr '\n' ' '; echo; \
+    printf '%s\n' "$runtime" | while IFS= read -r f; do rm -f "/$f"; done; \
+    rm -rf /usr/lib/portage \
+           /usr/lib/python3.14/site-packages/portage \
+           /usr/lib/python3.14/site-packages/_emerge; \
+    echo "gone: /usr/lib/portage, site-packages/portage, site-packages/_emerge"
+
+# Sanity: the `portage` package must be unimportable and /usr/lib/portage
+# must be absent, or the image build fails here.
+RUN if python3 -c 'import portage' 2>/dev/null; then \
+        echo "[noportage] sanity: 'import portage' still works" >&2; exit 1; \
+    fi; \
+    test ! -e /usr/lib/portage || \
+        { echo "[noportage] sanity: /usr/lib/portage still present" >&2; exit 1; }; \
+    test ! -e /usr/lib/python3.14/site-packages/portage || \
+        { echo "[noportage] sanity: site-packages/portage still present" >&2; exit 1; }; \
+    echo "[noportage] sanity ok: no import portage, no /usr/lib/portage"

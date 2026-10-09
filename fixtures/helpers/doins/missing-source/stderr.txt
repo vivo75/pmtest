@@ -1,0 +1,27 @@
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/doins.py", line 619, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ~~~~^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 608, in main
+    if _doins(
+       ~~~~~~^
+        opts, install_runner, os.path.basename(source), os.path.dirname(source)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ):
+    ^
+  File "<CHECKOUT>/bin/doins.py", line 451, in _doins
+    return install_runner.install_file(source, os.path.dirname(dest))
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 385, in install_file
+    return self._ins_runner.run(source, dest_dir)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 193, in run
+    sstat = os.stat(source)
+FileNotFoundError: [Errno 2] No such file or directory: b'no-such-file'
+ * ERROR: test-cat/testdoins-1.0::testrepo failed (install phase):
+ *   doins failed
+ * 
+ * If you need support, post the output of `emerge --info '=test-cat/testdoins-1.0::testrepo'`,
+ * the complete build log and the output of `emerge -pqv '=test-cat/testdoins-1.0::testrepo'`.
+ * The ebuild environment file is located at '<SCRATCH>/stage-missing-source/t/die.env'.
+ * Working directory: '<SCRATCH>/stage-missing-source/src'
