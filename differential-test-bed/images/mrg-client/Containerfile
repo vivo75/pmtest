@@ -1,0 +1,63 @@
+# [mrg-client] (portuale backlog #326 S8): the far end of the l31b
+# two-container remote-merge cell.
+#
+# FROM the [nopy] image (`localhost/test-portuale-nopy:latest`: no
+# `sys-apps/portage` runtime, no Python interpreters), and adds NOTHING
+# at build time -- nothing can be installed here anyway (there is no
+# Portage runtime left to install with). What this layer does is pin the
+# S8 client contract as build-time assertions, so the cell fails at
+# image-build time -- not mid-merge -- if the base ever regresses:
+#
+#   - bash >= 5.3 (the remote-merge.md §1 floor);
+#   - the full §6 tool floor the preflight `command -v` loop checks:
+#     tar mkdir rm cat chmod ln find grep sed cmp stat readlink id tail
+#     plus sha256sum mv uname mktemp for the client-binary install;
+#   - an sshd server binary (the client's only remote contact is the
+#     server over ssh; host keys are generated per run at container
+#     start by layers/l31b/client-init.sh, never baked in);
+#   - NO Python interpreter left (`compgen -c python` prints nothing);
+#   - NO portuale binary in /usr/local/bin (the server installs and
+#     verifies its own binary there at merge time; a baked-in copy
+#     would mask the install-bin stage the bed asserts on). The
+#     /usr/local/bin mount of the server binary (`run/lib.sh`
+#     `pm_mounts`) must never be added to this image's containers;
+#   - NO /opt/bin directory, so the D5 directory search (first /opt/bin,
+#     then /usr/local/bin) deterministically lands on /usr/local/bin
+#     and the runner asserts exactly that path. If /opt/bin is ever
+#     added here, the runner's D5-order detection still finds the right
+#     file, but the expected-path assertion in run/l31b-two-container.sh
+#     must be updated to match.
+#
+# Build: differential-test-bed/images/build-mrg-client.sh
+# (tag localhost/test-mrg-client:latest, the MRG_CLIENT_IMAGE default).
+
+ARG PORTTEST_IMAGE=localhost/test-portuale-nopy:latest
+FROM ${PORTTEST_IMAGE}
+
+RUN set -eu; \
+    echo "[mrg-client] asserting the S8 bare-client contract"; \
+    v=$(bash -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"'); \
+    major=${v%%.*}; minor=${v#*.}; \
+    [ "$major" -gt 5 ] || { [ "$major" -eq 5 ] && [ "$minor" -ge 3 ]; } || \
+        { echo "[mrg-client] bash too old: $v (need >= 5.3)" >&2; exit 1; }; \
+    echo "[mrg-client] bash $v ok"; \
+    missing=""; \
+    for t in tar mkdir rm cat chmod ln find grep sed cmp stat readlink id tail \
+             sha256sum mv uname mktemp sshd ssh; do \
+        command -v "$t" >/dev/null 2>&1 || missing="$missing $t"; \
+    done; \
+    [ -z "$missing" ] || \
+        { echo "[mrg-client] missing tools:$missing" >&2; exit 1; }; \
+    echo "[mrg-client] tool floor + sshd ok"; \
+    test ! -e /usr/lib/portage || \
+        { echo "[mrg-client] /usr/lib/portage still present" >&2; exit 1; }; \
+    /bin/bash -c 'test -z "$(compgen -c python)"' || \
+        { echo "[mrg-client] python commands remain:" >&2; \
+          /bin/bash -c 'compgen -c python' | LC_ALL=C sort -u >&2; exit 1; }; \
+    echo "[mrg-client] no portage runtime, no python ok"; \
+    ls /usr/local/bin/portuale* >/dev/null 2>&1 && \
+        { echo "[mrg-client] a portuale binary is baked in (must come from the server at merge time)" >&2; exit 1; }; \
+    echo "[mrg-client] no baked-in portuale ok"; \
+    test ! -e /opt/bin || \
+        { echo "[mrg-client] /opt/bin exists (install target must stay /usr/local/bin; see header)" >&2; exit 1; }; \
+    echo "[mrg-client] sanity ok: bare client (bash $v, tool floor, sshd, no python, no portuale, no /opt/bin)"

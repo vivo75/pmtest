@@ -195,23 +195,84 @@ and metrics: `docs/real-world-testing.md` §§2–8 (extracted from
 `docs/history/real-world-testing.md`, whose §14 slice history and §1
 methodology critique stay there).
 
+### L31b — remote merge into a separate bare client (portuale #326 S8)
+
+The two-container companion to `run/l31-remote-merge.sh` (l31, whose
+candidate merges over a loopback sshd into a far ROOT inside the *same*
+container). L31b is the cell portuale's S8a change needs: the server
+installs and verifies its own binary on the client, which only a
+separate bare machine can prove.
+
+```sh
+differential-test-bed/images/build-mrg-client.sh   # once: localhost/test-mrg-client:latest
+differential-test-bed/run/l31b-two-container.sh                       # default atomlists/l31-s0.txt
+L31B_SKIP_BUILD=1 differential-test-bed/run/l31b-two-container.sh     # reuse the shared _l31-pkgcache
+```
+
+What it proves: a `test-mrg-client` container (the nopy image asserted
+at build time — bash ≥ 5.3, the §6 tool floor, sshd, NO portuale, NO
+Python, NO repo mount, NO `/opt/bin`) is reached over a dedicated
+podman network (created per run, removed on exit) and merged into its
+own `/` through one `mrg --remote-binpkg` per atom — the same trial
+path l31 uses for the same atom list, so the pkgcache
+(`logs/_l31-pkgcache`) is shared with l31 and "the same gpkgs" is
+literal. The client snapshot is diffed against real Portage's consume
+of those gpkgs with the same normalise/diff tooling and no allowlist.
+Green iff 0 hard / 0 unexplained **and** the install-bin assertions in
+`<run>/install-bin.txt` hold:
+
+- first pass: exactly one `portuale-remote: install-bin 0` line, and
+  the client holds `/usr/local/bin/portuale-<hash>` (`/opt/bin` is
+  absent from the client image, so the D5 search deterministically
+  lands there) with the server binary's SHA-256 and mode 0755;
+- re-run against the same client: no `install-bin` line, same path,
+  same digest, same inode/mtime.
+
+Two bed-side orderings matter, both documented in the scripts: the
+parity snapshot is taken after the *first* pass (the trial path
+re-executes hooks on a re-merge, so a post-re-run snapshot would carry
+both passes' `phase.log` lines), and the bed `INSTALL_MASK` is staged
+in the client's `make.conf` by `layers/l31b/client-init.sh` (the
+client merge resolves it from the client's own config, as real
+Portage would; l31 gets this for free because its client and server
+are one container).
+
+Env: `PORTTEST_MRG_CLIENT_IMAGE` (default
+`localhost/test-mrg-client:latest`), `L31B_SKIP_BUILD=1`,
+`L31B_REBUILD=1` (wipes the *shared* `_l31-pkgcache`), `L31B_JOBS`,
+`L31B_SINGLE=1` (one pass only; skips the re-run assertions),
+`L31B_KEEP=1` (leave the client + network up for forensics),
+`L1_SKIP_PORTAGE_UPGRADE`. Exit: 0 green, 1 divergence or assertion
+failure, 2 setup error. Output: `differential-test-bed/logs/l31b-<timestamp>/`
+(`reference.*` / `client.*` snapshots, per-atom `*.first/second.*`
+mrg logs, `install-bin.txt`, `l31b-report.txt`);
+`differential-test-bed/logs/l31b-report.txt` symlinks the latest.
+The non-root (`--remote-portuale-dir`) and arch-mismatch
+(`--remote-portuale-binary`) variants are unit-tested in portuale;
+the bed cell covers the root login only.
+
 ### Layout
 
 ```
 run/          host orchestrators (l0-resolver.sh, l0-fixture-oracle.sh,
               l1-merge-from-binpkg.sh, l2-portuale-builder.sh,
-              l3-source-parity.sh, lib.sh)
+              l3-source-parity.sh, l31-remote-merge.sh,
+              l31b-two-container.sh, lib.sh)
 layers/l0/    in-container.sh — the per-atom probe driver
 layers/l0-fixture-oracle/  stage.sh + in-container.sh (real emerge on fixtures)
 layers/l1/    build.sh (Portage, from source) + consume.sh (one PM, merge + snapshot)
 layers/l2/    build-portage.sh + build-portuale.sh (archive-only / deep)
 layers/l3/    source-build parity (build-and-merge.sh)
+layers/l31/   consume-remote.sh (one-container remote merge over loopback sshd)
+layers/l31b/  client-init.sh + server-merge.sh + client-snapshot.sh
+              (two-container remote merge over a dedicated network)
 atomlists/    curated atom / package lists
 compare/      resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
               gpkg-structure.sh + gpkg-diff.sh (L2), test-*.sh, normalize.md,
               known-divergences.yaml, known-divergences-fixture-oracle.yaml
 net/          up.sh / down.sh
 images/       Containerfile material + overlay/porttest/ (incl. metadata/md5-cache)
+              + mrg-client/ (the l31b bare-client recipe) + build-*.sh
 logs/         run output (git-ignored)  — incl. _l1-pkgcache/, _l2-*
 ```
 
