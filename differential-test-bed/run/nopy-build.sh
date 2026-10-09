@@ -3,10 +3,17 @@
 # has no Portage (and, for [nopy], no Python). Portuale backlog #326 P0.
 #
 #   differential-test-bed/run/nopy-build.sh [--variant nopy|noportage]
-#       [--bin <dir>] [--env K=V]... <atom>...
+#       [--bin <dir>] [--reinstall] [--env K=V]... <atom>...
 #
 # --env K=V adds K=V to the container environment (repeatable), e.g. a
 # calling-env variable a probe needs to see leak into the phases.
+#
+# --reinstall forces the rebuild + re-merge even for atoms already
+# installed at the resolved version (guest passes `--reinstall-atoms`
+# to the step1 --buildpkg and the step2 --usepkgonly emerges). Needed
+# for lists like the glibc+bash gate, whose atoms the image already
+# holds: without it emerge treats them as satisfied and no binpkg is
+# produced.
 #
 # --variant selects the image (default nopy):
 #   nopy       localhost/test-portuale-nopy:latest
@@ -23,8 +30,9 @@
 # $LOGS_DIR/_l2-distfiles), and the porttest overlay staged the way
 # l1/l3 stage it when an atom starts with `porttest/`:
 #   1. portuale emerge -1 -v --buildpkg <atoms>
-#      (BINPKG_FORMAT=gpkg FEATURES="buildpkg -sign"
-#       PKGDIR=/var/cache/binpkgs -- the owner's original failing command)
+#      (BINPKG_FORMAT=gpkg FEATURES="buildpkg -sign noclean"
+#       PKGDIR=/var/cache/binpkgs -- the owner's original failing command;
+#       noclean keeps /var/tmp/portage for the audit/artifacts)
 #   2. portuale emerge -1 -v --usepkgonly <atoms>   (only if 1 succeeded)
 #   3. step 1 again with BINPKG_FORMAT=xpak into PKGDIR=/var/cache/binpkgs-xpak
 #      (only if 1 succeeded)
@@ -43,7 +51,18 @@
 # distfiles that were missing (distfiles-fetched.txt).
 #
 # Env: NOPY_IMAGE / NOPORTAGE_IMAGE, NOPY_DISTFILES, NOPY_TIMEOUT
-#      (default 28800, per-container wall-clock cap like L3_TIMEOUT).
+#      (default 28800, per-container wall-clock cap like L3_TIMEOUT),
+#      NOPY_JOBS (when set, the guest exports MAKEOPTS=-j<N> so
+#      from-source builds parallelise; unset leaves the image default),
+#      NOPY_REINSTALL=1 (same as --reinstall), NOPY_SNAPSHOT=1 (after
+#      the steps the guest writes a restricted merge snapshot --
+#      $OUT/snap.{files,mtimes,vdb.tar,meta}.tsv plus
+#      merged-cpvs.txt/paths.txt, exactly the consume.sh shape -- so a
+#      reference build can be diffed with compare/normalize.py +
+#      compare/diff.py; needs step1 rc=0), NOPY_AUDIT=1 (audit capture
+#      for compare/z326-audit.py: an interpreter/portage census in
+#      artifacts/audit-env.txt, a ps sampler across all steps in
+#      audit-ps.log, and per-package temp transcripts in artifacts/).
 
 set -euo pipefail
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -51,14 +70,16 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 VARIANT=nopy
 OPT_BIN=""
+OPT_REINSTALL=${NOPY_REINSTALL:-0}
 EXTRA_ENV=()
 while [ $# -gt 0 ]; do
   case $1 in
     --variant) VARIANT=${2:?--variant needs nopy|noportage}; shift 2 ;;
     --bin) OPT_BIN=${2:?--bin needs a directory}; shift 2 ;;
+    --reinstall) OPT_REINSTALL=1; shift ;;
     --env) case ${2:-} in GENTOO_MIRRORS=*) EXTRA_ENV+=(-e "GENTOO_MIRRORS=$(bed_guest_mirrors "${2#*=}")") ;; *=*) EXTRA_ENV+=(-e "$2") ;; *) echo "--env needs K=V" >&2; exit 2 ;; esac; shift 2 ;;
     --) shift; break ;;
-    -*) echo "unknown option: $1 (usage: nopy-build.sh [--variant nopy|noportage] [--bin <dir>] [--env K=V]... <atom>...)" >&2; exit 2 ;;
+    -*) echo "unknown option: $1 (usage: nopy-build.sh [--variant nopy|noportage] [--bin <dir>] [--reinstall] [--env K=V]... <atom>...)" >&2; exit 2 ;;
     *) break ;;
   esac
 done
@@ -129,13 +150,17 @@ TIMEOUT=${NOPY_TIMEOUT:-28800}
   echo "distfiles cache (guest): /distfiles (DISTDIR=/distfiles)"
   echo "stage_porttest_overlay: $STAGE_OVL"
   echo "timeout : $TIMEOUT"
+  echo "reinstall: $OPT_REINSTALL"
+  echo "jobs     : ${NOPY_JOBS:-unset}"
+  echo "snapshot : ${NOPY_SNAPSHOT:-0}"
+  echo "audit    : ${NOPY_AUDIT:-0}"
   echo "extra_env: ${EXTRA_ENV[*]:-(none)}"
   echo "date_utc: $(date -u +%FT%TZ)"
   echo
   echo "## step env"
-  echo "step1: BINPKG_FORMAT=gpkg FEATURES=\"buildpkg -sign\" PKGDIR=/var/cache/binpkgs"
+  echo "step1: BINPKG_FORMAT=gpkg FEATURES=\"buildpkg -sign noclean\" PKGDIR=/var/cache/binpkgs"
   echo "step2: PKGDIR=/var/cache/binpkgs (step 1 output dir; no other overrides)"
-  echo "step3: BINPKG_FORMAT=xpak FEATURES=\"buildpkg -sign\" PKGDIR=/var/cache/binpkgs-xpak"
+  echo "step3: BINPKG_FORMAT=xpak FEATURES=\"buildpkg -sign noclean\" PKGDIR=/var/cache/binpkgs-xpak"
 } > "$OUT/env.txt"
 
 {
@@ -174,10 +199,63 @@ backfill() {
 }
 trap backfill EXIT
 
-export PORTAGE_CONFIGROOT=/ ROOT=/
+export PORTAGE_CONFIGROOT=/ ROOT=/ PORTAGE_RUNNING_ROOT=/
 export EMERGE_DEFAULT_OPTS=""
 export LC_ALL=C.UTF-8 TZ=UTC
 umask 022
+
+# Harness-env hygiene (#326 Z, leg (c)): container -e variables leak
+# into every phase's saved environment (and hence into binpkg
+# metadata + the vdb), so anything the reference side does not set
+# identically would diff as noise. Consume each NOPY_* knob into a
+# shell-local once, then unset it before the first emerge.
+JOBS=${NOPY_JOBS:-}; unset NOPY_JOBS
+REINSTALL_WANT=${NOPY_REINSTALL:-0}; unset NOPY_REINSTALL
+SNAPSHOT=${NOPY_SNAPSHOT:-0}; unset NOPY_SNAPSHOT
+AUDIT=${NOPY_AUDIT:-0}; unset NOPY_AUDIT
+STAGE_OVL=${NOPY_STAGE_OVL:-0}; unset NOPY_STAGE_OVL
+GUEST_VARIANT=${NOPY_VARIANT:-?}; unset NOPY_VARIANT
+unset NOPY_OUT
+
+# NOPY_JOBS (host env, forwarded below): intra-package parallelism for
+# from-source builds (glibc serial takes hours). Unset: image default.
+if [ -n "${JOBS:-}" ]; then
+  export MAKEOPTS="-j${JOBS}"
+fi
+
+# NOPY_REINSTALL (host --reinstall): force rebuild + re-merge of atoms
+# already installed at the resolved version (the gate lists).
+REINSTALL=()
+if [ "$REINSTALL_WANT" = 1 ]; then
+  # One string like layers/l1/consume.sh's --reinstall-atoms shape.
+  REINSTALL=(--reinstall-atoms "$*")
+fi
+
+# The installed set before the build: the snapshot block diffs it
+# against the after set to find the merged packages (plus the atom
+# match below, which covers the --reinstall shape where before == after).
+if [ -d /var/db/pkg ]; then
+  ( cd /var/db/pkg && ls -d */*/ 2>/dev/null | sed 's:/$::' ) | LC_ALL=C sort > "$OUT/installed-before.txt" || true
+else
+  : > "$OUT/installed-before.txt"
+fi
+
+# Audit ps sampler (#326 Z): catches live
+# `portuale __helper <name>` dispatcher invocations (and any
+# real-python helper use) across all three steps. Stopped after step3.
+if [ "$AUDIT" = 1 ]; then
+  : > "$OUT/audit-ps.log"
+  if command -v ps >/dev/null 2>&1; then
+    ( while true; do
+        printf '### %s\n' "$(date -u +%FT%TZ)"
+        ps -ef | grep -E 'portuale|python|ebuild|emerge' | grep -v grep || true
+        sleep 5
+      done >> "$OUT/audit-ps.log" 2>&1 & echo $! > "$OUT/.audit-ps.pid" )
+    echo ">>> guest audit: sampler pid $(cat "$OUT/.audit-ps.pid")"
+  else
+    echo ">>> guest audit: no ps(1), sampler skipped"
+  fi
+fi
 
 if [ -x /usr/local/bin/emerge ]; then
   EM=(/usr/local/bin/emerge)
@@ -186,7 +264,7 @@ else
 fi
 echo ">>> guest: emerge argv0: ${EM[*]}"
 
-if [ "${NOPY_STAGE_OVL:-0}" = 1 ] && [ -d /porttest-overlay ]; then
+if [ "$STAGE_OVL" = 1 ] && [ -d /porttest-overlay ]; then
   rm -rf /var/db/repos/porttest
   cp -a /porttest-overlay /var/db/repos/porttest
   cat > /etc/portage/repos.conf/porttest.conf <<'EOF'
@@ -201,18 +279,64 @@ fi
 rc1=1 rc2=1 rc3=1
 echo ">>> guest step1: emerge -1 -v --buildpkg (gpkg)"
 set +e
-BINPKG_FORMAT=gpkg FEATURES="buildpkg -sign" PKGDIR=/var/cache/binpkgs \
-  "${EM[@]}" -1 -v --buildpkg "$@" > "$OUT/step1-build-gpkg.log" 2>&1
+BINPKG_FORMAT=gpkg FEATURES="buildpkg -sign noclean" PKGDIR=/var/cache/binpkgs \
+  "${EM[@]}" -1 -v --buildpkg "${REINSTALL[@]}" "$@" > "$OUT/step1-build-gpkg.log" 2>&1
 rc1=$?
 set -e
 printf 'step1\t%s\n' "$rc1" >> "$RESULT"
 echo ">>> guest step1 rc=$rc1"
 
+# Audit census capture (#326 Z).
+#
+# Why this shape: the saved per-package `temp/environment` is the
+# POST-filter dump (the filter strips PORTAGE_* by design), portuale
+# leaves `__source_all_bashrcs` unimplemented (so no bashrc hook can
+# observe the live phase env), and successful helper runs are silent.
+# The audit therefore rests on three legs, all captured here:
+#  1. census: which interpreters / portage packages exist at all
+#     (artifacts/audit-env.txt);
+#  2. a ps sampler running across all three steps, catching live
+#     `portuale __helper <name>` dispatcher invocations
+#     (audit-ps.log);
+#  3. the step logs + per-package temp(logging) transcripts, scanned
+#     host-side for real-python helper invocations.
+# The verdict logic lives in compare/z326-audit.py: helper scripts
+# exist ONLY inside the dispatcher (no .py files, no checkout, no
+# /usr/lib/portage -- asserted by the census), so in a green build
+# with zero `no native helper` 127s every helper call demonstrably
+# went through portuale-python; any real-python helper invocation in
+# the logs/ps record is a violation, while build-system python (e.g.
+# glibc's own configure) is allowed and counted separately.
+if [ "$AUDIT" = 1 ]; then
+  echo ">>> guest audit: census + ps sampler"
+  mkdir -p "$OUT/artifacts"
+  {
+    echo "variant: $GUEST_VARIANT"
+    echo "--- compgen -c python (empty = no python provider):"
+    compgen -c python | LC_ALL=C sort -u
+    echo "--- /usr/bin/python*:"
+    ls -la /usr/bin/python* 2>&1
+    echo "--- /usr/lib/portage:"
+    ls -lad /usr/lib/portage 2>&1
+    echo "--- site-packages portage (dist-info alone is NOT the package):"
+    ls -d /usr/lib/python*/site-packages/portage /usr/lib64/python*/site-packages/portage 2>&1
+    echo "--- import portage (NO-PYTHON / ModuleNotFound = good, IMPORTABLE = bad):"
+    if command -v python3 >/dev/null 2>&1; then
+      python3 -c 'import portage; print("IMPORTABLE:", portage.__file__)' 2>&1 | head -2
+    else
+      echo "NO-PYTHON-INTERPRETER"
+    fi
+    echo "--- ebuild helpers on PATH:"
+    command -v ebuild-pyhelper chmod-lite ecompress-file ebuild-ipc 2>&1
+  } > "$OUT/artifacts/audit-env.txt" 2>&1 || true
+  echo ">>> guest audit: census -> artifacts/audit-env.txt"
+fi
+
 if [ "$rc1" = 0 ]; then
   echo ">>> guest step2: emerge -1 -v --usepkgonly"
   set +e
   PKGDIR=/var/cache/binpkgs \
-    "${EM[@]}" -1 -v --usepkgonly "$@" > "$OUT/step2-usepkgonly.log" 2>&1
+    "${EM[@]}" -1 -v --usepkgonly "${REINSTALL[@]}" "$@" > "$OUT/step2-usepkgonly.log" 2>&1
   rc2=$?
   set -e
   printf 'step2\t%s\n' "$rc2" >> "$RESULT"
@@ -220,8 +344,8 @@ if [ "$rc1" = 0 ]; then
 
   echo ">>> guest step3: emerge -1 -v --buildpkg (xpak)"
   set +e
-  BINPKG_FORMAT=xpak FEATURES="buildpkg -sign" PKGDIR=/var/cache/binpkgs-xpak \
-    "${EM[@]}" -1 -v --buildpkg "$@" > "$OUT/step3-build-xpak.log" 2>&1
+  BINPKG_FORMAT=xpak FEATURES="buildpkg -sign noclean" PKGDIR=/var/cache/binpkgs-xpak \
+    "${EM[@]}" -1 -v --buildpkg "${REINSTALL[@]}" "$@" > "$OUT/step3-build-xpak.log" 2>&1
   rc3=$?
   set -e
   printf 'step3\t%s\n' "$rc3" >> "$RESULT"
@@ -234,6 +358,12 @@ fi
 # the binpkgs, the installed porttest tree (modes), and per build dir its
 # WORKDIR modes and build log (kept by a failed build).
 set +e
+# Stop the audit sampler first (NOPY_AUDIT=1); its log is complete.
+if [ -f "$OUT/.audit-ps.pid" ]; then
+  kill "$(cat "$OUT/.audit-ps.pid")" 2>/dev/null || true
+  rm -f "$OUT/.audit-ps.pid"
+  echo ">>> guest audit: sampler stopped ($(grep -c '^### ' "$OUT/audit-ps.log" 2>/dev/null || echo 0) samples)"
+fi
 mkdir -p "$OUT/artifacts"
 for d in /var/cache/binpkgs /var/cache/binpkgs-xpak; do
   [ -d "$d" ] && cp -a "$d" "$OUT/artifacts/"
@@ -251,7 +381,29 @@ for b in /var/tmp/portage/*/*/; do
   [ -d "$b/work" ] && (cd "$b/work" && find . -printf '%m %y %P\n' | LC_ALL=C sort -k3) \
     > "$OUT/artifacts/workdir-$tag.txt"
   [ -f "$b/temp/build.log" ] && cp "$b/temp/build.log" "$OUT/artifacts/build-$tag.log"
+  # Portuale writes no temp/build.log; keep whatever per-phase
+  # transcripts exist (temp/logging*) plus the temp inventory, which
+  # the host audit scans for python invocations.
+  if [ -d "$b/temp" ]; then
+    (cd "$b/temp" && find . -maxdepth 2 -printf '%m %s %P\n' | LC_ALL=C sort -k3) \
+      > "$OUT/artifacts/temp-contents-$tag.txt" 2>/dev/null || true
+    for t in "$b"/temp/logging*; do
+      [ -f "$t" ] || continue
+      cp "$t" "$OUT/artifacts/logging-$tag-$(basename "$t")" || true
+    done
+  fi
 done
+
+# Restricted merge snapshot (#326 Z, NOPY_SNAPSHOT=1): the merged
+# packages' installed files + their vdb dirs, the consume.sh shape, so
+# the host can diff this side against a real-Portage reference build
+# with compare/normalize.py + compare/diff.py. Needs step1 rc=0.
+if [ "$SNAPSHOT" = 1 ] && [ "$rc1" = 0 ]; then
+  echo ">>> guest snapshot: merged set + vdb"
+  # shellcheck disable=SC1091  # guest-side path inside the container
+  . /TEST/layers/z326/merged-snapshot-lib.sh
+  z326_snapshot_merged_set "$OUT" "$OUT/snap" "$@"
+fi
 GUEST_EOF
 
 # --- launch ------------------------------------------------------------
@@ -260,7 +412,9 @@ podman_argv=("$PODMAN" run --rm --name "porttest-nopy-$$"
   "${PM_MOUNTS[@]}" "${ovl_mount[@]}"
   -v "$DISTFILES:/distfiles"
   -e DISTDIR=/distfiles
-  -e "NOPY_OUT=/TEST/logs/$RUN" -e "NOPY_STAGE_OVL=$STAGE_OVL"
+  -e "NOPY_OUT=/TEST/logs/$RUN" -e "NOPY_STAGE_OVL=$STAGE_OVL" -e "NOPY_VARIANT=$VARIANT"
+  -e "NOPY_REINSTALL=$OPT_REINSTALL"
+  -e "NOPY_JOBS=${NOPY_JOBS:-}" -e "NOPY_SNAPSHOT=${NOPY_SNAPSHOT:-0}" -e "NOPY_AUDIT=${NOPY_AUDIT:-0}"
   ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"}
   "${EXTRA_ENV[@]}"
   --entrypoint /bin/bash "$IMAGE"
@@ -269,11 +423,11 @@ podman_argv=("$PODMAN" run --rm --name "porttest-nopy-$$"
   echo "# podman argv (host):"
   printf '%q ' "${podman_argv[@]}"; echo; echo
   echo "# portuale argv per step (guest: ${EMERGE:-(resolved in guest)}):"
-  echo "# step1: BINPKG_FORMAT=gpkg FEATURES=\"buildpkg -sign\" PKGDIR=/var/cache/binpkgs \\"
+  echo "# step1: BINPKG_FORMAT=gpkg FEATURES=\"buildpkg -sign noclean\" PKGDIR=/var/cache/binpkgs \\"
   printf '  %q ' emerge -1 -v --buildpkg "$@"; echo
   echo "# step2: PKGDIR=/var/cache/binpkgs \\"
   printf '  %q ' emerge -1 -v --usepkgonly "$@"; echo
-  echo "# step3: BINPKG_FORMAT=xpak FEATURES=\"buildpkg -sign\" PKGDIR=/var/cache/binpkgs-xpak \\"
+  echo "# step3: BINPKG_FORMAT=xpak FEATURES=\"buildpkg -sign noclean\" PKGDIR=/var/cache/binpkgs-xpak \\"
   printf '  %q ' emerge -1 -v --buildpkg "$@"; echo
 } > "$OUT/argv.txt"
 

@@ -1,0 +1,6 @@
+d 0755 1000 100 - - usr
+d 0755 1000 100 - - usr/lib
+d 0755 1000 100 - - usr/lib/probe
+d 0755 1000 100 - - usr/lib/probe/payload
+l ---- 1000 100 - - usr/lib/probe/payload/abs-link -> /usr/share/portuale-doins-oracle/not-installed-yet
+f 0755 1000 100 15 sha256:bdbd490685b3712108908f27ce49e6ed28628b0f04700cde33073e89b4622b87 usr/lib/probe/payload/plain.txt

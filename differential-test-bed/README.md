@@ -251,6 +251,46 @@ The non-root (`--remote-portuale-dir`) and arch-mismatch
 (`--remote-portuale-binary`) variants are unit-tested in portuale;
 the bed cell covers the root login only.
 
+### Z326 close-out — nopy / noportage builds vs real Portage (portuale #326 Z)
+
+```sh
+differential-test-bed/run/z326-closeout.sh [--jobs N]
+    [--skip-leg-a] [--skip-leg-b] [--skip-ref] [--skip-gate] [--skip-l31b]
+    [--leg-a-dir <run>] [--leg-b-dir <run>]
+```
+
+- **(a) [nopy]** `nopy-build.sh --variant nopy --reinstall` over
+  `atomlists/z326-nopy.txt` (eix, bash, the P0 probe ebuilds):
+  `--buildpkg` (gpkg), `--usepkgonly` re-merge, xpak rebuild.
+- **(b) [noportage]** the same over `atomlists/l1-merge-gate.txt`
+  (glibc + bash). A phase-env audit (`compare/z326-audit.py`)
+  asserts over both legs that `portuale-python` was the only
+  interpreter any Portage helper invoked (census + live `ps`
+  sampler + log scan; build-system python is allowed and counted).
+- **(c) reference** real Portage builds both lists from source in the
+  normal image (`layers/z326/ref-build-merge-snapshot.sh`, the l1
+  build path plus the same xpak step), then `normalize.py` +
+  `diff.py` (strict, existing allowlist only) on vdb + installed
+  files and `gpkg_diff.py --mode strict` per gpkg pair.
+- Then **[gate]** (`l1-merge-from-binpkg.sh` on the gate list, plus
+  `L1_SKIP_BUILD=1 L1_CONSUME_REINSTALL=1`) and **l31b**
+  (`L31B_SKIP_BUILD=1 l31b-two-container.sh`).
+
+Requires `GENTOO_MIRRORS="http://<eth0 IP>:8080"` (refused without
+it). Output: `logs/z326-<timestamp>/` (`legs.tsv`, reference
+snapshots, `diff-*` / `gpkg-*` / `audit-*` reports,
+`z326-report.txt`); reference binpkgs persist in
+`logs/_z326-pkgcache-{nopy,noportage}/`. Findings:
+`findings/z326-closeout.md`. Exit: 0 green, 1 divergence/step
+failure, 2 setup error.
+
+`nopy-build.sh` options beyond P0: `--reinstall` (force rebuild +
+re-merge of already-installed atoms), `NOPY_JOBS` (guest MAKEOPTS),
+`NOPY_SNAPSHOT=1` (restricted merge snapshot for the (c) diff),
+`NOPY_AUDIT=1` (audit capture). Env passthrough and the variant
+images are unchanged from P0 (`NOPY_IMAGE` / `NOPORTAGE_IMAGE`,
+`PM_BARE=1` mounts).
+
 ### Container mount modes (`PM_RELOCATED`, `PM_BARE`, `PM_NO_CHECKOUT`)
 
 Every `run/` orchestrator mounts the PM through `run/lib.sh`'s
@@ -288,7 +328,8 @@ PM_NO_CHECKOUT=1 differential-test-bed/run/l1-merge-from-binpkg.sh \
 run/          host orchestrators (l0-resolver.sh, l0-fixture-oracle.sh,
               l1-merge-from-binpkg.sh, l2-portuale-builder.sh,
               l3-source-parity.sh, l31-remote-merge.sh,
-              l31b-two-container.sh, lib.sh)
+              l31b-two-container.sh, nopy-build.sh, z326-closeout.sh,
+              lib.sh)
 layers/l0/    in-container.sh — the per-atom probe driver
 layers/l0-fixture-oracle/  stage.sh + in-container.sh (real emerge on fixtures)
 layers/l1/    build.sh (Portage, from source) + consume.sh (one PM, merge + snapshot)
@@ -297,9 +338,13 @@ layers/l3/    source-build parity (build-and-merge.sh)
 layers/l31/   consume-remote.sh (one-container remote merge over loopback sshd)
 layers/l31b/  client-init.sh + server-merge.sh + client-snapshot.sh
               (two-container remote merge over a dedicated network)
-atomlists/    curated atom / package lists
+layers/z326/  merged-snapshot-lib.sh (shared restricted snapshot) +
+              ref-build-merge-snapshot.sh (reference from-source build
+              + snapshot for the #326 Z close-out)
+atomlists/    curated atom / package lists (incl. z326-nopy.txt)
 compare/      resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
-              gpkg-structure.sh + gpkg-diff.sh (L2), test-*.sh, normalize.md,
+              gpkg-structure.sh + gpkg-diff.sh (L2), z326-audit.py (the #326 Z
+              phase-env audit), test-*.sh, normalize.md,
               known-divergences.yaml, known-divergences-fixture-oracle.yaml
 net/          up.sh / down.sh
 images/       Containerfile material + overlay/porttest/ (incl. metadata/md5-cache)

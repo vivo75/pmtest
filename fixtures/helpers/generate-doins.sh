@@ -158,7 +158,7 @@ chmod +x "$PYSHIM"
 CANON_KEYS=(CATEGORY D DIROPTIONS DOINSSTRICTOPTION EAPI EBUILD_PHASE ED EPREFIX FEATURES INSOPTIONS INSDESTTREE LANG NOCOLOR PATH PF PORTAGE_ACTUAL_DISTDIR PORTAGE_BIN_PATH PORTAGE_PYM_PATH PORTAGE_PYTHON PORTAGE_PYTHONPATH PORTAGE_REPO_NAME PORTAGE_XATTR_EXCLUDE T __E_DOCDESTTREE __E_INSDESTTREE)
 
 # Cases in run order.
-CASES=(files-no-r dirs-only-no-r recursive newins insopts-mode insopts-preserve diropts-mode owner-root unknown-lax unknown-strict dodoc-r doheader doconfd xattr-exclude missing-source die-eapi8 nodie-eapi3 distdir-deref eapi3-copy empty-dir-r phase-defaults-r phase-defaults-files phase-defaults-distfile)
+CASES=(files-no-r dirs-only-no-r recursive newins insopts-mode insopts-preserve diropts-mode owner-root unknown-lax unknown-strict dodoc-r doheader doconfd xattr-exclude missing-source die-eapi8 nodie-eapi3 distdir-deref eapi3-copy empty-dir-r phase-defaults-r phase-defaults-files phase-defaults-distfile dangling-abs-kept dangling-abs-nodistdir)
 
 # --- per-case notes: what the case isolates and its regression signature ----
 case_blurb() { # <case>
@@ -331,6 +331,25 @@ links are not reproduced), while an absolute symlink outside it and a
 relative symlink are preserved verbatim.
 If the native port regressed to preserving distdir-internal links,
 abs-in-dist would be l rather than f in out.manifest.
+EOF
+      ;;
+    dangling-abs-kept) cat <<'EOF'
+Isolates doins -r on an absolute symlink that points outside
+PORTAGE_ACTUAL_DISTDIR and dangles (the target is a file the package
+itself installs later -- porttest/helper-doins's abs-link, #326 Z): it is
+installed as a symlink, never stat'ed.
+If the native port regressed to dereferencing it, rc.txt would read 1
+with a FileNotFoundError, and payload/abs-link would be missing.
+EOF
+      ;;
+    dangling-abs-nodistdir) cat <<'EOF'
+Isolates the --distdir default: with PORTAGE_ACTUAL_DISTDIR unset the
+wrapper passes no --distdir, _parse_args turns "" into b"/", every
+absolute link target starts with it, and the dangling abs-link is
+dereferenced: FileNotFoundError, rc 1. This is why a phase env that
+lacks PORTAGE_ACTUAL_DISTDIR breaks dangling-abs-kept's shape.
+If the native port regressed to a different default, abs-link would be
+installed and rc.txt would read 0.
 EOF
       ;;
     eapi3-copy) cat <<'EOF'
