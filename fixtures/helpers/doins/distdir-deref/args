@@ -1,0 +1,10 @@
+--preserve_symlinks
+--helpers_can_die
+--distdir=<SCRATCH>/stage-distdir-deref/dist
+--helper=doins
+--dest=<SCRATCH>/stage-distdir-deref/ed/usr/lib/probe
+--
+abs-in-dist
+abs-outside
+rel-link
+plain.txt

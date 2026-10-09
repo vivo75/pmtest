@@ -1,0 +1,5 @@
+--helper=doins
+--dest=<SCRATCH>/stage-eapi3-copy/ed/usr/lib/probe
+--
+link-rel
+file.txt

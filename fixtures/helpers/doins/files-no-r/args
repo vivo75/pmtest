@@ -1,0 +1,8 @@
+--preserve_symlinks
+--helpers_can_die
+--helper=doins
+--dest=<SCRATCH>/stage-files-no-r/ed/usr/lib/probe
+--
+tree/file.txt
+tree/sub
+tree/linkdir

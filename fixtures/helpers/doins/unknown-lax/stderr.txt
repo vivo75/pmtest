@@ -1,0 +1,4 @@
+!!! doins: Unknown install options: -m0644 -v, ['-v']
+
+!!! doins: Continue with falling back to `install` command execution, which can be slower.
+

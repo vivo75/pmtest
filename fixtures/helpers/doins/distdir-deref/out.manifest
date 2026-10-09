@@ -1,0 +1,7 @@
+d 0755 1000 100 - - usr
+d 0755 1000 100 - - usr/lib
+d 0755 1000 100 - - usr/lib/probe
+f 0755 1000 100 18 sha256:1f995ac2099a2336e06204685fc329ede47d35980195ec14e7df89f71a32774d usr/lib/probe/abs-in-dist
+l ---- 1000 100 - - usr/lib/probe/abs-outside -> <SCRATCH>/stage-distdir-deref/src/plain.txt
+f 0755 1000 100 15 sha256:bdbd490685b3712108908f27ce49e6ed28628b0f04700cde33073e89b4622b87 usr/lib/probe/plain.txt
+l ---- 1000 100 - - usr/lib/probe/rel-link -> plain.txt

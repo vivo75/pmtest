@@ -1,0 +1,7 @@
+--recursive
+--preserve_symlinks
+--helpers_can_die
+--helper=doins
+--dest=<SCRATCH>/stage-empty-dir-r/ed/usr/lib/probe
+--
+emptyonly

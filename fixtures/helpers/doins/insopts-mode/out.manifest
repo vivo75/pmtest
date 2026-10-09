@@ -1,0 +1,4 @@
+d 0755 1000 100 - - usr
+d 0755 1000 100 - - usr/lib
+d 0755 1000 100 - - usr/lib/probe
+f 0600 1000 100 14 sha256:f40bd408926e1627d5f3822f9ff9168a5b2c72a50930dc8cdaabf458d618894c usr/lib/probe/file.txt

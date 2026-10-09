@@ -1,0 +1,24 @@
+Traceback (most recent call last):
+  File "<CHECKOUT>/bin/doins.py", line 619, in <module>
+    sys.exit(main(sys.argv[1:]))
+             ~~~~^^^^^^^^^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 600, in main
+    ret = _install_dir(opts, install_runner, source)
+  File "<CHECKOUT>/bin/doins.py", line 569, in _install_dir
+    install_runner.install_dir(dest)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 394, in install_dir
+    self._dir_runner.run(dest)
+    ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "<CHECKOUT>/bin/doins.py", line 315, in run
+    os.makedirs(dest)
+    ~~~~~~~~~~~^^^^^^
+  File "<frozen os>", line 236, in makedirs
+FileExistsError: [Errno 17] File exists: b'<SCRATCH>/stage-die-eapi8/ed/usr/lib/probe/tree/empty'
+ * ERROR: test-cat/testdoins-1.0::testrepo failed (install phase):
+ *   doins failed
+ * 
+ * If you need support, post the output of `emerge --info '=test-cat/testdoins-1.0::testrepo'`,
+ * the complete build log and the output of `emerge -pqv '=test-cat/testdoins-1.0::testrepo'`.
+ * The ebuild environment file is located at '<SCRATCH>/stage-die-eapi8/t/die.env'.
+ * Working directory: '<SCRATCH>/stage-die-eapi8/src'

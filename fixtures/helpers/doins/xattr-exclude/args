@@ -1,0 +1,8 @@
+--preserve_symlinks
+--helpers_can_die
+--enable_copy_xattr
+--xattr_exclude=user.drop
+--helper=doins
+--dest=<SCRATCH>/stage-xattr-exclude/ed/usr/lib/probe
+--
+tree/file.txt

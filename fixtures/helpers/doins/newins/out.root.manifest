@@ -1,0 +1,4 @@
+d 0755 0 0 - - usr
+d 0755 0 0 - - usr/lib
+d 0755 0 0 - - usr/lib/probe
+f 0755 0 0 14 sha256:f40bd408926e1627d5f3822f9ff9168a5b2c72a50930dc8cdaabf458d618894c usr/lib/probe/renamed.txt

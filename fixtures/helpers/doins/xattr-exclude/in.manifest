@@ -1,0 +1,16 @@
+d 0755 tree
+f 0644 tree/abs-target.txt |absolute-target-contents%0A
+d 0755 tree/adir
+f 0644 tree/adir/y.txt |adir-file-contents%0A
+l ---- tree/dangling -> no-such-target
+d 0755 tree/emptydir
+f 0644 tree/file.txt |file-contents%0A
+f 0644 tree/hard1 |hardlink-contents%0A
+h 0644 tree/hard2 => tree/hard1
+l ---- tree/link-abs -> @SRC@/tree/abs-target.txt
+l ---- tree/link-rel -> file.txt
+l ---- tree/linkdir -> sub
+f 0600 tree/secret.txt |secret-contents%0A
+d 0755 tree/sub
+f 0644 tree/sub/nested.txt |nested-contents%0A
+f 0644 tree/we%FFird.bin |non-utf8-name-contents%0A

@@ -1,0 +1,5 @@
+d 0755 1000 100 - - usr
+d 0755 1000 100 - - usr/share
+d 0755 1000 100 - - usr/share/doc
+d 0755 1000 100 - - usr/share/doc/testdoins-1.0
+f 0644 1000 100 25 sha256:12e2a9e88fe566391ccada347c57d8af7fef037e0cf1a6b00c3aa84095c69f0a usr/share/doc/testdoins-1.0/manual.pdf

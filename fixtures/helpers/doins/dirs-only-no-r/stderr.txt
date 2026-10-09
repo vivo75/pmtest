@@ -1,0 +1,7 @@
+ * ERROR: test-cat/testdoins-1.0::testrepo failed (install phase):
+ *   doins failed
+ * 
+ * If you need support, post the output of `emerge --info '=test-cat/testdoins-1.0::testrepo'`,
+ * the complete build log and the output of `emerge -pqv '=test-cat/testdoins-1.0::testrepo'`.
+ * The ebuild environment file is located at '<SCRATCH>/stage-dirs-only-no-r/t/die.env'.
+ * Working directory: '<SCRATCH>/stage-dirs-only-no-r/src'

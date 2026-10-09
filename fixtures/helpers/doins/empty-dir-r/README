@@ -1,0 +1,34 @@
+doins oracle case: empty-dir-r
+
+Isolates doins -r on an empty directory: creating the dest dir counts
+as success even with no files (rc 0), pinning the `if not relpath_list:
+return True` branch.
+If the native port regressed to failing on empty input, rc.txt would
+read 1.
+
+Run exactly as an install phase runs it (bin/ebuild-helpers/doins):
+  cd <SRC> && env -i <env> doins -r emptyonly
+with <env> from the checked-in env file (placeholders @ED@ @T@
+@DISTDIR@ @CHECKOUT@ @PYSHIM@ substituted with the stage trees,
+empty value unset), PORTAGE_PYTHON pointing at the argv-logging
+shim (see the header), and the checked-in manifests materialised
+by doins/materialise.py (source mtimes pinned, so -p is stable).
+File contents are recorded as size + sha256 (out of scope for
+chmod-lite, in scope here per D3); symlink modes are always ----.
+args holds the exact doins.py argv after the script path, one
+element per line as raw bytes (`\\` for backslash, `\n` for
+newline; <SCRATCH>/<CHECKOUT> substituted, newins tmpdir suffix
+as newins.RAND). stdout.txt exists only when non-empty.
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004 (3rdparty/repos.toml [portage] commit)
+  python: Python 3.14.8 (/usr/bin/python)
+  uid: 1000, umask: 022 (enforced)
+  staging: tmpfs (raw non-UTF-8 names OK: yes)
+  xattr-fs: user.* xattrs work on tmpfs
+  generator-locale: LANG=C.utf8 (enforced); charmap=UTF-8
+  date: 2026-10-09 (UTC day granularity; the only field that may change
+    between regenerations)
+  scrub: <SCRATCH>/<CHECKOUT> in args/stderr/stdout; newins.RAND
+  root-vs-user: DIFFER (user out.manifest vs root out.root.manifest: see the two files)

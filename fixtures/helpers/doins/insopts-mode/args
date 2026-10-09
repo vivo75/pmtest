@@ -1,0 +1,7 @@
+--preserve_symlinks
+--helpers_can_die
+--insoptions=-m0600
+--helper=doins
+--dest=<SCRATCH>/stage-insopts-mode/ed/usr/lib/probe
+--
+tree/file.txt

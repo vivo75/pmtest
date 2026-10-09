@@ -1,0 +1,7 @@
+--preserve_symlinks
+--helpers_can_die
+--insoptions=-m0644
+--helper=doins
+--dest=<SCRATCH>/stage-doconfd/ed/etc/conf.d/
+--
+tree/file.txt

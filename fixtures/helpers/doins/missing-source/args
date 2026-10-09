@@ -1,0 +1,6 @@
+--preserve_symlinks
+--helpers_can_die
+--helper=doins
+--dest=<SCRATCH>/stage-missing-source/ed/usr/lib/probe
+--
+no-such-file

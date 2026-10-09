@@ -14,8 +14,9 @@
 #     from the checked-in args (argv[1], the pattern, exactly as bytes)
 #     and in (stdin bytes), via the sibling generate-filter-env.sh (which
 #     this script calls at the end).
-#   gpkg/<case>/<comp>/... and xpak/<case>/... (plan #326 S4/S5), via the
-#     sibling generate-gpkg.sh and generate-xpak.sh, also called at the end.
+#   gpkg/<case>/<comp>/..., xpak/<case>/... and doins/<case>/... (plan #326
+#     S4/S5/S6), via the sibling generate-gpkg.sh, generate-xpak.sh and
+#     generate-doins.sh, also called at the end.
 #
 # Usage:
 #   fixtures/helpers/generate.sh
@@ -480,8 +481,9 @@ printf 'generate.sh: wrote %d chmod-lite cases and the locale table.\n' "${#CASE
 # same Portage.
 PORTAGE_CHECKOUT="$PORTAGE_CHECKOUT" "$HELPERS_DIR/generate-filter-env.sh"
 
-# --- gpkg compress and xpak recompose oracles (plan #326 S4/S5) -------------
-# Sibling scripts own these cases; formats in gpkg/README.md and the
-# generate-xpak.sh header.
+# --- gpkg compress, xpak recompose and doins oracles (plan #326 S4/S5/S6) ---
+# Sibling scripts own these cases; formats in gpkg/README.md, the
+# generate-xpak.sh header and doins/README.md.
 PORTAGE_CHECKOUT="$PORTAGE_CHECKOUT" "$HELPERS_DIR/generate-gpkg.sh"
 PORTAGE_CHECKOUT="$PORTAGE_CHECKOUT" "$HELPERS_DIR/generate-xpak.sh"
+PORTAGE_CHECKOUT="$PORTAGE_CHECKOUT" "$HELPERS_DIR/generate-doins.sh"
