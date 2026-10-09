@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: adds /usr/share/cfgprotlate to CONFIG_PROTECT through /etc/env.d (#333)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=543bfa160c7a923808cae3767d487ea6
