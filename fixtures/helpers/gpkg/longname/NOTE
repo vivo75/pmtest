@@ -1,0 +1,9 @@
+Isolates the image-tar GNU switch: a 120-byte file name and a 110-byte link
+target (both >= 100) make _get_tar_format_from_stats pick GNU for the image
+tar, so those members carry GNU longname/longlink extension headers
+(`pre=L`, `pre=K` in out.fields) and fmt=GNU, while the metadata tar and the
+container members gpkg-1, metadata.tar.<ext>, Manifest stay USTAR.  The
+container member image.tar.<ext> is headed with the IMAGE format, so it too
+reads `fmt=GNU` (pre=-: its name is short).  If the native writer stayed USTAR or emitted PAX
+records, `image.member ... fmt=` / `pre=` differ.  zstd only: the format
+decision does not depend on the compressor.

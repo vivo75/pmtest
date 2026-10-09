@@ -1,0 +1,3 @@
+The boundary partner of long-basename: a 153-character basename stays
+USTAR (the switch is `>= 154`).  If the native threshold were off by one
+(`>= 153`), the container members would flip to fmt=GNU here.  zstd only.

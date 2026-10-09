@@ -1,0 +1,40 @@
+gpkg compress oracle case: empty
+
+Isolates an image with no entries at all: the image tar holds only the
+`image/` directory header (plus end-of-archive padding to 10240), and the
+Manifest still lists the image.tar.<ext> member.  If the native writer
+skipped the image member or the root directory entry, `image.member` /
+manifest.data lines for image.tar disappear.
+
+Run exactly as bin/ebuild-pyhelper runs gpkg-helper.py:
+  /usr/bin/python <checkout>/bin/gpkg-helper.py compress <basename> <out> <metadata_dir> <image_dir>
+with PYTHONPATH=<checkout>/lib, PORTAGE_BIN_PATH=<checkout>/bin, PORTAGE_PYM_PATH=<checkout>/lib,
+PORTAGE_PYTHON=/usr/bin/python, under `env -i`, with a hermetic empty make.conf
+(PORTAGE_CONFIGROOT=<scratch>/cfg); every setting real reads from portage.settings is
+pinned in <comp>/env.  basename: empty-1.0-1 (11 chars).
+Inputs: image.manifest (this dir) materialised by ../materialise.py; metadata = ../metadata/
+(25 build-info files of a real porttest build, see ../README.md).
+
+Provenance (D4):
+  portage-ref: portage-3.0.82.2
+  portage-commit: 1d95fc2c552a2c7d347e54093fa0e5b172a57004
+  python: Python 3.14.8 (/usr/bin/python)
+  compressors (cases run: zstd xz bzip2 gzip):
+    zstd: Zstandard CLI (64-bit) v1.5.7, by Yann Collet
+    xz: xz (XZ Utils) 5.8.4
+    bzip2: bzip2, a block-sorting file compressor.  Version 1.0.8, 13-Jul-2019.
+    gzip: gzip 1.15
+  MAKEOPTS: -j4 (zstd/xz -T4)
+  BINPKG_COMPRESS_FLAGS, BINPKG_COMPRESS_FLAGS_<NAME>: unset (make.globals default empty)
+  PORTAGE_BZIP2_COMMAND: bzip2
+  FEATURES: unset
+  global config: /usr/share/portage/config (make.globals); make.conf: empty
+  /etc/passwd (user run): vivo:x:1000:100::/home/vivo:/bin/bash
+  /etc/group  (user run): users:x:100:
+  /etc/passwd (root run): root:x:0:0:System user; root:/root:/bin/bash
+  /etc/group  (root run): root:x:0:
+  uid 4242 / gid 4243: none; none
+  staging filesystem (tmpfs; see generate-gpkg.sh header): tmpfs
+  LANG=C.utf8; locale -a: see ../locale-a.txt (the helper needs a UTF-8 locale; C.utf8 is present)
+  date: 2026-10-08 (UTC day granularity; the only field that may change between regenerations)
+  root-vs-user identical (per compressor; 1 = identical so only the user files are kept, 0 = differs so out.root.* are kept): zstd=0 xz=0 bzip2=0 gzip=0 

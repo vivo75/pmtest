@@ -1,0 +1,12 @@
+Isolates the baseline gpkg compress path for each compressor (zstd, xz,
+bzip2, gzip): container = USTAR (basename < 154), members in the order
+gpkg-1, metadata.tar.<ext>, image.tar.<ext>, Manifest; metadata tar USTAR
+with the 25 real build-info files in raw os.walk order; image tar USTAR with
+directory names carrying a trailing `/`; every archive padded to a
+10240-byte record; Manifest DATA lines for gpkg-1, metadata and image only.
+If the native writer regressed (wrong member order, a sorted metadata
+listing, missing trailing `/` on directories, padding to 512 instead of
+10240, a `.sig` member without signing), out.fields shows it as a different
+`container.member` / `metadata.member` / `image.member` / `*.archive` line.
+Root run: uname/gname of the image members are `root`; user run: the
+invoking user's names (see the passwd/group lines below).

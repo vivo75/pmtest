@@ -1,0 +1,24 @@
+# special: symlinks (file + dir), a hardlink pair, setuid/setgid/sticky bits,
+# a non-ASCII name, a >100-byte path made of short components (USTAR prefix
+# split), three distinct owners (root, vivo:users, 4242:4243 with no
+# passwd/group entry).  Owners only take effect in the root run.
+d 0755 0 0 .
+d 0755 0 0 usr
+d 1777 0 0 usr/tmp
+d 0755 1000 100 usr/share
+f 0644 1000 100 usr/share/a.txt |aaaa%0A
+d 0755 0 0 usr/share/sub
+f 0644 4242 4243 usr/share/sub/b.txt |bbb%0A
+l ---- 0 0 usr/share/link-file -> a.txt
+l ---- 0 0 usr/share/link-dir -> sub
+f 0644 0 0 usr/share/orig.bin |hard%0A
+h 0644 0 0 usr/share/hard.bin => usr/share/orig.bin
+f 4755 0 0 usr/share/suid.bin |suid%0A
+f 2755 0 0 usr/share/sgid.bin |sgid%0A
+f 0644 0 0 usr/share/na%C3%AFve-caf%C3%A9.txt |utf8%0A
+d 0755 0 0 usr/share/deep-level-aaaaaaaaaa
+d 0755 0 0 usr/share/deep-level-aaaaaaaaaa/deep-level-bbbbbbbbbb
+d 0755 0 0 usr/share/deep-level-aaaaaaaaaa/deep-level-bbbbbbbbbb/deep-level-cccccccccc
+d 0755 0 0 usr/share/deep-level-aaaaaaaaaa/deep-level-bbbbbbbbbb/deep-level-cccccccccc/deep-level-dddddddddd
+d 0755 0 0 usr/share/deep-level-aaaaaaaaaa/deep-level-bbbbbbbbbb/deep-level-cccccccccc/deep-level-dddddddddd/deep-level-eeeeeeeeee
+f 0644 0 0 usr/share/deep-level-aaaaaaaaaa/deep-level-bbbbbbbbbb/deep-level-cccccccccc/deep-level-dddddddddd/deep-level-eeeeeeeeee/leaf.txt |leaf%0A
