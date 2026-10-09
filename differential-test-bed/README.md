@@ -251,6 +251,37 @@ The non-root (`--remote-portuale-dir`) and arch-mismatch
 (`--remote-portuale-binary`) variants are unit-tested in portuale;
 the bed cell covers the root login only.
 
+### Container mount modes (`PM_RELOCATED`, `PM_BARE`, `PM_NO_CHECKOUT`)
+
+Every `run/` orchestrator mounts the PM through `run/lib.sh`'s
+`pm_mounts` (one directory as the container's `/usr/local/bin`, the bed
+itself at `/TEST`). What else is mounted is an env knob:
+
+| mode | repo mount | checkout mount | proves |
+|---|---|---|---|
+| default | `$PM_REPO` at its host path | inside the repo mount when present | the standard gate shape |
+| `PM_RELOCATED=1` | none (`bin/` comes from the binary's embedded copy, backlog #322) | `$PM_REPO/3rdparty/portage` only | the relocated binary, with the checkout available |
+| `PM_BARE=1` | none | none (and no `PORTUALE_PORTAGE_CHECKOUT` in the container env) | full self-sufficiency: the [nopy]/[noportage] cells (backlog #326 P0) |
+| `PM_NO_CHECKOUT=1` | `$PM_REPO` at its host path | masked with an empty dir (and `PORTUALE_PORTAGE_CHECKOUT` pinned to the masked path, so an operator override cannot silently defeat the mask) | the standard gate shape with no checkout — as if the tree had none (backlog #326 S9) |
+
+`PM_BARE` wins over `PM_NO_CHECKOUT`, which wins over
+`PM_RELOCATED`. The L1 merge gate runs green under
+`PM_NO_CHECKOUT=1` from a tree *with* the checkout, and as-is from a
+tree without it (a fresh clone, a worktree — the checkout is
+gitignored).
+
+Companion check: `portuale_phase_helpers_preflight` (`run/lib.sh`)
+requires the checkout **only with
+`PORTUALE_PYTHON_HELPERS=real`** (the D2 oracle handle, where
+`bin_dir()` overlays `bin/` on the checkout's `bin/`); native runs
+(the default) skip it. Combining `PM_NO_CHECKOUT=1` with `=real`
+fails loud in the preflight instead of dying mid-merge.
+
+```sh
+PM_NO_CHECKOUT=1 differential-test-bed/run/l1-merge-from-binpkg.sh \
+  differential-test-bed/atomlists/l1-merge-gate.txt
+```
+
 ### Layout
 
 ```
