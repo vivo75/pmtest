@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: records ${ENVDRELOAD_VAR} as its src_install sees it (#332, after envdreload-a's env.d merge)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=aaf98ce6af8a995796a937c313ee2597

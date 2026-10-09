@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: installs /etc/env.d/99envdreload (ENVDRELOAD_VAR=1) so a later package task must see it (#332)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=594490dc90562586bb112cebf0852a5c

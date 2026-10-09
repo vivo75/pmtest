@@ -7,6 +7,34 @@ exported `GENTOO_MIRRORS="http://10.48.0.229:8080"` (the local
 distfiles proxy). `NOPY_JOBS=16` / `Z326_JOBS=16` everywhere
 (`MAKEOPTS=-j16`).
 
+## Rerun after #330 / #331 / #332 (2026-10-09, supersedes "Final results")
+
+Run `z326-20261009T153412Z`, portuale branch `backlog/330-332` with all
+three residue fixes in the tree (#331 `787a4b14`, then #330 and #332,
+committed after this run as `890eaeaa` and `06b15067`). Legs: (a)
+`nopy-20261009T153413Z`, (b) `nopy-20261009T153540Z`.
+
+| cell | result | before |
+|---|---|---|
+| leg (a) / leg (b) runners | ok / ok | ok / ok |
+| audit (a) / (b) | PASS / PASS | PASS / PASS |
+| diff (a), strict | green, 0 hard | 1 unexplained (`MY_PATCHES`, #330) |
+| gpkg (a) | 0/8 pairs hard | 4/8 (`PT_HELPER_DOINS` #332, + `MY_PATCHES`) |
+| diff (b), strict | 51 hard, all glibc: 39 `.a` archives, 12 getconf debuglink paths, and their 34 `CONTENTS` rows | 70 (the same families, plus bash `MY_PATCHES`) |
+| gpkg (b) | bash ok; glibc hard (`.a` + getconf only) | 2/2 hard |
+| [gate] | green (`l1-20261009T155717Z`) | green |
+| [gate] reinstall | green (`l1-20261009T162842Z`) | green |
+| l31b | green (`l31b-20261009T163026Z`) | green |
+
+What remains is the build nondeterminism already explained below:
+- glibc's static archives differ between two real-Portage builds too;
+- the getconf `.gnu_debuglink` names a different member of one hardlink
+  group (the #261 race).
+
+The overall rc=1 comes only from those rows. No allowlist entry was
+added. New residue: #333 (the local merge's `CONFIG_PROTECT` comes from
+the process env, not the resolved config).
+
 ## Final results (supersede the history sections further down)
 
 The first pass (sections below, from "Leg (a) [nopy] — BLOCKED")
