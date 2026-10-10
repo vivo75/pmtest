@@ -1,10 +1,10 @@
 """Black-box test for the emerge/ebuild portuale skeleton (see
-docs/agent-context.md, "emerge/ebuild binary shape"). Tests the real compiled
+LLM/agent-context.md, "emerge/ebuild binary shape"). Tests the real compiled
 CLI via symlinks in a PATH, exactly as it would be invoked in practice --
 not by importing anything from the binary.
 
 Also covers `ebuild`'s CLI-surface-recognition follow-up (see
-rust/portuale/src/ebuild.rs/ebuild_options.rs): real ebuild
+crates/portuale/src/ebuild.rs/ebuild_options.rs): real ebuild
 options (bin/ebuild's own argparse setup) and real ebuild commands
 (doebuild()'s own validcommands list) are recognized and accepted as a
 still-a-no-op dry-run stub, while genuinely invalid input (an
@@ -5682,7 +5682,7 @@ def _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir):
 
 
 def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp_path):
-    """Backlog #301 (`docs/backlog-tasks-2026-10.md`). The binhost lists two
+    """Backlog #301 (`LLM/backlog-tasks-2026-10.md`). The binhost lists two
     builds of `dev-libs/packagepkg-1.0` -- BUILD_ID 1 (BUILD_TIME 100)
     first, BUILD_ID 2 (BUILD_TIME 200) second, like the live `seed-desk`
     index -- each with its own `PATH`. Real fetches the instance the
@@ -6648,7 +6648,7 @@ def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(
     # The dir-mtime memo: `mtimedb["info"]` maps the absolute inforoot
     # to the directory's mtime, so a later run with no change reports
     # up-to-date instead of regenerating (covered hermetically in
-    # `rust/portuale/src/info_files.rs`; here just the persisted shape).
+    # `crates/portuale/src/info_files.rs`; here just the persisted shape).
     mtimedb = (root / "var/cache/edb/mtimedb").read_text()
     assert '"info"' in mtimedb
     assert str(info_dir) in mtimedb
@@ -9353,7 +9353,7 @@ def test_ebuild_install_does_not_deadlock_on_a_large_eclass_scope(
     """Regression test for a real upstream `brush` bug, fixed by the staged
     fix 03 (`fix/function-pipeline-stage-deadlock`, carried in the pin; a
     re-do of the still-open reubeno/brush#1276 -- see
-    docs/what-this-proves.md's eclass section for the full root-cause
+    LLM/what-this-proves.md's eclass section for the full root-cause
     writeup): a shell function used as a non-last pipeline
     stage used to run inline rather than as a background task, so real
     `bin/phase-functions.sh`'s own post-phase `__save_ebuild_env |
@@ -9397,7 +9397,7 @@ def test_ebuild_shell_bash_and_brush_produce_the_same_real_result(
     <phase>` subprocess (the default -- matching real portage's own
     `_doebuild_spawn()` invocation shape), or the embedded
     `brush_core::Shell` (see `ebuild_phases::ShellBackend`'s own doc
-    comment and docs/what-this-proves.md's eclass section for the full
+    comment and LLM/what-this-proves.md's eclass section for the full
     writeup, including why the default is `bash`). Both backends run the
     same real `dev-libs/phasepkg` fixture's own `src_install`, so this
     asserts they produce an identical real file, not just a zero exit

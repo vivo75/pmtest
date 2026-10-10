@@ -7,7 +7,7 @@
 #   podman run --rm --entrypoint /bin/bash -v $PWD/scripts:/o:ro \
 #     localhost/test-portuale:latest /o/328-quickpkg-makeopts.sh /usr/bin/emerge
 #   podman run --rm --entrypoint /bin/bash -v $PWD/scripts:/o:ro \
-#     -v <portuale>/rust/target/release:/pm:ro \
+#     -v <portuale>/target/release:/pm:ro \
 #     localhost/test-portuale:latest /o/328-quickpkg-makeopts.sh "/pm/portuale emerge"
 #
 # Prints the argv of every zstd call made during `emerge -C`.

@@ -7,7 +7,7 @@ due to a dependency conflict:` block real prints from
 `_show_missed_update_slot_conflicts`
 (`3rdparty/portage/lib/_emerge/depgraph.py:1652`, 3.0.82.2) and
 portuale renders from `GraphResult::skipped_updates`
-(`rust/portuale/src/pretend.rs`). Synthetic outputs below follow the
+(`crates/portuale/src/pretend.rs`). Synthetic outputs below follow the
 shapes observed in
 `differential-test-bed/logs/l0-fx-20260927T125711Z/` (both sides print,
 different USE displays) and `l0-fx-20260924T211811Z/` (real-only block

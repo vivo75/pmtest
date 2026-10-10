@@ -1,5 +1,5 @@
 """Black-box contract suite for the `emerge --pretend` slice (see
-docs/agent-context.md and rust/portage-repo/src/lib.rs for the full
+LLM/agent-context.md and crates/portage-repo/src/lib.rs for the full
 scope writeup, including the dependency-recursion follow-up in
 resolve_pretend_graph, the profile/make.conf -> real USE/ACCEPT_KEYWORDS
 follow-up in portage-profile, the package.mask/.unmask/.accept_keywords/
@@ -15,7 +15,7 @@ each one gets a specific "recognized, not implemented" message instead
 of a generic "unsupported option" one). Drives the real compiled
 `emerge` binary (portuale, dispatched via a real symlink
 -- not a neutral harness, since emerge is an actual product surface per
-docs/agent-context.md's testing decision) against the synthetic fixture
+LLM/agent-context.md's testing decision) against the synthetic fixture
 tree at fixtures (whose repos.conf/make.profile/make.conf/package.mask/
 package.unmask/package.accept_keywords/package.use now drive real config
 resolution, not hardcoded values, and whose repos.conf now defines a
@@ -3793,7 +3793,7 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
     Backlog #278: the cycle starts where real's single-root rendering
     starts (`shortest_cycle[0]` — here `hardcycleb`, matching real's
     `FX_HOST_ROOTS=1` capture; portuale
-    `docs/evidence/2026-09-30-278/`). Real's default-staging rendering
+    `LLM/evidence/2026-09-30-278/`). Real's default-staging rendering
     starts at the other node (cross-root graph, Track X #242)."""
     base = ["--pretend", "dev-libs/hardcyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -3915,7 +3915,7 @@ def test_mixed_priority_cycle_prints_each_edge_real_label(
     (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
     (unconditional atoms give `_find_suggestions` nothing). Backlog
     #278 starts the printed cycle where real does
-    (`shortest_cycle[0]`; portuale `docs/evidence/2026-09-30-278/` —
+    (`shortest_cycle[0]`; portuale `LLM/evidence/2026-09-30-278/` —
     real starts here under both stagings), so the pin now records
     real's bytes; stdout is portuale's own forced verbose-tree
     stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
@@ -3967,7 +3967,7 @@ def test_circular_dep_use_flag_suggestion(
     Backlog #278: the cycle starts where real's single-root rendering
     starts (`shortest_cycle[0]` — here `usecycleb`, matching real's
     `FX_HOST_ROOTS=1` capture; portuale
-    `docs/evidence/2026-09-30-278/`). The `-x` suggestion is
+    `LLM/evidence/2026-09-30-278/`). The `-x` suggestion is
     unaffected (it names the USE-gated member, not the start node)."""
     base = ["--pretend", "dev-libs/usecyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -4020,7 +4020,7 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     probe shows live real starting this cycle at `gpcycleb-1.0`
     (`gpcycleb → gpcyclea → gpcycleb`); backlog #278 starts portuale's
     printed cycle there too (`shortest_cycle[0]`; portuale
-    `docs/evidence/2026-09-30-278/`), so the pin records real's bytes."""
+    `LLM/evidence/2026-09-30-278/`), so the pin records real's bytes."""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4129,7 +4129,7 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     renderer. Backlog #278 starts the printed ring where real's
     single-root rendering starts (`shortest_cycle[0]` — `cyc4b`,
     matching real's `FX_HOST_ROOTS=1` capture; portuale
-    `docs/evidence/2026-09-30-278/`; real's default-staging rendering
+    `LLM/evidence/2026-09-30-278/`; real's default-staging rendering
     starts at `cyc4c`, cross-root Track X #242)."""
     args = ["--pretend", "dev-libs/cyc4a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -5200,7 +5200,7 @@ def test_use_unsat_conditional_flag_on_iuse_less_target_is_missing_iuse(
     `(dependency required by …)` chain. Grounded on a fresh real 3.0.82.2
     staged-fixture probe with identical options (`emerge
     --ignore-default-opts --pretend "=dev-libs/mia0a-1"`,
-    `docs/evidence/2026-09-30-265/real/mia0a-1.txt` in the portuale
+    `LLM/evidence/2026-09-30-265/real/mia0a-1.txt` in the portuale
     checkout). Upstream shape: `test_missing_iuse_and_evaluated_atoms`
     pg0 `=A-1`."""
     args = ["--pretend", "=dev-libs/mia0a-1"]
@@ -5227,7 +5227,7 @@ def test_use_unsat_conditional_flag_beside_plain_flag_is_missing_iuse(
     `Change USE: +bar` row. Grounded on a fresh real 3.0.82.2
     staged-fixture probe with identical options (`emerge
     --ignore-default-opts --pretend "=dev-libs/mia0a-2"`,
-    `docs/evidence/2026-09-30-265/real/mia0a-2.txt` in the portuale
+    `LLM/evidence/2026-09-30-265/real/mia0a-2.txt` in the portuale
     checkout). Upstream shape: `test_missing_iuse_and_evaluated_atoms`
     pg0 `=A-2`."""
     args = ["--pretend", "=dev-libs/mia0a-2"]
@@ -6056,7 +6056,7 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     aubreakwant's [brk] as the ordinary non-fatal dependency warning.
 
     Backlog #244 (real 3.0.82.2, fixture-oracle `l0-fx-20260929T152543Z`,
-    portuale `docs/evidence/2026-09-28-244/fixture-oracle-2/real/`): the
+    portuale `LLM/evidence/2026-09-28-244/fixture-oracle-2/real/`): the
     default block's chain starts at the requester that needed the change
     (`aubreakwant`, three lines), not at whoever pulled `aubreaksub` in
     first; under `=y` real's clean pass stops at the first failing atom,
@@ -6441,7 +6441,7 @@ def test_use_dep_enforcement_negated_flag_declared_but_enabled_does_not_match(
     lines. Grounded on a fresh real 3.0.82.2 staged-fixture probe with
     identical options (`emerge --ignore-default-opts --pretend
     --autounmask-use=n 'dev-libs/useflagpkg[-foo]'`,
-    `docs/evidence/2026-09-30-265/real/useflagpkg-autounmask-use-n.txt`
+    `LLM/evidence/2026-09-30-265/real/useflagpkg-autounmask-use-n.txt`
     in the portuale checkout). Portuale omits real's staging
     `for <root>.` suffix (the `fixture-miss-message-unsuffixed` class)."""
     result = _run(
@@ -6952,7 +6952,7 @@ def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
     (without --autounmask-only) plus the changes block, rc 0. Backlog
     #271. Grounded on a fresh host real 3.0.82.2 (`/usr/sbin/emerge`)
     staged-fixture probe with identical options (`--ignore-default-opts`,
-    `docs/evidence/2026-09-30-271/` in the portuale checkout): real's
+    `LLM/evidence/2026-09-30-271/` in the portuale checkout): real's
     only-run stdout is byte-identical to its control stdout (modulo the
     timing line and the first-run Global Updates noise), stderr
     byte-identical, rc 0 vs 1. Portuale omits real's staging `to <root>`
@@ -7401,7 +7401,7 @@ def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_maske
           --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
 
     (Staged copy of the script and its output:
-    `<portuale>/docs/evidence/2026-09-28-g195/g195b-{in-probe.sh,real-probe.txt}`.)
+    `<portuale>/LLM/evidence/2026-09-28-g195/g195b-{in-probe.sh,real-probe.txt}`.)
 
     cell `emerge --pretend dev-libs/parentflipeqpkg` (identical text with
     `--autounmask` and with `--autounmask-use=n`; Global-Updates/news
@@ -7533,7 +7533,7 @@ def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_real(
           --entrypoint /bin/bash localhost/test-portuale:latest /in-probe.sh
 
     (Staged copy of the script and its output:
-    `<portuale>/docs/evidence/2026-09-28-g195/g195c-{in-probe.sh,real-probe.txt}`.)
+    `<portuale>/LLM/evidence/2026-09-28-g195/g195c-{in-probe.sh,real-probe.txt}`.)
 
     cell `emerge --pretend dev-libs/pfgraphparent` (identical text with
     `--autounmask-backtrack=y` and with `--autounmask-use=n`):
@@ -8690,7 +8690,7 @@ def test_getbinpkg_multi_instance_newest_build_time_wins(
 
 def _multi_instance_tree(tmp_path, remote_builds, local_builds=()):
     """A hermetic config root for the binpkg-multi-instance cases below
-    (portuale backlog #299/#300, `docs/backlog-tasks-2026-10.md`):
+    (portuale backlog #299/#300, `LLM/backlog-tasks-2026-10.md`):
     `dev-libs/mispectre-1.0` exists **only** as binary builds, `olddep` /
     `newdep` are plain ebuilds, and the builds differ in their `RDEPEND`
     -- the shape of the real `seed-desk` binhost's `libspectre-0.2.12`
@@ -8813,7 +8813,7 @@ def test_getbinpkg_multi_instance_local_build_does_not_shadow_a_newer_remote_bui
 
 
 def _slotop_pin_tree(tmp_path):
-    """A hermetic config root for backlog #303 (`docs/backlog-tasks-2026-10.md`):
+    """A hermetic config root for backlog #303 (`LLM/backlog-tasks-2026-10.md`):
     `dev-libs/mibar` is installed at 2.0 (`SLOT=0/2`) while the tree also
     carries 1.0 (`SLOT=0/1`); the installed `dev-libs/miholder-1.0` was
     built against the *old* sub-slot (`RDEPEND=dev-libs/mibar:0/1=`), so
@@ -8901,7 +8901,7 @@ def test_update_rebuilds_a_stale_consumer_instead_of_downgrading_its_provider(
 
 
 def _slotop_new_slot_tree(tmp_path):
-    """A hermetic config root for backlog #304 (`docs/backlog-tasks-2026-10.md`):
+    """A hermetic config root for backlog #304 (`LLM/backlog-tasks-2026-10.md`):
     `dev-libs/mislot` is installed in slot 0 only (`0/1`, 1.0) while the
     tree also carries 2.0 in slot 1 (`1/2`) -- the `ffmpeg-compat:6` /
     `ffmpeg-compat:8` shape; the installed `dev-libs/pinned-1.0` was built against `mislot:0/1=` and
@@ -13422,7 +13422,7 @@ def test_short_flag_bundle_reports_the_first_out_of_scope_character(
     assert unimplemented.returncode == 2
     assert (
         unimplemented.stderr.strip()
-        == 'emerge: option "--fetchonly" is a real emerge option, but is not yet '
+        == 'emerge: option "--fetchonly" is a Portage emerge option, but is not yet '
         'implemented in portuale -- run "emerge --help" for the options '
         "and actions that are."
     )
@@ -13463,7 +13463,7 @@ def test_help_prints_a_pilot_specific_summary_not_real_emerges_own(
     assert result.stdout == r"""emerge: command-line interface to the Portuale package manager
 
 Portuale is a drop-in Rust reimplementation of Portage: same behaviour,
-verified against the Python original by a shared test suite. Any real
+verified against the Python original by a shared test suite. Any Portage
 emerge option or action not listed below is recognized by name
 (lib/_emerge/main.py) -- using one reports that it is not yet implemented
 in portuale, rather than a generic error.
@@ -13489,7 +13489,7 @@ Actions (with none of these, the targets are built and merged):
       --list-sets            list the available package sets
       --check-news           report how many unread GLEP 42 news items there are
       --regen                regenerate every repo's metadata/md5-cache (runs each depend phase)
-      --metadata             no-op here (md5-cache is read directly); prints the real header only
+      --metadata             no-op here (md5-cache is read directly); prints Portage's header only
   -r, --resume [--skipfirst] replay the merge list saved by the last failed run (--skipfirst drops entry 1)
   -h, --help                 show this message and exit
 
@@ -13569,7 +13569,7 @@ Output:
       --depclean-lib-check[=y|n]  with --depclean/--prune: scan for soname breakage (default y)
   -d, --debug               PORTAGE_DEBUG=1 in ebuild phases; resolver trace under --pretend
 
-Portuale extensions (not real emerge options):
+Portuale extensions (not Portage emerge options):
       --json                dump the resolved graph as one JSON line instead of the display
       --shell <bash|brush>  which real shell runs a merge / unmerge / --config phase chain (default bash)
       --solver <solver>     which dependency solver resolves the graph: portage (default), pubgrub or resolvo
@@ -17658,7 +17658,7 @@ def test_real_option_not_implemented_message_names_the_option(emerge_binary, fix
     assert result.stdout == ""
     assert (
         result.stderr.strip()
-        == 'emerge: option "--accept-properties" is a real emerge option, but is '
+        == 'emerge: option "--accept-properties" is a Portage emerge option, but is '
         'not yet implemented in portuale -- run "emerge --help" for the '
         "options and actions that are."
     )
@@ -17674,7 +17674,7 @@ def test_real_option_inline_equals_form_is_still_recognized(emerge_binary, fixtu
     assert result.returncode == 2
     assert (
         result.stderr.strip()
-        == 'emerge: option "--accept-properties" is a real emerge option, but is '
+        == 'emerge: option "--accept-properties" is a Portage emerge option, but is '
         'not yet implemented in portuale -- run "emerge --help" for the '
         "options and actions that are."
     )
@@ -17700,7 +17700,7 @@ def test_real_action_not_implemented_message_says_action_not_option(emerge_binar
     result = _run([str(emerge_binary)], ["--moo"], fixture_env)
     assert result.returncode == 2
     expected = (
-        'emerge: action "--moo" is a real emerge action, but is not yet '
+        'emerge: action "--moo" is a Portage emerge action, but is not yet '
         'implemented in portuale -- run "emerge --help" for the options '
         "and actions that are."
     )
@@ -20599,7 +20599,7 @@ def test_oracle_289_world_slot_atom_holds_the_old_instance(
     world atom (the #284 pin above) the old slot is uninstalled, rc 0.
     Grounded on the container probe E5 (`--pretend --update
     app-misc/bdprov`, installed `bdprov-1` `0/1` + `bdprov-2` `1/1`;
-    capture `docs/evidence/2026-10-03-289/`). A bare `app-misc/bdprov`
+    capture `LLM/evidence/2026-10-03-289/`). A bare `app-misc/bdprov`
     world atom selects the new slot instead and holds nothing."""
     installed = [
         ("app-misc", "bdprov", "1", "0/1", {"EAPI": "8"}),
@@ -20631,7 +20631,7 @@ def test_oracle_296_installed_holder_in_world_holds_the_old_instance(
     rc 1, never uninstalling the old slot. Portuale used to enforce the
     holder's slot-0 atom as a pin that an upgrade in slot 1 does not break,
     withdraw the update and exit 0 with no rows. Grounded on the container
-    probe E1/E2/E3/E6 (capture `docs/evidence/2026-10-03-296/`)."""
+    probe E1/E2/E3/E6 (capture `LLM/evidence/2026-10-03-296/`)."""
     installed = [
         ("app-misc", "bdprov", "1", "0/1", {"EAPI": "8"}),
         ("app-misc", "bdprov", "2", "1/1", {"EAPI": "8"}),
@@ -20674,7 +20674,7 @@ def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
     probe 2026-10-03, `FX_WORLD_EXTRA=dev-libs/whtarget`, argv `--pretend
     --update --deep --newuse --oneshot [--backtrack 0] <args>` with
     `<args>` = `whpuller <old> <new>` and `<old> <new> whpuller`
-    (`docs/evidence/2026-10-03-292/`)."""
+    (`LLM/evidence/2026-10-03-292/`)."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/whtarget")
     pair = [
         "dev-libs/slotconflictoldconsumer",
@@ -20710,7 +20710,7 @@ def test_oracle_298_argument_subtrees_walk_last_argument_first(
     `slotconflictnewconsumer` (bare dep): `<unsolvable> <newconsumer>` ->
     `slotconflicttarget-2.0` then `-1.0`; `<newconsumer> <unsolvable>` ->
     `-1.0` then `-2.0` (real 3.0.82.2 container probe 2026-10-03, both at
-    `--backtrack 0` and the default; `docs/evidence/2026-10-03-292/`).
+    `--backtrack 0` and the default; `LLM/evidence/2026-10-03-292/`).
     Portuale's FIFO queue used to give `-2.0` first for both."""
     unsolvable = "dev-libs/slotconflictunsolvable"
     newcons = "dev-libs/slotconflictnewconsumer"
@@ -21218,7 +21218,7 @@ def test_oracle_270_bt0_provider_update_is_atomic(
     Portage 3.0.82.2, container probe 2026-10-02 (staged fixture tree,
     ad-hoc ROOT with EAPI-bearing vdb, `--ignore-default-opts --pretend
     --color=n`; captures in portuale
-    `docs/evidence/2026-10-02-270/`)."""
+    `LLM/evidence/2026-10-02-270/`)."""
     installed = [
         ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
         (
@@ -21251,7 +21251,7 @@ def test_oracle_270_bt0_provider_update_is_atomic(
 def test_oracle_270_bt0_warning_block_shape(emerge_binary, fixture_env, tmp_path):
     """#270 S3: the WARNING of the #253 `pprov`/`pcons` cell at `--backtrack=0`
     has real's shape (container probe 2026-10-02, real 3.0.82.2;
-    `docs/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`; portuale
+    `LLM/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`; portuale
     prints it on stdout, real on stderr -- a standing difference): the
     `slotconflicttarget:0` block first (real renders its
     `_conflict_missed_update` dict in insertion order,
@@ -21407,7 +21407,7 @@ def test_oracle_288_argument_pin_vetoes_the_update_probe(
     `[ebuild U] mmprov-3 [2]` + `[ebuild rR] mmcons-1` here because the
     probe's parent map only held installed parents. Grounded on the
     container probe `D-arg-pin` (real 3.0.82.2, 2026-10-03; capture
-    `docs/evidence/2026-10-03-288/`)."""
+    `LLM/evidence/2026-10-03-288/`)."""
     installed = [
         ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
         ("app-misc", "mmprov", "2", "1/1", {"EAPI": "8"}),
@@ -21786,7 +21786,7 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
     bare `:=` before checking the candidate
     (`_slot_operator_check_reverse_dependencies`,
     `lib/_emerge/depgraph.py:2472-2538`, `:2494-2502`). Portuale's S1b
-    overlay (`rust/portage-repo/src/lib.rs::installed_dep_string`)
+    overlay (`crates/portage-repo/src/lib.rs::installed_dep_string`)
     appended the recorded atoms but the joint-satisfiability check kept
     them raw, so only the installed instance satisfied the whole atom
     set and the upgrade was withheld (no `provpkg-2.0` row, no consumer
@@ -23854,7 +23854,7 @@ def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
 # test_circular_dependencies pg0 cases (#50 batch 2). The batch-2 CASES
 # check only the exit code; their labels cite the ResolverPlayground
 # solutions, which live `emerge` does not reproduce. Captures:
-# portuale docs/evidence/2026-09-27-181-circular-text/ (fixture-oracle run
+# portuale LLM/evidence/2026-09-27-181-circular-text/ (fixture-oracle run
 # l0-fx-20260927T202111Z, real Portage 3.0.82.2). Each pin is a strict
 # xfail until its backlog item lands.
 _CYC0_REAL_BLOCKS = {
@@ -23862,7 +23862,7 @@ _CYC0_REAL_BLOCKS = {
     # Backlog #278: the start is real's single-root (`FX_HOST_ROOTS=1`)
     # rendering (`dev-libs/cyc0a` first); live real under default
     # staging starts at the other node (`dev-libs/cyc0b` first —
-    # recorded in portuale `docs/evidence/2026-09-30-278/` alongside
+    # recorded in portuale `LLM/evidence/2026-09-30-278/` alongside
     # the O1 triage captures), a cross-root difference owned by
     # Track X (#242). Portuale renders the single-root graph, so the
     # pin records the hostroots bytes.
@@ -23911,7 +23911,7 @@ def test_circular_dependencies_upstream_pg0_real_text(
     Cross-root run (PORTAGE_RUNNING_ROOT=/ != ROOT=fixtures): with a
     non-`/` ROOT, EAPI >= 7 DEPEND resolves against the running root, so
     the cycle forms there around `cyc0z-3` -- the default-staging bytes in
-    portuale `docs/evidence/2026-09-29-242-inventory/probes/`
+    portuale `LLM/evidence/2026-09-29-242-inventory/probes/`
     (`default-cyc0z-1.txt`, real 3.0.82.2). `/` is deterministic here:
     the fixture-only `cyc0*` CPs are never in the host vdb (the same basis
     as the existing PORTAGE_RUNNING_ROOT=/ pins)."""
@@ -24015,7 +24015,7 @@ def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
     bytes. The fixture BDEPEND resolves against the running root (real
     `ESYSROOT`, `depgraph.py:4255-4291`), so `g216comp` merges TWICE --
     once per root -- and the running-root `g216boot` leads the list
-    (`docs/evidence/2026-09-29-242-inventory/probes/default-g216top.txt`,
+    (`LLM/evidence/2026-09-29-242-inventory/probes/default-g216top.txt`,
     real 3.0.82.2: 5 rows, `backtrack: 1/20`, rc 0). The running root
     here is a hermetic empty tmp tree (nothing installed, same testrepo),
     so the run is deterministic. Suffix placement (`to <root>` on the
@@ -24057,7 +24057,7 @@ def test_or_pick_backtrack0_reports_the_self_cycle(
     bytes. Under the hermetic dual-root env (see the rc-0 pin above) the
     pass-1 graph strands on the running-root self loop with FOUR merge
     rows behind the block (dual `g216comp`), and the `Total:` counts
-    both roots (`docs/evidence/2026-09-29-242-inventory/probes/
+    both roots (`LLM/evidence/2026-09-29-242-inventory/probes/
     default-g216top-b0.txt`, real 3.0.82.2: `Total: 4`, rc 1). The row
     rendering of the abort partial (backlog #245, closed) is pinned by the
     fixture-oracle g216 list; this pin fixes rc, the verbatim block, and
@@ -24101,7 +24101,7 @@ def test_or_pick_direct_target_resolves_to_bootstrap(
     bytes. The direct target lands in the target root while its BDEPEND
     self pick resolves running-rooted, so even the direct target merges
     `g216comp` TWICE plus the running `g216boot` (3 rows;
-    `docs/evidence/2026-09-29-242-inventory/probes/default-g216comp.txt`,
+    `LLM/evidence/2026-09-29-242-inventory/probes/default-g216comp.txt`,
     real 3.0.82.2: `backtrack: 1/20`, rc 0). Hermetic dual-root env as
     in the `g216top` pin above; suffix placement is Slice D's."""
     running = tmp_path / "running"
@@ -24137,7 +24137,7 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
     Track X Slice C (#242): re-pinned to the default-staging dual-root
     bytes. Under the hermetic dual-root env the direct target strands
     with BOTH `g216comp` instances behind the block
-    (`docs/evidence/2026-09-29-242-inventory/probes/
+    (`LLM/evidence/2026-09-29-242-inventory/probes/
     default-g216comp-b0.txt`, real 3.0.82.2: `Total: 2`, rc 1)."""
     running = tmp_path / "running"
     running.mkdir()
@@ -24212,7 +24212,7 @@ def test_autounmask_use_breakage_argument_order_text_matches_real(
     `--autounmask-backtrack` values, plus the two-argument pair.
 
     Real 3.0.82.2, fixture-oracle `l0-fx-20260929T151941Z` /
-    `l0-fx-20260929T152543Z` (portuale `docs/evidence/2026-09-28-244/
+    `l0-fx-20260929T152543Z` (portuale `LLM/evidence/2026-09-28-244/
     fixture-oracle{,-2}/real/`), pinned here verbatim except for
     portuale's standing conventions: no `for <ROOT>` / `to '<ROOT>'`
     suffixes (`fixture-miss-message-unsuffixed` /
@@ -24247,7 +24247,7 @@ def test_236_minimize_children_collapses_an_ebuild_parents_version_range(
     eliminates, ascending: `0.99.0-r1` is the only match of `<1` and stays,
     `1.0.0-r1` is dropped, so both atoms bind `0.99.0-r1` and there is no
     conflict to report. Expected from real's own ResolverPlayground
-    (portuale `docs/evidence/2026-09-29-236/playground/libgit2-glib.log`:
+    (portuale `LLM/evidence/2026-09-29-236/playground/libgit2-glib.log`:
     merge list `libgit2-0.99.0-r1`, `libgit2-glib-0.99.0.1`, no problems
     block). Before Slice B portuale printed the same two rows plus a
     skipped-update warning naming `libgit2-1.0.0-r1`."""
@@ -24271,7 +24271,7 @@ def test_236_collapsed_slot_operator_child_is_upgraded_by_the_update_probe(
     `_slot_operator_update_backtrack`, `_emerge/depgraph.py:2576-2800`,
     `:2400-2452`): the restart merges `U provpkg-2.0` and rebuilds
     `consrdep`. Expected from real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-29-236/playground/slotop-debug.log`: `backtracking
+    `LLM/evidence/2026-09-29-236/playground/slotop-debug.log`: `backtracking
     due to missed slot abi update`, then `provpkg-2.0` + `consrdep-1.0`) and
     from the fixture-oracle `slotop` list's `-uDvN --oneshot
     dev-libs/consrdep` cell. With the collapse but without the probe's
@@ -24315,9 +24315,9 @@ def test_236_r25_default_backtracking_settles_in_one_silent_pass(
     `r25lib-2.0`: one pass, no skipped-update block. Expected from real:
     the fixture-oracle `r25` cell (`differential-test-bed/logs/`
     `l0-fx-20260929T204839Z`, captured under portuale
-    `docs/evidence/2026-09-29-236/fixture-oracle/`): `r25up-2.0 [U]` +
+    `LLM/evidence/2026-09-29-236/fixture-oracle/`): `r25up-2.0 [U]` +
     `r25target-1.0 [N]`, `backtrack: 0/20`, no warning; and real's own
-    ResolverPlayground (`docs/evidence/2026-09-29-236/playground/`
+    ResolverPlayground (`LLM/evidence/2026-09-29-236/playground/`
     `r25-debug.log`). Before #236 portuale selected `r25lib-2.0`,
     restarted once (`--json` `restarts: 1`) and printed the warning."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
@@ -24367,7 +24367,7 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
     plus `dev-libs/r266lib bar` in `etc/portage/package.use`) -> rc 0,
     rows `N r266lib-2.0 USE="bar"` + `N r266mid-1.0`, no block. Same
     split from real's own ResolverPlayground (portuale
-    `docs/evidence/2026-10-01-266/r266_pg.py`: B mergelist
+    `LLM/evidence/2026-10-01-266/r266_pg.py`: B mergelist
     `[2.0, 3.0, mid]`, A mergelist `[2.0, mid]`). Before the fix
     portuale printed three rows in both profiles (a use-dep atom only
     ever matched its own pick for an ebuild candidate).
@@ -24429,7 +24429,7 @@ def test_107_use_dep_dynamic_deps_pair_settles_in_one_silent_pass(
     both of r107mid's atoms bind the installed `r107lib-1.0` and the
     update probe is refused by `r107pin`: one silent pass. Expected from
     real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-29-107-reprobe/playground/r107-debug.log`:
+    `LLM/evidence/2026-09-29-107-reprobe/playground/r107-debug.log`:
     merge list `r107up-2.0`, `r107target-1.0`, `candidate package does not
     match atom '<dev-libs/r107lib-2.0:='`, no backtrack, no warning) and
     from the live host re-probe in the same directory. Before D2 portuale
@@ -24481,7 +24481,7 @@ def test_256_unsatisfied_probe_seeds_every_hitting_parent_in_one_pass(
     provider moved to slot `2/2`), and each has a same-slot ebuild whose
     live `u256prov:=` accepts `u256prov-2`. The entry assumed real restarts
     on the first hitting edge; real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-256-257/u256-a-*.log`) shows otherwise:
+    `LLM/evidence/2026-09-30-256-257/u256-a-*.log`) shows otherwise:
     `_add_dep`'s `return 1` (`_emerge/depgraph.py:3453-3455`) ends only that
     edge, the walk goes on, both edges probe in the same pass
     (`backtracking due to unsatisfied built slot-operator dep` twice) and
@@ -24546,7 +24546,7 @@ def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
     on the next pass the same way, the unsatisfied probe seeds the
     healing sibling, and the update probe schedules its forced
     reinstall. Expected from real 3.0.82.2: the ResolverPlayground
-    shape b (portuale `docs/evidence/2026-09-30-256-257/u256-b-@world.log`:
+    shape b (portuale `LLM/evidence/2026-09-30-256-257/u256-b-@world.log`:
     mergelist `['app-misc/u256prov-2', 'app-misc/u256pa-1']`, `backtracking
     try 4` records `[ebuild rR] u256pa-1` through the forced reinstall
     atoms) and the host staged-fixture probe of this hermetic shape
@@ -24603,7 +24603,7 @@ def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     `app-misc/u257par-1` recorded `RDEPEND=app-misc/u257prov:0/1=`; the
     provider moved to slot `2/2`, and the same-slot ebuild's live
     `u257prov:=` accepts `u257prov-2`. Real's ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-256-257/u257-usepkg.log`): one unsatisfied
+    `LLM/evidence/2026-09-30-256-257/u257-usepkg.log`): one unsatisfied
     probe hit, one restart, `[ebuild N] u257prov-2` + `[ebuild N]
     u257par-1`; under `--usepkgonly` there is no ebuild replacement and
     the run fails on the binary's dep (`u257-usepkgonly.log`). Before
@@ -24648,7 +24648,7 @@ def test_254_conflict_abi_probe_evaluates_the_replacements_use_conditionals(
     (whose `validated_atoms` keep every conditional branch,
     `_emerge/Package.py:329-359`) reinstalls the consumer. Expected from
     real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-254-255/u254-cond.txt`): the same three rows
+    `LLM/evidence/2026-09-30-254-255/u254-cond.txt`): the same three rows
     as the unconditional shape but **no** "causing rebuilds" block (real's
     `_compute_abi_rebuild_info` only pairs a provider that is a child of
     the replacement). Before #254 portuale accepted the flat token and
@@ -24690,7 +24690,7 @@ def test_255_forced_rebuild_marker_is_keyed_by_the_providers_slot(
     `new_slot`, still `new`. The #214 shape (installed `abicons-1` bound
     to `abiprov:0/1=`, `abiforce` pulling `abiprov-2`) plus an installed
     `abiprov-0.5` in slot `1/1`: real's ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-254-255/u255-otherslot.txt`) prints
+    `LLM/evidence/2026-09-30-254-255/u255-otherslot.txt`) prints
     `[ebuild  NS    ] app-misc/abiprov-2 [0.5]` -- no `r`. Portuale keyed
     newness off any installed version of the cp and printed `rS`."""
     installed = [
@@ -24728,7 +24728,7 @@ def test_249_virtual_or_choice_uses_the_pullers_circular_record(emerge_binary, f
     `u249make -> {virtual/u249make}` and, on the restart, finds
     `u249make` under the *puller* `u249json`'s key, demotes that branch and
     merges the bootstrap. Expected from real's own ResolverPlayground
-    (portuale `docs/evidence/2026-09-30-249/u249.txt`): `u249make-bootstrap-1`,
+    (portuale `LLM/evidence/2026-09-30-249/u249.txt`): `u249make-bootstrap-1`,
     `virtual/u249make-0`, `u249json-1`, `u249make-1`, rc 0; with
     `--backtrack=0` the cycle aborts. Portuale walks the virtual as its own
     node and looked up only the virtual's key, so it reported the cycle."""
@@ -24765,7 +24765,7 @@ def test_278_printed_cycle_starts_where_reals_shortest_cycle_starts(
     `u278json`, the earliest-inserted node, whose ring closes through
     its child `u278make`. Grounded on live real 3.0.82.2 on the same
     geometry under `u249` names, both stagings (portuale
-    `docs/evidence/2026-09-30-278/`: single-root rendering starts at
+    `LLM/evidence/2026-09-30-278/`: single-root rendering starts at
     `u249json`; default staging starts at `u249make` on real's
     cross-root graph, Track X #242). Portuale renders the single-root
     graph, so the pin records the `u278json` start."""
@@ -24805,7 +24805,7 @@ def test_251a_demoted_branch_keeps_only_the_settled_blockers(
     circular restart demotes `u251ta`, only `u251tb`'s blocker belongs to
     the settled graph -- unless `u251ta` is itself the target. Expected
     from real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-251/u251a.txt`): for `u251m`, `u251tb` +
+    `LLM/evidence/2026-09-30-251/u251a.txt`): for `u251m`, `u251tb` +
     its `[uninstall]`/`[blocks b]` pair + `u251m`; for `u251ta`, both pairs
     in merge order."""
     installed = [
@@ -24845,7 +24845,7 @@ def test_251b_installed_instance_of_a_recorded_cp_keeps_its_own_choice(
     instance keeps `u251q`, which is in the graph anyway. Portuale's
     installed deep walk takes an empty map for the same reason. Expected
     from real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-251/u251b.txt`): `u251r-1`, `u251p-2` (new
+    `LLM/evidence/2026-09-30-251/u251b.txt`): `u251r-1`, `u251p-2` (new
     slot), `u251q-1` in both argument orders."""
     installed = [
         (
@@ -24878,7 +24878,7 @@ def test_251c_every_branch_demoted_keeps_reals_partial_list(emerge_binary, fixtu
     in-bin promotion runs over `other` (`dep_check.py:738-802`); the cycle
     through the direct `u251d` dep persists and both sides abort. Expected
     from real's own ResolverPlayground (portuale
-    `docs/evidence/2026-09-30-251/u251c.txt`): the forced tree lists
+    `LLM/evidence/2026-09-30-251/u251c.txt`): the forced tree lists
     `u251y` (nomerge), `u251d`, `u251c`, `u251y` for either argument
     order and `u251y`, `u251c`, `u251d`, `u251y` for `u251y` alone; with
     `u251c` first the circular block also matches. The other two orders
@@ -24922,7 +24922,7 @@ def test_250_use_mismatched_installed_instance_does_not_satisfy_a_build_edge(
     the installed `-foo` build does not satisfy `u250make[foo]`: the edge
     is unbreakable, the cycle forms, the circular restart demotes the
     branch and the bootstrap merges. Expected from real's own
-    ResolverPlayground (portuale `docs/evidence/2026-09-30-250/u250.txt`):
+    ResolverPlayground (portuale `LLM/evidence/2026-09-30-250/u250.txt`):
     `u250make-bootstrap-1`, `u250json-1`, `u250make-1` for the tool, and
     `u250make-bootstrap-1`, `u250json-1` for the library. Portuale's edge
     check was version/slot only: the installed instance "satisfied" the

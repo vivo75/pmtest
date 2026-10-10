@@ -17,7 +17,7 @@ container's `_emerge/depgraph.py::_serialize_tasks`, right before it
 removes the selected nodes.
 
 Portuale side (`MO_SEL`): `PORTUALE_MO_SEL=1` makes
-`rust/portage-repo/src/merge_order.rs::select_nodes` print the same line
+`crates/portage-repo/src/merge_order.rs::select_nodes` print the same line
 format. Unset, output is byte-identical to a normal run (pinned by the
 `mo_sel_trace_line_pins_the_harness_format` unit test).
 
@@ -50,7 +50,7 @@ differential-test-bed/scripts/mo-trace/ptl-trace.sh /tmp/gtk4 -- --pretend --deb
 
 ```sh
 # 1. patch real inside the throwaway container, run real emerge, keep stderr
-sudo podman run --rm -v "$PWD:$PWD:ro" -v "$PWD/rust/target/release:/usr/local/bin:ro" \
+sudo podman run --rm -v "$PWD:$PWD:ro" -v "$PWD/target/release:/usr/local/bin:ro" \
     --entrypoint /bin/bash localhost/test-portuale:latest -c "
         python3 $PWD/differential-test-bed/scripts/mo-trace/real-trace.py &&
         /usr/sbin/emerge --pretend app-misc/gtk:4 --debug >/tmp/real.out 2>/tmp/real.err;

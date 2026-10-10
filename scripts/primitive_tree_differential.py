@@ -5,7 +5,7 @@
 Feeds every dependency atom, every dependency string and every
 REQUIRED_USE string of a whole `metadata/md5-cache` through the kept
 primitive harnesses -- `python-harness/*_harness.py` wrap the real
-`portage.dep`, `rust/*-harness` wrap portuale's crates -- and diffs the
+`portage.dep`, `crates/*-harness` wrap portuale's crates -- and diffs the
 answers line by line:
 
 * `atom`         -- `parse <atom>` for each atom in *DEPEND/PDEPEND/IDEPEND;

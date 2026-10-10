@@ -1,5 +1,5 @@
 # Phase 13 S0 — `--tree` walk-sequence oracle cells (#131 + #150).
-# Re-grounded 2026-09-24 (plan docs/02.131-tree-walk-sequence.md §S0 in
+# Re-grounded 2026-09-24 (plan LLM/02.131-tree-walk-sequence.md §S0 in
 # the portuale repo). Not the default list: this is the capture set the
 # S0 verdict quotes verbatim and S1/S2's pins assert against.
 #

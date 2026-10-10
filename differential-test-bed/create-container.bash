@@ -29,7 +29,7 @@ PORTAGE_PIN=3.0.82.2
 STAGETS=${DATESTART//-/}
 STAGETS=${STAGETS//:/}
 
-#PORTUALE_EXECS=/home/vivo/repo/portage/PORTING/rust/target/release
+#PORTUALE_EXECS=/home/vivo/repo/portage/PORTING/target/release
 
 SU='sudo -su vivo'
 
@@ -205,7 +205,7 @@ ${SU} podman images
 # podman run --rm \
 #  -v ./differential-test-bed/scripts:/TEST/scripts \
 #  -v ./differential-test-bed/logs:/TEST/logs \
-#  -v /home/vivo/repo/portage/PORTING/rust/target/release:/usr/local/bin \
+#  -v /home/vivo/repo/portage/PORTING/target/release:/usr/local/bin \
 #  localhost/test-portuale
 
 

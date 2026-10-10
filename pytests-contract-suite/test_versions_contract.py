@@ -1,9 +1,9 @@
 """Black-box contract suite for the versions-comparison portuale (see
-docs/agent-context.md). Drives the Python harness (a thin wrapper around the
+LLM/agent-context.md). Drives the Python harness (a thin wrapper around the
 real `portage.versions`) and the Rust harness identically via subprocess,
 and asserts their outputs are byte-for-byte the same. Neither harness's
 internals are imported directly -- this is deliberately implementation-
-agnostic, per the "black-box via CLI/API" decision in docs/agent-context.md.
+agnostic, per the "black-box via CLI/API" decision in LLM/agent-context.md.
 
 Test vectors are mirrored from lib/portage/tests/versions/test_vercmp.py so
 portuale is graded against the same cases the Python implementation is
@@ -122,7 +122,7 @@ def test_vercmp_of_invalid_version_is_none_in_both(
 def test_batch_mode_output_matches(versions_harness_python, versions_harness_rust):
     """Exercises benchmark mode: many operations fed to a single process
     invocation via stdin, to avoid fork/exec overhead dominating a
-    performance comparison (see docs/agent-context.md, harness architecture)."""
+    performance comparison (see LLM/agent-context.md, harness architecture)."""
     lines = [f"vercmp {v1} {v2}" for v1, v2 in _all_vercmp_pairs()]
     lines += [f"ververify {ver}" for ver in VERVERIFY_VALID_CASES]
     lines += [f"ververify {ver}" for ver in VERVERIFY_INVALID_CASES]

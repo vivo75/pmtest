@@ -117,7 +117,7 @@ REQUSE = re.compile(r'REQUIRED_USE (?:flag constraints are unsatisfied|not satis
 # dependency conflict:` block after the merge list (rc 0) -- one
 # `<slot_atom>` header per missed upgrade with its `conflicts with`
 # detail rows underneath. Portuale renders the same block from
-# `GraphResult::skipped_updates` (`rust/portuale/src/pretend.rs`,
+# `GraphResult::skipped_updates` (`crates/portuale/src/pretend.rs`,
 # "Backlog #90 (S2) + #92"). The block used to be silently dropped by
 # this comparator (none of its lines match MERGE/TOTAL/ERRLINE), so the
 # r25 cell reported 0 unexplained while portuale printed the warning
