@@ -10,7 +10,7 @@ real removes the selected nodes:
            drop_satisfied=<0|1> ig=<name> pick=<cat/pkg-ver ...>
 
 with exactly the field order portuale's `PORTUALE_MO_SEL` line uses
-(`rust/portage-repo/src/merge_order.rs::mo_sel_trace_line`), so
+(`crates/portage-repo/src/merge_order.rs::mo_sel_trace_line`), so
 `align-traces.py` can walk the two streams in step. `retlist` counts
 merge packages only (real appends only those), `alive` counts every
 non-uninstall package still in `mygraph`, `pick` the merge nodes chosen

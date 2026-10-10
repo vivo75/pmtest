@@ -133,21 +133,21 @@ def test_debug_build_omits_release_flag(monkeypatch):
 
 def test_yaml_target_path_rewritten_under_debug(monkeypatch):
     monkeypatch.setenv("PMTEST_PROFILE", "debug")
-    resolved = str(registry.resolve_path("../portuale/rust/target/release/portuale"))
+    resolved = str(registry.resolve_path("../portuale/target/release/portuale"))
     assert "/target/debug/portuale" in resolved
     assert "target/release" not in resolved
 
 
 def test_yaml_target_path_unchanged_by_default(monkeypatch):
     monkeypatch.delenv("PMTEST_PROFILE", raising=False)
-    resolved = str(registry.resolve_path("../portuale/rust/target/release/portuale"))
-    assert resolved.endswith("/portuale/rust/target/release/portuale")
+    resolved = str(registry.resolve_path("../portuale/target/release/portuale"))
+    assert resolved.endswith("/portuale/target/release/portuale")
 
 
 def test_yaml_debug_path_rewritten_under_release(monkeypatch):
     """The pin is a placeholder: either segment follows the active profile."""
     monkeypatch.setenv("PMTEST_PROFILE", "release")
-    resolved = str(registry.resolve_path("../portuale/rust/target/debug/portuale"))
+    resolved = str(registry.resolve_path("../portuale/target/debug/portuale"))
     assert "/target/release/portuale" in resolved
 
 

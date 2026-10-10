@@ -32,7 +32,7 @@ Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
 
 Esclusi dalla copia (rigenerabili / scratch host-specifico): `differential-test-bed/logs/`,
 `differential-test-bed/WORKDIR/`, `differential-test-bed/repos/`, `differential-test-bed/stage3-*.tar.xz`,
-`fixtures/var/cache/`, `__pycache__/`, `.pytest_cache/`, `rust/target/`.
+`fixtures/var/cache/`, `__pycache__/`, `.pytest_cache/`, `target/`.
 
 ## Uso
 

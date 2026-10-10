@@ -31,8 +31,8 @@ pms:
 Campi opzionali per i PM costruiti da sorgente (come portuale):
 
 ```yaml
-    repo: ../portuale          # albero sorgente; la build gira in <repo>/rust
-    rust_dir: ../portuale/rust # default: <repo>/rust (serve solo se diverso)
+    repo: ../portuale          # albero sorgente; la build gira in <repo>
+    rust_dir: ../portuale      # workspace Cargo; default: <repo> (serve solo se diverso)
     package: portuale          # package cargo del multicall (default: portuale)
     binary: /path/esplicito    # vince su emerge per la fixture product-binary
     versions_harness: /path    # override per-harness (default:
@@ -79,8 +79,8 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
    ```yaml
    portuale-dev:
      type: portage-compatible
-     emerge: /home/vivo/repo/PORTUALE/portuale-dev/rust/target/release/portuale
-     ebuild: /home/vivo/repo/PORTUALE/portuale-dev/rust/target/release/portuale
+     emerge: /home/vivo/repo/PORTUALE/portuale-dev/target/release/portuale
+     ebuild: /home/vivo/repo/PORTUALE/portuale-dev/target/release/portuale
      version: <commit della build>
    ```
 

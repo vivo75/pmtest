@@ -3,7 +3,7 @@
 portuale -- see docs/agent-context.md, "Test/benchmark harness architecture". Wraps
 portage.versions instead of the real product CLI, and exposes the same
 argv/output contract as the Rust harness at
-rust/versions-harness so both can be driven identically by a
+crates/versions-harness so both can be driven identically by a
 black-box test suite.
 
 Usage:

@@ -34,7 +34,7 @@ import registry  # noqa: E402  (pmtest root is not a package)
 
 # The citations being reviewed live in the PM's own sources, so the tree
 # to scan comes from the registry (managers/managers.yaml, $PMTEST_PM).
-RUST = registry.rust_dir(registry.active_pm()[1])
+RUST = registry.crates_dir(registry.active_pm()[1])
 SCOPES = ("lib/_emerge", "lib/portage")
 CITATION = re.compile(r"([A-Za-z_][\w/]*\.py):(\d+)(?:-(\d+))?")
 
@@ -85,7 +85,10 @@ def rust_index():
     """Line-number citations per `.py` basename, and comment identifiers."""
     citations: dict[str, list[tuple[int, int, str]]] = defaultdict(list)
     names: dict[str, list[str]] = defaultdict(list)
-    for rs in sorted(RUST.glob("*/src/**/*.rs")):
+    sources = sorted(RUST.glob("*/src/**/*.rs"))
+    if not sources:
+        sys.exit(f"no Rust sources under {RUST}")
+    for rs in sources:
         rel = rs.relative_to(REPO)
         for i, text in enumerate(rs.read_text(errors="replace").splitlines(), 1):
             if "//" not in text:

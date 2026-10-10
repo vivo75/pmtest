@@ -362,7 +362,7 @@ From the repo root:
 podman run --rm --cgroups=enabled --cgroupns=private \
   --security-opt seccomp=unconfined \
   -v ./differential-test-bed/scripts:/TEST/scripts -v ./differential-test-bed/logs:/TEST/logs \
-  -v "$PWD/rust/target/release:/usr/local/bin" \
+  -v "$PWD/target/release:/usr/local/bin" \
   localhost/test-portuale
 ```
 

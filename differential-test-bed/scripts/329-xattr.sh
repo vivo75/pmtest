@@ -8,7 +8,7 @@
 #   podman run --rm --entrypoint /bin/bash -v $PWD/scripts:/o:ro \
 #     localhost/test-portuale:latest /o/329-xattr.sh /usr/bin/emerge
 #   podman run --rm --entrypoint /bin/bash -v $PWD/scripts:/o:ro \
-#     -v <portuale>/rust/target/release:/pm:ro \
+#     -v <portuale>/target/release:/pm:ro \
 #     localhost/test-portuale:latest /o/329-xattr.sh "/pm/portuale emerge"
 #
 # Optional $2: extra FEATURES tokens (e.g. "-xattr" for the control).

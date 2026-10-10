@@ -4,7 +4,7 @@ CLI via symlinks in a PATH, exactly as it would be invoked in practice --
 not by importing anything from the binary.
 
 Also covers `ebuild`'s CLI-surface-recognition follow-up (see
-rust/portuale/src/ebuild.rs/ebuild_options.rs): real ebuild
+crates/portuale/src/ebuild.rs/ebuild_options.rs): real ebuild
 options (bin/ebuild's own argparse setup) and real ebuild commands
 (doebuild()'s own validcommands list) are recognized and accepted as a
 still-a-no-op dry-run stub, while genuinely invalid input (an
@@ -6648,7 +6648,7 @@ def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(
     # The dir-mtime memo: `mtimedb["info"]` maps the absolute inforoot
     # to the directory's mtime, so a later run with no change reports
     # up-to-date instead of regenerating (covered hermetically in
-    # `rust/portuale/src/info_files.rs`; here just the persisted shape).
+    # `crates/portuale/src/info_files.rs`; here just the persisted shape).
     mtimedb = (root / "var/cache/edb/mtimedb").read_text()
     assert '"info"' in mtimedb
     assert str(info_dir) in mtimedb

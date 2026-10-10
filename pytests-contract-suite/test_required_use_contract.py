@@ -1,5 +1,5 @@
 """Black-box contract suite for the REQUIRED_USE portuale (see
-docs/agent-context.md and rust/portage-required-use/src/lib.rs).
+docs/agent-context.md and crates/portage-required-use/src/lib.rs).
 Drives the Python harness (a thin wrapper around the real
 portage.dep.check_required_use, pinned to eapi="8") and the Rust harness
 identically via subprocess, and asserts their outputs are byte-for-byte

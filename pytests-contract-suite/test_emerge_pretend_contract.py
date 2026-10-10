@@ -1,5 +1,5 @@
 """Black-box contract suite for the `emerge --pretend` slice (see
-docs/agent-context.md and rust/portage-repo/src/lib.rs for the full
+docs/agent-context.md and crates/portage-repo/src/lib.rs for the full
 scope writeup, including the dependency-recursion follow-up in
 resolve_pretend_graph, the profile/make.conf -> real USE/ACCEPT_KEYWORDS
 follow-up in portage-profile, the package.mask/.unmask/.accept_keywords/
@@ -21786,7 +21786,7 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
     bare `:=` before checking the candidate
     (`_slot_operator_check_reverse_dependencies`,
     `lib/_emerge/depgraph.py:2472-2538`, `:2494-2502`). Portuale's S1b
-    overlay (`rust/portage-repo/src/lib.rs::installed_dep_string`)
+    overlay (`crates/portage-repo/src/lib.rs::installed_dep_string`)
     appended the recorded atoms but the joint-satisfiability check kept
     them raw, so only the installed instance satisfied the whole atom
     set and the upgrade was withheld (no `provpkg-2.0` row, no consumer

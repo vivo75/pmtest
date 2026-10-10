@@ -27,7 +27,7 @@
 #   (image), :1297-1338 (metadata); metadata key set from
 #   `__dyn_install` + `_post_src_install_write_metadata`
 #   (doebuild.py:2700-3005). Portuale reader/writer:
-#   rust/portuale/src/binpkg.rs.
+#   crates/portuale/src/binpkg.rs.
 #
 # tar + zstd + md5sum + python3 only. The only Python use is the
 # Packages-index stanza parse (the same `KEY: value` / blank-line format

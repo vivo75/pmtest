@@ -7,7 +7,7 @@
 #   podman run --rm --entrypoint /bin/bash -v $PWD/scripts:/o:ro \
 #     localhost/test-portuale:latest /o/333-config-protect.sh /usr/bin/emerge
 #   podman run --rm --entrypoint /bin/bash -v $PWD/scripts:/o:ro \
-#     -v <portuale>/rust/target/release:/pm:ro \
+#     -v <portuale>/target/release:/pm:ro \
 #     localhost/test-portuale:latest /o/333-config-protect.sh "/pm/portuale emerge"
 #
 # cp/a installs /etc/env.d/99late (CONFIG_PROTECT="/usr/share/late");

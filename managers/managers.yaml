@@ -11,11 +11,11 @@
 pms:
   portuale:
     type: portage-compatible
-    repo: ../portuale  # source tree; cargo builds run in <repo>/rust
+    repo: ../portuale  # source tree; cargo builds run in <repo> (workspace root)
     package: portuale  # cargo package for the emerge/ebuild/mrg multicall
-    emerge: ../portuale/rust/target/release/portuale  # argv[0]-dispatched multicall
-    ebuild: ../portuale/rust/target/release/portuale
-    mrg: ../portuale/rust/target/release/portuale
+    emerge: ../portuale/target/release/portuale  # argv[0]-dispatched multicall
+    ebuild: ../portuale/target/release/portuale
+    mrg: ../portuale/target/release/portuale
     version: git
   portage:
     type: reference

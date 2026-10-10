@@ -183,8 +183,14 @@ def rust_dir(pm):
     if pm.get("rust_dir"):
         return resolve_path(pm["rust_dir"], canonical=True)
     if pm.get("repo"):
-        return resolve_path(pm["repo"], canonical=True) / "rust"
+        return resolve_path(pm["repo"], canonical=True)
     return None
+
+
+def crates_dir(pm):
+    """Directory holding the workspace crates (`<cargo dir>/crates`), or None."""
+    rd = rust_dir(pm)
+    return rd / "crates" if rd else None
 
 
 _version_cache = {}
