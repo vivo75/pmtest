@@ -12,9 +12,13 @@
 #     localhost/test-portuale:latest /o/329-xattr.sh "/pm/portuale emerge"
 #
 # Optional $2: extra FEATURES tokens (e.g. "-xattr" for the control).
+# Optional $3=binpkg (#334): real Portage first builds an xpak with
+# --buildpkgonly (always real, so both runs merge the same archive),
+# then $1 merges it with -K. That isolates the xpak extraction.
 set -u
 EMERGE=$1
 EXTRA=${2:-}
+MODE=${3:-source}
 R=/var/db/repos/xa
 mkdir -p $R/metadata $R/profiles $R/xa/x
 echo xa > $R/profiles/repo_name; echo xa > $R/profiles/categories
@@ -39,8 +43,17 @@ src_install() {
 }
 EOF
 F="-sandbox -usersandbox -ipc-sandbox -network-sandbox -pid-sandbox -mount-sandbox $EXTRA"
-env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root TERM=dumb FEATURES="$F" \
-	$EMERGE -1 --quiet-build=y xa/x > /tmp/emerge.log 2>&1
+if [ "$MODE" = binpkg ]; then
+	env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root TERM=dumb \
+		FEATURES="-sandbox -usersandbox -ipc-sandbox -network-sandbox -pid-sandbox -mount-sandbox" \
+		BINPKG_FORMAT=xpak /usr/bin/emerge -1 --buildpkgonly --quiet-build=y xa/x > /tmp/build.log 2>&1
+	echo "build rc=$? ($(find /var/cache/binpkgs -name 'x-1*' | sed 's|.*/||'))"
+	env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root TERM=dumb FEATURES="$F" \
+		$EMERGE -1 -K xa/x > /tmp/emerge.log 2>&1
+else
+	env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin HOME=/root TERM=dumb FEATURES="$F" \
+		$EMERGE -1 --quiet-build=y xa/x > /tmp/emerge.log 2>&1
+fi
 echo "emerge rc=$?"
 tail -3 /tmp/emerge.log
 for f in /usr/libexec/xa/viaexe /usr/bin/viabin /usr/libexec/xa/viainstall; do
