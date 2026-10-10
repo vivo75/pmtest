@@ -7,7 +7,7 @@
 # over the arguments; a USE flip contradicting a needed change fails the
 # pass and sends it to the autounmask-breakage clean pass, whose
 # _create_graph stops at the first failing atom. Capture:
-# portuale docs/evidence/2026-09-28-244/.
+# portuale LLM/evidence/2026-09-28-244/.
 --autounmask-backtrack=y dev-libs/aub0c dev-libs/aub0b dev-libs/aub0a
 --autounmask-backtrack=y dev-libs/aub0c dev-libs/aub0a dev-libs/aub0b
 --autounmask-backtrack=y dev-libs/aub0b dev-libs/aub0c dev-libs/aub0a

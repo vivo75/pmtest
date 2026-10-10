@@ -17,7 +17,7 @@
 #   differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g216.txt
 #
 # Shape (real 3.0.82.2, the L0 pin;
-# `docs/evidence/2026-09-29-242-inventory/probes/default-g216*.txt`):
+# `LLM/evidence/2026-09-29-242-inventory/probes/default-g216*.txt`):
 # `g216top` RDEPENDs `g216mid`, `g216mid` RDEPENDs `g216comp`,
 # `g216comp` BDEPENDs `|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )`.
 # Real's pass 1 keeps the in-graph `>=g216comp` branch live

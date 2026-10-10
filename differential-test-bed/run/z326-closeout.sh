@@ -1,6 +1,6 @@
 #!/bin/bash
 # z326-closeout.sh -- the #326 Z close-out run: nopy / noportage builds
-# vs real Portage (plan docs/02.326-no-portage-runtime.opus.md, "### Z").
+# vs real Portage (plan LLM/02.326-no-portage-runtime.opus.md, "### Z").
 #
 #   differential-test-bed/run/z326-closeout.sh [--jobs N]
 #       [--skip-leg-a] [--skip-leg-b] [--skip-ref] [--skip-gate] [--skip-l31b]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Neutral CLI test-harness binary (Python side) for the
-use_reduce(flat=True) portuale -- see docs/agent-context.md and
+use_reduce(flat=True) portuale -- see LLM/agent-context.md and
 crates/use-reduce-harness/src/use_reduce.rs for what is and isn't
 ported. Wraps the real portage.dep.use_reduce rather than reimplementing
 it, always called with flat=True and no masklist/excludeall/is_src_uri/

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Neutral CLI test-harness binary (Python side) for the atom-matching
-portuale -- see docs/agent-context.md and crates/portage-dep/src/lib.rs
+portuale -- see LLM/agent-context.md and crates/portage-dep/src/lib.rs
 for the deliberately narrowed v1 grammar this exercises. Wraps the real
 portage.dep.Atom / portage.dep.match_from_list rather than reimplementing
 them, and rejects any atom that uses a feature outside the v1 subset
