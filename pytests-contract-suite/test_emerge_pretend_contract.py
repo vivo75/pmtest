@@ -13422,7 +13422,7 @@ def test_short_flag_bundle_reports_the_first_out_of_scope_character(
     assert unimplemented.returncode == 2
     assert (
         unimplemented.stderr.strip()
-        == 'emerge: option "--fetchonly" is a real emerge option, but is not yet '
+        == 'emerge: option "--fetchonly" is a Portage emerge option, but is not yet '
         'implemented in portuale -- run "emerge --help" for the options '
         "and actions that are."
     )
@@ -13463,7 +13463,7 @@ def test_help_prints_a_pilot_specific_summary_not_real_emerges_own(
     assert result.stdout == r"""emerge: command-line interface to the Portuale package manager
 
 Portuale is a drop-in Rust reimplementation of Portage: same behaviour,
-verified against the Python original by a shared test suite. Any real
+verified against the Python original by a shared test suite. Any Portage
 emerge option or action not listed below is recognized by name
 (lib/_emerge/main.py) -- using one reports that it is not yet implemented
 in portuale, rather than a generic error.
@@ -13489,7 +13489,7 @@ Actions (with none of these, the targets are built and merged):
       --list-sets            list the available package sets
       --check-news           report how many unread GLEP 42 news items there are
       --regen                regenerate every repo's metadata/md5-cache (runs each depend phase)
-      --metadata             no-op here (md5-cache is read directly); prints the real header only
+      --metadata             no-op here (md5-cache is read directly); prints Portage's header only
   -r, --resume [--skipfirst] replay the merge list saved by the last failed run (--skipfirst drops entry 1)
   -h, --help                 show this message and exit
 
@@ -13569,7 +13569,7 @@ Output:
       --depclean-lib-check[=y|n]  with --depclean/--prune: scan for soname breakage (default y)
   -d, --debug               PORTAGE_DEBUG=1 in ebuild phases; resolver trace under --pretend
 
-Portuale extensions (not real emerge options):
+Portuale extensions (not Portage emerge options):
       --json                dump the resolved graph as one JSON line instead of the display
       --shell <bash|brush>  which real shell runs a merge / unmerge / --config phase chain (default bash)
       --solver <solver>     which dependency solver resolves the graph: portage (default), pubgrub or resolvo
@@ -17658,7 +17658,7 @@ def test_real_option_not_implemented_message_names_the_option(emerge_binary, fix
     assert result.stdout == ""
     assert (
         result.stderr.strip()
-        == 'emerge: option "--accept-properties" is a real emerge option, but is '
+        == 'emerge: option "--accept-properties" is a Portage emerge option, but is '
         'not yet implemented in portuale -- run "emerge --help" for the '
         "options and actions that are."
     )
@@ -17674,7 +17674,7 @@ def test_real_option_inline_equals_form_is_still_recognized(emerge_binary, fixtu
     assert result.returncode == 2
     assert (
         result.stderr.strip()
-        == 'emerge: option "--accept-properties" is a real emerge option, but is '
+        == 'emerge: option "--accept-properties" is a Portage emerge option, but is '
         'not yet implemented in portuale -- run "emerge --help" for the '
         "options and actions that are."
     )
@@ -17700,7 +17700,7 @@ def test_real_action_not_implemented_message_says_action_not_option(emerge_binar
     result = _run([str(emerge_binary)], ["--moo"], fixture_env)
     assert result.returncode == 2
     expected = (
-        'emerge: action "--moo" is a real emerge action, but is not yet '
+        'emerge: action "--moo" is a Portage emerge action, but is not yet '
         'implemented in portuale -- run "emerge --help" for the options '
         "and actions that are."
     )
