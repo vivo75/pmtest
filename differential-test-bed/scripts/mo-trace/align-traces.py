@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Align a real-portage `RT_SEL` trace with a portuale `MO_SEL` trace --
+"""Align a Portage `RT_SEL` trace with a portuale `MO_SEL` trace --
 the comparator half of the harness described in
 `differential-test-bed/scripts/mo-trace/README.md`.
 
@@ -83,13 +83,13 @@ def render(row):
     )
 
 
-def report_nodes(real_nodes, ptl_nodes):
+def report_nodes(portage_nodes, ptl_nodes):
     """Name a post-prune graph membership difference (the gtk:4
     alive=398 vs 395 gap) before the iteration walk."""
-    if not real_nodes and not ptl_nodes:
+    if not portage_nodes and not ptl_nodes:
         return False
-    rs, ps = set(real_nodes), set(ptl_nodes)
-    print(f"graph nodes: real {len(real_nodes)}  portuale {len(ptl_nodes)}")
+    rs, ps = set(portage_nodes), set(ptl_nodes)
+    print(f"graph nodes: real {len(portage_nodes)}  portuale {len(ptl_nodes)}")
     if rs != ps:
         for label, diff in (("only in real", sorted(rs - ps)), ("only in portuale", sorted(ps - rs))):
             if diff:
@@ -104,9 +104,9 @@ def report_nodes(real_nodes, ptl_nodes):
 def merge_sequence(rows):
     """The ordered merge picks (`m:` items) across the whole trace --
     exactly the order they were appended to `retlist`, i.e. the merge
-    list real/portuale are actually compared on. Nomerges are skipped so
+    list Portage/portuale are actually compared on. Nomerges are skipped so
     an irrelevant nomerge-ordering difference does not mask the first
-    real merge-order divergence."""
+    Portage merge-order divergence."""
     seq = []
     for row in rows:
         for item in row["pick"].split():
@@ -115,8 +115,8 @@ def merge_sequence(rows):
     return seq
 
 
-def report_merges(real, ptl):
-    r, p = merge_sequence(real), merge_sequence(ptl)
+def report_merges(portage, ptl):
+    r, p = merge_sequence(portage), merge_sequence(ptl)
     print(f"merge picks: real {len(r)}  portuale {len(p)}")
     for i in range(min(len(r), len(p))):
         if r[i] != p[i]:
@@ -144,26 +144,26 @@ def main(argv):
     if len(argv) != 2:
         print(__doc__)
         return 2
-    real, real_nodes = parse(argv[0])
+    portage, portage_nodes = parse(argv[0])
     ptl, ptl_nodes = parse(argv[1])
-    node_diff = report_nodes(real_nodes, ptl_nodes)
+    node_diff = report_nodes(portage_nodes, ptl_nodes)
     if merge_only:
-        rc = report_merges(real, ptl)
+        rc = report_merges(portage, ptl)
         return 1 if node_diff or rc else 0
-    print(f"real iterations: {len(real)}   portuale iterations: {len(ptl)}")
-    n = min(len(real), len(ptl))
+    print(f"real iterations: {len(portage)}   portuale iterations: {len(ptl)}")
+    n = min(len(portage), len(ptl))
     for i in range(n):
-        diffs = [f for f in FIELDS if real[i][f] != ptl[i][f]]
+        diffs = [f for f in FIELDS if portage[i][f] != ptl[i][f]]
         if diffs:
             print(f"\nfirst divergence at trace index {i} (0-based):")
-            print(f"  real     : {render(real[i])}")
+            print(f"  real     : {render(portage[i])}")
             print(f"  portuale : {render(ptl[i])}")
             for f in diffs:
-                print(f"    {f}: real={real[i][f]!r} portuale={ptl[i][f]!r}")
+                print(f"    {f}: real={portage[i][f]!r} portuale={ptl[i][f]!r}")
             return 1
-    if len(real) != len(ptl):
-        if len(real) > n:
-            print(f"\nportuale trace ended first; next real line: {render(real[n])}")
+    if len(portage) != len(ptl):
+        if len(portage) > n:
+            print(f"\nportuale trace ended first; next real line: {render(portage[n])}")
         else:
             print(f"\nreal trace ended first; next portuale line: {render(ptl[n])}")
         return 1

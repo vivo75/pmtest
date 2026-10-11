@@ -1,5 +1,5 @@
 #!/bin/bash
-# Nail down real portage's slot-op-rebuild TRIGGER condition: is it
+# Nail down Portage's slot-op-rebuild TRIGGER condition: is it
 # "consumer is a set member" or "consumer is reachable from a set"?
 set +e
 LOG=/TEST/logs/31-slotop-trigger.log

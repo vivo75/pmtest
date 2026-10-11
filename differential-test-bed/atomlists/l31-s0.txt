@@ -5,11 +5,11 @@
 # differential-test-bed container ROOT); a real off-box VM is deferred.
 #
 # Two cells, both tiny porttest overlay ebuilds (EAPI=8, no SRC_URI, build
-# in seconds with real Portage into a gpkg $PKGDIR):
+# in seconds with Portage into a gpkg $PKGDIR):
 #
 #   porttest/setuid  THE minimal package.  4711/2755/1750/0600 modes +
 #                    distinct uid/gid on shared parents + real ELF bytes
-#                    + a vdb entry.  S0 already shows real Portage keeps
+#                    + a vdb entry.  S0 already shows Portage keeps
 #                    all three setuid/setgid/sticky bits while mrg remote
 #                    drops them (711/755/750) -- the one cell that makes
 #                    the bed's first candidate diff honest.

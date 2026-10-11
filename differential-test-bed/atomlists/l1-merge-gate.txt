@@ -4,8 +4,8 @@
 #
 #   differential-test-bed/run/l1-merge-from-binpkg.sh differential-test-bed/atomlists/l1-merge-gate.txt
 #
-# Portage builds both from source into the shared $PKGDIR once, then real
-# Portage and portuale each merge the identical binpkg set into a fresh
+# Portage builds both from source into the shared $PKGDIR once, then Portage
+# and portuale each merge the identical binpkg set into a fresh
 # container. Portuale's own shell children run from the very /bin/bash it
 # is replacing and every process in the container maps the libc being
 # replaced, so this cell fails loudly (or takes the container down) for

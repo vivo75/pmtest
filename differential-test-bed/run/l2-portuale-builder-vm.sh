@@ -66,15 +66,15 @@ KNOWN_HITS=0
 KNOWN_FINDINGS=(
   # `porttest/setuid`'s three byte-identical binaries share one build-id;
   # which name the shared `.build-id/e0/2277…` links target depends on
-  # `estrip`'s `___parallel` traversal order. Real disagrees with itself
+  # `estrip`'s `___parallel` traversal order. Portage disagrees with itself
   # (oracle `pt-setuid`, a later real L2 build `pt-sticky`), so this one
   # link pair is the only ungradable row (#38 S0/S2).
   "l2-gpkg-dostrip-splitdebug|usr/lib/debug/\.build-id/e0/2277.*: a=.*b="
   # Portuale never tracks repo revisions (`PORTAGE_REPO_REVISIONS` is
-  # `"{}"` until it does -- emerge_build.rs documents it), while real
+  # `"{}"` until it does -- emerge_build.rs documents it), while Portage
   # fills them via git retrieve_head whenever git exists. The VM golden
   # has git (needed for repo clones); the container image has none, so
-  # real writes `{}` there too and the pair matches. Filed in
+  # Portage writes `{}` there too and the pair matches. Filed in
   # vm/FINDINGS.md (L1 section); delete when portuale tracks revisions.
   # Tradeoff, stated plainly: the environment.bz2 row masks on the file
   # name only, so a FUTURE unrelated env delta would hide behind this
@@ -250,7 +250,7 @@ set -e
   echo "## archive diffs (portage-built vs portuale-built)"
   grep -E '^gpkg-diff:' "$OUT/archive-diffs.txt" || true
   echo
-  echo "## cross-install (real Portage merges portuale-built)"
+  echo "## cross-install (Portage merges portuale-built)"
   sed -n '/^## summary/,/^$/p' "$OUT/cross-install.txt"
   echo "## control (portuale merges portage-built)"
   sed -n '/^## summary/,/^$/p' "$OUT/control.txt"

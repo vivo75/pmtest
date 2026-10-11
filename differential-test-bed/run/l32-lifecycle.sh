@@ -12,11 +12,11 @@
 #   F2  corrupt/truncated binpkg merged with --usepkgonly (S0 group 5b)
 #   F3  local binhost HTTP 500, abort then source fallback (S0 group 5c)
 #
-#   control   -- BOTH sides real Portage through the same harness; the two
+#   control   -- BOTH sides Portage through the same harness; the two
 #                snapshots are normalised + diffed with NO allowlist and
 #                must be 0 unexplained. That is the gate and the noise
 #                floor for every cell.
-#   candidate -- reference side stays real Portage; the other side runs
+#   candidate -- reference side stays Portage; the other side runs
 #                the SAME cell with portuale's real CLI
 #                (layers/l32/run-cell.sh portuale). Every diff row is
 #                recorded and triaged against findings/l5.md expected
@@ -149,9 +149,9 @@ unexplained_of() {  # <report>
 
 # Backlog #187: F3's exit codes are the finding the filesystem diff
 # cannot see (F3a installs nothing on either side once portuale aborts
-# like real; F3b installs the same tree) -- compare what each side
-# recorded for the stale-index abort (`binhost-merge`, real rc 1) and
-# the empty-PKGDIR fallback (`binhost-fallback`, real rc 0). `rc_of` in
+# like Portage; F3b installs the same tree) -- compare what each side
+# recorded for the stale-index abort (`binhost-merge`, Portage rc 1) and
+# the empty-PKGDIR fallback (`binhost-fallback`, Portage rc 0). `rc_of` in
 # run-cell.sh always writes both files, so a missing file is itself a
 # setup error, not a silent pass. Appends `[RC]` finding rows to the
 # cell report either way; returns 0 iff both steps agree, so a

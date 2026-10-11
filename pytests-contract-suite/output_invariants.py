@@ -18,7 +18,7 @@ from pathlib import Path
 
 MERGE_BOUND = {"new", "upgrade", "downgrade", "reinstall"}
 
-# Dependency variables that force merge order. Real's `_serialize_tasks`
+# Dependency variables that force merge order. Portage's `_serialize_tasks`
 # `ignore_priority` ladder (DepPriorityNormalRange) may drop `RDEPEND`
 # (runtime) and `PDEPEND` (runtime_post) edges when a pass stalls; only
 # buildtime edges (DEPEND/BDEPEND/IDEPEND, and `:=` slot-operator deps)
@@ -78,7 +78,7 @@ def parse_plain(stdout: str) -> list[dict]:
             continue
         cpv, rest = m.group("cpv"), m.group("rest")
         # Track X Slice D (#242): every merge/nomerge/uninstall row whose
-        # entry root != "/" carries real's `to <ROOT>` suffix. The spaced
+        # entry root != "/" carries Portage's `to <ROOT>` suffix. The spaced
         # form (`pkg-1.0 to /ROOT`) leaves `cpv` clean; the tree-code
         # nomerge shape glues it (`diamond-1.0to /ROOT`), so strip a
         # trailing `to` when the rest starts with the root path (a real
@@ -89,7 +89,7 @@ def parse_plain(stdout: str) -> list[dict]:
         rows.append({
             "kind": m.group("kind"),
             "flags": m.group("flags"),
-            # #75 C1: real's tree indent is exactly `depth` spaces
+            # #75 C1: Portage's tree indent is exactly `depth` spaces
             # (`output_helpers.py`'s `self.indent`), printed after the
             # one literal space every row format already carries.
             "depth": len(m.group("indent")) - 1,
@@ -201,7 +201,7 @@ def check_json(doc: dict, root: Path | None = None,
                installed: set[tuple[str, str]] | None = None,
                dep_vars: dict[tuple, set[str]] | None = None) -> list[str]:
     """`args` is the command line; `--rebuild-if-*` reinstalls are seeds
-    (real adds them as rebuild arguments, so they have no parent).
+    (Portage adds them as rebuild arguments, so they have no parent).
     `installed` is a `parse_vdb_list` set (the L0 run cannot expose a
     `root`); `dep_vars` maps `(child_cp, owner_cp)` to the owner's
     dependency variables naming the child (L0's `dep-classes.tsv`),
@@ -283,7 +283,7 @@ def check_json(doc: dict, root: Path | None = None,
             for j in owners:
                 by_owner_cp.setdefault((entries[j]["category"], entries[j]["package"]), []).append(j)
             child_cp = (e["category"], e["package"])
-            # Real `_serialize_tasks` may ignore an edge whose dependency an
+            # Portage `_serialize_tasks` may ignore an edge whose dependency an
             # installed instance already satisfies (`DepPriority.satisfied`),
             # so a child with any installed instance is not held to it.
             # `_installed(root=None)` degrades to "cannot tell", which must
@@ -301,7 +301,7 @@ def check_json(doc: dict, root: Path | None = None,
                     continue
                 # Another merge-bound instance of a multi-instance child cp
                 # before the owner satisfies the cp-level edge: the JSON
-                # aggregates `required_by` by cp, while real's constraint is
+                # aggregates `required_by` by cp, while Portage's constraint is
                 # per package instance (e.g. the clang:21 entry carrying an
                 # edge that clang:22 already satisfied).
                 if len(by_cp[child_cp]) > 1 and any(
@@ -384,7 +384,7 @@ def check_summary(stdout: str) -> list[str]:
 def check_cross_mode(plain: str, tree: str, quiet: str, doc: dict,
                      args: list[str] | None = None) -> list[str]:
     """`args` is the command line: `--autounmask-only` is skipped because a
-    changeless resolve prints no merge list in either implementation (real
+    changeless resolve prints no merge list in either implementation (Portage
     re-shows the list only from inside its change loops -- backlog #271 --
     so displayed rows and `--json` entries legitimately differ there), and
     `--onlydeps` keeps the suppressed arguments in `--json`
@@ -457,7 +457,7 @@ def check_cross_mode(plain: str, tree: str, quiet: str, doc: dict,
                 # #75 C1 / #82: a `[blocks …]` or `[uninstall …]` row is
                 # not matched by `_LINE`, so a row nested under one of
                 # those collapses onto whatever parsed row precedes it --
-                # which, in real's `_tree_display` rewrite, can be a
+                # which, in Portage's `_tree_display` rewrite, can be a
                 # package this row **owns** rather than one that owns it
                 # (B0b's p2c: `blocked-2.0` sits under the blocker row
                 # under `bparent-1.1`, and `bparent-1.1` is `blocked`'s

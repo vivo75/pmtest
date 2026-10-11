@@ -16,7 +16,7 @@
 #
 # The F cells (S2, S0 group 5) deliberately fail a merge: a disk-full
 # tmpfs (F1), a truncated binpkg (F2) and a local binhost answering 500
-# (F3). The in-container exit code is never the gate here (real Portage
+# (F3). The in-container exit code is never the gate here (Portage
 # exits 143 on F1); every emergent rc and error-shape line is recorded
 # under "$OUT.logs" for the triage, and the snapshot still compares the
 # installed root/VDB the fault left behind.
@@ -263,13 +263,13 @@ cell_f2() {
   export FEATURES="-buildpkg -cgroup -observability -ipc-sandbox -network-sandbox -pid-sandbox"
 
   # S2 observation: name the binpkg each PM produces with the *unforced*
-  # default BINPKG_FORMAT. Real make.globals says gpkg; this side-by-side
+  # default BINPKG_FORMAT. Portage make.globals says gpkg; this side-by-side
   # record is what shows a candidate whose default naming diverges.
   PKGDIR="$probe" $EM --oneshot --usepkg=n --color=n --buildpkg l32/faultpkg > "$G/format-probe-build.log" 2>&1
   echo "rc=$?" > "$G/format-probe-build.rc"
   find "$probe" -type f -name 'faultpkg-1.0*' -printf '%f\n' 2>/dev/null | sort > "$G/format-probe.txt"
 
-  # Pin gpkg for the corrupt-archive scenario itself (real's own default):
+  # Pin gpkg for the corrupt-archive scenario itself (Portage's own default):
   # an explicit value isolates the fault from the default-naming question.
   export PKGDIR="$pkg" BINPKG_FORMAT=gpkg
 

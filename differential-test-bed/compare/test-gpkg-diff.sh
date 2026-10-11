@@ -143,7 +143,7 @@ head -c 512 "$SB" > "$TMP/trunc.gpkg.tar"
 # --- positive controls --------------------------------------------------
 expect_rc 0 "strict: two porttest instances are hard-clean" \
   "$DIFF" --mode strict "$SA" "$SB"
-expect_rc 0 "tolerant: two real portage instances are hard-clean" \
+expect_rc 0 "tolerant: two Portage instances are hard-clean" \
   "$DIFF" --mode payload-tolerant "$TA" "$TB"
 
 # --- mutations ----------------------------------------------------------

@@ -5,7 +5,7 @@
 # Mirrors layers/l31/consume-remote.sh's snapshot section exactly
 # (vdb-list from the installed-before file client-init.sh recorded,
 # CONFIG_PROTECT divert files, the same fixed tail), so the host diffs
-# the client snapshot against real Portage's consume with the same
+# the client snapshot against Portage's consume with the same
 # compare/ helpers and no new semantics.
 #
 # Usage (from the host orchestrator):
@@ -48,7 +48,7 @@ comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" \
       && awk '$1=="obj"||$1=="sym"||$1=="dir" {print $2}' "$d/CONTENTS"
   done < "$OUT.vdb-list.txt"
   # CONFIG_PROTECT divert files, mirroring layers/l1/consume.sh exactly:
-  # real Portage writes `._cfg????_*` siblings under a protected path.
+  # Portage writes `._cfg????_*` siblings under a protected path.
   # `${FAR%/}/etc` keeps a leading single slash for the `/` far root
   # this cell uses.
   find "${FAR%/}/etc" -name '._cfg????_*' 2>/dev/null

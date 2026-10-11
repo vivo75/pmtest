@@ -5,7 +5,7 @@
     xpak_diff.py --structure [--packages] (--dir <PKGDIR> | <archive.xpak>...)
 
 The xpak counterpart of `gpkg_diff.py` + `gpkg-structure.sh`. Format
-(real Portage `lib/portage/xpak.py`, written by `__dyn_package` in
+(Portage `lib/portage/xpak.py`, written by `__dyn_package` in
 `bin/misc-functions.sh`):
 
     <tar of ${D}, compressed with BINPKG_COMPRESS>
@@ -285,7 +285,7 @@ class Structure:
         pk = pkgdir / "Packages"
         if not pk.is_file():
             self.fail("INDEX", str(pkgdir),
-                      "no Packages index (real Portage under pkgdir-index-trusted cannot see any archive)")
+                      "no Packages index (Portage under pkgdir-index-trusted cannot see any archive)")
             return
         stanzas: dict[str, dict[str, str]] = {}
         for block in pk.read_text(errors="replace").split("\n\n"):

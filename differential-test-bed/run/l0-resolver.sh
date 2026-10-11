@@ -2,7 +2,7 @@
 # L0 -- resolver parity at real-tree scale.
 #
 # Builds portuale, runs `emerge -pv` for every entry in the atom list
-# under both real portage and portuale inside a throwaway container, then
+# under both Portage and portuale inside a throwaway container, then
 # diffs the merge lists / errors / exit codes on the host.
 #
 #   differential-test-bed/run/l0-resolver.sh [atomlist]

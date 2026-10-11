@@ -2,7 +2,7 @@
 """Neutral CLI test-harness binary (Python side) for the
 use_reduce(flat=True) portuale -- see LLM/agent-context.md and
 crates/use-reduce-harness/src/use_reduce.rs for what is and isn't
-ported. Wraps the real portage.dep.use_reduce rather than reimplementing
+ported. Wraps Portage's portage.dep.use_reduce rather than reimplementing
 it, always called with flat=True and no masklist/excludeall/is_src_uri/
 opconvert/subset/token_class -- see the Rust side's doc comment for why
 those are out of v1 scope.

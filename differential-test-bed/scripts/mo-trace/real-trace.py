@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Inject the `RT_SEL` merge-order trace into real portage's
-`_serialize_tasks` -- the real half of the harness described in
+"""Inject the `RT_SEL` merge-order trace into Portage's
+`_serialize_tasks` -- the Portage half of the harness described in
 `differential-test-bed/scripts/mo-trace/README.md`.
 
 The injected block prints one line per selection iteration, just before
-real removes the selected nodes:
+Portage removes the selected nodes:
 
     RT_SEL iter=<N> retlist=<R> alive=<A> asap=[<cpv ...>] prefer_asap=<0|1>
            drop_satisfied=<0|1> ig=<name> pick=<cat/pkg-ver ...>
@@ -12,7 +12,7 @@ real removes the selected nodes:
 with exactly the field order portuale's `PORTUALE_MO_SEL` line uses
 (`crates/portage-repo/src/merge_order.rs::mo_sel_trace_line`), so
 `align-traces.py` can walk the two streams in step. `retlist` counts
-merge packages only (real appends only those), `alive` counts every
+merge packages only (Portage appends only those), `alive` counts every
 non-uninstall package still in `mygraph`, `pick` the merge nodes chosen
 this iteration.
 

@@ -173,7 +173,7 @@ REQUIRED_USE_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "required_use_harne
 FIXTURES_ROOT = REPO_ROOT / "fixtures"
 
 # Config variables portuale now honours from the process environment
-# (real `config.regenerate()`'s `env` USE_ORDER layer -- see
+# (Portage `config.regenerate()`'s `env` USE_ORDER layer -- see
 # portage-profile's `ENV_INCREMENTAL_VARS`/`ENV_SCALAR_VARS`). A test
 # runner's own environment must not leak into the fixture config, so
 # these are stripped process-wide for the whole test session; a test
@@ -360,9 +360,9 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
 
 @pytest.fixture(autouse=True)
 def _no_clean_delay(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Real `emerge -C`/`--depclean`/`--prune` run a `CLEAN_DELAY`-second
+    """Portage `emerge -C`/`--depclean`/`--prune` run a `CLEAN_DELAY`-second
     countdown (default 5) before removing anything. Pin it to 0 for the
-    whole suite so removal tests don't each sleep -- real portage's own
+    whole suite so removal tests don't each sleep -- Portage's own
     test infra does the same."""
     monkeypatch.setenv("CLEAN_DELAY", "0")
 
@@ -384,7 +384,7 @@ def fixture_env() -> dict[str, str]:
 
     PORTAGE_RUNNING_ROOT is pinned to the same fixture ROOT: portuale
     now routes BDEPEND/IDEPEND against the running root whenever it
-    differs from the target ROOT (real EAPI-7+ portage does this
+    differs from the target ROOT (Portage EAPI-7+ does this
     unconditionally -- see running_root_from_env's doc comment), so
     without this pin every fixture-ROOT test would consult the real
     host's /var/db/pkg and lose determinism. A test that specifically

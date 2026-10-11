@@ -5,7 +5,7 @@ LLM/agent-context.md ("Benchmark data: a real, vendored Gentoo tree snapshot
 
 Walks a local ebuild repository (e.g. /.gentoo/repos/gentoo -- a full
 Gentoo tree checkout) and records the set of real version strings that
-exist for each package, using the real portage.versions.pkgsplit as the
+exist for each package, using Portage's portage.versions.pkgsplit as the
 authority for what a version string is (rather than re-deriving version
 parsing here). The output is a plain JSON map of "category/package" to a
 sorted list of version strings, committed at gentoo_snapshot.json so the

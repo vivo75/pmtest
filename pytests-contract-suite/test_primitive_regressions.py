@@ -1,7 +1,7 @@
 """Replay the inputs on which the tree-wide primitive differential
 (`scripts/primitive_tree_differential.py`,
-`docs/second_python_copy_removal.md` §3) once found Rust and real
-Portage disagreeing. Each `pytests-contract-suite/primitive_regressions/<harness>.txt`
+`docs/second_python_copy_removal.md` §3) once found Rust and Portage
+disagreeing. Each `pytests-contract-suite/primitive_regressions/<harness>.txt`
 line is one batch operation; both harnesses must now answer it the same.
 """
 
@@ -23,7 +23,7 @@ def _batch(cmd, lines):
 
 @pytest.mark.skipif(not FILES, reason="no recorded primitive regressions")
 @pytest.mark.parametrize("path", FILES, ids=[f.stem for f in FILES])
-def test_primitive_regressions_agree_with_real_portage(path, request):
+def test_primitive_regressions_agree_with_portage(path, request):
     harness = path.stem  # atom | use_reduce | required_use
     rust = request.getfixturevalue(f"{harness}_harness_rust")
     python = request.getfixturevalue(f"{harness}_harness_python")

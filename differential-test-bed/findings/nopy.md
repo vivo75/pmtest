@@ -355,7 +355,7 @@ Artifacts: `artifacts/binpkgs/porttest/helper-unpack` (empty
 directories only, 0 files). No `workdir-*.txt` and no
 `helper-unpack-modes.txt` were captured for this run, so the recorded
 WORKDIR modes are absent; the only modes evidence is the QA notice
-above. Against the real-Portage oracle (644 file0600 / 755 file0777 /
+above. Against the Portage oracle (644 file0600 / 755 file0777 /
 755 sub0700 / 644 sub0700/nested0640 / 755 sub0775): file0777 is
 observed world-writable in the installed tree instead of 755; the other
 four entries are NOT OBSERVED (no modes.txt, no workdir listing).

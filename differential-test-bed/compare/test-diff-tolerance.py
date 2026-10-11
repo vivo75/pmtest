@@ -141,7 +141,7 @@ def r3_case(label: str, a: Path, b: Path, must_have: list[str]) -> None:
 def build_r3_cases(root: Path) -> None:
     # Case 1 -- porttest/setuid: three byte-identical setuid binaries share
     # one .build-id (e0/2277…); estrip links the shared links at whichever
-    # copy won the race, so real and portuale disagree about the target.
+    # copy won the race, so Portage and portuale disagree about the target.
     # This is exactly the allowlisted l2-gpkg-dostrip-splitdebug pair.
     pt = "\t".join(["", "f", "4755", "0", "0", "9", "11" * 32, "-", "-"])
     pt_rows = [

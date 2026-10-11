@@ -3,7 +3,7 @@
 ## Open investigations (backlog)
 
 - **xtrans-early pattern** (filed 2026-09-19): in ~10 L0-VM order
-  findings portuale merges `x11-libs/xtrans` well before real does
+  findings portuale merges `x11-libs/xtrans` well before Portage does
   (vs libpng, binutils-libs, xorg-proto, libidn, libatomic_ops, ...).
   Open: systematic edge-violation or benign traversal difference?
   Per-probe dependency-path analysis pending.
@@ -22,7 +22,7 @@ The gap is guest-state-driven, not plumbing: same repos/profile
 family/python-major, but the weekly official image ships a NEWER
 installed set than the pinned stage3 container (e.g. expat-2.8.4 vs
 2.8.3, python 3.14.7 vs 3.14.6, different @system closure). Both PMs
-see the same guest (fair); real adapts to the installed set where
+see the same guest (fair); Portage adapts to the installed set where
 portuale does not. Adjudication belongs to the portuale owner (no
 unilateral blessing); candidates:
 
@@ -38,7 +38,7 @@ unilateral blessing); candidates:
    accepted-variance). Procedure applied: no dependency edge either
    way (verified RDEPENDs); nano-9.2 + glibc-2.43-r2 installed and
    kept by both PMs (no provider switch); @world pins neither;
-   real seed-stable (0/1/42) yet traversal-arbitrary. No rule
+   Portage seed-stable (0/1/42) yet traversal-arbitrary. No rule
    contradiction → not a bug.
 
 ## L1 (slice 4)
@@ -52,7 +52,7 @@ unilateral blessing); candidates:
   1. The stock cloud image ships
      `/etc/portage/package.use/releng/no-filecaps` (`*/* -filecaps`,
      "caps are not useful" on auto-login images).
-  2. Real honors it (htop binpkg built/merged with `-filecaps`);
+  2. Portage honors it (htop binpkg built/merged with `-filecaps`);
      portuale ignores the fragment (computes `filecaps` from IUSE
      default) → binpkg USE mismatch → source rebuild.
   3. Proof of causality: same probe in the container bed (no releng
@@ -86,12 +86,12 @@ unilateral blessing); candidates:
 - `REPO_REVISIONS` (filed, suppressed; suppression CONFIRMED per
   owner decision 2026-09-19): portuale hardcodes
   `PORTAGE_REPO_REVISIONS="{}"` ("until portuale tracks a repo
-  revision", `emerge_build.rs`); real fills SHAs via git
+  revision", `emerge_build.rs`); Portage fills SHAs via git
   `retrieve_head` whenever git exists. Suppressed in
   `l2-portuale-builder-vm.sh` `KNOWN_FINDINGS` as
   `l2-vm-repo-revisions[-env]` plus yaml VDB entries
   (`l2-vm-repo-revisions-vdb[-env]`, `l3-vm-repo-revisions-vdb[-env]`);
   delete all when portuale tracks revisions. The VM golden has git
-  (repo clones need it), the container image has none — so real writes
+  (repo clones need it), the container image has none — so Portage writes
   `{}` on containers (pair matches, bed green) and SHAs on VMs. The
   full 1308-line `environment.bz2` diff is that ONE line.

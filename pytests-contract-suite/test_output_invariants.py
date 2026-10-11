@@ -257,7 +257,7 @@ def test_checker_tolerates_a_multi_instance_child_satisfied_earlier():
 
 
 def test_checker_tolerates_soft_edges_only():
-    # Real's `ignore_priority` ladder may relax RDEPEND (runtime) and
+    # Portage's `ignore_priority` ladder may relax RDEPEND (runtime) and
     # PDEPEND (runtime_post) edges; DEPEND/BDEPEND/IDEPEND never.
     doc = _doc(_entry("root", 0, requested=True), _entry("leaf", 1, ("root",)))
     key = (("dev-libs", "leaf"), ("dev-libs", "root"))

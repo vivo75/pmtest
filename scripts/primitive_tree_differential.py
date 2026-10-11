@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Tree-wide primitive differential: real Portage vs Rust
+"""Tree-wide primitive differential: Portage vs Rust
 (`docs/second_python_copy_removal.md` §3).
 
 Feeds every dependency atom, every dependency string and every
 REQUIRED_USE string of a whole `metadata/md5-cache` through the kept
-primitive harnesses -- `python-harness/*_harness.py` wrap the real
+primitive harnesses -- `python-harness/*_harness.py` wrap Portage's
 `portage.dep`, `crates/*-harness` wrap portuale's crates -- and diffs the
 answers line by line:
 
@@ -37,7 +37,7 @@ import registry  # noqa: E402  (pmtest root is not a package)
 
 REGRESSIONS = REPO / "pytests-contract-suite" / "primitive_regressions"
 DEP_KEYS = ("DEPEND", "RDEPEND", "BDEPEND", "PDEPEND", "IDEPEND")
-# <registry harness key>: the Python harness wrapping real Portage.
+# <registry harness key>: the Python harness wrapping Portage.
 HARNESSES = {
     "atom": "atom_harness.py",
     "use_reduce": "use_reduce_harness.py",
@@ -116,7 +116,7 @@ def run_batch(cmd: list[str], lines: list[str]) -> list[str]:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Tree-wide primitive differential: real Portage vs Rust.")
+    ap = argparse.ArgumentParser(description="Tree-wide primitive differential: Portage vs Rust.")
     ap.add_argument("--repo", type=Path, default=Path("/var/db/repos/gentoo"))
     ap.add_argument("--limit", type=int, help="only the first N md5-cache entries")
     opts = ap.parse_args()
@@ -135,12 +135,12 @@ def main() -> int:
     for name, py_script in HARNESSES.items():
         lines = batches[name]
         rust = run_batch([str(rust_harness[name])], lines)
-        real = run_batch([sys.executable, str(REPO / "python-harness" / py_script)], lines)
-        mismatches = [line for line, r, p in zip(lines, rust, real) if r != p]
+        portage = run_batch([sys.executable, str(REPO / "python-harness" / py_script)], lines)
+        mismatches = [line for line, r, p in zip(lines, rust, portage) if r != p]
         print(f"{name}: {len(lines)} inputs, {len(mismatches)} mismatches")
         for line in mismatches[:20]:
             i = lines.index(line)
-            print(f"  {line}\n    rust: {rust[i]}\n    real: {real[i]}")
+            print(f"  {line}\n    rust: {rust[i]}\n    portage: {portage[i]}")
         if mismatches:
             path = REGRESSIONS / f"{name}.txt"
             known = set(path.read_text().splitlines()) if path.exists() else set()

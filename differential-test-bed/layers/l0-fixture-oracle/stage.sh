@@ -1,24 +1,24 @@
 #!/bin/bash
-# Real `emerge` as a fixture oracle (backlog #49 / second_python_copy_removal.md
+# Portage's `emerge` as a fixture oracle (backlog #49 / second_python_copy_removal.md
 # §6) -- the staging step, run inside the test container.
 #
 # Copies the checked-in `fixtures/` tree (mounted read-only at /fixtures)
-# into a writable stage dir and applies the minimal deltas real Portage
+# into a writable stage dir and applies the minimal deltas Portage
 # needs. The checked-in fixtures stay untouched; the deltas are:
 #
-#   1. `repos.conf` locations become absolute in-container paths (real
+#   1. `repos.conf` locations become absolute in-container paths (Portage
 #      rejects the relative `location = repo` portuale accepts);
 #   2. `binrepos.conf`'s `${PORTAGE_CONFIGROOT}` is resolved to the
 #      staged configroot (portuale-only interpolation);
 #   3. an `etc/portage/categories` file is added, listing every staged
-#      fixture category (real masks a package whose category is not
+#      fixture category (Portage masks a package whose category is not
 #      listed);
 #   4. one `Manifest` per staged package dir with every ebuild's own
-#      BLAKE2B/SHA512 (real masks a digest-less ebuild as corruption, and
+#      BLAKE2B/SHA512 (Portage masks a digest-less ebuild as corruption, and
 #      "not listed in the Manifest" for a missing multi-version line);
 #      distfile records are not needed for `--pretend`;
 #   5. `repo/metadata/news` is dropped (the fixture news items use a
-#      portuale-only format real rejects);
+#      portuale-only format Portage rejects);
 #   6. an empty `/etc/make.local` is created in the container, because
 #      the fixture `make.conf` sources it (the only host-root path the
 #      staged run touches, and only in the throwaway container);
@@ -29,7 +29,7 @@
 #      longer touches ebuild bytes, so the S1-valid committed entries
 #      keep validating;
 #   8. a `metadata/layout.conf` with `masters = testrepo` is added where
-#      the fixture repo lacks one (real warns on every run otherwise).
+#      the fixture repo lacks one (Portage warns on every run otherwise).
 #
 # `FX_WORLD_EXTRA` (backlog #54 S0): space-separated atoms appended to
 # the staged `var/lib/portage/world` before either package manager runs
@@ -53,7 +53,7 @@ sed -i "s|^location = |location = $FX/|" "$FX/etc/portage/repos.conf/repos.conf"
 sed -i "s|\${PORTAGE_CONFIGROOT}|$FX|g" "$FX/etc/portage/binrepos.conf"
 # 6. silence the fixture make.conf's `source /etc/make.local`
 touch /etc/make.local
-# 5. real rejects the fixture news format
+# 5. Portage rejects the fixture news format
 rm -rf "$FX/repo/metadata/news"
 
 # FX_WORLD_EXTRA: append atoms to the staged world (#54 S0)
@@ -75,10 +75,10 @@ if [ -n "${FX_DROP_VDB:-}" ]; then
   done
 fi
 
-# 3. categories real will accept. Written to /etc/portage/categories
+# 3. categories Portage will accept. Written to /etc/portage/categories
 #    *and* to each staged repo's own profiles/categories: a BDEPEND
 #    resolved against the running root uses a `local_config=False`
-#    settings object (real EAPI 7+ semantics deliberately isolate the
+#    settings object (Portage EAPI 7+ semantics deliberately isolate the
 #    build root's config from the target root's `/etc/portage`
 #    overrides), which never reads /etc/portage/categories at all --
 #    only a repo's own profile-chain categories file, unconditionally
@@ -104,7 +104,7 @@ done
 #    valid (#46 S1), so make it stale on purpose -- wrong `_md5_` and a
 #    resolution-visible `KEYWORDS=~amd64` against the ebuild's `amd64`.
 #    Both PMs must ignore it and regenerate from the ebuild (#46 S3;
-#    real's `_pull_valid_cache` always did). Staging-only; the committed
+#    Portage's `_pull_valid_cache` always did). Staging-only; the committed
 #    tree stays valid.
 stale="$FX/repo/metadata/md5-cache/dev-libs/common-1.0"
 if [ -f "$stale" ]; then
@@ -114,7 +114,7 @@ if [ -f "$stale" ]; then
     "$stale"
 fi
 
-# 8. layout.conf masters (the fixture repos omit it; real warns otherwise)
+# 8. layout.conf masters (the fixture repos omit it; Portage warns otherwise)
 for repo in overlay independentoverlay layoutmasteroverlay repnamerepo; do
   [ -d "$FX/$repo" ] || continue
   mkdir -p "$FX/$repo/metadata"
@@ -124,13 +124,13 @@ for repo in overlay independentoverlay layoutmasteroverlay repnamerepo; do
 done
 
 #   9. comments in a staged `profiles/updates/` file are an error to
-#      real's parser (`Update type not recognized '# ...'`); drop them.
+#      Portage's parser (`Update type not recognized '# ...'`); drop them.
 for upd in "$FX"/*/profiles/updates/*; do
   [ -f "$upd" ] || continue
   sed -i '/^[[:space:]]*#/d' "$upd"
 done
 
-#  10. `*/<pkg>` is portuale-only syntax real rejects ("Invalid atom");
+#  10. `*/<pkg>` is portuale-only syntax Portage rejects ("Invalid atom");
 #      rewrite it to the package's real category in the staged copy. The
 #      rewritten atom is the same target, so no resolution input changes.
 python3 - "$FX" <<'PY'
@@ -157,8 +157,8 @@ for path in sorted(fx.glob("*/profiles/package.use.*")) + sorted(fx.glob("*/prof
         path.write_text(fixed)
 PY
 
-#  11. repos whose profiles lack `repo_name` make real warn on every run;
-#      the file content is the section name real would otherwise use.
+#  11. repos whose profiles lack `repo_name` make Portage warn on every run;
+#      the file content is the section name Portage would otherwise use.
 for repo in overlay independentoverlay layoutmasteroverlay; do
   [ -d "$FX/$repo" ] || continue
   if [ ! -s "$FX/$repo/profiles/repo_name" ]; then
@@ -170,7 +170,7 @@ done
 # 12. FX_SOUSAT_UNSAT=1 (#215 S0): install the unsatisfied-probe
 #     fragment -- installed `app-misc/sousatpar-1` bound to the
 #     abandoned provider slot (`RDEPEND=">=app-misc/sousatprov-1:0/1="`,
-#     EAPI-bearing vdb so real's `FakeVartree` overlay registers the
+#     EAPI-bearing vdb so Portage's `FakeVartree` overlay registers the
 #     built dep), in world. The tree holds only `sousatprov-2`
 #     (`SLOT="2/2"`) plus the parent's own live ebuild. The fragment
 #     lives outside the shared fixture vdb so the standard runs are
@@ -184,8 +184,8 @@ fi
 # 13. FX_SLOTOP_BDEP=1 (#65 S0/S3): install the slot-operator build-time
 #     deps matrix -- provpkg-1.0 (sub-slot 0/1, upgraded to 2.0/0/2 in the
 #     tree) plus five installed consumers, one per dep key, each bound to
-#     `>=dev-libs/provpkg-1.0:0/1=` (real's own versioned built-atom shape;
-#     a bare `:0/1=` is dropped by real's dynamic-deps apply), all six in
+#     `>=dev-libs/provpkg-1.0:0/1=` (Portage's own versioned built-atom shape;
+#     a bare `:0/1=` is dropped by Portage's dynamic-deps apply), all six in
 #     world. The fragment lives outside the shared fixture vdb so the
 #     standard runs are untouched.
 if [ "${FX_SLOTOP_BDEP:-}" = 1 ]; then
@@ -198,7 +198,7 @@ fi
 # 14. FX_PRUNE_VDB=1 (#213 S0): install the prune_rebuilds pair --
 #     pprov-1.0 (sub-slot 0/1, upgraded to 2.0/0/2 in the tree) plus the
 #     installed consumer pcons-1.0 bound to `>=app-misc/pprov-1:0/1=`
-#     (real's own versioned built-atom shape, as in §13). The fragment
+#     (Portage's own versioned built-atom shape, as in §13). The fragment
 #     lives outside the shared fixture vdb so the standard runs are
 #     untouched. No world change: the g213 cell passes explicit atoms.
 if [ "${FX_PRUNE_VDB:-}" = 1 ]; then

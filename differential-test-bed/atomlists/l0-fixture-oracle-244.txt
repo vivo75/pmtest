@@ -3,7 +3,7 @@
 # the fixture profile enables foo, so aub0a's aub0d[-foo] is the requester
 # that needs a change): all six argument orders under both
 # --autounmask-backtrack values, the two-argument pair, and aubreaktop (a
-# flag wanted both ways inside one package's deps). Real's walk is LIFO
+# flag wanted both ways inside one package's deps). Portage's walk is LIFO
 # over the arguments; a USE flip contradicting a needed change fails the
 # pass and sends it to the autounmask-breakage clean pass, whose
 # _create_graph stops at the first failing atom. Capture:

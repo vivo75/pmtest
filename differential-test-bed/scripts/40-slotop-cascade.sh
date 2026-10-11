@@ -1,5 +1,5 @@
 #!/bin/bash
-# Multi-level slot-operator-rebuild cascade: portuale -p vs real emerge -p
+# Multi-level slot-operator-rebuild cascade: portuale -p vs Portage emerge -p
 # for a three-package chain casctail -> cascmid -> casctarget where
 # rebuilding cascmid is itself a sub-slot shift (its tree ebuild moved
 # 0/1 -> 0/2 since it was installed), forcing a second rebuild of
@@ -49,21 +49,21 @@ echo dev-libs/casctail >> "$WORLD"
 
 filt() { grep -E '^\[(ebuild|binary)|causing rebuilds|causes rebuilds for|scheduled for merge'; }
 
-/usr/bin/emerge        -p --color=n dev-libs/casctarget > /tmp/real.raw 2>&1
+/usr/bin/emerge        -p --color=n dev-libs/casctarget > /tmp/portage.raw 2>&1
 /usr/local/bin/emerge  -p --color=n dev-libs/casctarget > /tmp/portuale.raw 2>&1
-echo "### real RAW:"; cat /tmp/real.raw; echo
-filt < /tmp/real.raw > /tmp/real.out
+echo "### Portage RAW:"; cat /tmp/portage.raw; echo
+filt < /tmp/portage.raw > /tmp/portage.out
 filt < /tmp/portuale.raw > /tmp/portuale.out
 
-echo "### real emerge -p:"
-cat /tmp/real.out
+echo "### Portage emerge -p:"
+cat /tmp/portage.out
 echo
 echo "### portuale -p:"
 cat /tmp/portuale.out
 echo
 echo "### diff (must be empty):"
-if diff -u /tmp/real.out /tmp/portuale.out; then
-    echo "PASS: portuale matches real portage byte-for-byte"
+if diff -u /tmp/portage.out /tmp/portuale.out; then
+    echo "PASS: portuale matches Portage byte-for-byte"
 else
     echo "FAIL: divergence above"
 fi

@@ -1,8 +1,8 @@
 #!/bin/bash
 # L0 -- resolver parity, in-container half.
 #
-# Runs `emerge -pv` for every entry in an atom list with BOTH the real
-# portage (`/usr/sbin/emerge`) and portuale (`/usr/local/bin/emerge`),
+# Runs `emerge -pv` for every entry in an atom list with BOTH Portage
+# (`/usr/sbin/emerge`) and portuale (`/usr/local/bin/emerge`),
 # saving each raw output + exit code. The host-side
 # `differential-test-bed/compare/resolve-compare.py` does the diffing.
 #
@@ -23,23 +23,23 @@ OUTDIR=${2:?output dir}
 PIN=${L0_PORTAGE_PIN:-3.0.82.2}
 EOPTS=${L0_EMERGE_OPTS:--pv}
 
-REAL=/usr/sbin/emerge
+PORTAGE_EMERGE=/usr/sbin/emerge
 PTL=/usr/local/bin/emerge
 
 export PORTAGE_CONFIGROOT=/ ROOT=/
 export LC_ALL=C.UTF-8 TZ=UTC
-# Real portage's `_serialize_tasks` (and `_display_autounmask`) iterate
+# Portage's `_serialize_tasks` (and `_display_autounmask`) iterate
 # plain `set`s in a few spots, so its merge order / autounmask flag order
 # is PYTHONHASHSEED-randomised for a handful of order-independent
 # adjacent pairs (e.g. `llvm-core/llvmgold` <-> `llvm-core/llvm-toolchain-
-# symlinks`). Pin the seed so the real reference is reproducible and the
+# symlinks`). Pin the seed so the Portage reference is reproducible and the
 # comparison is against one stable target -- portuale's own order is
-# deterministic and matches real at `PYTHONHASHSEED=0`.
+# deterministic and matches Portage at `PYTHONHASHSEED=0`.
 export PYTHONHASHSEED=0
 umask 022
 
 mkdir -p "$OUTDIR"/real "$OUTDIR"/portuale "$OUTDIR"/portuale-modes
-: > "$OUTDIR/meta.tsv"          # slug \t kind \t real_rc \t ptl_rc
+: > "$OUTDIR/meta.tsv"          # slug \t kind \t portage_rc \t ptl_rc
 : > "$OUTDIR/run.log"
 
 log() { printf '%s\n' "$*" | tee -a "$OUTDIR/run.log" ; }
@@ -66,17 +66,17 @@ log "fingerprint:"; sed 's/^/  /' "$OUTDIR/fingerprint.tsv" | tee -a "$OUTDIR/ru
 
 # -- portage version pin ------------------------------------------------
 if [ "${L0_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
-  cur=$("$REAL" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
+  cur=$("$PORTAGE_EMERGE" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
   if [ "$cur" = "$PIN" ]; then
     log "portage already $PIN"
   else
     log "upgrading portage $cur -> $PIN (ACCEPT_KEYWORDS=~amd64)"
-    ACCEPT_KEYWORDS=~amd64 "$REAL" -q "=sys-apps/portage-$PIN" >> "$OUTDIR/run.log" 2>&1 \
-      && log "portage now $("$REAL" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')" \
+    ACCEPT_KEYWORDS=~amd64 "$PORTAGE_EMERGE" -q "=sys-apps/portage-$PIN" >> "$OUTDIR/run.log" 2>&1 \
+      && log "portage now $("$PORTAGE_EMERGE" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')" \
       || log "!!! portage upgrade FAILED -- comparison is against $cur, not $PIN"
   fi
 fi
-"$REAL" --version 2>/dev/null | head -1 >> "$OUTDIR/fingerprint.tsv"
+"$PORTAGE_EMERGE" --version 2>/dev/null | head -1 >> "$OUTDIR/fingerprint.tsv"
 
 # -- seed a realistic @world -------------------------------------------
 # The image ships an empty /var/lib/portage/world, so `@world` collapses
@@ -99,7 +99,7 @@ cp "$WORLD" "$OUTDIR/world.txt"
 # -- installed-package snapshot (backlog #48) ---------------------------
 # The host-side invariant checker cannot see this container's vdb, but
 # "is there an installed version of this cp" is what decides the
-# merge-order exemption (real `DepPriority.satisfied`). One line per
+# merge-order exemption (Portage `DepPriority.satisfied`). One line per
 # installed package: `cat/pkg-version`.
 find /var/db/pkg -mindepth 2 -maxdepth 2 -type d -printf '%P\n' | sort \
   > "$OUTDIR/vdb-list.txt"
@@ -111,7 +111,7 @@ probe() {
   local atom=$1 kind=$2 s rrc prc
   s=$(slug "$atom")
   # shellcheck disable=SC2086
-  timeout 600 "$REAL" $EOPTS --color=n "$atom" > "$OUTDIR/real/$s.txt" 2>&1 ; rrc=$?
+  timeout 600 "$PORTAGE_EMERGE" $EOPTS --color=n "$atom" > "$OUTDIR/real/$s.txt" 2>&1 ; rrc=$?
   # shellcheck disable=SC2086
   timeout 600 "$PTL"  $EOPTS --color=n "$atom" > "$OUTDIR/portuale/$s.txt" 2>&1 ; prc=$?
   if [ "${L0_SKIP_INVARIANTS:-0}" != 1 ]; then
@@ -128,7 +128,7 @@ probe() {
       > "$OUTDIR/portuale-modes/$s.json.txt" 2> "$OUTDIR/portuale-modes/$s.json.stderr"
   fi
   printf '%s\t%s\t%s\t%s\n' "$s" "$kind" "$rrc" "$prc" >> "$OUTDIR/meta.tsv"
-  log "  [$kind] $atom  (real rc=$rrc  ptl rc=$prc)"
+  log "  [$kind] $atom  (Portage rc=$rrc  ptl rc=$prc)"
 }
 
 log "running probes from $ATOMLIST"
@@ -146,7 +146,7 @@ done < "$ATOMLIST"
 # -- dependency-class snapshot for the host invariant checker (#48) -----
 # For every (child, owner) edge portuale's `--json` reports, record which
 # dependency variables of the owner's md5-cache entry name the child.
-# The host checker uses it for real's own soft-edge rule: RDEPEND /
+# The host checker uses it for Portage's own soft-edge rule: RDEPEND /
 # PDEPEND edges may be dropped by the `ignore_priority` ladder, while
 # DEPEND / BDEPEND / IDEPEND force order. The container's repo checkout
 # is not visible from the host, so this is snapshotted alongside the
@@ -213,10 +213,10 @@ fi
 probe_multi() {  # label + emerge args
   local label=$1; shift
   local s="MULTI_$(slug "$label")" rrc prc
-  timeout 1200 "$REAL" "$@" --color=n > "$OUTDIR/real/$s.txt" 2>&1 ; rrc=$?
+  timeout 1200 "$PORTAGE_EMERGE" "$@" --color=n > "$OUTDIR/real/$s.txt" 2>&1 ; rrc=$?
   timeout 1200 "$PTL"  "$@" --color=n > "$OUTDIR/portuale/$s.txt" 2>&1 ; prc=$?
   printf '%s\t%s\t%s\t%s\n' "$s" "multi" "$rrc" "$prc" >> "$OUTDIR/meta.tsv"
-  log "  [multi] $label  (real rc=$rrc  ptl rc=$prc)"
+  log "  [multi] $label  (Portage rc=$rrc  ptl rc=$prc)"
 }
 probe_multi "emptytree-system"  -pe   @system
 probe_multi "deep-update-world" -puvD @world

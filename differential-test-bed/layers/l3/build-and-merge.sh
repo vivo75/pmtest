@@ -65,7 +65,7 @@ log() { printf '[l3-build %s] %s\n' "$PM" "$*"; }
 # rather than the process env, so #37's config path is what is exercised.
 if ! grep -q 'portuale-l3 determinism block' /etc/portage/make.conf 2>/dev/null; then
   # A second `FEATURES=` in the same file would *replace* the first for
-  # real portage (make.conf is sourced bash-style; the last assignment
+  # Portage (make.conf is sourced bash-style; the last assignment
   # is that file's incremental layer), so replace the image's own line
   # in place instead of appending -- keeping the two PMs on the same
   # value, which is the whole point of the block.

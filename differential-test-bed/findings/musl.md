@@ -95,7 +95,7 @@ error[E0063]: missing fields `sched_ss_init_budget`, `sched_ss_low_priority`,
 
 glibc's `struct sched_param` is a single `sched_priority`; musl's
 carries the four `SCHED_DEADLINE` members. Pre-existing source bug,
-hidden all along by wall 1. Real Portage calls
+hidden all along by wall 1. Portage calls
 `os.sched_setscheduler(pid, policy, os.sched_param(priority))`
 (`3rdparty/portage/lib/_emerge/actions.py:3379`), and CPython converts
 that to `struct sched_param` as a C11 compound literal with only
@@ -175,7 +175,7 @@ portuale               INTERP=0 NEEDED=0
 ```
 
 `std::mem::zeroed()` + `param.sched_priority = priority` is byte-for-byte
-CPython's own conversion: real passes `os.sched_param(priority)` to
+CPython's own conversion: Portage passes `os.sched_param(priority)` to
 `os.sched_setscheduler` (`actions.py:3379`) and CPython builds the C
 struct as a compound literal with only `sched_priority` set. The
 existing host test `test_emerge_applies_portage_scheduling_policy`
@@ -225,10 +225,10 @@ exact-match pins were pilot-era. The table is what S4 rewrote from
 | order | target first | dependencies first, target last |
 | USE | no column | `USE="foo -missingflag"` / `USE="-foo"` |
 | masked+unmasked | `[ebuild  N]` | `[ebuild  N    #]` |
-| blocks | `[blocks] a hard blocks b ("!!b")` | `[blocks B      ] b ("b" is hard blocking a)`, rc 1 + real's blocked-packages error |
+| blocks | `[blocks] a hard blocks b ("!!b")` | `[blocks B      ] b ("b" is hard blocking a)`, rc 1 + Portage's blocked-packages error |
 | slot conflict | a `[slot conflict]` block | settles on `slotconflicttarget-1.0` (contract-pinned) |
 | virtual | 3 entries incl. newpkg | `virtual/texteditor-0`, `virtualconsumerpkg` |
-| REQUIRED_USE | old single-line grep | real's `!!! The ebuild selected … has unmet requirements` block |
+| REQUIRED_USE | old single-line grep | Portage's `!!! The ebuild selected … has unmet requirements` block |
 | `--jobs` | "real option, unimplemented" | implemented; now checks `--nobindeps`' refusal instead |
 | ebuild `merge` | "pilot stub" text | `ebuild --help` usage + the bad-phase refusal |
 

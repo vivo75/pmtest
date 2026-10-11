@@ -48,7 +48,7 @@
   match: "real net-libs/nghttp2 vs portuale"
   reason: >
     Cluster-A abort residue (the F-B5 family), not a #17/#25 order bug.
-    Real's `_solve_non_slot_operator_slot_conflicts` removes the installed
+    Portage's `_solve_non_slot_operator_slot_conflicts` removes the installed
     systemd that polkit's `systemd[policykit]` supersedes, then re-walks
     the removed node's parents to point their edges at the merge. In
     these two probes that re-walk aborts at gnome-keyring's unsatisfiable
@@ -67,7 +67,7 @@
   categories: [order, extra, totals, advice, error]
   slugs: ["gnome-base_gnome-shell"]
   reason: >
-    Cluster-A abort-path bundle, not a #17 order bug: real abandons the
+    Cluster-A abort-path bundle, not a #17 order bug: Portage abandons the
     resolve at the unsatisfiable USE-dep (`emerge: there are no ebuilds
     built with USE flags to satisfy ">=net-fs/samba-4.0.0[client]"`, the
     masked-required notice, rc 1) and prints a truncated merge list
@@ -95,7 +95,7 @@
   reason: >
     Installed-version visibility gap (single filing with
     l0-vm-installed-python-slot): the VM golden ships expat-2.8.4
-    installed, real reuses it as satisfied, portuale plans 2.8.3 from
+    installed, Portage reuses it as satisfied, portuale plans 2.8.3 from
     the repo. Absent on containers (2.8.3 installed there). Scoped to
     this exact ebuild row, so any behavior change resurfaces.
     Filed in differential-test-bed/vm/FINDINGS.md.
@@ -125,7 +125,7 @@
     keep them (identical R rows, no provider switch), @world pins
     neither provider -- rules 1-3 hold identically on both sides and
     only the order of two dependency-free rows differs (no edge either
-    way, verified RDEPENDs). Real is seed-stable (0/1/42) but its
+    way, verified RDEPENDs). Portage is seed-stable (0/1/42) but its
     traversal choice is arbitrary, and mimicking CPython traversal is
     declared unportable (see gedit-nautilus-cluster-a-rewalk-abort).
     Evidence: logs/l0-vm-20260918T183537Z.
@@ -149,10 +149,10 @@
   match: "portuale='{}'"
   reason: >
     Portuale hardcodes PORTAGE_REPO_REVISIONS="{}" ("until portuale
-    tracks a repo revision", emerge_build.rs); real fills SHAs via git
+    tracks a repo revision", emerge_build.rs); Portage fills SHAs via git
     retrieve_head whenever git exists. The VM golden has git (repo
-    clones need it) so real records SHAs; the container image has no
-    git so real writes {} there too. Same single cause as the archive
+    clones need it) so Portage records SHAs; the container image has no
+    git so Portage writes {} there too. Same single cause as the archive
     rows (l2-vm-repo-revisions* in the L2-VM classifier). Filed in
     differential-test-bed/vm/FINDINGS.md; delete when portuale tracks
     revisions.
@@ -177,7 +177,7 @@
   match: "portuale='{}'"
   reason: >
     Same root cause as l2-vm-repo-revisions-vdb, on source-built
-    packages: portuale hardcodes PORTAGE_REPO_REVISIONS="{}", real
+    packages: portuale hardcodes PORTAGE_REPO_REVISIONS="{}", Portage
     fills SHAs via git retrieve_head (VM golden has git). Filed in
     differential-test-bed/vm/FINDINGS.md; delete when portuale tracks
     revisions.

@@ -1,9 +1,9 @@
-# #215 — the in-walk unsatisfied slot-operator probe (v2 #24f, real
+# #215 — the in-walk unsatisfied slot-operator probe (v2 #24f, Portage's
 # `_slot_operator_unsatisfied_probe`, `depgraph.py:2817`, +
 # `_slot_operator_unsatisfied_backtrack`, `:2881`, fired at `:3447-3458`).
 # Run with FX_SOUSAT_UNSAT=1 FX_HOST_ROOTS=1 (stage.sh installs the fragment:
 # installed `app-misc/sousatpar-1` bound to the abandoned provider slot
-# (`RDEPEND=">=app-misc/sousatprov-1:0/1="`, EAPI-bearing vdb so real's
+# (`RDEPEND=">=app-misc/sousatprov-1:0/1="`, EAPI-bearing vdb so Portage's
 # `FakeVartree` overlay registers the built dep) while the tree holds
 # only `app-misc/sousatprov-2` (`SLOT="2/2"`) and the parent's own live
 # `app-misc/sousatpar-1` ebuild (`RDEPEND="app-misc/sousatprov:="`); the
@@ -14,7 +14,7 @@
 # Shape (S0 probes, this branch): the installed parent's built `:=` dep
 # matches nothing (old provider slot abandoned AND uninstalled), while
 # the replacement parent (here the parent's own live ebuild) carries a
-# satisfiable live `:=` on the same child cp. Real heals through the
+# satisfiable live `:=` on the same child cp. Portage heals through the
 # probe's restart (`slot_operator_replace_installed` + reinstall the
 # parent against the new child): it merges `app-misc/sousatprov-2` and
 # reinstalls `app-misc/sousatpar-1` (rc 0; the vendored-3.0.82.2

@@ -1,7 +1,7 @@
-"""Put the *pinned* real-Portage checkout on `sys.path`, or refuse to run.
+"""Put the *pinned* Portage checkout on `sys.path`, or refuse to run.
 
 Every harness in this directory is the reference side of a primitive
-contract: its answers are real Portage's answers, and which Portage
+contract: its answers are Portage's answers, and which Portage
 answered is part of the result. The checkout is `3rdparty/portage`
 (a symlink to the PM tree's sibling checkout, pinned in
 `3rdparty/repos.toml`), overridable with `$PORTUALE_PORTAGE_CHECKOUT`.

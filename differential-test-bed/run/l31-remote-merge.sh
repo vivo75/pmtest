@@ -1,12 +1,12 @@
 #!/bin/bash
 # L31 -- the remote-merge bed (#31). Smallest bed that runs:
 #
-#   control   -- merge one $PKGDIR with REAL Portage into two fresh
+#   control   -- merge one $PKGDIR with Portage into two fresh
 #                container ROOTs (portage-vs-portage). Normalise + diff
 #                with compare/ helpers and NO allowlist: the control pair
 #                must be 0 unexplained -- that is S1's gate and S2's noise
 #                floor.
-#   candidate -- the reference side stays real Portage; the other side
+#   candidate -- the reference side stays Portage; the other side
 #                merges the same gpkgs through `mrg --remote-*` over the R9
 #                loopback-sshd stand-in into a far ROOT inside its
 #                container (layers/l31/consume-remote.sh). S1 only proves
@@ -54,7 +54,7 @@ ensure_pm_built "$OUT"
 ensure_image
 
 # The porttest synthetic overlay is live-mounted into every container
-# (exactly like L1); both the real builder/consumer and mrg's staged repo
+# (exactly like L1); both the Portage builder/consumer and mrg's staged repo
 # see it.
 PORTTEST_OVL="$TEST_DIR/images/overlay/porttest"
 ovl_mount=()
@@ -80,7 +80,7 @@ ovl_mount=()
 } > "$OUT/header.txt"
 echo ">>> run $RUN (mode=$MODE) -> $OUT"
 
-# --- build the gpkg set once with real Portage (cached) -----------------
+# --- build the gpkg set once with Portage (cached) -----------------
 [ "${L31_REBUILD:-0}" = 1 ] && { echo ">>> L31_REBUILD: wiping $PKGCACHE"; rm -rf "${PKGCACHE:?}"/*; }
 
 if [ "${L31_SKIP_BUILD:-0}" != 1 ]; then
@@ -97,9 +97,9 @@ else
   echo ">>> L31_SKIP_BUILD: using $(find "$PKGCACHE" -name '*.gpkg.tar' | wc -l) cached binpkgs"
 fi
 
-# --- real-Portage consume (reference side of both modes) ----------------
-consume_real() {  # <name> <container-out-prefix>
-  echo ">>> merging with real Portage ($1)"
+# --- Portage consume (reference side of both modes) ----------------
+consume_portage() {  # <name> <container-out-prefix>
+  echo ">>> merging with Portage ($1)"
   podman_run_pm "porttest-l31-$1-$$" \
     -v "$PKGCACHE:/pkgs:ro" "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs \
@@ -110,13 +110,13 @@ consume_real() {  # <name> <container-out-prefix>
 }
 
 if [ "$MODE" = control ]; then
-  consume_real "l31-control-a" "/TEST/logs/$RUN/control/portage-a" || { echo "!!! control side A failed" >&2; exit 2; }
-  consume_real "l31-control-b" "/TEST/logs/$RUN/control/portage-b" || { echo "!!! control side B failed" >&2; exit 2; }
+  consume_portage "l31-control-a" "/TEST/logs/$RUN/control/portage-a" || { echo "!!! control side A failed" >&2; exit 2; }
+  consume_portage "l31-control-b" "/TEST/logs/$RUN/control/portage-b" || { echo "!!! control side B failed" >&2; exit 2; }
   PREFIX_A="$OUT/control/portage-a"
   PREFIX_B="$OUT/control/portage-b"
   LVL=control
 else
-  consume_real "l31-cand-portage" "/TEST/logs/$RUN/candidate/portage" || { echo "!!! candidate reference side failed" >&2; exit 2; }
+  consume_portage "l31-cand-portage" "/TEST/logs/$RUN/candidate/portage" || { echo "!!! candidate reference side failed" >&2; exit 2; }
   echo ">>> candidate side: mrg --remote-* over loopback sshd into a far ROOT"
   set +e
   podman_run_pm "porttest-l31-cand-mrg-$$" \

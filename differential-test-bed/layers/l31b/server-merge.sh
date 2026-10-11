@@ -52,7 +52,7 @@ WORKDIR=${L31B_WORKDIR:-/var/tmp/portage-remote}
 export PORTAGE_CONFIGROOT=/ ROOT=/ PORTAGE_RUNNING_ROOT=/
 export LC_ALL=C.UTF-8 TZ=UTC
 # Same calling-env FEATURES as the reference side (layers/l1/consume.sh):
-# real reads them from its calling environment, and mrg's server-side
+# Portage reads them from its calling environment, and mrg's server-side
 # resolution does too, so both sides must start from the same value or
 # the regenerated vdb env's FEATURES differs for bed reasons (#171).
 export FEATURES="-buildpkg -cgroup -ccache -distcc -sign xattr filecaps"

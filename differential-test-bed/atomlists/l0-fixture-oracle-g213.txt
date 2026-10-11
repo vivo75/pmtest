@@ -1,13 +1,13 @@
 # #213 — `prune_rebuilds` (v2 #24d): a slot-operator replace set meeting
 # missed updates restarts with `config["prune_rebuilds"]`
-# (real `_resolve`, depgraph.py:5763-5780).
+# (Portage's `_resolve`, depgraph.py:5763-5780).
 # Run with FX_PRUNE_VDB=1 (stage.sh installs the fragment: installed
-# pprov-1 0/1 + pcons-1 bound to `>=app-misc/pprov-1:0/1=`, real's own
+# pprov-1 0/1 + pcons-1 bound to `>=app-misc/pprov-1:0/1=`, Portage's own
 # versioned built-atom shape; tree pprov-2 0/2 is the subslot-bump
 # target, both ebuilds EAPI 8).
 #
 # Shape (S0 probe, this branch): `emerge -uD` over the provider, the
-# consumer and the dev-libs/btparent conflict trio. Real's same-slot
+# consumer and the dev-libs/btparent conflict trio. Portage's same-slot
 # update probe (`_slot_operator_update_probe`, depgraph.py:2576)
 # schedules the pcons-1 rebuild (`slot_operator_replace_installed`),
 # while the solved bttarget slot conflict leaves backtrack masks behind

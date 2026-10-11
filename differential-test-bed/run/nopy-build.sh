@@ -396,7 +396,7 @@ done
 
 # Restricted merge snapshot (#326 Z, NOPY_SNAPSHOT=1): the merged
 # packages' installed files + their vdb dirs, the consume.sh shape, so
-# the host can diff this side against a real-Portage reference build
+# the host can diff this side against a Portage reference build
 # with compare/normalize.py + compare/diff.py. Needs step1 rc=0.
 if [ "$SNAPSHOT" = 1 ] && [ "$rc1" = 0 ]; then
   echo ">>> guest snapshot: merged set + vdb"

@@ -22,7 +22,7 @@ Applied by `resolve-compare.py`:
   `missing`+`extra`.
 - `USE="…"` / `PYTHON_TARGETS="…"` / `ABI_X86="…"` etc. values are
   compared as **sorted token sets** per key, so ordering never matters
-  (real and portuale already agree on order per the contract suite, but
+  (Portage and portuale already agree on order per the contract suite, but
   the set compare removes a whole class of false positives).
 - Error/message lines (`emerge:`, `!!!`, `* ERROR`, anything mentioning
   `REQUIRED_USE`) have `/var/tmp/portage/<…>` → `<builddir>` and

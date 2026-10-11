@@ -1,14 +1,14 @@
 # #212 — `slot_operator_mask_built` for a non-installed binary (v2 #24c),
-# the slot-change arm (real `_slot_change_backtrack`, depgraph.py:2383).
+# the slot-change arm (Portage's `_slot_change_backtrack`, depgraph.py:2383).
 # No knobs: the stale binary rides the committed local PKGDIR
 # (`fixtures/pkgdir`, `PKGDIR=${PORTAGE_CONFIGROOT}/pkgdir`), and the
 # default ROOT=$FX shape suffices (no installed packages involved).
 #
 # Shape (S0 probe, this branch): genuine `dev-libs/somaskchild-1.0`
-# binpkg built at `SLOT="0/1"` (real `ebuild package`, committed under
+# binpkg built at `SLOT="0/1"` (Portage's `ebuild package`, committed under
 # `fixtures/pkgdir/dev-libs/`) while the tree ebuild moved to `SLOT="0/2"`
 # without a revbump; `dev-libs/somaskparent-1.0` carries the unbuilt
-# `RDEPEND="dev-libs/somaskchild:="` (both ebuilds EAPI 8). Real masks
+# `RDEPEND="dev-libs/somaskchild:="` (both ebuilds EAPI 8). Portage masks
 # the stale binary (`slot_operator_mask_built`) through the
 # backtrack-config restart and merges the ebuild instead:
 #
@@ -19,15 +19,15 @@
 # suffix is the bed's ROOT display, normalised by the comparator). Pre-#212 portuale merges
 # the stale `[binary N] somaskchild-1.0-1` instead.
 --usepkg dev-libs/somaskparent
-# #243 — the probe honours ebuild visibility (real `_slot_change_probe`,
+# #243 — the probe honours ebuild visibility (Portage's `_slot_change_probe`,
 # `depgraph.py:2347`): genuine `dev-libs/somaskvischild-1.0` binpkg built
-# at `SLOT="0/1"` (real `ebuild package`, committed under
+# at `SLOT="0/1"` (Portage's `ebuild package`, committed under
 # `fixtures/pkgdir/dev-libs/`) while the tree ebuild moved to `SLOT="0/2"`
 # without a revbump AND went keyword-masked (`~amd64`);
 # `dev-libs/somaskvisparent-1.0` carries the unbuilt
 # `RDEPEND="dev-libs/somaskvischild:="` (both ebuilds EAPI 8); the parent
 # is ebuild-only (no binpkg), so the probe's unbuilt-parent gate is met.
-# Real keeps the binary: its probe returns None when the same-version
+# Portage keeps the binary: its probe returns None when the same-version
 # ebuild is not visible (`:2347`), so nothing is masked and no restart
 # happens (`backtrack: 0/20`, rc 0):
 #
@@ -36,8 +36,8 @@
 #
 # Before #243 portuale masked the binary anyway, restarted and dead-ended
 # on the keyword-masked ebuild (rc 1). History: until the bed's index fix
-# (#294: the committed `Packages` header lacked `VERSION:`, so real's
+# (#294: the committed `Packages` header lacked `VERSION:`, so Portage's
 # bintree was empty and every `--usepkg*` cell ran against a binary-less
-# real) this cell "agreed" at rc 1 by accident; the earlier S0/g243
-# conclusions about real's rejector were drawn from that empty tree.
+# Portage) this cell "agreed" at rc 1 by accident; the earlier S0/g243
+# conclusions about Portage's rejector were drawn from that empty tree.
 --usepkg dev-libs/somaskvisparent

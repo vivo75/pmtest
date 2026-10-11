@@ -1,7 +1,7 @@
 """Black-box contract suite for the REQUIRED_USE portuale (see
 LLM/agent-context.md and crates/portage-required-use/src/lib.rs).
-Drives the Python harness (a thin wrapper around the real
-portage.dep.check_required_use, pinned to eapi="8") and the Rust harness
+Drives the Python harness (a thin wrapper around Portage's
+`portage.dep.check_required_use`, pinned to eapi="8") and the Rust harness
 identically via subprocess, and asserts their outputs are byte-for-byte
 the same.
 """
@@ -69,8 +69,8 @@ _LIBSDL2_RU = (
 ).split()
 
 # "reduce" cases: the harness returns "-" when satisfied, else the
-# human-readable minimal unsatisfied sub-expression (real
-# check_required_use(...).tounicode() -> human_readable_required_use).
+# human-readable minimal unsatisfied sub-expression (Portage
+# `check_required_use(...).tounicode()` -> `human_readable_required_use`).
 REDUCE_CASES = [
     ("a", "a,b", ["||", "(", "a", "b", ")"]),  # satisfied -> "-"
     ("-", "a,b", ["a", "b"]),  # top-level all-of, both unsatisfied

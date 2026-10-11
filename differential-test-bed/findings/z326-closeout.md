@@ -1,4 +1,4 @@
-# #326 Z close-out run (2026-10-09): nopy / noportage builds vs real Portage
+# #326 Z close-out run (2026-10-09): nopy / noportage builds vs Portage
 
 Spec: portuale `docs/02.326-no-portage-runtime.opus.md` §Z. Bed entry:
 `run/z326-closeout.sh`. Portuale branch `backlog/326`; the product-side
@@ -27,7 +27,7 @@ committed after this run as `890eaeaa` and `06b15067`). Legs: (a)
 | l31b | green (`l31b-20261009T163026Z`) | green |
 
 What remains is the build nondeterminism already explained below:
-- glibc's static archives differ between two real-Portage builds too;
+- glibc's static archives differ between two Portage builds too;
 - the getconf `.gnu_debuglink` names a different member of one hardlink
   group (the #261 race).
 
@@ -41,15 +41,15 @@ The first pass (sections below, from "Leg (a) [nopy] — BLOCKED")
 ran on portuale `d0558538` and found the leg (a) doins blocker. The
 blocker was then fixed in portuale, and so was a second bug the
 unblocked leg exposed:
-1. `PORTAGE_ACTUAL_DISTDIR` was not exported to the phases. Real
+1. `PORTAGE_ACTUAL_DISTDIR` was not exported to the phases. Portage
    `config.environ()` (`config.py:3403-3409`) exports it, and
    `ebuild-helpers/doins:80-82` passes `--distdir` only when it is set.
-   Without `--distdir`, real `doins.py` dereferences absolute symlinks
+   Without `--distdir`, Portage `doins.py` dereferences absolute symlinks
    too: the new oracle cases `fixtures/helpers/doins/dangling-abs-kept`
    and `dangling-abs-nodistdir` show both behaviours, generated from
-   real `doins`. The native doins was right; its environment was
+   Portage `doins`. The native doins was right; its environment was
    wrong.
-2. A `--buildpkg` source merge recorded no vdb `BINPKGMD5`. Real
+2. A `--buildpkg` source merge recorded no vdb `BINPKGMD5`. Portage
    `_record_binpkg_info` (`EbuildBuild.py:502-523`) writes it.
 
 | cell | run | result |
@@ -66,10 +66,10 @@ unblocked leg exposed:
 | l31b | `l31b-20261009T124514Z` | 0 / 0, install-bin assertions hold |
 
 New residue families, read from the rows:
-- **`PT_HELPER_DOINS="1"` only in real's gpkg environments** of
+- **`PT_HELPER_DOINS="1"` only in Portage's gpkg environments** of
   helper-docompress, helper-package, bash and eix. Each is built
   after `porttest/helper-doins`, which installs
-  `/etc/env.d/99pt-helper-doins`. Real re-reads `profile.env` for
+  `/etc/env.d/99pt-helper-doins`. Portage re-reads `profile.env` for
   every package task (`Scheduler._allocate_config` → `config.reload()`,
   `Scheduler.py:1899-1913`, `config.py:2691-2699`). portuale reads it
   once per run. Filed as portuale #332. The merge order is identical
@@ -78,10 +78,10 @@ New residue families, read from the rows:
   `#261-hardlink-debug-race` family, but hit the stripped binaries
   themselves, which the allowlist entry does not cover. The
   `.gnu_debuglink` names a different member of the same hardlink
-  group: real `POSIX_V7_LP64_OFF64.debug`, portuale
+  group: Portage `POSIX_V7_LP64_OFF64.debug`, portuale
   `POSIX_V6_LP64_OFF64.debug`, in the leg (b) gpkgs. A different name
   length gives the 30992-vs-31000 sizes. No allowlist entry was added.
-- **glibc `.a`**: unchanged from the first pass, proven real-vs-real
+- **glibc `.a`**: unchanged from the first pass, proven Portage-vs-Portage
   (family 1 below).
 
 Bed changes after the first pass:
@@ -115,7 +115,7 @@ Bed changes after the first pass:
   `z326_snapshot_merged_set` (merged-cpvs as union of fresh installs +
   atom matches, paths.txt, `compare/snapshot.sh`).
 - `layers/z326/ref-build-merge-snapshot.sh` (new): reference side in the
-  normal image — real Portage from-source `--buildpkg` (gpkg),
+  normal image — Portage from-source `--buildpkg` (gpkg),
   `--usepkgonly` re-merge, xpak rebuild + re-merge (mirrors the nopy
   guest step for step, same FEATURES), then the shared snapshot;
   binpkgs persist via `PKGDIR=/pkgs`.
@@ -147,9 +147,9 @@ FileNotFoundError: [Errno 2] No such file or directory: b'/var/tmp/portage/portt
 Reading: the ebuild installs an ABSOLUTE symlink
 (`ln -s /usr/share/porttest/helper-doins/plain.txt payload/abs-link`)
 whose target does not exist until the package itself is installed
-(it dangles at build time). Real Portage (`ref a-nopy`, rc=0, same
+(it dangles at build time). Portage (`ref a-nopy`, rc=0, same
 list) handles it. Portuale's native doins appears to stat/resolve
-through the link instead of copying the link node (real `doins.py`
+through the link instead of copying the link node (Portage `doins.py`
 copies it). The S6 oracle tree has an absolute symlink too, but
 non-dangling, so this case slipped through. NOT fixed (brief
 forbids product changes); filed here as the leg-(a) blocker.
@@ -246,7 +246,7 @@ Triaged into four families (all recorded unexplained; none silenced):
 
 1. **glibc `.a` archive bytes differ (13 CONTENT + 26 CONTENTS)** —
    independent-build archive nondeterminism (member order/timestamps
-   under `-j16`), proven real-vs-real: ref run1 vs run2 digests
+   under `-j16`), proven Portage-vs-Portage: ref run1 vs run2 digests
    differ with the same PM, e.g. `usr/lib64/libc.a` ref CONTENTS
    md5 `f47184b08c8b3d0fcd05286d031f9be8` (run `095604Z`) vs
    `c8571f94092317f0098b52fecd57e280` (run `101059Z`); image sha
@@ -267,7 +267,7 @@ Triaged into four families (all recorded unexplained; none silenced):
    xpak build produced `/bin/bash`
    `7ff785e8695e…`/`bash.debug -8B` vs four `3cb21306418f…`
    builds (portuale step1, portuale gpkg rebuild, portuale xpak
-   rebuild, real ×3). Same-size binary ⇒ link-order lottery
+   rebuild, Portage ×3). Same-size binary ⇒ link-order lottery
    striking once, not format-dependent (xpak rebuild gives `3cb2`).
    Notably the divergent build was still self-consistent
    (xpak image == merged bytes). No bash rows in the final pass.
@@ -275,9 +275,9 @@ Triaged into four families (all recorded unexplained; none silenced):
    cosmetics only (bash pair, 3 lines): `BUILD_ID="3"` (persistent-
    cache counter, ref side); `MY_PATCHES` paths `/distfiles/…`
    (portuale uses DISTDIR directly) vs
-   `/var/tmp/portage/…/distdir/…` (real links into per-package
+   `/var/tmp/portage/…/distdir/…` (Portage links into per-package
    distdir) — same files, different staging paths; plus a stray
-   real-side `declare -- f`. The earlier `FEATURES`/`NOPY_*`/
+   Portage-side `declare -- f`. The earlier `FEATURES`/`NOPY_*`/
    `BINPKG_FORMAT`-last-touch rows were harness bugs, fixed
    (FEATURES parity + env hygiene + ref xpak step3) before the final
    pass.
@@ -322,7 +322,7 @@ re-run zero lines, same inode/mtime).
 - bash one-off build bytes (7ff7) — single lottery sample; a rebuild
   matrix (or `ar`/link-order determinism work) could apportion it.
 - `MY_PATCHES`/distdir staging difference — filed as portuale #330
-  (real `_prepare_fake_distdir`).
+  (Portage `_prepare_fake_distdir`).
 - V-std for the final portuale tree: see portuale
   `docs/evidence/2026-10-09-326-z.md`.
 

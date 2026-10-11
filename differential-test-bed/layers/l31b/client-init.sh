@@ -88,7 +88,7 @@ log "sshd accepting on port $SSH_PORT (StrictModes no, root key login)"
 
 # --- resolved-config parity (INSTALL_MASK, bed reasons) ------------------
 # The client merge resolves INSTALL_MASK from the CLIENT's own config
-# (like real Portage would on that machine), while the reference side
+# (like Portage would on that machine), while the reference side
 # reads it from the identical staging block in layers/l1/consume.sh.
 # l31 gets this for free (client and server are the same container, so
 # the server's staging lands in the client's config too); here the

@@ -94,7 +94,7 @@ silent survivors):
   (verified by grep); that coverage lives in the contract suite + L0
   mo-trace, which this run does not execute.
 
-Real-gap clusters (missed / timeouts):
+Portage-gap clusters (missed / timeouts):
 
 - `select_nodes` main loop: 32 missed + 4 timeouts (:2831–:3053
   `&&`/`||`/`!`/`>` flips in asap/leaf/batch selection;
@@ -251,7 +251,7 @@ can produce):
   equivalent: the extra duplicate `asap` entry is pruned by
   `asap.retain(alive)`.
 - `3325:18`/`3325:67` ×4, `3327:16` ×2 (the leftover weave-back's
-  bounds/sort arms) — equivalent: `select_nodes` schedules every real
+  bounds/sort arms) — equivalent: `select_nodes` schedules every Portage
   entry, so `leftover` is always empty and the block's body never runs.
 
 The 19 timeouts, by family (a bounded test cannot observe a hang — the
@@ -545,7 +545,7 @@ Scope accounting (S0 on current `main`: `cargo mutants -p portage-repo
 | `autounmask_dep_chain` | 13 | 1 | S6 chain/upgrade/installed/self-loop legs; 1 proven equivalent (below) |
 
 Closeout re-run of the S0 command (touch first): **133 tested: 1
-missed / 130 caught / 2 unviable** (was 73 / 58 / 2). Real grounding
+missed / 130 caught / 2 unviable** (was 73 / 58 / 2). Portage grounding
 for every mask/license verdict leg: `_getmaskingstatus`
 (`3rdparty/portage/lib/portage/package/ebuild/getmaskingstatus.py:43`,
 one `_MaskReason` per failing category — the "X alone" semantics),
@@ -571,13 +571,13 @@ Survivor buckets (line numbers are `portage-repo/src/lib.rs` at
   target type implements `Default`, so neither compiles.
 
 No product divergence found: every mask/license verdict the legs pin
-matches real's reason-accumulation semantics above. Two test-design
+matches Portage's reason-accumulation semantics above. Two test-design
 traps hit while writing legs (both fixed before committing, kept here
 so the next item doesn't re-learn them): (1) `test_config` accepts no
 license by default, so MIT-licensed scratch packages read as
 license-masked — accept `*` when the KEYWORDS verdict is the subject;
 (2) an operator-less versioned constraint (`!dev-libs/pkg-1.0`) is
-rejected as PMS-ambiguous by portage-dep (mirroring real
+rejected as PMS-ambiguous by portage-dep (mirroring Portage
 `Atom.__init__`), making the constraint vacuous — use `!=...`.
 
 Scope-filter notes for the next items: `--re` also matches 4
@@ -636,8 +636,8 @@ surviving):
 - Unreachable (1): 13406:27 guard-`true` (`Some(use_deps) if true`).
   Only `Some([])` could observe it, and `portage-dep`
   `parse_use_deps` returns `None` for empty brackets (`foo[]` is
-  invalid, same as real) while `parse_atom` propagates that `None`
-  — so the arm is entered exactly when real enters it.
+  invalid, same as Portage) while `parse_atom` propagates that `None`
+  — so the arm is entered exactly when Portage enters it.
 - Unviable (13, tool-reported, no test possible): the four
   whole-body `Default::default()` rows (`resolve_pretend`,
   `abort_outcome`, `assemble_result`, `resolve_pretend_graph` —
@@ -841,7 +841,7 @@ above (the row is killed after all). Tallies move to: S7 8 kills,
 total killed 70, `resolve_blockers` missed 8→0, closeout 223 caught /
 18 missed / 13 unviable / 1 timeout (projected from the scoped
 re-run; no full re-run), equivalent bucket 9. Same commit also fixes
-the `tests_165` module docstring's real-source paths
+the `tests_165` module docstring's Portage-source paths
 (`lib/_emerge/depgraph.py:8891 _validate_blockers`;
 `lib/_emerge/actions.py` `UnmergeDepPriority` /
 `ignore_priority_range` ~:1709), makes the volatile second-repo leg
@@ -890,7 +890,7 @@ no test possible, unchanged from S0):
 `Candidate` nor `CircularSuggestion` implements `Default`).
 
 Slice notes (so the next item doesn't re-learn them):
-- Real grounding for the suggestion legs is
+- Portage grounding for the suggestion legs is
   `_find_suggestions`
   (`3rdparty/portage/lib/_emerge/resolver/circular_dependency.py:114`,
   not `depgraph.py` as the brief's shorthand had it) — same

@@ -12,7 +12,7 @@ loop. When the merge *list* differs, the interesting question is at
 diff only shows the downstream symptom. This harness dumps one state
 line per iteration from each side and aligns them.
 
-Real side (`RT_SEL`): `real-trace.py` injects a block into the
+Portage side (`RT_SEL`): `real-trace.py` injects a block into the
 container's `_emerge/depgraph.py::_serialize_tasks`, right before it
 removes the selected nodes.
 
@@ -28,15 +28,15 @@ MO_SEL iter=7 retlist=3 alive=42 asap=1 prefer_asap=0 drop_satisfied=1
        ig=ignore_runtime pick=dev-libs/a-1 dev-libs/b-2
 ```
 
-- `retlist` -- merge packages selected so far (real appends only merges)
+- `retlist` -- merge packages selected so far (Portage appends only merges)
 - `alive` -- non-uninstall packages still in the graph (post-prune)
 - `asap` -- the bracketed list of live `asap_nodes` cpvs (contents, not a
   count: one extra lingering node is what firefox's clang-runtime
   divergence turned out to be)
-- `ig` -- `ignore_priority.__name__` (real) / the same name ported
+- `ig` -- `ignore_priority.__name__` (Portage) / the same name ported
 - `pick` -- the nodes selected this iteration, `m:cat/pkg-ver` for a
   merge-bound node, `n:cat/pkg-ver` for an installed nomerge one (the
-  `m`/`n` prefix is what makes a "real drained installed leaves while
+  `m`/`n` prefix is what makes a "Portage drained installed leaves while
   portuale drained merge leaves" divergence visible at iteration 1)
 
 ## Local (portuale-only) use
@@ -46,10 +46,10 @@ differential-test-bed/scripts/mo-trace/ptl-trace.sh /tmp/gtk4 -- --pretend --deb
 # -> /tmp/gtk4.portuale.trace
 ```
 
-## Full real-vs-portuale run (container)
+## Full Portage-vs-portuale run (container)
 
 ```sh
-# 1. patch real inside the throwaway container, run real emerge, keep stderr
+# 1. patch Portage inside the throwaway container, run Portage emerge, keep stderr
 sudo podman run --rm -v "$PWD:$PWD:ro" -v "$PWD/target/release:/usr/local/bin:ro" \
     --entrypoint /bin/bash localhost/test-portuale:latest -c "
         python3 $PWD/differential-test-bed/scripts/mo-trace/real-trace.py &&
@@ -74,7 +74,7 @@ but not the other).
 
 - Patch only a throwaway container (or a copy); `--unpatch` restores the
   file byte-for-byte.
-- Real's container is PID-1 `/init`-based; the `podman run --entrypoint
+- Portage's container is PID-1 `/init`-based; the `podman run --entrypoint
   /bin/bash` form above bypasses it so the patch and the emerge run are
   one shell.
 - The harness is Rust-only by design (the Python reference that once

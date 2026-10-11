@@ -6,7 +6,7 @@
 # #135 (a)(b)(e) + #138 + #134 — arm A: USE-failure abort, autounmask
 # chain, and the --debug rows (Candidates:/Child:)
 -D dev-libs/deepusedepconsumer
-# #135 (d) — arm D: real's "there are no ebuilds to satisfy <atom>"
+# #135 (d) — arm D: Portage's "there are no ebuilds to satisfy <atom>"
 # block vs portuale's bare NVC line (the default-list cell that is red)
 -D dev-libs/deepusedepfconsumer
 # #135 (c)(d) — the --autounmask-use=n installed-|| abort (preamble +
