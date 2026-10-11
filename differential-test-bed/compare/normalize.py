@@ -74,7 +74,7 @@ def _twin_families(prefix: Path) -> dict[str, str]:
     record on disk as N copies of the same file under different names
     (ld/ld.bfd, gcc-ar/x86_64-…-gcc-ar, the getconf managers, the
     porttest setuid triple).  The names a family ships are identical on
-    the real and portuale sides, so the canonical (lexicographic minimum)
+    the Portage and portuale sides, so the canonical (lexicographic minimum)
     is the same string on both sides without any cross-side coupling.
     Returns basename -> canonical (each member maps to the canonical;
     non-members are absent).  Non-`f` rows and presence-blanked rows
@@ -214,7 +214,7 @@ def norm_metadata(text: str) -> str:
 # regenerated binpkg env keeps whatever the phase inherited -- a
 # test-harness difference, not a portuale bug.
 # FEATURES / PORTAGE_FEATURES are NOT dropped -- L1-c's PORTAGE_UPDATE_ENV
-# regeneration makes them match real. Nor are EMERGE_DEFAULT_OPTS /
+# regeneration makes them match Portage. Nor are EMERGE_DEFAULT_OPTS /
 # PORTAGE_RUNNING_ROOT / O -- L1-f's phase-env whitelist keeps them out.
 ENV_DROP = re.compile(
     r"^(declare (-[-x]+ )?)?"
@@ -273,7 +273,7 @@ def norm_contents(text: str, twins: dict[str, str]) -> str:
         elif f[0] == "dir" and len(f) >= 2 and f[1].startswith("/usr/lib/debug/.build-id/"):
             # dir /usr/lib/debug/.build-id/<xx>  -- the per-architecture
             # hash subdir the split-debug manager creates for a binary
-            # (cc1 appears under `5d` for the real side, `5a` for
+            # (cc1 appears under `5d` for the Portage side, `5a` for
             # portuale).  Drop the hash, keep parent presence: the parent
             # `dir /usr/lib/debug/.build-id` row already exists, so the
             # collapse only ever dedupes to a line both sides emit.

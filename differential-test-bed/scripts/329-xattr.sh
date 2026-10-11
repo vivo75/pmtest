@@ -12,8 +12,8 @@
 #     localhost/test-portuale:latest /o/329-xattr.sh "/pm/portuale emerge"
 #
 # Optional $2: extra FEATURES tokens (e.g. "-xattr" for the control).
-# Optional $3=binpkg (#334): real Portage first builds an xpak with
-# --buildpkgonly (always real, so both runs merge the same archive),
+# Optional $3=binpkg (#334): Portage first builds an xpak with
+# --buildpkgonly (always Portage, so both runs merge the same archive),
 # then $1 merges it with -K. That isolates the xpak extraction.
 set -u
 EMERGE=$1

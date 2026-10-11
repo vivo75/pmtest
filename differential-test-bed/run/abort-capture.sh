@@ -1,13 +1,13 @@
 #!/bin/bash
-# Capture real portage's output for fixture atoms inside the differential-test-bed
+# Capture Portage's output for fixture atoms inside the differential-test-bed
 # container (backlog #19 oracle, docs/abort-path-spec.md §3).
 #
 #   differential-test-bed/run/abort-capture.sh [-o OUTDIR] ATOM...
 #
 # Method (identical to the Slice 1 captures): the committed fixtures/
 # tree is copied to a scratch dir, the copy gets (a) a repos.conf with
-# absolute /fixtures/... locations (real portage rejects the fixture
-# tree's relative ones) and (b) generated Manifest files (real masks
+# absolute /fixtures/... locations (Portage rejects the fixture
+# tree's relative ones) and (b) generated Manifest files (Portage masks
 # every Manifest-less ebuild "masked by: corruption"; portuale reads
 # md5-cache directly). The copy is mounted at /fixtures, /etc/make.local
 # is bind-mounted (the fixture make.conf sources it by absolute path),

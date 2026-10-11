@@ -2,7 +2,7 @@
 # L2 -- portuale as builder: build the atom list from source with BOTH
 # package managers (`--buildpkgonly`), structurally validate every
 # portuale archive, diff it against the portage-built sibling, then
-# cross-install: real Portage merges the PORTUALE-built set (candidate)
+# cross-install: Portage merges the PORTUALE-built set (candidate)
 # and the PORTAGE-built set (reference) into two identical fresh
 # containers, and the resulting $ROOT + VDB snapshots are diffed.
 #
@@ -71,11 +71,11 @@ KNOWN_HITS=0
 # (ids match differential-test-bed/findings/l2.md; delete an entry when its gap is fixed).
 # The `l2-gpkg-metadata-members`/`l2-pkgindex-eapi-missing` rows are gone
 # (#39, 2026-09-13): the archive metadata and `Packages` stanza now match
-# real, archive diffs are `hard=0 soft=0`, and the merged VDB is clean.
+# Portage, archive diffs are `hard=0 soft=0`, and the merged VDB is clean.
 KNOWN_FINDINGS=(
   # `porttest/setuid`'s three byte-identical binaries share one build-id;
   # which name the shared `.build-id/e0/2277…` links target depends on
-  # `estrip`'s `___parallel` traversal order. Real disagrees with itself
+  # `estrip`'s `___parallel` traversal order. Portage disagrees with itself
   # (oracle `pt-setuid`, a later real L2 build `pt-sticky`), so this one
   # link pair is the only ungradable row (#38 S0/S2).
   "l2-gpkg-dostrip-splitdebug|usr/lib/debug/\.build-id/e0/2277.*: a=.*b="
@@ -191,7 +191,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   fi
 done < "$ATOMLIST"
 
-# --- cross-install: real Portage consumes the portuale-built set --------
+# --- cross-install: Portage consumes the portuale-built set --------
 consume() {  # <label> <pkgdir> <portage|portuale>
   local label=$1 pkgdir=$2 pm=$3
   echo ">>> cross-install $label: $pm merges $(basename "$pkgdir")"
@@ -244,7 +244,7 @@ set -e
   echo "## archive diffs (portage-built vs portuale-built)"
   grep -E "^$FORMAT-diff:" "$OUT/archive-diffs.txt" || true
   echo
-  echo "## cross-install (real Portage merges portuale-built)"
+  echo "## cross-install (Portage merges portuale-built)"
   sed -n '/^## summary/,/^$/p' "$OUT/cross-install.txt"
   echo "## control (portuale merges portage-built)"
   sed -n '/^## summary/,/^$/p' "$OUT/control.txt"

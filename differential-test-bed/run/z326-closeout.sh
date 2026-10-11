@@ -1,6 +1,6 @@
 #!/bin/bash
 # z326-closeout.sh -- the #326 Z close-out run: nopy / noportage builds
-# vs real Portage (plan LLM/02.326-no-portage-runtime.opus.md, "### Z").
+# vs Portage (plan LLM/02.326-no-portage-runtime.opus.md, "### Z").
 #
 #   differential-test-bed/run/z326-closeout.sh [--jobs N]
 #       [--skip-leg-a] [--skip-leg-b] [--skip-ref] [--skip-gate] [--skip-l31b]
@@ -20,7 +20,7 @@
 #                    portuale-python was the only interpreter any
 #                    Portage helper invoked (build systems may use a
 #                    real python; the audit separates the two).
-#   (c) reference    real Portage builds the same two lists from source
+#   (c) reference    Portage builds the same two lists from source
 #                    in the normal image (layers/z326/
 #                    ref-build-merge-snapshot.sh, the l1 build path),
 #                    then compare/vdb+files via normalize.py + diff.py
@@ -156,7 +156,7 @@ ref_side() {  # <leg-id> <atomlist> <pkgcache> <out-name>
   [ -d "$PORTTEST_OVL/porttest" ] && ovl=(-v "$PORTTEST_OVL:/porttest-overlay:ro")
   local distfiles=${NOPY_DISTFILES:-$LOGS_DIR/_l2-distfiles}
   mkdir -p "$distfiles"
-  note "--- ref $leg: real Portage from-source + snapshot (pkgcache $cache)"
+  note "--- ref $leg: Portage from-source + snapshot (pkgcache $cache)"
   # argv array (timeout cannot exec the podman_run_pm function).
   ref_argv=("$PODMAN" run --rm --name "porttest-z326-ref-$leg-$$"
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private

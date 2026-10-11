@@ -13,7 +13,7 @@
 #      first), L1_SKIP_BUILD=1 (reuse whatever is in the pkgcache),
 #      L1_JOBS, L1_SKIP_PORTAGE_UPGRADE, L1_CONSUME_REINSTALL=1,
 #      L1_PORTUALE_VDB=sqlite|redb (portuale merges through mrg --vdb-backend=<kind>)
-#      L1_PORTAGE_VDB_MOUNT=sqlite|redb (real portage merges through
+#      L1_PORTAGE_VDB_MOUNT=sqlite|redb (Portage merges through
 #        `portuale vdb mount --rw` over a database of that kind; #317)
 #      (`--reinstall`: force both PMs to re-merge an already-installed
 #      set -- the merge-path safety gate's glibc/bash cell).
@@ -69,7 +69,7 @@ fi
 consume() {  # pm
   local pm=$1
   local fuse=()
-  # L1_PORTAGE_VDB_MOUNT (#317): real portage merges through a FUSE mount,
+  # L1_PORTAGE_VDB_MOUNT (#317): Portage merges through a FUSE mount,
   # which needs the device and, as container root, CAP_SYS_ADMIN (S0).
   if [ "$pm" = portage ] && [ -n "${L1_PORTAGE_VDB_MOUNT:-}" ]; then
     fuse=(--device /dev/fuse --cap-add SYS_ADMIN)

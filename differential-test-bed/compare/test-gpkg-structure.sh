@@ -2,7 +2,7 @@
 # test-gpkg-structure.sh -- host-side self-test for gpkg-structure.sh.
 #
 # Stays honest by construction: it first proves the validator is clean on
-# real Portage-built archives (the L1 pkgcache is a 78-archive oracle),
+# Portage-built archives (the L1 pkgcache is a 78-archive oracle),
 # then injects one mutation per check category and requires the
 # validator to catch each one.
 #
@@ -62,7 +62,7 @@ done
 REL=${SRC#"${PKGDIR_SRC:-/nonexistent}"/}
 
 # --- 1. positive controls ----------------------------------------------
-expect_rc 0 "clean on the real source archive" "$CHECK" "$SRC"
+expect_rc 0 "clean on the Portage source archive" "$CHECK" "$SRC"
 if [ -n "$PKGDIR_SRC" ]; then
   mkdir -p "$TMP/clean-pkgdir/$(dirname "$REL")"
   cp -a "$SRC" "$TMP/clean-pkgdir/$REL"

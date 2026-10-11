@@ -4,7 +4,7 @@
 # this same throwaway container (the R9 hermetic far machine: pmtest's
 # `loopback_sshd` fixture shape + the differential-test-bed container ROOT),
 # then snapshot the far $ROOT + vdb with the *same* compare/ helpers the
-# real Portage side uses -- so the host diffs them with no new semantics.
+# Portage side uses -- so the host diffs them with no new semantics.
 #
 # S1 settled l4.md's open topology question as the second option there:
 # the sshd lives *inside* the container, the mrg client runs as the same
@@ -35,7 +35,7 @@ MRG=${MRG:-/usr/local/bin/mrg}
 export PORTAGE_CONFIGROOT=/ ROOT=/ PORTAGE_RUNNING_ROOT=/
 export LC_ALL=C.UTF-8 TZ=UTC
 # Same calling-env FEATURES as the reference side (layers/l1/consume.sh):
-# real reads them from its calling environment, and mrg's server-side
+# Portage reads them from its calling environment, and mrg's server-side
 # resolution does too, so both sides must start from the same value or
 # the regenerated vdb env's FEATURES differs for bed reasons (#171).
 export FEATURES="-buildpkg -cgroup -ccache -distcc -sign xattr filecaps"
@@ -167,7 +167,7 @@ for atom in "${atoms[@]}"; do
   log "$atom: mrg rc=$rc"
 done
 
-# --- snapshot the far ROOT exactly like the real side --------------------
+# --- snapshot the far ROOT exactly like the Portage side --------------------
 installed_cpvs > "$OUT.installed-after.txt"
 comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.vdb-list.txt"
 
@@ -179,7 +179,7 @@ comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.vdb-list
       && awk '$1=="obj"||$1=="sym"||$1=="dir" {print $2}' "$d/CONTENTS"
   done < "$OUT.vdb-list.txt"
   # CONFIG_PROTECT divert files, mirroring layers/l1/consume.sh exactly:
-  # real Portage writes `._cfg????_*` siblings under a protected path, and
+  # Portage writes `._cfg????_*` siblings under a protected path, and
   # without this a future cell whose merge diverts a config file would
   # compare those rows as MISSING. `${FAR%/}/etc` keeps a leading single
   # slash for the `/` far root this bed uses (FAR is ROOT-relative input,

@@ -1,6 +1,6 @@
-# L0 fixture oracle — real `emerge` on the checked-in fixture tree
+# L0 fixture oracle — Portage's `emerge` on the checked-in fixture tree
 
-Backlog #49 / `docs/second_python_copy_removal.md` §6. Runs the real
+Backlog #49 / `docs/second_python_copy_removal.md` §6. Runs Portage's
 `emerge -p` on a staged copy of `fixtures/` and compares it to
 portuale's own output through the same comparator the L0 bed uses.
 
@@ -20,19 +20,19 @@ TEST/run/l0-fixture-oracle.sh          # atom list: TEST/atomlists/l0-fixture-or
 | cases | `TEST/atomlists/l0-fixture-oracle.txt` |
 | allowlist | `TEST/compare/known-divergences-fixture-oracle.yaml` |
 
-The staging deltas (each one a real-Portage requirement the checked-in
+The staging deltas (each one a Portage requirement the checked-in
 fixture tree does not satisfy; the checked-in tree stays untouched):
 
-1. `repos.conf` relative `location =` -> absolute staged paths (real
+1. `repos.conf` relative `location =` -> absolute staged paths (Portage
    rejects the relative form portuale accepts);
 2. `binrepos.conf`'s `${PORTAGE_CONFIGROOT}` resolved (portuale-only
    interpolation);
-3. `etc/portage/categories` added (real masks a package whose category is
+3. `etc/portage/categories` added (Portage masks a package whose category is
    not listed);
 4. one `Manifest` per package dir with **every** ebuild's
-   BLAKE2B/SHA512 (real masks a digest-less ebuild as corruption and a
+   BLAKE2B/SHA512 (Portage masks a digest-less ebuild as corruption and a
    multi-version dir missing a line as "not listed in the Manifest");
-5. `repo/metadata/news` dropped (portuale-format fixture news, real
+5. `repo/metadata/news` dropped (portuale-format fixture news, Portage
    rejects them);
 6. `/etc/make.local` touched in the throwaway container (fixture
    `make.conf` sources it);
@@ -43,15 +43,15 @@ fixture tree does not satisfy; the checked-in tree stays untouched):
    backquoted ebuilds: staging no longer touches ebuild bytes, so the
    S1-valid committed entries keep validating;
 8. `masters = testrepo` appended to the overlay repos' `layout.conf`
-   (real warns otherwise; `repnamerepo` has a `layout.conf` without it);
-9. comment lines stripped from staged `profiles/updates/*` (real's parser
+   (Portage warns otherwise; `repnamerepo` has a `layout.conf` without it);
+9. comment lines stripped from staged `profiles/updates/*` (Portage's parser
    errors on them);
 10. `*/<pkg>` profile atoms rewritten to the package's real category
-    (real reports "Invalid atom" otherwise);
-11. `profiles/repo_name` added where missing (real warns otherwise);
+    (Portage reports "Invalid atom" otherwise);
+11. `profiles/repo_name` added where missing (Portage warns otherwise);
 12. after the portage pin upgrade, the container's `/var/db/pkg` is
     replaced with the fixture vdb, so the running root's installed set is
-    the fixture set -- otherwise real prints "The following installed
+    the fixture set -- otherwise Portage prints "The following installed
     packages are masked" (the image's gentoo set is not in the staged
     fixture repos) on every probe. Portuale's `fixture_env` pins
     `PORTAGE_RUNNING_ROOT` to fixtures for the same reason.
@@ -83,16 +83,16 @@ ebuild and resolve identically (`#46 S4`, `TEST/findings/l2.md`).
 
 ## #54 — the installed-consumer pin over-approximation
 
-Real 3.0.82.2 in the staged (hermetic) environment:
+Portage 3.0.82.2 in the staged (hermetic) environment:
 
-| case | real | portuale |
+| case | Portage | portuale |
 |---|---|---|
 | `--update dev-libs/paired` | `[ebuild U] paired-2.0 [1.0]`, rc 0 | silent, keeps 1.0 |
 | `dev-libs/needer` | `U 2.0` + `N needer`, **no block**, rc 0 | same list **+ block** |
 | `=dev-libs/paired-2.0` | `U 2.0`, **no block**, rc 0 | `U 2.0` **+ block** |
 | `needer dev-libs/othermod` | `U 2.0` + `N needer` + `N othermod` + block, rc 1 | same list + block, rc 0 |
 
-Mechanism, from real's source: complete mode is only enabled when the
+Mechanism, from Portage's source: complete mode is only enabled when the
 package tracker already holds a **slot conflict**
 (`depgraph.py:9446-9453` `_resolve_conflicts`), and the end-of-walk loop
 that pulls an installed satisfier into the graph only sees deps of nodes
@@ -100,7 +100,7 @@ already in the graph (`depgraph.py:8562+`, the `_unsatisfied_deps` loop).
 `keeper-1.0`'s `=paired-1.0` pin is outside every target closure, so it
 is only walked when a competing constraint (`othermod`'s `<paired-2.0`)
 keeps the installed `paired-1.0` in the graph — the triangle. In the
-single-sided shapes real replaces `paired-1.0` and never sees keeper.
+single-sided shapes Portage replaces `paired-1.0` and never sees keeper.
 Portuale applies the pin (and renders the residual block) unconditionally.
 
 The three differences are pinned the wrong way in the contract suite
@@ -108,7 +108,7 @@ The three differences are pinned the wrong way in the contract suite
 `test_explicitly_pinned_upgrade_breaks_an_installed_pin_and_reports_it`,
 `test_hard_dependency_requirement_breaks_an_installed_pin_and_reports_it`)
 with docstrings claiming live verification; those pins must move with the
-#54 fix, and the triangle's expected parents include keeper where real
+#54 fix, and the triangle's expected parents include keeper where Portage
 names only `othermod`.
 
 ## #54 S0 — oracle matrix: world state × case × complete-graph gate
@@ -124,7 +124,7 @@ Bed: `TEST/layers/l0-fixture-oracle/stage.sh` now honours
 `var/lib/portage/world`); a throwaway vdb-only fixture
 `fixtures/var/db/pkg/dev-libs/keeperroot-1.0` (`RDEPEND=dev-libs/keeper`,
 no matching ebuild — the same "vdb orphan" pattern as `oldmovepkg` etc.)
-gives a transitive-reachability cell. Real: `emerge -p --pretend` inside
+gives a transitive-reachability cell. Portage: `emerge -p --pretend` inside
 `localhost/test-portuale:latest`, staged via `in-container.sh` directly
 (not through the atomlist-comparator wrapper — this is an oracle-only
 exploration, not a pinned case set), one throwaway run dir per cell.
@@ -152,14 +152,14 @@ Extra cells:
 
 **Verdict: H holds for three of the four cases** (`needer`, `=paired-2.0`,
 the `needer`+`othermod` triangle) — with `keeper` reachable from `@world`
-(directly or transitively through `keeperroot`), real reproduces
+(directly or transitively through `keeperroot`), Portage reproduces
 511e659's exact shapes byte-for-byte (module the volatile "Dependency
 resolution took" line), confirming the fix is reachability gating, not a
-mechanism real doesn't have. The `--update dev-libs/paired` case is a
+mechanism Portage doesn't have. The `--update dev-libs/paired` case is a
 **new third shape** under keeper-in-world that 511e659 never observed: no
 merge at all plus a `WARNING: ... skipped due to a dependency conflict`
 notice (portage's "the entry never enters the graph, so it reports a
-skip instead of a slot collision" branch — a *different* real code path
+skip instead of a slot collision" branch — a *different* Portage code path
 than the `!!! Multiple package instances...` block the other three
 cases render, since there is no competing hard requirement forcing the
 upgrade in this shape). `test_satisfiable_installed_pin_still_holds_the_
@@ -173,7 +173,7 @@ Commit: bed switch + throwaway fixture + this section (no code change).
 
 S1 (`b27bdb4`) gated `reverse_dependency_constraints`'s consumer scan on
 `ResolveCtx::slot_op_reachable`, as S0 confirmed. Fixed 3 of the 4 cases
-byte-identical to real hermetically (`--update paired`, `needer`,
+byte-identical to Portage hermetically (`--update paired`, `needer`,
 `=paired-2.0` all merge cleanly, no block) and reproduced 511e659's exact
 keeper-reachable shapes on a copied configroot (K2).
 
@@ -184,9 +184,9 @@ all three packages silently, no block, exit 0. Root cause: the block
 (`build_residual_slot_conflicts`) is driven exclusively by
 `reverse_dependency_constraints`'s *dropped* pins; with keeper correctly
 excluded (unreachable), `dropped` is empty and the function never fires.
-Real's mechanism for this specific case is different: needer's `>=2.0`
+Portage's mechanism for this specific case is different: needer's `>=2.0`
 and othermod's `<2.0` are both **directly-requested** hard atoms (no
-installed vdb consumer at all), so real's ordinary two-hard-atom
+installed vdb consumer at all), so Portage's ordinary two-hard-atom
 slot-conflict detection reports it independent of `_complete_graph`.
 Portuale has no equivalent path — the vdb reverse scan is the *only*
 producer of this block shape, and it doesn't fire when both conflicting
@@ -221,7 +221,7 @@ every one is a pre-existing, already-triaged cluster (merge-order #,
 `gcr[gtk]`/`xwayland[libei]` masked-during-backtracking, `plasma-meta`
 truncation). `media-libs/libdisplay-info` does not appear at all,
 confirming the reverse-dep-atoms fix (memory
-`complete-graph-reverse-dep-atoms`) stays intact — real's `@world`
+`complete-graph-reverse-dep-atoms`) stays intact — Portage's `@world`
 reaches almost every installed package on the live tree, so the
 reachability gate has (as predicted) no visible effect there; the gap it
 closes is specific to a consumer *outside* every reachable set, which
@@ -241,13 +241,13 @@ entries removed from the staged vdb before either PM runs — the
 merge-vs-merge control needs `paired-1.0` *not* installed without
 touching the shared fixture).
 
-Real: `emerge -p --pretend` (cell a also `--debug`) inside
+Portage: `emerge -p --pretend` (cell a also `--debug`) inside
 `localhost/test-portuale:latest`, staged via `in-container.sh` directly
 (oracle-only exploration, not the atomlist-comparator wrapper), two run
 dirs (cells a/b/c/e/f share the default staging; cell d uses
 `FX_DROP_VDB=dev-libs/paired-1.0`).
 
-| # | args | real | portuale |
+| # | args | Portage | portuale |
 |---|---|---|---|
 | a | `needer othermod --debug` | block (installed 1.0 pulled by othermod, merge 2.0 pulled by needer), rc 1, `backtrack: 4/20` | no block, rc 0 |
 | b | `othermod needer` | same block, rc 1 | no block, rc 0 |
@@ -260,7 +260,7 @@ Run dirs: `TEST/logs/l0-fx-057-main-20260915T195546Z` (a/b/c/e/f),
 `TEST/logs/l0-fx-057-notinstalled-20260915T195546Z` (d).
 
 **§2 open question, answered by cell a's `--debug` trace and confirmed
-by cell c:** real's final reported state is exactly "the tracker holds
+by cell c:** Portage's final reported state is exactly "the tracker holds
 installed 1.0 plus merge 2.0, unsolvable, choices exhausted" — **none**
 of the 4 backtrack tries change what gets reported. Trace detail:
 `runtime_pkg_mask` grows across tries 1-4 (try 1 masks *both* the
@@ -296,7 +296,7 @@ coarser map than `build_slot_conflict` will need. S1 step 1's
 ... nothing broader") from the opposite direction**: with `paired-1.0`
 not installed, both instances are ordinary merge candidates and
 portuale's *existing* `resolved_slots` slot check already renders the
-same block real does (module path-string formatting the comparator
+same block Portage does (module path-string formatting the comparator
 already normalizes) — confirming the gap S1 needs to close is
 installed-instance-specific, not a defect in the slot-conflict
 mechanism itself.
@@ -321,7 +321,7 @@ and checks the slot from **both** sides — the `AlreadyInstalled` early
 branch against `resolved_slots`, and the merge-outcome slot check
 against `installed_slots` — so an installed instance is a slot-conflict
 party whichever argv order graphs it first. Neither check `continue`s:
-real keeps the installed node and still merges the other instance.
+Portage keeps the installed node and still merges the other instance.
 
 Solvable vs unsolvable is **not** a second solver: the record is fed to
 the existing backtracker, whose `collect_feedback` `slot_want`
@@ -330,7 +330,7 @@ solvability check is portuale's `_solve_non_slot_operator_slot_conflicts`
 `fixture_solvable_slot_conflict_is_reconciled_by_backtracking`). A
 jointly-satisfiable slot reconciles on the retry and the record
 disappears with it; an unsatisfiable one exhausts the mask trials and
-`get_best_run` reports the original shape, matching real's
+`get_best_run` reports the original shape, matching Portage's
 `backtrack: 4/20` run byte-for-byte modulo the two residues below.
 
 | cell | before S1 | after S1 |
@@ -347,9 +347,9 @@ Residues, both deliberate and both pre-existing:
   reworded to cite the convention, owner `portuale-bug` →
   `claude-opus-5`; `-suppressed-merge-list` likewise; the two
   `-missing-block-*` entries are deleted.
-* **instance order** inside the block is inverted vs real in every case:
+* **instance order** inside the block is inverted vs Portage in every case:
   portuale's queue is FIFO and lists the first-graphed instance first,
-  real's `_dep_stack` is LIFO and lists the other one first. Cell d
+  Portage's `_dep_stack` is LIFO and lists the other one first. Cell d
   (merge-vs-merge, neither instance installed) shows the same inversion
   *without* any S1 code, so this is not new. The comparator compares
   `!!!` lines as a set, so it is invisible to the oracle.
@@ -368,7 +368,7 @@ Three side findings:
    `AlreadyInstalled` entry whose cp/slot is also merge-bound), so there
    is no second child to file anything under. `--debug` trace fidelity,
    not the block: belongs with backlog #59.
-2. **`test_oracle_slotop_rebuild_order` pinned real's merge list against
+2. **`test_oracle_slotop_rebuild_order` pinned Portage's merge list against
    the wrong fixture.** Upstream re-uses the name `app-misc/C` for two
    different ebuilds — `test_slot_operator_rebuild.py` case 1's
    `|| ( app-misc/X app-misc/A:= )` and `test_slot_conflict_rebuild.py`'s
@@ -378,13 +378,13 @@ Three side findings:
    `A-1` satisfies; before S1 nothing looked at the installed instance's
    slot, so the cap was silently ignored and the case passed for the
    wrong reason. New fixture `app-misc/Cor` carries upstream's ebuild,
-   the case points at it, and real's `[A-2, (B-0, Cor-0)]` is
+   the case points at it, and Portage's `[A-2, (B-0, Cor-0)]` is
    reproduced exactly.
 3. **`build_residual_slot_conflicts` needed two plumbing fixes** for the
    #54 interplay (step 5): its records now go through
    `record_slot_conflict` instead of `extend` (the walker and the
    residual builder can produce the same `(package, merge version,
-   installed version)` triple — the keeper-reachable triangle — and real
+   installed version)` triple — the keeper-reachable triangle — and Portage
    renders one block carrying both parents, which is the residual
    record); and the dropped reverse-dep pins are collected *before* a
    slot-conflict mask feedback can return, with the current node
@@ -397,7 +397,7 @@ One more S1-only resolver fix fell out of the K2 guard: the two
 `AlreadyInstalled` without consulting `extra_constraints`, so the
 solvable retry re-derived the same collision forever (the plainuser
 control looped and then reported a block). Both are now gated on the
-constraint set, which is what real's `_select_pkg_highest_available`
+constraint set, which is what Portage's `_select_pkg_highest_available`
 weighing the whole atom set means.
 
 Verification: workspace-root `cargo build/test/clippy --release` clean
@@ -407,7 +407,7 @@ full `pytest tests -q` 1693 passed / 0 failed / 5 xfailed. Corpus drift
 was exactly two contract rows, both reviewed:
 `test_oracle_slotop_complete` (`socc-2` → `socc-1`, i.e. **K3
 alternative A**: the bug-614390 strict xfail XPASSed, the full merge
-list now equals real's, the marker is removed and the test is a
+list now equals Portage's, the marker is removed and the test is a
 permanent pin) and `test_oracle_slotop_rebuild_order` (`C-0` → `Cor-0`,
 side finding 2). `tests/corpus/expanded.json.xz` — the whole fixture
 atom × option grid — did not drift at all.
@@ -418,7 +418,7 @@ before and after. It is also ~37 % slower (30.7 s → 42.4 s); an ablation
 build that keeps every new vdb read but skips the two
 `record_slot_conflict` calls times 31.0 s, so the whole delta is extra
 resolver passes — a solvable installed-vs-merge collision somewhere in
-`@world` now takes the same reconcile-and-restart route real takes.
+`@world` now takes the same reconcile-and-restart route Portage takes.
 Correct work, not overhead; flagged here for S2 to confirm against the
 120-probe L0 bed.
 
@@ -456,11 +456,11 @@ MULTI_emptytree-system
 ```
 
 This is the pre-existing, already-documented environmental flake where
-the container's own real-portage self-upgrade doesn't always "take"
+the container's own Portage self-upgrade doesn't always "take"
 before the `-pe @system` multi-probe runs (`TEST/findings/l0.md` line
 ~953, "environmental — the container's pin upgrade did not take on
 this run. Unchanged pattern.") — confirmed here by checking the raw
-`real/MULTI_emptytree-system.txt` output directly: real's own vdb still
+`real/MULTI_emptytree-system.txt` output directly: Portage's own vdb still
 reports `sys-apps/portage-3.0.81.3` at probe time even though the
 in-container setup log says `portage now 3.0.82.2` earlier in the same
 run. Nothing else changed: the set of 19 probes carrying any
@@ -481,7 +481,7 @@ change).
 
 ## What a fixture addition must not break
 
-A new fixture that real will read needs: a digest for **every** ebuild in
+A new fixture that Portage will read needs: a digest for **every** ebuild in
 its package dir, a category in `etc/portage/categories`, and no `*/pkg`
 atoms or `profiles/updates` comments. A new fixture that trips one of
 these shows up as a real-only staging diagnostic, not as a portuale

@@ -1,6 +1,6 @@
 # `differential-test-bed/` — real-tree validation for portuale
 
-Scaffolding for running `portuale` (and the real `emerge`) against a real
+Scaffolding for running `portuale` (and Portage's `emerge`) against a real
 Gentoo tree inside container images.
 
 Two things live here:
@@ -41,7 +41,7 @@ differential-test-bed/run/l0-resolver.sh differential-test-bed/atomlists/foo.txt
 ```
 
 Runs `emerge -pv` for every entry in `atomlists/l0-resolve.txt` under
-both real portage (`/usr/sbin/emerge`) and portuale
+both Portage (`/usr/sbin/emerge`) and portuale
 (`/usr/local/bin/emerge`) inside a throwaway container, then
 `compare/resolve-compare.py` diffs the merge lists / USE / order /
 errors / exit codes. Findings that match `compare/known-divergences.yaml`
@@ -60,7 +60,7 @@ step), `L0_SKIP_MULTI=1` (skip the `@system`/`@world` whole-graph runs),
 `L0_SKIP_INVARIANTS=1` (skip the extra portuale mode runs),
 `L0_EMERGE_OPTS`, `PORTTEST_IMAGE`, `PORTTEST_PODMAN`.
 
-### L0 fixture oracle — real `emerge` on the checked-in fixture tree
+### L0 fixture oracle — Portage's `emerge` on the checked-in fixture tree
 
 ```sh
 differential-test-bed/run/l0-fixture-oracle.sh        # differential-test-bed/atomlists/l0-fixture-oracle.txt
@@ -69,7 +69,7 @@ differential-test-bed/run/l0-fixture-oracle.sh        # differential-test-bed/at
 Stages a copy of `fixtures/` inside the container (absolute repo
 locations, `PORTAGE_REPOSITORIES`, categories, per-ebuild Manifests, the
 fixture vdb as the running root — 12 documented deltas in
-`layers/l0-fixture-oracle/stage.sh`) and runs real `emerge -p` and
+`layers/l0-fixture-oracle/stage.sh`) and runs Portage's `emerge -p` and
 portuale on the same cases through the same comparator as L0, against
 `compare/known-divergences-fixture-oracle.yaml`. Real-execution-only:
 no contract `CASES` entry, no Python mirror. Findings and their
@@ -135,14 +135,14 @@ filename↔`BUILD_ID`, `Packages` stanza);
 `gpkg-diff.sh --mode strict|payload-tolerant` diffs each
 portage-built/portuale-built pair (outer layout, normalised metadata,
 image paths/attrs, payload; strict = payload hard, for the
-deterministic `porttest` fixtures); finally real Portage merges the
+deterministic `porttest` fixtures); finally Portage merges the
 portuale-built **candidate** and the portage-built **reference** into
 two identical fresh containers (`layers/l1/consume.sh`), portuale
 merges the portage-built set as the L1 **control**, and
 `diff.py --layer l2 [--tolerate-payload]` compares the normalised
 snapshots. `L2_BUILD_MODE=bpkgonly` (default) is archive-only
 `--buildpkgonly`; `deep` builds+merges the dependency closure first
-(real `-B` refuses unmerged deps).
+(Portage `-B` refuses unmerged deps).
 
 Output: `differential-test-bed/logs/l2-<timestamp>/` (`structure-*.txt`,
 `archive-<cat>-<pn>.txt`, `cross-install.txt`, `control.txt`,
@@ -216,7 +216,7 @@ podman network (created per run, removed on exit) and merged into its
 own `/` through one `mrg --remote-binpkg` per atom — the same trial
 path l31 uses for the same atom list, so the pkgcache
 (`logs/_l31-pkgcache`) is shared with l31 and "the same gpkgs" is
-literal. The client snapshot is diffed against real Portage's consume
+literal. The client snapshot is diffed against Portage's consume
 of those gpkgs with the same normalise/diff tooling and no allowlist.
 Green iff 0 hard / 0 unexplained **and** the install-bin assertions in
 `<run>/install-bin.txt` hold:
@@ -233,7 +233,7 @@ parity snapshot is taken after the *first* pass (the trial path
 re-executes hooks on a re-merge, so a post-re-run snapshot would carry
 both passes' `phase.log` lines), and the bed `INSTALL_MASK` is staged
 in the client's `make.conf` by `layers/l31b/client-init.sh` (the
-client merge resolves it from the client's own config, as real
+client merge resolves it from the client's own config, as Portage
 Portage would; l31 gets this for free because its client and server
 are one container).
 
@@ -251,7 +251,7 @@ The non-root (`--remote-portuale-dir`) and arch-mismatch
 (`--remote-portuale-binary`) variants are unit-tested in portuale;
 the bed cell covers the root login only.
 
-### Z326 close-out — nopy / noportage builds vs real Portage (portuale #326 Z)
+### Z326 close-out — nopy / noportage builds vs Portage (portuale #326 Z)
 
 ```sh
 differential-test-bed/run/z326-closeout.sh [--jobs N]
@@ -267,7 +267,7 @@ differential-test-bed/run/z326-closeout.sh [--jobs N]
   asserts over both legs that `portuale-python` was the only
   interpreter any Portage helper invoked (census + live `ps`
   sampler + log scan; build-system python is allowed and counted).
-- **(c) reference** real Portage builds both lists from source in the
+- **(c) reference** Portage builds both lists from source in the
   normal image (`layers/z326/ref-build-merge-snapshot.sh`, the l1
   build path plus the same xpak step), then `normalize.py` +
   `diff.py` (strict, existing allowlist only) on vdb + installed
@@ -331,7 +331,7 @@ run/          host orchestrators (l0-resolver.sh, l0-fixture-oracle.sh,
               l31b-two-container.sh, nopy-build.sh, z326-closeout.sh,
               lib.sh)
 layers/l0/    in-container.sh — the per-atom probe driver
-layers/l0-fixture-oracle/  stage.sh + in-container.sh (real emerge on fixtures)
+layers/l0-fixture-oracle/  stage.sh + in-container.sh (Portage emerge on fixtures)
 layers/l1/    build.sh (Portage, from source) + consume.sh (one PM, merge + snapshot)
 layers/l2/    build-portage.sh + build-portuale.sh (archive-only / deep)
 layers/l3/    source-build parity (build-and-merge.sh)

@@ -2,8 +2,8 @@
 """Capture upstream resolver tests as data for portuale fixture translation
 (backlog #50 / `docs/second_python_copy_removal.md` §7).
 
-Loads an upstream `lib/portage/tests/resolver/test_*.py` module, runs its
-real `ResolverPlayground` against the vendored portage (pinned in
+Loads an upstream `lib/portage/tests/resolver/test_*.py` module, runs the
+Portage's `ResolverPlayground` against the vendored portage (pinned in
 `3rdparty/repos.toml`), and records, per resolution:
 
 * the playground's inputs (`ebuilds`, `installed`, `world`,
@@ -150,7 +150,7 @@ class Capture:
     `eapi_floor` (backlog #220): when set, every playground ebuild and
     installed entry whose EAPI is below the floor is raised to the floor
     before the playground is constructed, so the recorded oracle is what
-    real's resolver does at the supported EAPI range (portuale never
+    Portage's resolver does at the supported EAPI range (portuale never
     sees an ebuild below EAPI 7; owner rule 2026-09-27). The recorded
     playground inputs carry the raised EAPIs, and the per-module
     document notes how many entries were raised."""

@@ -12,7 +12,7 @@ The container's vdb and repos are not visible from the host, so the
 run snapshots what the checker needs: `vdb-list.txt` ("is this cp
 installed", the merge-order exemption) and `dep-classes.tsv` (which
 dependency variables of each owner named each child, so the soft-edge
-exemption reflects real's `ignore_priority` ladder). Without the
+exemption reflects Portage's `ignore_priority` ladder). Without the
 snapshots the corresponding checks degrade to the strict behaviour.
 
 The plain-text checks (`USE` repeats, `Total:` counters) also run over
@@ -78,15 +78,15 @@ def main(run: Path) -> int:
             print(f"portuale {slug}: {p}")
         violations += len(problems)
 
-        real = run / "real" / plain_path.name
-        if real.exists():
-            text = real.read_text(errors="replace")
+        portage = run / "real" / plain_path.name
+        if portage.exists():
+            text = portage.read_text(errors="replace")
             for p in inv.check_plain_use(text) + inv.check_summary(text):
-                print(f"real (checker control) {slug}: {p}")
+                print(f"Portage (checker control) {slug}: {p}")
                 control += 1
 
     print(f"invariants: {checked} probes, {violations} portuale violation(s), "
-          f"{control} control violation(s) on real output")
+          f"{control} control violation(s) on Portage output")
     return 1 if violations else 0
 
 

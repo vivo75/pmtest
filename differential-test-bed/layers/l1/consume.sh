@@ -36,7 +36,7 @@ umask 022
 # Test-bed binhost policy (backlog #43): the image's catalyst
 # binrepos.conf points at a real remote gentoo binhost -- signed, and at
 # *different revisions* than the $PKGDIR set under test. Under
-# `-k --getbinpkg` real Portage would silently substitute a
+# `-k --getbinpkg` Portage would silently substitute a
 # gentoo-revision binary for the one being tested, and dies on GnuPG
 # verification when the local test archives (unsigned) make it fall
 # back. The set under test is $PKGDIR + installed deps: drop it.
@@ -102,7 +102,7 @@ reinstall_opts=()
 # opt-in): the portuale side converts the container's /var/db/pkg into a
 # database of that kind, merges through `mrg --vdb-backend=<kind>`,
 # and converts the result back into /var/db/pkg before the snapshot, so
-# the usual diff against real portage grades the database merge. The
+# the usual diff against Portage grades the database merge. The
 # portage side and the default run are unchanged.
 merge_cmd=("$EM")
 VDB_KIND=${L1_PORTUALE_VDB:-files}
@@ -122,14 +122,14 @@ oneshot=(--oneshot)
 [ -n "${VDB_DB:-}" ] && oneshot=()
 
 # `L1_PORTAGE_VDB_MOUNT=sqlite|redb` (portuale #317 S6, opt-in): the
-# *real portage* side merges through `portuale vdb mount --rw`. The
+# *Portage* side merges through `portuale vdb mount --rw`. The
 # container's /var/db/pkg is converted into a database of that kind, the
 # directory is moved aside and the read-write FUSE view of the database is
-# mounted in its place; real emerge then merges into the database. After
+# mounted in its place; Portage emerge then merges into the database. After
 # the merge the mount is unmounted (the daemon imports world, the counter
-# and the other stores real wrote under / and exits) and the database is
+# and the other stores Portage wrote under / and exits) and the database is
 # converted back into /var/db/pkg before the snapshot, so the usual diff
-# against portuale grades real portage's merge through the mount. Needs
+# against portuale grades Portage's merge through the mount. Needs
 # `--device /dev/fuse --cap-add SYS_ADMIN` (added by
 # run/l1-merge-from-binpkg.sh). The portuale side is unchanged.
 PMOUNT_KIND=${L1_PORTAGE_VDB_MOUNT:-}
@@ -143,7 +143,7 @@ if [ "$PM" = portage ] && { [ "$PMOUNT_KIND" = sqlite ] || [ "$PMOUNT_KIND" = re
   if ! /usr/local/bin/portuale vdb mount --rw --root / "$PMOUNT_KIND:$PMOUNT_DB" /var/db/pkg 2>&1 | tee "$OUT.vdb-mount.log"; then
     log "!!! vdb mount --rw failed"; exit 1
   fi
-  log "real portage merges through portuale vdb mount --rw over $PMOUNT_KIND ($(grep ' /var/db/pkg ' /proc/mounts | cut -d' ' -f1,3))"
+  log "Portage merges through portuale vdb mount --rw over $PMOUNT_KIND ($(grep ' /var/db/pkg ' /proc/mounts | cut -d' ' -f1,3))"
 fi
 
 # `-k --getbinpkg`: prefer a $PKGDIR binpkg, fall back to an ebuild (so
@@ -152,8 +152,8 @@ fi
 #  * NOT `--usepkgonly`/`-K`: portuale doesn't treat an installed dep
 #    with no binpkg as satisfied under it (L1-a).
 #  * portuale needs `--getbinpkg` to actually *execute* a local-$PKGDIR
-#    binary merge where real portage merges on `-k` alone (L1-b); real
-#    portage accepts the redundant `--getbinpkg` (no binhost -> no-op).
+#    binary merge where Portage merges on `-k` alone (L1-b); Portage
+#    accepts the redundant `--getbinpkg` (no binhost -> no-op).
 # The builder built the whole closure, so nothing is built here -- a
 # `>>> Emerging (` line in the log breaks that invariant (asserted below).
 set -o pipefail
@@ -184,7 +184,7 @@ if [ -n "${VDB_DB:-}" ]; then
 fi
 
 if [ -n "$PMOUNT_DB" ]; then
-  # The export below rewrites the stores; keep the world file real emerge
+  # The export below rewrites the stores; keep the world file Portage emerge
   # left (--oneshot: untouched) byte- and mtime-exact for the snapshot.
   [ -e /var/lib/portage/world ] && cp -a /var/lib/portage/world /var/lib/portage/world.l1-saved
   umount /var/db/pkg || { log "!!! umount /var/db/pkg failed"; MERGE_RC=1; }

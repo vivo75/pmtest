@@ -8,7 +8,7 @@
 # uses.
 #
 # This is NOT a correctness gate and is NOT run in CI: real-world trees
-# exercise plenty of real emerge behavior this pilot deliberately hasn't
+# exercise plenty of Portage emerge behavior this pilot deliberately hasn't
 # built yet (no --getbinpkg/binhost support, no default non-"-v" USE
 # display, no combined U+D display column, no --autounmask-use, no explicit
 # repos.conf masters=, etc. -- see README.md's own "What this
@@ -17,7 +17,7 @@
 # point is to see how far real-world data agrees with the pilot's own core
 # resolution decisions (New / Upgrade / Downgrade / Reinstall /
 # AlreadyInstalled), on packages neither implementation was ever hand-tuned
-# against, not to chase byte-for-byte parity with real emerge's own display
+# against, not to chase byte-for-byte parity with Portage emerge's own display
 # formatting.
 #
 # Usage:
@@ -32,7 +32,7 @@
 # dependency-recursion cascade this pilot's own lack of binhost support can
 # trigger on a system that tracks one -- see the README).
 #
-# Requires real emerge on PATH (a real Gentoo system); the PM under test
+# Requires Portage's emerge on PATH (a real Gentoo system); the PM under test
 # is resolved (and rebuilt) through managers/managers.yaml.
 
 set -uo pipefail
@@ -48,9 +48,9 @@ PM_ENV="$(python3 "${REPO_DIR}/managers/registry.py" --sh)" || {
 eval "${PM_ENV}"
 PILOT_BIN="${PM_EMERGE}"
 
-REAL_EMERGE="$(command -v emerge || true)"
-if [ -z "${REAL_EMERGE}" ]; then
-    echo "real_world_spotcheck: no real 'emerge' found on PATH -- this script needs an actual Gentoo system" >&2
+PORTAGE_EMERGE="$(command -v emerge || true)"
+if [ -z "${PORTAGE_EMERGE}" ]; then
+    echo "real_world_spotcheck: no Portage 'emerge' found on PATH -- this script needs an actual Gentoo system" >&2
     exit 1
 fi
 
@@ -80,36 +80,36 @@ else
 fi
 
 # Reduces one `--pretend --nodeps` run's own stdout to just its bracket
-# lines (drops real emerge's own banner/progress/timing chatter, which this
+# lines (drops Portage emerge's own banner/progress/timing chatter, which this
 # pilot never prints at all) and collapses whitespace runs to single spaces
-# (real emerge pads columns; this pilot doesn't) so the two sides can be
+# (Portage's emerge pads columns; this pilot doesn't) so the two sides can be
 # compared on substance, not incidental spacing.
 normalize() {
     grep -E '^\[' <<<"$1" | tr -s ' '
 }
 
-echo "Real emerge:  ${REAL_EMERGE}"
-echo "Pilot emerge: ${PILOT_BIN} (via ${PILOT_EMERGE})"
+echo "Portage emerge: ${PORTAGE_EMERGE}"
+echo "Pilot emerge:   ${PILOT_BIN} (via ${PILOT_EMERGE})"
 echo
 
 agree=0
 differ=0
 for atom in "${ATOMS[@]}"; do
     echo "=== ${atom} ==="
-    real_out="$("${REAL_EMERGE}" --pretend --nodeps "${atom}" 2>&1)"
-    real_status=$?
+    portage_out="$("${PORTAGE_EMERGE}" --pretend --nodeps "${atom}" 2>&1)"
+    portage_status=$?
     pilot_out="$("${PILOT_EMERGE}" --pretend --nodeps "${atom}" 2>&1)"
     pilot_status=$?
 
-    real_norm="$(normalize "${real_out}")"
+    portage_norm="$(normalize "${portage_out}")"
     pilot_norm="$(normalize "${pilot_out}")"
 
-    echo "--- real (exit ${real_status}) ---"
-    echo "${real_out}" | sed -n '1,15p'
+    echo "--- Portage (exit ${portage_status}) ---"
+    echo "${portage_out}" | sed -n '1,15p'
     echo "--- pilot (exit ${pilot_status}) ---"
     echo "${pilot_out}"
 
-    if [ "${real_norm}" = "${pilot_norm}" ]; then
+    if [ "${portage_norm}" = "${pilot_norm}" ]; then
         echo "=> MATCH (bracket lines identical after normalization)"
         agree=$((agree + 1))
     else

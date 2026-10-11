@@ -1,4 +1,4 @@
-# Known, justified portuale-vs-real-Portage divergences on the
+# Known, justified portuale-vs-Portage divergences on the
 # *fixture* tree (differential-test-bed/run/l0-fixture-oracle.sh, backlog #49). Same
 # schema as `known-divergences.yaml` (see its header for the field
 # documentation); findings land here only after adjudication, and an
@@ -7,7 +7,7 @@
 #
 # Keep this file sorted by id.
 
-# -- presentation: the staging makes ROOT != "/", real appends
+# -- presentation: the staging makes ROOT != "/", Portage appends
 #    ` for <configroot>/` to its masked/unmet messages while portuale
 #    (whose fixture env never has that suffix) does not.
 
@@ -16,7 +16,7 @@
   slugs: ["*"]
   match: "for /tmp/l0-fixture-oracle/fixtures/"
   reason: >
-    Real's masked-atom / unmet-requirements messages append the target
+    Portage's masked-atom / unmet-requirements messages append the target
     configroot path when it is not "/"; the staged oracle copy must live
     outside / for the fixture vdb to be the target root, and portuale's
     own fixture harness has no such suffix. The compared content (atom,
@@ -29,8 +29,8 @@
   match: "masked-atom:"
   reason: >
     The comparator derives `masked-atom: <atom>` from the `"<atom>" have
-    been masked` line; real's copy of that line carries the staging path
-    suffix, so only portuale's yield the derived atom. Real's line is
+    been masked` line; Portage's copy of that line carries the staging path
+    suffix, so only portuale's yield the derived atom. Portage's line is
     itself explained by `fixture-masked-path-suffix`; the atom set is the
     same.
   owner: portuale-oracle
@@ -40,7 +40,7 @@
   slugs: ["*"]
   match: "has unmet requirements."
   reason: >
-    Real's unmet-requirements line carries the staged root suffix; both
+    Portage's unmet-requirements line carries the staged root suffix; both
     sides print the same sentence otherwise (the real-only `Problem
     resolving dependencies for X` header is covered by the same entry's
     sibling).
@@ -51,7 +51,7 @@
   slugs: ["*"]
   match: "Problem resolving dependencies for"
   reason: >
-    Real prints a `!!! Problem resolving dependencies for <atom>` header
+    Portage prints a `!!! Problem resolving dependencies for <atom>` header
     before the unmet-requirements line; portuale prints the same failure
     without that header. Output wording, not resolver behaviour.
   owner: portuale-oracle
@@ -64,7 +64,7 @@
     Same staging-artifact class as fixture-masked-message-unsuffixed, for
     the two sentences #135 (d) (Phase 5b S2) put on portuale's side:
     `there are no ebuilds to satisfy` and `there are no ebuilds built
-    with USE flags to satisfy`. Real's copies carry the staged target
+    with USE flags to satisfy`. Portage's copies carry the staged target
     root (`for /tmp/l0-fixture-oracle/fixtures/.`, explained by
     fixture-masked-path-suffix); portuale's deliberately do not (the
     contract pins and the top-level miss keep the unsuffixed form). The
@@ -77,14 +77,14 @@
   match: "All ebuilds that could satisfy"
   reason: >
     Portuale's copy of the masked-atom message has no staging-path suffix
-    (real's is explained by `fixture-masked-path-suffix`); the atom and
+    (Portage's is explained by `fixture-masked-path-suffix`); the atom and
     the masked package set are the same.
   owner: portuale-oracle
 
 # -- #65 S0/S1/S2 + #71: the slot-operator bdeps matrix (FX_SLOTOP_BDEP=1
 #    FX_HOST_ROOTS=1, differential-test-bed/atomlists/l0-fixture-oracle-slotop.txt). The
 #    two artifact entries (totals duplication, the considep extra) were
-#    deleted by the #71 S1 re-scope: with host-exact roots real and
+#    deleted by the #71 S1 re-scope: with host-exact roots Portage and
 #    portuale agree on set and Total: in every argument/option cell.
 #    What remains is a genuine merge-order divergence in the three
 #    @world cells (below).
@@ -93,7 +93,7 @@
 #
 # (Backlog #242 Slice D retired `skipped-updates-cross-root-missed-line`:
 # the main list now runs with FX_HOST_RUNNING_ROOT=1, so portuale resolves
-# the blk0 build deps against the container host like real does — the
+# the blk0 build deps against the container host like Portage does — the
 # missed dev-libs/blk0x instance sits in `/` and paints the host profile's
 # USE_EXPAND on both sides. Entry removed; if the bed ever flags the
 # missed-line USE again, re-add it with fresh bytes rather than this text.)
@@ -105,7 +105,7 @@
   match: "merge order diverges"
   reason: >
     Standing merge-order class (#17, deliberate cut): in the staged
-    matrix's `@world` shape real's complete-graph rebuild order is
+    matrix's `@world` shape Portage's complete-graph rebuild order is
     `consbdep, consdep, considep, conspdep, consrdep` (the order its
     `_complete_graph` `_unsatisfied_deps` re-probe reaches them) while
     portuale emits them in dependency-discovery order
@@ -124,8 +124,8 @@
 
 # -- #85 (DONE 2026-09-18): two new slots of one cp, pulled by
 #    different parents, merged in the opposite order. S0 proved this
-#    was not the #17 frontier-drain wall: real's `--debug` digraph dump
-#    shows `treeslotuser` has NO edge to 1.10 at all -- real's
+#    was not the #17 frontier-drain wall: Portage's `--debug` digraph dump
+#    shows `treeslotuser` has NO edge to 1.10 at all -- Portage's
 #    `_minimize_children` (`depgraph.py:4751-4856`) eliminates the
 #    redundant 1.10 selection (`:0` matches only 1.9, the bare atom
 #    matches both), so the bias parent-count ties 1-1 and discovery

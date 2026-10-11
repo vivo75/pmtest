@@ -30,9 +30,9 @@ import pytest
 FIXTURES_ROOT = str(Path(__file__).resolve().parents[1] / "fixtures")
 
 
-# Real `_emerge/post_emerge.py` -> `util/_info_files.py::chk_updated_info_files`
+# Portage `_emerge/post_emerge.py` -> `util/_info_files.py::chk_updated_info_files`
 # (backlog #176): after a merge that changed the vdb, with
-# `/usr/bin/install-info` present and no info dir to regenerate, real prints
+# `/usr/bin/install-info` present and no info dir to regenerate, Portage prints
 # a bare newline then ` * GNU info directory index is up-to-date.` on stdout
 # (`_info_files.py:29-32`); `--quiet-build` does not suppress it. These are
 # the only non-`>>>` lines the quiet-build pins below may see.
@@ -40,7 +40,7 @@ _POST_EMERGE_INFO_LINES = frozenset({"", " * GNU info directory index is up-to-d
 
 # The merged `usr/share/penvbuildpkg/flags` file's expected content: the
 # `penv-buildflags` env file's values (backlog #95 -- CC/CXX/AR/RUSTFLAGS
-# are real's toolchain selectors the old BUILD_VARS filter dropped,
+# are Portage's toolchain selectors the old BUILD_VARS filter dropped,
 # ENV_UNSET is the incremental fold's observable value).
 PENVBUILDPKG_FLAGS = (
     "CFLAGS=-Os -march=fixturepkgenv\n"
@@ -61,7 +61,7 @@ def _fixture_env():
 
 
 def test_dispatch_via_symlink_emerge(portuale_binary, tmp_path):
-    """Exercises real `emerge --pretend` resolution (see
+    """Exercises Portage's `emerge --pretend` resolution (see
     test_emerge_pretend_contract.py for full coverage of the outcomes);
     here the point is that the symlink-dispatched binary reaches it at
     all."""
@@ -162,7 +162,7 @@ def test_mrg_dispatch_via_symlink(mrg_binary, fixture_env):
     """`mrg` dispatches through the same symlink machinery as
     `emerge`/`ebuild`, then hands its parsed/translated argv to portuale's
     own emerge codepath: `--pretend dev-libs/newpkg` resolves and prints
-    the exact `[ebuild  N     ] ...` line real pretend emits."""
+    the exact `[ebuild  N     ] ...` line Portage pretend emits."""
     result = subprocess.run(
         [str(mrg_binary), "--pretend", "dev-libs/newpkg"],
         capture_output=True,
@@ -211,7 +211,7 @@ def test_mrg_runs_the_emerge_codepath(mrg_binary, emerge_binary, fixture_env):
 
 
 def test_mrg_solver_selects_the_resolution_backend(mrg_binary, emerge_binary, fixture_env):
-    """`--solver=` is portuale-only (real emerge has none): `mrg` parses
+    """`--solver=` is portuale-only (Portage emerge has none): `mrg` parses
     exactly portage/pubgrub/resolvo and forwards `--solver=<value>` to the
     emerge codepath, which resolves with that backend. All three agree on
     the trivial fixture; anything else is a clap usage error (exit 2)."""
@@ -309,7 +309,7 @@ def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
     matched by the shared walk-path `resolve_blockers` and rendered
     byte-identically to the walk. A weak merge-vs-merge block (`B`, rc 1
     since #68 S2) and a strong block against installed `samepkg` that no
-    walked node pulls in (`b`, rc 0 since #68 S3; real 3.0.82.2 oracle
+    walked node pulls in (`b`, rc 0 since #68 S3; Portage 3.0.82.2 oracle
     2026-09-16). Resolvo reads weak blockers as hard conflicts and
     refuses `graphblockerparent` outright -- an engine-model divergence,
     out of scope (its H.15a text already renders the refusal readably)."""
@@ -343,9 +343,9 @@ def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
             check=False,
             env=fixture_env,
         )
-        # Satisfied (no walked graph node pulls samepkg in, so real
+        # Satisfied (no walked graph node pulls samepkg in, so Portage
         # uninstalls it): the walk and both engines print the satisfied
-        # `b` line and exit 0 -- #68 S2/S3, real 3.0.82.2 oracle.
+        # `b` line and exit 0 -- #68 S2/S3, Portage 3.0.82.2 oracle.
         assert result.returncode == 0, solver
         assert (
             '[blocks b      ] dev-libs/samepkg ("dev-libs/samepkg"'
@@ -450,7 +450,7 @@ def test_solver_backends_schedule_stale_equals_consumer_reinstalls(
 def test_solver_backends_share_the_walk_merge_order(emerge_binary, fixture_env):
     """H.15b (merge-order fidelity): bridge plans used to display in raw
     engine install order (pubgrub printed shared-b before shared-a for
-    `dev-libs/diamond`). Bridge entries now carry real `deps` edges and
+    `dev-libs/diamond`). Bridge entries now carry Portage `deps` edges and
     run through the same `serialize_merge_order` sort as the walk, so all
     three backends print one identical dependency-first merge list."""
     outputs = []
@@ -476,7 +476,7 @@ def test_solver_backends_share_the_walk_merge_order(emerge_binary, fixture_env):
 def test_solver_backends_render_forced_flag_markers(emerge_binary, fixture_env):
     """`--solver=` forced-flag markers (backlog Tier 1): bridge entries
     used to build their USE display with an empty forced set, dropping
-    real `pkg_use_display`'s `( )` wraps for profile-forced/masked
+    Portage `pkg_use_display`'s `( )` wraps for profile-forced/masked
     flags. Both bridges now call the walk's own `forced_or_masked_flags`,
     so `-pv` of `dev-libs/pkgusemaskforcepkg` matches the walk-path
     contract byte for byte (`USE="(forceflag) (-maskflag) -specflag"`)."""
@@ -508,11 +508,11 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     (no separate re-display); the pubgrub bridge result stays `Complete`
     by construction (no walk/backtrack to abandon -- Slice 2), so it
     keeps the legacy list-plus-redisplay. Since backlog #206 both paths
-    print real's `Package.__str__` node text with real's three leading
+    print Portage's `Package.__str__` node text with Portage's three leading
     newlines, and the `--solver=portage` path renders the stuck remainder
-    as real's forced `--verbose --tree` display (same bytes as the walk
+    as Portage's forced `--verbose --tree` display (same bytes as the walk
     path); the pubgrub stdout shape is unchanged. Backlog #278: both
-    paths start the printed cycle at `hardcycleb` (real's
+    paths start the printed cycle at `hardcycleb` (Portage's
     `shortest_cycle[0]` under the single-root rendering)."""
     legacy_stdout = (
         f'[ebuild  N     ] dev-libs/hardcyclea-1.0 to {fixture_env["ROOT"]}\n'
@@ -1584,7 +1584,7 @@ def test_mrg_remote_merge_replaces_a_same_slot_version(
     mrg_binary, fixture_env, tmp_path
 ):
     """Slice-4 replace over local transport: merge 1.0, then 2.0. The
-    old hooks run from the old vdb env in real interleave order
+    old hooks run from the old vdb env in Portage interleave order
     (setup/preinst new, prerm/postrm old, postinst new), the old payload
     and vdb entry are gone, and only 2.0 remains installed."""
     root = tmp_path / "root"
@@ -1658,9 +1658,9 @@ def test_mrg_remote_bundle_missing_file_is_exit_1(mrg_binary, fixture_env, tmp_p
 
 
 def test_mrg_bare_deep_keeps_the_atom(mrg_binary, fixture_env):
-    """Bare `-D` followed by an atom: real emerge's insert_optional_args
+    """Bare `-D` followed by an atom: Portage emerge's insert_optional_args
     does NOT swallow the atom (`cat/a` isn't a valid int), so `-D` stays
-    bare (real inserted default `True`) and `cat/a` is forwarded as the
+    bare (Portage inserted default `True`) and `cat/a` is forwarded as the
     target atom -- portuale's emerge then reports no ebuild for it."""
     result = subprocess.run(
         [str(mrg_binary), "-D", "cat/a"],
@@ -1674,7 +1674,7 @@ def test_mrg_bare_deep_keeps_the_atom(mrg_binary, fixture_env):
 
 
 def test_mrg_deep_consumes_a_space_separated_integer(mrg_binary, fixture_env):
-    """`-D 2` is the real separate-valid-value spelling real emerge's
+    """`-D 2` is the Portage separate-valid-value spelling Portage emerge's
     insert_optional_args consumes (`2` is a valid int), joined into the
     explicit form before clap sees it and forwarded as `--deep=2`."""
     result = subprocess.run(
@@ -1705,7 +1705,7 @@ def test_mrg_rejects_a_missing_required_value(mrg_binary):
 
 
 def test_mrg_help_exits_zero(mrg_binary):
-    """clap's own `-h`/`--help` are the real emerge spellings, render the
+    """clap's own `-h`/`--help` are the Portage emerge spellings, render the
     whole for-real option surface, and exit 0."""
     for flag in ("-h", "--help"):
         result = subprocess.run(
@@ -1719,7 +1719,7 @@ def test_mrg_help_exits_zero(mrg_binary):
 
 def test_ebuild_install_phase_sees_config_derived_use(ebuild_binary, tmp_path):
     """A standalone `ebuild <file> <phase>` has no resolved graph entry,
-    but real `doebuild_environment()` still exports the package's
+    but Portage `doebuild_environment()` still exports the package's
     effective `USE` from the resolved config -- so `bin/ebuild.sh`'s
     `use()` works there too. `dev-libs/usebuildpkg` has
     `IUSE="buildflag"` (enabled for it in
@@ -1798,7 +1798,7 @@ def test_ebuild_accepts_the_inline_equals_form_of_a_value_option(ebuild_binary):
 def test_ebuild_rejects_an_unrecognized_option(ebuild_binary):
     """Distinct from a real-but-unimplemented option: a token that isn't
     in bin/ebuild's own option surface at all is rejected immediately
-    and specifically, unlike real bin/ebuild's own argparse (which uses
+    and specifically, unlike Portage bin/ebuild's own argparse (which uses
     parse_known_args and would silently swallow it into the positional
     args instead -- see ebuild.rs's doc comment for why portuale
     deviates)."""
@@ -1825,7 +1825,7 @@ def test_ebuild_rejects_a_filename_not_ending_in_dot_ebuild(ebuild_binary):
 
 def test_ebuild_rejects_an_unrecognized_command(ebuild_binary):
     """"not-a-real-phase" isn't in doebuild()'s own validcommands list,
-    so it must be rejected the same way real doebuild() itself would
+    so it must be rejected the same way Portage doebuild() itself would
     (exit 1), not silently accepted as if it were a real, merely
     unimplemented phase."""
     result = subprocess.run(
@@ -1842,7 +1842,7 @@ def test_ebuild_rejects_an_unrecognized_command(ebuild_binary):
 
 
 def test_ebuild_rejects_missing_required_args(ebuild_binary):
-    """Mirrors real bin/ebuild's own argparse parser.error() exit code
+    """Mirrors Portage bin/ebuild's own argparse parser.error() exit code
     (2) for "missing required args", distinct from the exit-1 "invalid
     input" cases above."""
     no_args = subprocess.run(
@@ -1859,7 +1859,7 @@ def test_ebuild_rejects_missing_required_args(ebuild_binary):
 
 
 def test_ebuild_help_is_implemented(ebuild_binary):
-    """-h/--help are real and implemented now (real bin/ebuild's own
+    """-h/--help are real and implemented now (Portage bin/ebuild's own
     argparse auto-adds them) -- previously neither was even in
     ebuild_options.rs's own OPTIONS table at all, so a bare "--help"
     invocation used to be rejected as an unrecognized option instead of
@@ -1887,7 +1887,7 @@ def test_ebuild_short_help_alias_is_implemented(ebuild_binary):
 def test_ebuild_help_wins_unconditionally_regardless_of_position_or_other_args(
     ebuild_binary,
 ):
-    """Matches real bin/ebuild's own behavior: argparse's own -h/--help
+    """Matches Portage bin/ebuild's own behavior: argparse's own -h/--help
     action is checked during parsing itself, so it wins no matter where
     it appears or what else (valid or not) accompanies it -- same
     precedent emerge's own --help already set."""
@@ -1907,7 +1907,7 @@ def test_ebuild_help_wins_unconditionally_regardless_of_position_or_other_args(
 
 def test_ebuild_version_is_recognized_but_not_specially_implemented(ebuild_binary):
     """--version is deliberately NOT specially implemented -- see
-    ebuild_options.rs's own doc comment: real bin/ebuild's own
+    ebuild_options.rs's own doc comment: Portage bin/ebuild's own
     portage.VERSION is derived live via "git describe" for a
     from-source checkout (exactly what this repo is), not a static
     string, so printing a real version was ruled out. It's still a real,
@@ -1928,8 +1928,8 @@ def test_ebuild_version_is_recognized_but_not_specially_implemented(ebuild_binar
 def test_ebuild_debug_flag_enables_real_set_x_tracing(ebuild_binary, tmp_path):
     """`--debug` is real, not a no-op: unlike every other `Kind::Boolean`
     ebuild option (still a pure no-op -- see the module docstring above),
-    ebuild.rs sets real `PORTAGE_DEBUG=1` in the phase environment, which
-    triggers real `bin/ebuild.sh`'s own `set -x` guard (`bin/ebuild.sh`
+    ebuild.rs sets Portage's `PORTAGE_DEBUG=1` in the phase environment, which
+    triggers Portage `bin/ebuild.sh`'s own `set -x` guard (`bin/ebuild.sh`
     lines 479/680, `bin/phase-functions.sh`'s own phase-dispatch case
     branches) during real phase execution (task #54). This exercises
     task #54's real `pretend` phase (a fast, side-effect-free real phase)
@@ -1971,7 +1971,7 @@ def _real_build_env(tmp_path):
     verification of `ebuild <file> package` and `emerge --buildpkgonly`
     already proved this is safe. `PORTAGE_TMPDIR` gets a private dir
     like every other real-op helper (backlog #266): the default
-    `/var/tmp/portage` is shared with the host system's real portage,
+    `/var/tmp/portage` is shared with the host system's Portage,
     whose root runs recreate category dirs as `portage:portage` and then
     the pre-clean dies with `Permission denied` for this user."""
     env = _fixture_env()
@@ -1983,12 +1983,12 @@ def _real_build_env(tmp_path):
 def _gzip_make_conf_env(tmp_path, env):
     """Point `env` at a private copy of the fixture config root whose
     `make.conf` sets `BINPKG_COMPRESS="gzip"` (backlog Q6 of
-    `batch-2026-09-26.md`). Real Portage never exports `BINPKG_COMPRESS`
+    `batch-2026-09-26.md`). Portage never exports `BINPKG_COMPRESS`
     into a phase environment (`special_env_vars.environ_filter`), and
     the gpkg image is compressed by `bin/gpkg-helper.py`, which rebuilds
     `portage.settings` from that filtered env plus the config files -- so
     only a config-file value reaches the gpkg compressor; a calling-env
-    one does not. The value keeps these tests off `zstd` (the real
+    one does not. The value keeps these tests off `zstd` (the Portage
     `make.globals` default) so they don't need it installed."""
     cfg = tmp_path / "cfg-gzip"
     if not cfg.exists():
@@ -2008,13 +2008,12 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     non-dry-run execution path portuale implements for `emerge`
     itself (see emerge_build.rs's own module doc comment). `packagepkg`
     RDEPENDs on `samepkg`, which the shared fixture ROOT already has an
-    installed vdb entry for, so --buildpkgonly's own real depgraph gate
+    installed vdb entry for, so --buildpkgonly's own Portage depgraph gate
     (see the dry-run contract tests) has nothing to object to. With no
-    `BINPKG_FORMAT` anywhere, the artefact is a `.gpkg.tar` -- real
+    `BINPKG_FORMAT` anywhere, the artefact is a `.gpkg.tar` -- Portage
     `cnf/make.globals:43`'s own default (backlog #173; the pre-#173 pin
-    expected the old xpak `.tbz2` here). Backlog #185: a real
-    non-`--pretend` run without `--ask`/`--tree`/`--verbose` shows no
-    merge list (real `_emerge/actions.py:464-469`; m185 container probe,
+    expected the old xpak `.tbz2` here). Backlog #185: a Portage non-`--pretend` run without `--ask`/`--tree`/`--verbose` shows no
+    merge list (Portage `_emerge/actions.py:464-469`; m185 container probe,
     `emerge --oneshot --usepkgonly probe/probe-a` in six shapes) -- only
     the resolution-phase display (`Calculating dependencies ... done!`
     + the timing line) before the first `>>>`."""
@@ -2029,10 +2028,10 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     )
     assert "[ebuild" not in result.stdout
     assert "Calculating dependencies ... done!" in result.stdout
-    # Backlog #177: real `MergeListItem._start` prints
+    # Backlog #177: Portage `MergeListItem._start` prints
     # `Emerging (N of M) cpv::repo` (here `ROOT` is the fixture tree
     # itself); no `Installing`/`Completed` follows under `--buildpkgonly`
-    # (real `PackageMerge._should_show_status`).
+    # (Portage `PackageMerge._should_show_status`).
     assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
     assert ">>> Installing" not in result.stdout
 
@@ -2051,11 +2050,11 @@ def test_emerge_buildpkgonly_without_pretend_really_builds_a_binary_package(
     assert "PATH: dev-libs/packagepkg-1.0.gpkg.tar" in packages
 
 
-def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
+def test_emerge_buildpkgonly_packages_stanza_matches_portage_slot_and_digest_rules(
     emerge_binary, tmp_path
 ):
-    """Backlog #188: a portuale-written `Packages` stanza follows real's
-    stanza rules on the S0 shapes. Real `bintree._pkgindex_entry`
+    """Backlog #188: a portuale-written `Packages` stanza follows Portage's
+    stanza rules on the S0 shapes. Portage `bintree._pkgindex_entry`
     (`3rdparty/portage/lib/portage/dbapi/bintree.py:2289-2313`) plus
     `PackageIndex.write`
     (`3rdparty/portage/lib/portage/getbinpkg.py:153-177`): `SLOT` is
@@ -2063,7 +2062,7 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     `bintree.py:609-629`; restored on read by `readBody`'s `setdefault`)
     and written verbatim otherwise, and the digest keys are the fixed
     `_pkgindex_hashes = ["MD5", "SHA1"]` (`bintree.py:548`), independent
-    of `PORTAGE_CHECKSUM_FILTER`. Probed against real Portage in
+    of `PORTAGE_CHECKSUM_FILTER`. Probed against Portage in
     `localhost/test-portuale:latest`: `l32/dep-a` (`SLOT="0"`, default
     config) has no `SLOT` line, `l32/slotpkg` (`SLOT="1"`) has
     `SLOT: 1`, and a `PORTAGE_CHECKSUM_FILTER='-SHA1'` rebuild of
@@ -2077,7 +2076,7 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     the portuale stanza must too -- pinned below, not just in the
     `stanza_bytes_for_default_slot_omit_slot_and_keep_both_digests`
     Rust unit test, to prove the whole real-execution chain (phase env
-    `PORTAGE_REPO_REVISIONS` -> real build-info writer -> archive ->
+    `PORTAGE_REPO_REVISIONS` -> Portage build-info writer -> archive ->
     index) end to end."""
     env = _real_build_env(tmp_path)
     env.pop("BINPKG_FORMAT", None)
@@ -2093,7 +2092,7 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     packages = (Path(env["PKGDIR"]) / "Packages").read_text()
     assert not any(
         line.startswith("SLOT:") for line in packages.splitlines()
-    ), f"default SLOT must be omitted like real's:\n{packages}"
+    ), f"default SLOT must be omitted like Portage's:\n{packages}"
     assert any(
         line.startswith("MD5: ") for line in packages.splitlines()
     ), f"fixed MD5 digest missing:\n{packages}"
@@ -2102,7 +2101,7 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     ), f"fixed SHA1 digest missing:\n{packages}"
     assert any(
         line == "REPO_REVISIONS: {}" for line in packages.splitlines()
-    ), f"sync-less REPO_REVISIONS must be carried like real's:\n{packages}"
+    ), f"sync-less REPO_REVISIONS must be carried like Portage's:\n{packages}"
 
     env["PORTAGE_CHECKSUM_FILTER"] = "-SHA1"
     subprocess.run(
@@ -2118,7 +2117,7 @@ def test_emerge_buildpkgonly_packages_stanza_matches_real_slot_and_digest_rules(
     ), f"MD5 must survive the checksum filter:\n{packages}"
     assert any(
         line.startswith("SHA1: ") for line in packages.splitlines()
-    ), f"SHA1 must survive the checksum filter like real's:\n{packages}"
+    ), f"SHA1 must survive the checksum filter like Portage's:\n{packages}"
 
 
 def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
@@ -2126,7 +2125,7 @@ def test_emerge_buildpkgonly_with_binpkg_format_gpkg_builds_a_real_gpkg_tar(
 ):
     """`BINPKG_FORMAT=gpkg` routes real, unmodified `bin/misc-functions.sh
     __dyn_package` to real, unmodified `bin/gpkg-helper.py compress`
-    (real `portage.gpkg.gpkg().compress()`) instead of the xpak
+    (Portage `portage.gpkg.gpkg().compress()`) instead of the xpak
     `xpak-helper.py` path -- producing a genuine `<cat>/<pf>.gpkg.tar`
     (an outer tar of `gpkg-1` / `metadata.tar.<comp>` / `image.tar.<comp>`
     / `Manifest`). `BINPKG_COMPRESS=gzip` keeps this off `zstd` (the real
@@ -2164,9 +2163,9 @@ def test_emerge_buildpkgonly_make_conf_binpkg_format_xpak_is_obeyed(
 ):
     """Backlog #173: `BINPKG_FORMAT` follows the full config chain --
     calling env over `make.conf` over profile over `make.globals`
-    (real `config` precedence). Hermetically: copy the configroot and
+    (Portage `config` precedence). Hermetically: copy the configroot and
     put `BINPKG_FORMAT="xpak"` in the copy's `make.conf` (no calling-env
-    value). The build then names the old xpak `.tbz2` with real
+    value). The build then names the old xpak `.tbz2` with Portage
     `XPAKPACK` bytes; setting the calling env to `gpkg` on top flips
     that same config back to `.gpkg.tar`, proving the env beats
     `make.conf`. No new fixture ebuild: `packagepkg` is reused, so no
@@ -2211,8 +2210,8 @@ def test_emerge_buildpkgonly_make_conf_binpkg_chain_is_obeyed(
 ):
     """Backlog #180: `PKGDIR` and `BINPKG_COMPRESS` follow the full
     config chain -- calling env over `make.conf` over profile over
-    `make.globals` (real `config` precedence) -- for `xpak` runs, with
-    the Q6 carve-out for `gpkg` runs: real's `environ_filter`
+    `make.globals` (Portage `config` precedence) -- for `xpak` runs, with
+    the Q6 carve-out for `gpkg` runs: Portage's `environ_filter`
     (`special_env_vars.py:280-281`) keeps a calling-environment
     `BINPKG_COMPRESS` out of the phase env, and `bin/gpkg-helper.py`
     rebuilds `portage.settings` from that filtered env plus the config
@@ -2303,14 +2302,14 @@ def test_emerge_buildpkgonly_make_conf_bzip2_command_is_obeyed(
     emerge_binary, tmp_path
 ):
     """Backlog #180: `PORTAGE_BZIP2_COMMAND` follows the full chain too
-    -- calling env over `make.conf`/profile/`make.globals` (real
+    -- calling env over `make.conf`/profile/`make.globals` (Portage
     `cnf/make.globals:105` defaults it to `bzip2`) -- for *both*
     formats, since the key is whitelisted into the phase env, never
     `environ_filter`ed (`special_env_vars.py:143`, absent from `:257`).
     Hermetically: copy the configroot; the copy's `make.conf` sets
     `BINPKG_FORMAT="xpak"`, `BINPKG_COMPRESS="bzip2"` and a bogus
     `PORTAGE_BZIP2_COMMAND`. The build then fails (no
-    `PORTAGE_COMPRESSION_COMMAND` reaches real `__dyn_package`, which
+    `PORTAGE_COMPRESSION_COMMAND` reaches Portage `__dyn_package`, which
     dies on its own guard) -- proving the `make.conf` value is read.
     Setting the calling env to the real `bzip2` on top succeeds with
     `BZh` bytes -- proving the env beats `make.conf`. `packagepkg` is
@@ -2355,21 +2354,21 @@ def test_emerge_buildpkgonly_make_conf_bzip2_command_is_obeyed(
 def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
     emerge_binary, tmp_path
 ):
-    """Real `--buildpkgonly` reads `BINPKG_COMPRESS` from the package's
+    """Portage `--buildpkgonly` reads `BINPKG_COMPRESS` from the package's
     own settings (`doebuild.py:697`, reached through its `package.env`
     match) for the xpak pipe -- backlog #147 S2, oracle S0 B-xpak:
-    real writes a gzip artefact for the matched package (magic
+    Portage writes a gzip artefact for the matched package (magic
     `1f 8b`) and the run-wide fallback for its neighbour. The gpkg
-    half is deliberately not pinned here: real's `gpkg-helper.py`
+    half is deliberately not pinned here: Portage's `gpkg-helper.py`
     reads the *run-wide* settings (`bin/gpkg-helper.py:49`), so
-    per-entry compression is xpak-only by real's own rule (S0
+    per-entry compression is xpak-only by Portage's own rule (S0
     B-gpkg). The run-wide value is deliberately left unset (no
-    calling-env `BINPKG_COMPRESS`): real lets the calling
+    calling-env `BINPKG_COMPRESS`): Portage lets the calling
     environment beat `package.env` for a scalar (#101's
     `[run-wide, pkg, calling-env]` order), so a calling-env value
     would mask the match on both sides -- the unmatched neighbour
     pins the `bzip2` fallback both sides compute with no
-    `BINPKG_COMPRESS` anywhere (real's own `.get` default,
+    `BINPKG_COMPRESS` anywhere (Portage's own `.get` default,
     `doebuild.py:697`; fixture roots carry no `make.globals`
     layer). Both artefacts stay on the single-instance layout: S2
     moves no layout (that is the STOPPED S1 arm, not this slice).
@@ -2411,8 +2410,8 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
     emerge_binary, tmp_path
 ):
     """Backlog #147 S1 ruling (i): the binpkg layout is run-wide-only
-    (real's bintree binds its allocator once, `bintree.py:529-531`),
-    while `BUILD_ID` follows the entry's own token (real
+    (Portage's bintree binds its allocator once, `bintree.py:529-531`),
+    while `BUILD_ID` follows the entry's own token (Portage
     `EbuildBinpkg.py:47-48`) -- oracle S0 A2/D2. An overlay config
     (copytree precedent:
     `test_standalone_ebuild_setup_sees_the_per_package_features`)
@@ -2458,7 +2457,7 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
     )
     assert r.returncode == 0, r.stderr
 
-    # Backlog #173: no `BINPKG_FORMAT` configured here, so the real
+    # Backlog #173: no `BINPKG_FORMAT` configured here, so the Portage
     # `make.globals` default (`gpkg`) names the multi-instance
     # artefacts -- the pre-#173 pin expected the old xpak `.xpak` here.
     twin = pkgdir / "dev-libs/penvcmppkg/penvcmppkg-1.0-1.gpkg.tar"
@@ -2482,7 +2481,7 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
 
 
 # Portage's own committed GnuPG test keyring
-# (`3rdparty/portage/lib/portage/tests/.gnupg` -- the same keys real's
+# (`3rdparty/portage/lib/portage/tests/.gnupg` -- the same keys Portage's
 # own `test_gpkg_gpg.py` signs with): trusted `0x5D90EA06352177F6`,
 # untrusted `0x8812797DDF1DD192`, both with passphrase `GentooTest`.
 _GNUPG_FIXTURE_HOME = (
@@ -2501,8 +2500,7 @@ def _copy_gnupg_home(dest):
 
 def _kill_gpg_agent(home):
     """Best-effort `gpg-agent` shutdown (a signing `gpg` daemonizes its
-    agent, which would otherwise outlive the test session -- real
-    portage's own `conftest.py` does the same)."""
+    agent, which would otherwise outlive the test session -- Portage's own `conftest.py` does the same)."""
     subprocess.run(
         ["gpgconf", "--homedir", str(home), "--kill", "all"],
         stdout=subprocess.DEVNULL,
@@ -2512,8 +2510,8 @@ def _kill_gpg_agent(home):
 
 
 def _signing_env(env, home):
-    """Real `BINPKG_GPG_SIGNING_*` configuration against a test keyring
-    (mirroring real's own `ResolverPlayground` test setup, minus the
+    """Portage `BINPKG_GPG_SIGNING_*` configuration against a test keyring
+    (mirroring Portage's own `ResolverPlayground` test setup, minus the
     `flock` wrapper -- no `/run/lock` dependency)."""
     gpg = shutil.which("gpg") or "/usr/bin/gpg"
     env["BINPKG_GPG_SIGNING_BASE_COMMAND"] = (
@@ -2529,7 +2527,7 @@ def _signing_env(env, home):
 def test_emerge_buildpkgonly_with_binpkg_signing_builds_a_signed_gpkg(
     emerge_binary, tmp_path
 ):
-    """Real `FEATURES=binpkg-signing` (`gpkg.gpkg.create_signature`,
+    """Portage `FEATURES=binpkg-signing` (`gpkg.gpkg.create_signature`,
     `gpkg.py:790`): the real, unmodified `bin/gpkg-helper.py compress`
     signs the `metadata.tar`/`image.tar` members (detached `.sig`
     sidecars) and clear-signs the `Manifest` itself, configured via the
@@ -2571,9 +2569,9 @@ def test_emerge_buildpkgonly_with_binpkg_signing_builds_a_signed_gpkg(
 def test_emerge_buildpkgonly_with_binpkg_signing_but_no_key_is_rejected(
     emerge_binary, tmp_path
 ):
-    """Real `_emerge/actions.py:623-646`'s own pre-build gate: with
+    """Portage `_emerge/actions.py:623-646`'s own pre-build gate: with
     `FEATURES=binpkg-signing` but no `BINPKG_GPG_SIGNING_GPG_HOME`/`KEY`
-    configured, real prints `!!! {var} is not set` and exits 1 *before*
+    configured, Portage prints `!!! {var} is not set` and exits 1 *before*
     building anything."""
     env = _real_build_env(tmp_path)
     env["BINPKG_FORMAT"] = "gpkg"
@@ -2658,7 +2656,7 @@ def test_emerge_getbinpkgonly_merges_a_signed_gpkg_after_verifying(
     """The full round trip: a `file://` binhost serves the committed
     signed fixture; `emerge --getbinpkgonly` (no `--pretend`)
     downloads it, verifies the Manifest clear-sign + detached `.sig`
-    sidecars against the test keyring (real `_verify_binpkg`'s own GPG
+    sidecars against the test keyring (Portage `_verify_binpkg`'s own GPG
     layer), and merges it -- image file under `ROOT`, real vdb entry."""
     if shutil.which("gpg") is None:
         pytest.skip("gpg not available")
@@ -2673,10 +2671,10 @@ def test_emerge_getbinpkgonly_merges_a_signed_gpkg_after_verifying(
         env=env,
     )
     assert result.returncode == 0, (result.stdout, result.stderr)
-    # Backlog #177: real `MergeListItem._start`'s binary arm prints
+    # Backlog #177: Portage `MergeListItem._start`'s binary arm prints
     # `Emerging binary (N of M) cpv::repo` (`REPO: gentoo` is the
     # fixture `Packages` index's own claim); `Installing`/`Completed`
-    # follow from real `PackageMerge`.
+    # follow from Portage `PackageMerge`.
     assert f">>> Emerging binary (1 of 1) dev-libs/gpgsignedpkg-1.0::gentoo for {env['ROOT']}" in result.stdout
     assert f">>> Installing (1 of 1) dev-libs/gpgsignedpkg-1.0::gentoo to {env['ROOT']}" in result.stdout
     assert f">>> Completed (1 of 1) dev-libs/gpgsignedpkg-1.0::gentoo to {env['ROOT']}" in result.stdout
@@ -2690,7 +2688,7 @@ def test_emerge_getbinpkgonly_rejects_a_signed_gpkg_from_an_unknown_key(
     emerge_binary, tmp_path
 ):
     """Same round trip, but the verify keyring is empty: no `GOODSIG`
-    from a trusted key is possible, so the merge fails with real's own
+    from a trusted key is possible, so the merge fails with Portage's own
     "signed with at least one unknown key" failure -- and nothing is
     merged. Proves verification is enforced, not merely attempted."""
     if shutil.which("gpg") is None:
@@ -2720,14 +2718,14 @@ def test_emerge_getbinpkgonly_rejects_a_signed_gpkg_from_an_unknown_key(
 def test_emerge_buildpkgonly_multi_instance_gpkg_exports_a_real_build_id(
     emerge_binary, tmp_path
 ):
-    """Real `EbuildBinpkg._start`'s own condition, exactly: `if
+    """Portage `EbuildBinpkg._start`'s own condition, exactly: `if
     "binpkg-multi-instance" in self.settings.features: self.settings[
     "BUILD_ID"] = str(build_id)` (`EbuildBinpkg.py:47-48`). Previously
     `BUILD_ID` was never exported to the `package` phase at all, so the
     archive itself never got a real `build-info/BUILD_ID` file (only the
     `$PKGDIR/Packages` *index* entry carried it) -- `invoke_dyn_package`
     now exports it whenever one is allocated. `FEATURES=packdebug
-    splitdebug` is added here too: real `__generate_packdebug` needs
+    splitdebug` is added here too: Portage `__generate_packdebug` needs
     that same `BUILD_ID` and was consequently dead code regardless of
     what was requested; with no compiled binaries to strip in this
     fixture its own early-return guard is a clean no-op, but the whole
@@ -2745,7 +2743,7 @@ def test_emerge_buildpkgonly_multi_instance_gpkg_exports_a_real_build_id(
     )
     assert f">>> Emerging (1 of 1) dev-libs/packagepkg-1.0::testrepo for {FIXTURES_ROOT}" in result.stdout
 
-    # Real `bintree._allocate_filename_multi`: `<cat>/<pn>/<pf>-<build_id>.gpkg.tar`.
+    # Portage `bintree._allocate_filename_multi`: `<cat>/<pn>/<pf>-<build_id>.gpkg.tar`.
     gpkg = Path(env["PKGDIR"]) / "dev-libs/packagepkg/packagepkg-1.0-1.gpkg.tar"
     assert gpkg.is_file()
 
@@ -2764,7 +2762,7 @@ def test_emerge_buildpkgonly_multi_instance_gpkg_exports_a_real_build_id(
 def test_emerge_buildpkgonly_with_pretend_stays_dry_run(emerge_binary, tmp_path):
     """The exact same atom as the real-build test above, but with
     `--pretend` also given -- must stay a pure dry-run report, matching
-    real portage's own `--pretend` always suppressing every real action
+    Portage's own `--pretend` always suppressing every real action
     regardless of what else is requested alongside it."""
     env = _real_build_env(tmp_path)
     result = subprocess.run(
@@ -2782,9 +2780,9 @@ def test_emerge_buildpkgonly_with_pretend_stays_dry_run(emerge_binary, tmp_path)
 def test_emerge_regen_regenerates_md5_cache_from_the_depend_phase(
     emerge_binary, tmp_path
 ):
-    """`emerge --regen` (real action_regen -> MetadataRegen): run every
+    """`emerge --regen` (Portage action_regen -> MetadataRegen): run every
     ebuild's `depend` phase and (re)write `metadata/md5-cache/<cat>/<pf>`
-    in real portage.cache.flat_hash format -- sorted keys, empty values
+    in Portage's `portage.cache.flat_hash` format -- sorted keys, empty values
     omitted, `_md5_=<md5 of the ebuild>` last. Exercised on a tiny
     standalone repo so it stays fast. Then a resolve against the freshly
     generated cache must work."""
@@ -2842,7 +2840,7 @@ def test_emerge_regen_regenerates_md5_cache_from_the_depend_phase(
         f"_md5_={md5}\n"
     )
 
-    # `--pretend` is rejected outright (real actions.py:4106).
+    # `--pretend` is rejected outright (Portage actions.py:4106).
     rej = subprocess.run(
         [str(emerge_binary), "-p", "--regen"],
         capture_output=True,
@@ -2860,7 +2858,7 @@ def test_cache_less_repo_metadata_falls_back_to_the_depend_phase(
     emerge_binary, tmp_path
 ):
     """#41 C2: a repo with no `metadata/md5-cache` resolves through the
-    registered depend-phase metadata provider -- real `porttree.py`'s
+    registered depend-phase metadata provider -- Portage `porttree.py`'s
     ebuild fallback (`_pull_valid_cache` miss -> `doobuild(mydo="depend")`,
     C0's oracle: `emerge -p porttest/docs` resolves to
     `[ebuild  N] porttest/docs-1.0`). The provider is registered by the
@@ -2918,7 +2916,7 @@ def test_cache_less_repo_metadata_falls_back_to_the_depend_phase(
     assert not cache.exists()
 
     # Concurrent resolutions share the builddir (`PORTAGE_TMPDIR`) but not
-    # the depend phase's metadata hand-off: real reads it from a private
+    # the depend phase's metadata hand-off: Portage reads it from a private
     # pipe. A fixed file name there let one process delete another's
     # metadata and report "no ebuilds" (found by the corpus replay,
     # docs/second_python_copy_removal.md §9).
@@ -2953,7 +2951,7 @@ def test_cache_less_repo_metadata_falls_back_to_the_depend_phase(
 
 
 def test_cache_less_repo_metadata_is_written_to_the_depcache(emerge_binary, tmp_path):
-    """#41 C3: real keeps a regenerated `depend`-phase metadata dict in the
+    """#41 C3: Portage keeps a regenerated `depend`-phase metadata dict in the
     writable `depcachedir` in its flat `md5-dict` layout
     (`<depcachedir>/<repo path without the leading '/'>/<cat>/<pf>`,
     `cache/flat_hash.py:20-22`, C0's oracle) and `_pull_valid_cache`
@@ -3048,7 +3046,7 @@ def test_cache_less_repo_metadata_is_written_to_the_depcache(emerge_binary, tmp_
 
 
 # -- #46 S3: a present-but-stale metadata/md5-cache entry is validated
-# in the read path (real `_pull_valid_cache`) -- C0's P6/P7/P8 and S0's
+# in the read path (Portage `_pull_valid_cache`) -- C0's P6/P7/P8 and S0's
 # cells (a)/(d)/(f). Rust-only (E7).
 
 
@@ -3109,7 +3107,7 @@ def _stage_md5_validation_repo(emerge_binary, tmp_path, ebuild_text, *,
 def test_stale_md5_cache_entry_is_regenerated_from_the_ebuild(emerge_binary, tmp_path):
     """#46 S3, cell (f) of the S0 oracle: the committed cache says
     `KEYWORDS=~amd64` with a placeholder `_md5_`, the ebuild says
-    `amd64` -- real ignores the stale entry, runs the depend phase and
+    `amd64` -- Portage ignores the stale entry, runs the depend phase and
     resolves per the *ebuild* (C0's P8 shape with a visible
     consequence). Portuale must not resolve the `~amd64` mask."""
     import hashlib
@@ -3158,7 +3156,7 @@ def test_valid_md5_cache_entry_is_trusted_even_when_the_ebuild_differs(
 
 def test_eclass_change_invalidates_the_md5_cache_entry(emerge_binary, tmp_path):
     """#46 S3, cell (a) of the S0 oracle: the entry validates against the
-    old eclass, the eclass content changes, and real re-runs the depend
+    old eclass, the eclass content changes, and Portage re-runs the depend
     phase. The depcachedir write-back carries the *depcache* format
     (`name\tdir\tmd5` triples, S0's `mtime_md5_database` shape)."""
     import hashlib
@@ -3189,9 +3187,9 @@ def test_stale_entry_whose_depend_phase_fails_is_not_a_candidate(emerge_binary, 
     """#46 S3, cell (d) of the S0 oracle: a stale entry whose ebuild
     fails the depend phase (a backquoted `DESCRIPTION` is command
     substitution) is treated as a miss that cannot be replaced -- never
-    a fall-back to the stale data (E5). Real prints the phase's ERROR
+    a fall-back to the stale data (E5). Portage prints the phase's ERROR
     block and reports `masked by: corruption`; portuale drops the
-    candidate and reports real's no-ebuilds-to-satisfy shape, exit 1
+    candidate and reports Portage's no-ebuilds-to-satisfy shape, exit 1
     (documented narrowing), and writes nothing to the depcachedir."""
     ebuild_text = 'EAPI=8\nDESCRIPTION="clean at write time"\nSLOT="0"\nKEYWORDS="amd64"\n'
     _, ebuild, entry, _, resolve = _stage_md5_validation_repo(
@@ -3254,11 +3252,11 @@ def test_pms_first_cache_formats_ignores_a_valid_md5_cache_entry(
 def test_metadata_transfer_features_ignores_a_valid_md5_cache_entry(
     emerge_binary, tmp_path
 ):
-    """#55 S2, S0 cell g: real `porttree.py:322` skips
+    """#55 S2, S0 cell g: Portage `porttree.py:322` skips
     `_create_pregen_cache` when `FEATURES` names `metadata-transfer`, so
     a valid md5-cache entry with masking `KEYWORDS` is ignored and the
     ebuild's metadata (depend phase, written back to the depcachedir)
-    resolves the package. The token rides the calling env, real's
+    resolves the package. The token rides the calling env, Portage's
     highest-priority `env` layer. Rust-only (the fallback needs the
     phase)."""
     import hashlib
@@ -3284,7 +3282,7 @@ def test_metadata_transfer_features_ignores_a_valid_md5_cache_entry(
 def test_emerge_regen_skips_a_repo_whose_cache_formats_have_no_md5_dict(
     emerge_binary, tmp_path
 ):
-    """#55 S2 (L3), S0 cell h1: real `egencache --update` writes
+    """#55 S2 (L3), S0 cell h1: Portage `egencache --update` writes
     `metadata/cache` for `cache-formats = pms` and never touches
     `metadata/md5-cache`; portuale has no pms writer, so `--regen` skips
     the repo with a message and exit 1 instead of writing the wrong
@@ -3325,7 +3323,7 @@ def test_emerge_regen_skips_a_repo_whose_cache_formats_have_no_md5_dict(
 
 
 def test_emerge_regen_prunes_a_stale_cache_entry(emerge_binary, tmp_path):
-    """Real `MetadataRegen._cleanup`'s "global cleanse"
+    """Portage `MetadataRegen._cleanup`'s "global cleanse"
     (`MetadataRegen.py:142-189`): a plain, unfiltered `--regen` diffs the
     on-disk `metadata/md5-cache` against every ebuild actually found this
     run and deletes any entry whose ebuild has since vanished. Build a
@@ -3382,13 +3380,13 @@ def test_emerge_regen_prunes_a_stale_cache_entry(emerge_binary, tmp_path):
 def test_emerge_regen_finds_an_inherited_eclass_across_the_masters_chain(
     emerge_binary, tmp_path
 ):
-    """Real `eclass_cache.cache.update_eclasses` walks a repo's own
+    """Portage `eclass_cache.cache.update_eclasses` walks a repo's own
     masters chain (`repository/config.py:1267-1276`: masters first, in
     declared order, then the repo itself), not just the repo's own
     `eclass/` dir. An ebuild in an overlay that inherits an eclass which
     only exists in the overlay's master must still get a real `md5`
     for it in `_eclasses_`, instead of the field being silently dropped
-    (real `_eclasses_` is only absent when nothing was inherited at
+    (Portage `_eclasses_` is only absent when nothing was inherited at
     all)."""
     import hashlib
 
@@ -3440,7 +3438,7 @@ def test_emerge_regen_finds_an_inherited_eclass_across_the_masters_chain(
     eclass_md5 = hashlib.md5(eclass_text.encode()).hexdigest()
     lines = entry.read_text().splitlines()
     assert f"_eclasses_=regenclass\t{eclass_md5}" in lines
-    # Real `EbuildMetadataPhase._async_start` pops the phase-env
+    # Portage `EbuildMetadataPhase._async_start` pops the phase-env
     # `INHERITED` before the cache write and records `INHERIT` +
     # `_eclasses_` instead; the writer must not emit `INHERITED`.
     assert "INHERIT=regenclass" in lines
@@ -3448,7 +3446,7 @@ def test_emerge_regen_finds_an_inherited_eclass_across_the_masters_chain(
 
 
 def test_emerge_regen_jobs_parallel_matches_serial_cache_bytes(emerge_binary, tmp_path):
-    """`emerge --regen --jobs` (real `action_regen` -> `MetadataRegen`'s
+    """`emerge --regen --jobs` (Portage `action_regen` -> `MetadataRegen`'s
     `AsyncScheduler`: up to `--jobs` `depend` phases concurrently, the
     `--load-average` gate holding off additional ones): only wall-clock
     time changes -- the cache *content* is byte-identical to a serial
@@ -3457,7 +3455,7 @@ def test_emerge_regen_jobs_parallel_matches_serial_cache_bytes(emerge_binary, tm
     snapshot every cache file's bytes, wipe the cache, regen with
     `--jobs=4` (plus a `--load-average` no real load can reach, which
     must never throttle), and diff both the bytes and stdout. A
-    `--jobs=0` run (real `main.py`: CPU count) must also succeed with
+    `--jobs=0` run (Portage `main.py`: CPU count) must also succeed with
     identical bytes."""
     repo = tmp_path / "repo"
     (repo / "dev-libs" / "regenpkg").mkdir(parents=True)
@@ -3537,7 +3535,7 @@ def test_emerge_regen_jobs_parallel_matches_serial_cache_bytes(emerge_binary, tm
 def test_emerge_regen_skips_the_depend_phase_when_the_cache_entry_is_valid(
     emerge_binary, tmp_path
 ):
-    """Real `MetadataRegen._iter_metadata_processes`'s
+    """Portage `MetadataRegen._iter_metadata_processes`'s
     `portdb._pull_valid_cache(cpv, ebuild_path, repo_path)` shortcut
     (`porttree.py:603-658` + `cache/template.py::validate_entry`):
     when the on-disk `metadata/md5-cache/<cat>/<pf>` entry is already
@@ -3621,7 +3619,7 @@ def test_emerge_regen_skips_the_depend_phase_when_the_cache_entry_is_valid(
         in entry.read_text().split("_md5_=")[1]
     )
 
-    # A changed eclass invalidates via `_eclasses_` (real
+    # A changed eclass invalidates via `_eclasses_` (Portage
     # `eclass_cache.validate_and_rewrite_cache`): the inherited
     # entry's `_eclasses_` md5 follows the eclass file.
     (repo / "eclass" / "regenclass.eclass").write_text("# fixture eclass v2\n")
@@ -3634,12 +3632,12 @@ def test_emerge_regen_skips_the_depend_phase_when_the_cache_entry_is_valid(
 def test_emerge_regen_retries_a_cp_on_an_unexpected_returncode(
     emerge_binary, tmp_path
 ):
-    """Real `metadata_regen_retry` (`MetadataRegen.py:15-52`) + `_task_exit`
+    """Portage `metadata_regen_retry` (`MetadataRegen.py:15-52`) + `_task_exit`
     (`MetadataRegen.py:199-212`): a `depend` phase that dies with an
     *unexpected* returncode (anything but 1) re-runs its whole cp, up to
-    3 passes total (real `max_tries=3`); a returncode-1 ("expected")
+    3 passes total (Portage `max_tries=3`); a returncode-1 ("expected")
     failure never retries. A finally-failed cpv is dropped from the
-    valid set before pruning (real `_task_exit`'s `_valid_pkgs.discard`),
+    valid set before pruning (Portage `_task_exit`'s `_valid_pkgs.discard`),
     so a failed ebuild never leaves a (stale) cache entry behind."""
     repo = tmp_path / "repo"
     (repo / "dev-libs" / "goodpkg").mkdir(parents=True)
@@ -3654,7 +3652,7 @@ def test_emerge_regen_retries_a_cp_on_an_unexpected_returncode(
     (repo / "dev-libs" / "expfailpkg" / "expfailpkg-1.0.ebuild").write_text(
         'EAPI=8\ninherit nosucheclass\nSLOT="0"\n'
     )
-    # Top-level `exit 2`: an unexpected returncode (like real's sandbox
+    # Top-level `exit 2`: an unexpected returncode (like Portage's sandbox
     # hit, which reports 2), so this whole cp is re-run.
     (repo / "dev-libs" / "retryfailpkg" / "retryfailpkg-1.0.ebuild").write_text(
         'EAPI=8\nexit 2\nSLOT="0"\n'
@@ -3688,7 +3686,7 @@ def test_emerge_regen_retries_a_cp_on_an_unexpected_returncode(
     assert result.returncode == 1
     # Three passes total: the initial full run plus two retries of the
     # unexpectedly-failed cp, each reprinting the header and its
-    # `Processing` line (one `MetadataRegen` instance per pass in real).
+    # `Processing` line (one `MetadataRegen` instance per pass in Portage).
     assert result.stdout.count("Regenerating cache entries...") == 3
     assert result.stdout.count("Processing dev-libs/retryfailpkg") == 3
     # The expected-failure cp and the good cp run exactly once.
@@ -3762,7 +3760,7 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
     assert emerging in result.stdout
     assert installing in result.stdout
     assert completed in result.stdout
-    # Backlog #177 review: real's `Installing` fires between the build
+    # Backlog #177 review: Portage's `Installing` fires between the build
     # and the merge (successful `EbuildBuild` → `Scheduler._build_exit`
     # → `PackageMerge._start`, `Scheduler.py:1615-1621`), never before
     # the build phases run.
@@ -3777,7 +3775,7 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
     assert "/usr/share/packagepkg/hello.txt" in (vdb / "CONTENTS").read_text()
     assert (vdb / "RDEPEND").read_text().strip() == "dev-libs/samepkg"
 
-    # Real Scheduler._world_atom: the target was recorded in the world
+    # Portage Scheduler._world_atom: the target was recorded in the world
     # file (sorted, existing entries preserved; the RDEPEND `samepkg`,
     # only a dependency, is NOT added).
     assert ">>> Recording dev-libs/packagepkg in \"world\" favorites file..." in result.stdout
@@ -3790,7 +3788,7 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
 def test_emerge_failed_build_prints_emerging_but_no_installing_line(
     emerge_binary, tmp_path
 ):
-    """Real `Scheduler._build_exit` queues a `PackageMerge` (the task
+    """Portage `Scheduler._build_exit` queues a `PackageMerge` (the task
     whose `_start` prints `>>> Installing (N of M)`, and whose
     `_install_exit` prints `>>> Completed`) only for a *successful*
     build (`Scheduler.py:1615-1621`); a failed build prints `Emerging`
@@ -3845,7 +3843,7 @@ def test_emerge_failed_build_prints_emerging_but_no_installing_line(
         f">>> Emerging (1 of 1) dev-libs/failpkg-1.0::main for {root}"
         in result.stdout
     )
-    # The build died, so real queues no merge: neither follow-up line.
+    # The build died, so Portage queues no merge: neither follow-up line.
     assert ">>> Installing" not in result.stdout
     assert ">>> Completed" not in result.stdout
     assert "merge failed" in result.stderr
@@ -3858,8 +3856,8 @@ def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
     in an earlier phase must not be written, while one it still has a
     value for must be.
 
-    Real `bin/phase-functions.sh`'s `__dyn_install` loop writes an aux
-    file only when its value is non-empty, and real
+    Portage `bin/phase-functions.sh`'s `__dyn_install` loop writes an aux
+    file only when its value is non-empty, and Portage
     `config.environ()`'s `filter_calling_env`
     (`lib/portage/package/ebuild/config.py:3275-3305`, bug #189417) is
     what keeps `unset CFLAGS` -- `dev-build/ninja-1.13.2-r1`'s own
@@ -3867,7 +3865,7 @@ def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
     leaking back into `src_install`. Before the fix portuale re-injected
     the config `CFLAGS` into every later phase, so `src_install` still saw
     it, `build-info/CFLAGS` existed, and the vdb carried a `CFLAGS` row
-    real omits (l3-20260925T074707Z Class 4). `CXXFLAGS`, never unset in
+    Portage omits (l3-20260925T074707Z Class 4). `CXXFLAGS`, never unset in
     the ebuild, is the control: its row must stay. The whole shape is a
     merged-vdb set difference, so it only shows on a real merge -- a
     `--pretend` run never writes a vdb (this pin is therefore real
@@ -3913,8 +3911,8 @@ def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
 def test_emerge_atom_docompress_compresses_docs_and_repairs_symlinks(
     emerge_binary, tmp_path
 ):
-    """#38 S1: the real `install_qa_check` `binpkg-docompress` gate
-    (`misc-functions.sh:147-152`) runs real `bin/ecompress` over `${D}`
+    """#38 S1: the Portage `install_qa_check` `binpkg-docompress` gate
+    (`misc-functions.sh:147-152`) runs Portage `bin/ecompress` over `${D}`
     when the phase env carries `PORTAGE_COMPRESS` plus the resolved
     `FEATURES` token. `dev-libs/doccompresspkg` installs a >128 B doc
     (`PORTAGE_DOCOMPRESS_SIZE_LIMIT`), a smaller one, and a symlink into
@@ -3922,7 +3920,7 @@ def test_emerge_atom_docompress_compresses_docs_and_repairs_symlinks(
     in both the merged tree and `CONTENTS`, the small one must stay
     plain, and the link must be repaired to `link-to-big.txt.bz2 ->
     BIG.txt.bz2`. `FEATURES`/`PORTAGE_COMPRESS` are set on the calling
-    env, real's highest config layer (the fixture root ships no
+    env, Portage's highest config layer (the fixture root ships no
     `make.globals`)."""
     if shutil.which("bzip2") is None:
         pytest.skip("bzip2 not available on the host")
@@ -3962,7 +3960,7 @@ def test_emerge_atom_docompress_compresses_docs_and_repairs_symlinks(
 def test_emerge_instprep_compresses_at_merge_for_source_and_binary(
     emerge_binary, tmp_path
 ):
-    """#38 S4: real `dblink.treewalk()` runs the `instprep` phase
+    """#38 S4: Portage `dblink.treewalk()` runs the `instprep` phase
     (`misc-functions.sh __dyn_instprep`) on every merge. Under
     `FEATURES=-binpkg-docompress` the `install_qa_check` gate is off, so
     the `--buildpkgonly` archive keeps a plain `BIG.txt` and the
@@ -4066,8 +4064,8 @@ def test_emerge_emptytree_without_pretend_really_merges(emerge_binary, tmp_path)
 
 
 def test_emerge_debug_flag_enables_set_x_in_the_build_phases(emerge_binary, tmp_path):
-    """`emerge --debug`/`-d` (real main.py:1235) sets PORTAGE_DEBUG=1 in
-    every phase environment, so real bin/ebuild.sh's `set -x` guard fires
+    """`emerge --debug`/`-d` (Portage main.py:1235) sets PORTAGE_DEBUG=1 in
+    every phase environment, so Portage bin/ebuild.sh's `set -x` guard fires
     during the source build -- the same real effect as `ebuild --debug`,
     now threaded through emerge's own MergeOptions. A plain `emerge
     <atom>` build emits no `+ ` trace lines; `emerge --debug <atom>`
@@ -4143,12 +4141,12 @@ def test_emerge_atom_source_build_sees_the_resolved_use_and_build_flags(
 def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     emerge_binary, tmp_path
 ):
-    """The non-`USE` half of `package.env` (real `_grab_pkg_env` into
+    """The non-`USE` half of `package.env` (Portage `_grab_pkg_env` into
     `configdict["pkg"]`): `fixtures/etc/portage/package.env` maps
     `dev-libs/penvbuildpkg` to the env file `penv-buildflags`, which sets
-    `CFLAGS`/`MAKEOPTS` plus real's toolchain selectors
+    `CFLAGS`/`MAKEOPTS` plus Portage's toolchain selectors
     (`CC`/`CXX`/`AR`/`RUSTFLAGS`) and the `ENV_UNSET` incremental
-    (backlog #95). Real's `USE_ORDER` (`config.py:1031-1035`) puts the
+    (backlog #95). Portage's `USE_ORDER` (`config.py:1031-1035`) puts the
     calling-environment `env` layer above the `pkg` layer, so a scalar
     the process carries wins over the env file (backlog #101, S0 cell
     A): with `CFLAGS`/`MAKEOPTS` in the process env the phase sees the
@@ -4168,7 +4166,7 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
     # The run-wide values -- the calling env wins over package.env for
-    # these two keys (real's `env`-over-`pkg` layer order, #101 S0 A).
+    # these two keys (Portage's `env`-over-`pkg` layer order, #101 S0 A).
     env["CFLAGS"] = "-O2 -pipe"
     env["MAKEOPTS"] = "-j3"
     # Isolation: no other env-file key may leak in from the ambient
@@ -4204,7 +4202,7 @@ def test_emerge_atom_source_build_package_env_applies_when_the_process_is_silent
     none of the env file's keys, the whole `penv-buildflags` set reaches
     the phase (`PENVBUILDPKG_FLAGS` verbatim). Together the two pins show
     the winner is per-key -- the calling env where set, the env file
-    where it is not -- which is real's `env`-over-`pkg` layer order, not
+    where it is not -- which is Portage's `env`-over-`pkg` layer order, not
     a run-wide clobber in either direction."""
     root = tmp_path / "root"
     import shutil
@@ -4234,7 +4232,7 @@ def test_standalone_ebuild_setup_sees_the_full_resolved_config_env(
     ebuild_binary, tmp_path
 ):
     """Backlog #100 (S0 cell F): a standalone `ebuild <file> setup`
-    exports real's full resolved config env (`config.environ()`), not
+    exports Portage's full resolved config env (`config.environ()`), not
     the old narrow `BUILD_VARS` base. Hermetically: copy the configroot,
     put `CC="makeconf-cc"` in the copy's `make.conf` (no package.env
     entry), and the `dev-libs/envdumppkg` `pkg_setup` dump shows
@@ -4332,7 +4330,7 @@ def test_standalone_ebuild_setup_fails_for_a_missing_per_package_tmpdir(
     ebuild_binary, tmp_path
 ):
     """Backlog #99 (S0 cell E, standalone): the env file names a
-    `PORTAGE_TMPDIR` that does not exist -- real fails with its exact
+    `PORTAGE_TMPDIR` that does not exist -- Portage fails with its exact
     `_check_temp_dir` text and exit 1, and so does portuale."""
     probe = tmp_path / "probe-tmp"  # deliberately not created
     cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
@@ -4388,7 +4386,7 @@ def test_emerge_atom_source_build_fails_for_a_missing_per_package_tmpdir(
     emerge_binary, tmp_path
 ):
     """Backlog #99 (S0 cell E, merge scheduler): the missing directory
-    aborts the entry before anything runs, with real's text and exit 1."""
+    aborts the entry before anything runs, with Portage's text and exit 1."""
     import shutil
 
     probe = tmp_path / "probe-tmp"  # deliberately not created
@@ -4437,7 +4435,7 @@ def _cfg_with_splitdebug_env(tmp_path, process_features):
 
 def _debug_trees(root):
     """Merged `.debug` files per probe binary (empty when estrip did not
-    split). Layout-tolerant: real nests them under `usr/lib/debug/` with
+    split). Layout-tolerant: Portage nests them under `usr/lib/debug/` with
     `.build-id` links beside them."""
     probe = sorted(
         str(p.relative_to(root))
@@ -4530,11 +4528,11 @@ def test_standalone_ebuild_setup_sees_the_per_package_features(
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     emerge_binary, tmp_path
 ):
-    """`FEATURES=buildpkg` / `--buildpkg`/`-b` (real _emerge/EbuildBinpkg):
+    """`FEATURES=buildpkg` / `--buildpkg`/`-b` (Portage _emerge/EbuildBinpkg):
     a source `emerge <atom>` also writes a binpkg into $PKGDIR (before the
     vdb merge), then merges normally. `--buildpkg=n` wins over the
     FEATURE. With no `BINPKG_FORMAT` configured, the artefact is a
-    `.gpkg.tar` -- real `cnf/make.globals:43`'s own default (backlog
+    `.gpkg.tar` -- Portage `cnf/make.globals:43`'s own default (backlog
     #173; the pre-#173 pin expected the old xpak `.tbz2` here)."""
     import shutil
     import tarfile as _tarfile
@@ -4633,7 +4631,7 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
 def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     emerge_binary, tmp_path
 ):
-    """Real portage merges a local `$PKGDIR` binary on `-k`/`--usepkg`
+    """Portage merges a local `$PKGDIR` binary on `-k`/`--usepkg`
     (or `-K`) alone -- `--getbinpkg` is only about *also* consulting a
     remote binhost. Regression test for L1-b (portuale gated binary-merge
     *execution* on `--getbinpkg` even for a purely local `$PKGDIR`,
@@ -4673,18 +4671,18 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     assert (root / "usr/share/packagepkg/hello.txt").is_file()
 
 
-def test_emerge_without_display_flags_shows_no_merge_list_like_real(
+def test_emerge_without_display_flags_shows_no_merge_list_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #185: a real non-`--pretend` `emerge` with no display flags
+    """Backlog #185: a Portage non-`--pretend` `emerge` with no display flags
     shows no merge list before merging -- only the resolution-phase
-    display. Real `_emerge/actions.py:464-469` (the `mergelist_shown`
+    display. Portage `_emerge/actions.py:464-469` (the `mergelist_shown`
     branch) shows the list only with `--ask`, `--tree` or `--verbose`;
     the m185 container probe (`emerge --oneshot --usepkgonly
-    probe/probe-a` in six shapes, real 3.0.81.3 -- gating identical in
+    probe/probe-a` in six shapes, Portage 3.0.81.3 -- gating identical in
     3.0.82.2 by source read) shows the plain shape printing
-    `Calculating dependencies ... done!` (real `stdout_spinner.py`,
-    STATIC mode) plus the timing line (real
+    `Calculating dependencies ... done!` (Portage `stdout_spinner.py`,
+    STATIC mode) plus the timing line (Portage
     `depgraph.py::_show_resolution_report`; the wall-clock seconds are
     cut per the #135 determinism precedent, only the `backtrack: B/M`
     signal is kept) and no list before the first `>>>`."""
@@ -4724,31 +4722,31 @@ def test_emerge_without_display_flags_shows_no_merge_list_like_real(
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
 
 
-def test_emerge_oneshot_prints_news_count_notice_twice_like_real(
+def test_emerge_oneshot_prints_news_count_notice_twice_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #196: a real non-`--pretend` `emerge` prints the GLEP 42
-    news-count notice twice -- once before resolution (real
+    """Backlog #196: a Portage non-`--pretend` `emerge` prints the GLEP 42
+    news-count notice twice -- once before resolution (Portage
     `_emerge/actions.py:4264`, `run_action`, only when `--pretend` is
-    absent) and again after the merge (real `_emerge/post_emerge.py:155`,
-    `post_emerge`, once the vdb changed). Both go through real
+    absent) and again after the merge (Portage `_emerge/post_emerge.py:155`,
+    `post_emerge`, once the vdb changed). Both go through Portage
     `post_emerge.py:37` `display_news_notification` (gated on `news` in
-    FEATURES plus a nonzero unread count, counted by real
-    `portage/news.py` `NewsManager`), printing real
+    FEATURES plus a nonzero unread count, counted by Portage
+    `portage/news.py` `NewsManager`), printing Portage
     `news.py:509` `display_news_notifications`' text:
     ` * IMPORTANT: N news items need reading for repository '<repo>'.`
     plus ` * Use eselect news read to view new items.`. The m185
     container probe shows the pre-resolution notice standing first in
-    real's pre-`>>>` output (news, blank, header, `Calculating...`).
+    Portage's pre-`>>>` output (news, blank, header, `Calculating...`).
     The fixture testrepo carries thirteen news items, five of them
     relevant (see `test_check_news_counts_unread_relevant_items`), so
-    the hermetic count here is 5. Real `display_news_notification` is
+    the hermetic count here is 5. Portage `display_news_notification` is
     gated on `news` in FEATURES; the fixture config root ships no
     `make.globals` (and the suite strips the calling-env `FEATURES`),
     so this test opts in with `FEATURES="news"` -- the same layering a
-    real `FEATURES="news" emerge ...` invocation uses. The
+    Portage `FEATURES="news" emerge ...` invocation uses. The
     `--buildpkgonly` step shows the pre-resolution notice only: it
-    never merges, so real's `_pkgs_changed` stays false and its
+    never merges, so Portage's `_pkgs_changed` stays false and its
     `post_emerge` early-returns with no second notice."""
     import shutil
 
@@ -4790,7 +4788,7 @@ def test_emerge_oneshot_prints_news_count_notice_twice_like_real(
     )
     assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
     assert (root / "var/db/pkg/dev-libs/packagepkg-1.0/CONTENTS").is_file()
-    # Real `NewsManager.updateItems`' own write-back: the evaluated
+    # Portage `NewsManager.updateItems`' own write-back: the evaluated
     # items sit in `.unread` (and `.skip`) under ROOT.
     unread = (root / "var/lib/gentoo/news/news-testrepo.unread").read_text().splitlines()
     assert len(unread) == 5
@@ -4799,7 +4797,7 @@ def test_emerge_oneshot_prints_news_count_notice_twice_like_real(
 def test_emerge_buildpkgonly_without_news_feature_prints_no_notice(
     emerge_binary, tmp_path
 ):
-    """Backlog #196, the FEATURES gate: real
+    """Backlog #196, the FEATURES gate: Portage
     `_emerge/post_emerge.py:38` skips the notice wholesale unless
     `news` is in `FEATURES` (no evaluation, no output, no state
     files) -- so a non-`--pretend` run without the feature prints no
@@ -4831,7 +4829,7 @@ def test_emerge_buildpkgonly_without_news_feature_prints_no_notice(
 def _news_env(tmp_path, name):
     """Backlog #196 fix round 1: an isolated ROOT (a copy of the
     fixtures' `var`, so merges/unmerges never touch the git-tracked
-    tree) with `FEATURES="news"` opted in -- the same layering a real
+    tree) with `FEATURES="news"` opted in -- the same layering a Portage
     `FEATURES="news" emerge ...` invocation uses. Returns `(root,
     env)`."""
     import shutil
@@ -4857,20 +4855,20 @@ def _news_env(tmp_path, name):
     return root, env
 
 
-def test_emerge_pretend_prints_news_count_notice_at_the_end_like_real(
+def test_emerge_pretend_prints_news_count_notice_at_the_end_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #196 fix round 1: real `emerge --pretend` prints the
-    GLEP 42 count notice at the end of the run (real
+    """Backlog #196 fix round 1: Portage's `emerge --pretend` prints the
+    GLEP 42 count notice at the end of the run (Portage
     `_emerge/post_emerge.py:112-117`, `post_emerge`: the vdb never
     changes under `--pretend`, so the `--pretend` arm prints the
-    notice through real `post_emerge.py:37`
+    notice through Portage `post_emerge.py:37`
     `display_news_notification` -- gated on `news` in FEATURES plus a
-    nonzero unread count, counted by real `portage/news.py`
+    nonzero unread count, counted by Portage `portage/news.py`
     `NewsManager`). There is no pre-resolution notice under
-    `--pretend` (real `_emerge/actions.py:4264` only fires when
+    `--pretend` (Portage `_emerge/actions.py:4264` only fires when
     `--pretend` is absent), so exactly one notice appears, after the
-    merge list -- and real's own `updateItems` write-back lands in
+    merge list -- and Portage's own `updateItems` write-back lands in
     `.unread` under ROOT, like on every other notice path."""
     root, env = _news_env(tmp_path, "root-pretend-news")
 
@@ -4886,12 +4884,12 @@ def test_emerge_pretend_prints_news_count_notice_at_the_end_like_real(
     assert len(unread) == 5
 
 
-def test_emerge_pretend_failed_resolve_still_prints_news_notice_like_real(
+def test_emerge_pretend_failed_resolve_still_prints_news_notice_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #196 fix round 1: real calls `post_emerge`
-    unconditionally after `action_build` (real
-    `_emerge/actions.py:4289-4297`), so the `--pretend` arm (real
+    """Backlog #196 fix round 1: Portage calls `post_emerge`
+    unconditionally after `action_build` (Portage
+    `_emerge/actions.py:4289-4297`), so the `--pretend` arm (Portage
     `post_emerge.py:112-117`) prints the notice even when the resolve
     itself failed. `dev-libs/anyofunresolvable` aborts the resolve
     (its `||` RDEPEND has no visible candidate anywhere -- see
@@ -4910,15 +4908,15 @@ def test_emerge_pretend_failed_resolve_still_prints_news_notice_like_real(
     assert len(unread) == 5
 
 
-def test_emerge_failed_resolve_still_prints_pre_notice_like_real(
+def test_emerge_failed_resolve_still_prints_pre_notice_like_portage(
     emerge_binary, tmp_path
 ):
     """Backlog #196 (review Minor item 6): the pre-resolution notice
-    (real `_emerge/actions.py:4264`) sits before `action_build`, so it
+    (Portage `_emerge/actions.py:4264`) sits before `action_build`, so it
     fires even when the resolve itself later fails -- a plain
     `emerge dev-libs/anyofunresolvable` exits 1 with exactly one
     notice (the pre one, before `Calculating...`), and no post notice
-    (nothing merged, so real's `_pkgs_changed` gate stays shut)."""
+    (nothing merged, so Portage's `_pkgs_changed` gate stays shut)."""
     root, env = _news_env(tmp_path, "root-resolve-fail-news")
 
     r = subprocess.run(
@@ -4934,11 +4932,11 @@ def test_emerge_failed_resolve_still_prints_pre_notice_like_real(
     assert not (root / "var/db/pkg/dev-libs/anyofunresolvable-1.0").exists()
 
 
-def test_emerge_quiet_still_prints_news_count_notice_like_real(
+def test_emerge_quiet_still_prints_news_count_notice_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #196 (review Minor item 6): real
-    `display_news_notification` (real `post_emerge.py:37`) consults
+    """Backlog #196 (review Minor item 6): Portage
+    `display_news_notification` (Portage `post_emerge.py:37`) consults
     neither `--quiet` nor `--ask` -- so a quiet `--buildpkgonly`
     run with `news` in FEATURES still prints the (pre-resolution)
     notice exactly once."""
@@ -4952,10 +4950,10 @@ def test_emerge_quiet_still_prints_news_count_notice_like_real(
     assert b.stdout.count("Use eselect news read to view new items.") == 1
 
 
-def test_emerge_failed_merge_prints_news_notice_when_the_vdb_changed_like_real(
+def test_emerge_failed_merge_prints_news_notice_when_the_vdb_changed_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #196 fix round 1: real `post_emerge.py:155` prints the
+    """Backlog #196 fix round 1: Portage `post_emerge.py:155` prints the
     notice regardless of retval (`retval` only feeds `exit_msg`,
     `:104-108`). `dev-libs/schedok` merges first, then
     `dev-libs/schedbad`'s `src_install` dies (the deliberate fixture
@@ -4981,11 +4979,11 @@ def test_emerge_failed_merge_prints_news_notice_when_the_vdb_changed_like_real(
     assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
 
 
-def test_emerge_failed_merge_without_any_merge_prints_no_post_notice_like_real(
+def test_emerge_failed_merge_without_any_merge_prints_no_post_notice_like_portage(
     emerge_binary, tmp_path
 ):
     """Backlog #196 fix round 1: the failure-path notice is still
-    gated on real's `_pkgs_changed` (real `post_emerge.py:112-117`
+    gated on Portage's `_pkgs_changed` (Portage `post_emerge.py:112-117`
     early-returns when nothing changed). With the failing
     `dev-libs/schedbad` first, nothing merges at all -- so only the
     pre-resolution notice prints, exactly once."""
@@ -5002,16 +5000,16 @@ def test_emerge_failed_merge_without_any_merge_prints_no_post_notice_like_real(
     assert r.stdout.count("Use eselect news read to view new items.") == 1
 
 
-def test_emerge_unmerge_prints_news_count_notice_like_real(
+def test_emerge_unmerge_prints_news_count_notice_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #196 fix round 1: real calls `post_emerge` after the
-    uninstall actions too (real `_emerge/actions.py:4164-4175` --
+    """Backlog #196 fix round 1: Portage calls `post_emerge` after the
+    uninstall actions too (Portage `_emerge/actions.py:4164-4175` --
     clean/depclean/prune/unmerge/rage-clean, except
     deselect/buildpkgonly/fetchonly/pretend), whose tail is the same
     GLEP 42 notice. Seed `dev-libs/binpkgrmpkg-1.0` via a direct
     `ebuild <file> merge` (like the neighbouring `-C` test): a
-    pretend `-p -C` prints no notice (real skips `post_emerge`
+    pretend `-p -C` prints no notice (Portage skips `post_emerge`
     under `--pretend`), while the real `-C` prints it exactly once,
     after the removal -- and the package is really gone."""
     root, env = _news_env(tmp_path, "root-unmerge-news")
@@ -5048,11 +5046,11 @@ def test_emerge_unmerge_prints_news_count_notice_like_real(
     assert len(unread) == 5
 
 
-def test_emerge_resume_prints_news_notices_like_real(emerge_binary, tmp_path):
-    """Backlog #231 (a): real `run_action` prints the pre-resolution
+def test_emerge_resume_prints_news_notices_like_portage(emerge_binary, tmp_path):
+    """Backlog #231 (a): Portage `run_action` prints the pre-resolution
     news-count notice before `action_build` -- and the resume handling
-    lives inside `action_build` (real `_emerge/actions.py:220-4289`)
-    -- so a resumed build prints it too; real `post_emerge`
+    lives inside `action_build` (Portage `_emerge/actions.py:220-4289`)
+    -- so a resumed build prints it too; Portage `post_emerge`
     (`post_emerge.py:155`, called unconditionally at
     `actions.py:4289-4297`) prints the post notice once the resumed
     merge changed the vdb. `dev-libs/schedbad`'s src_install dies, so
@@ -5098,13 +5096,13 @@ def test_emerge_resume_prints_news_notices_like_real(emerge_binary, tmp_path):
     assert not mtimedb.exists()  # resume list cleared on success
 
 
-def test_mrg_remote_success_prints_no_post_merge_notice_like_real(
+def test_mrg_remote_success_prints_no_post_merge_notice_like_portage(
     mrg_binary, fixture_env, tmp_path
 ):
     """Backlog #231 (b): the remote-execution early return skips
     `post_emerge`'s tail -- correctly so. The remote plan merges onto
     the remote host; the local `${ROOT}/var/db/pkg` is never touched,
-    so real's `_pkgs_changed` gate (real
+    so Portage's `_pkgs_changed` gate (Portage
     `_emerge/post_emerge.py:112-117`) evaluates false and -- the run
     being non-`--pretend` -- the tail would print nothing. Same
     local-transport setup as
@@ -5142,7 +5140,7 @@ def test_mrg_remote_success_prints_no_post_merge_notice_like_real(
 
 def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n", flags=None):
     """Run `emerge --ask --read-news --oneshot dev-libs/schedok` with
-    stdin on a pty (real `actions.py:3920-3926` rejects `--ask` on a
+    stdin on a pty (Portage `actions.py:3920-3926` rejects `--ask` on a
     non-terminal). `script(1)` provides the pty -- resolved absolutely
     so a test can empty `PATH` -- and its own stdin (a pipe here) feeds
     the child's answers. `flags` overrides the two prompt flags (backlog
@@ -5166,14 +5164,14 @@ def _read_news_pty_run(emerge_binary, env, answers="Yes\nNo\n", flags=None):
 
 
 def _ask_pty_with_sigint(emerge_binary, args, env, prompt_marker, timeout=300):
-    """Run `emerge ...` under `script(1)` (pty stdin, satisfying real's
+    """Run `emerge ...` under `script(1)` (pty stdin, satisfying Portage's
     `--ask` TTY gate) and deliver SIGINT as a `^C` byte *after* the
     prompt is up: the byte is written to script's stdin only once
     `prompt_marker` is observed on the child's output, so the signal
     cannot strike during startup or the resolve (where SIGINT must
     keep killing the process as today). This models a terminal user's
     Ctrl-C at the prompt -- the pty line discipline raises a real
-    SIGINT, which real `_emerge/UserQuery.query`
+    SIGINT, which Portage `_emerge/UserQuery.query`
     (`_emerge/UserQuery.py:74-76`) catches out of `input()`
     (backlog #240). Returns the completed process; stdout carries the
     pty output, as in `_read_news_pty_run`."""
@@ -5220,8 +5218,8 @@ def _ask_pty_with_sigint(emerge_binary, args, env, prompt_marker, timeout=300):
     )
 
 
-def test_emerge_ask_read_news_spawns_eselect_like_real(emerge_binary, tmp_path):
-    """Backlog #231 (c): real `_emerge/actions.py:4266-4281` -- once
+def test_emerge_ask_read_news_spawns_eselect_like_portage(emerge_binary, tmp_path):
+    """Backlog #231 (c): Portage `_emerge/actions.py:4266-4281` -- once
     the pre-resolution notice printed, `--ask --read-news` prompts
     "Would you like to read the news items while calculating
     dependencies?" and spawns `eselect news read` on "Yes", then
@@ -5245,8 +5243,8 @@ def test_emerge_ask_read_news_spawns_eselect_like_real(emerge_binary, tmp_path):
     assert marker.read_text() == "news read\n"
 
 
-def test_emerge_ask_read_news_no_skips_eselect_like_real(emerge_binary, tmp_path):
-    """Backlog #231 (c), the "No" arm: real's `== "Yes"` check fails,
+def test_emerge_ask_read_news_no_skips_eselect_like_portage(emerge_binary, tmp_path):
+    """Backlog #231 (c), the "No" arm: Portage's `== "Yes"` check fails,
     so no spawn happens and the run continues -- the stub marker never
     appears, while the notice still printed once and the declined merge
     prompt still exits 130."""
@@ -5266,12 +5264,12 @@ def test_emerge_ask_read_news_no_skips_eselect_like_real(emerge_binary, tmp_path
     assert not marker.exists()
 
 
-def test_emerge_ask_read_news_eof_exits_before_resolve_like_real(emerge_binary, tmp_path):
-    """Backlog #234 (a): real `_emerge/UserQuery.query`
+def test_emerge_ask_read_news_eof_exits_before_resolve_like_portage(emerge_binary, tmp_path):
+    """Backlog #234 (a): Portage `_emerge/UserQuery.query`
     (`_emerge/UserQuery.py:74-76`) prints `Interrupted.` and exits
     `128 + SIGINT` on EOF -- the news prompt's `sys.exit` fires before
     `action_build`. A VEOF byte (`Ctrl-D`) on the pty is the terminal
-    user's EOF (real's `input()` raises `EOFError` on it): the run must
+    user's EOF (Portage's `input()` raises `EOFError` on it): the run must
     print `Interrupted.`, exit 130, and never reach the resolve
     (`Calculating dependencies` stays absent)."""
     root, env = _news_env(tmp_path, "root-ask-read-news-eof")
@@ -5283,17 +5281,17 @@ def test_emerge_ask_read_news_eof_exits_before_resolve_like_real(emerge_binary, 
     assert "Calculating dependencies" not in r.stdout
 
 
-def test_emerge_ask_read_news_sigint_exits_before_resolve_like_real(
+def test_emerge_ask_read_news_sigint_exits_before_resolve_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #240: real `_emerge/UserQuery.query`
+    """Backlog #240: Portage `_emerge/UserQuery.query`
     (`_emerge/UserQuery.py:74-76`) catches `KeyboardInterrupt` out of
     `input()`, prints `Interrupted.`, and exits `128 + SIGINT` from
     inside `query` -- the news prompt's `sys.exit` fires before
     `action_build`. A `^C` byte delivered through the pty *after* the
     prompt is up (see `_ask_pty_with_sigint`) is the terminal user's
     Ctrl-C (the line discipline raises a real SIGINT): the run must
-    print `Interrupted.` (and no `Quitting.` -- real's `== "Yes"`
+    print `Interrupted.` (and no `Quitting.` -- Portage's `== "Yes"`
     comparison never runs), exit 130, and never reach the resolve
     (`Calculating dependencies` stays absent). Before the fix the
     process died by signal with no `Interrupted.` line."""
@@ -5312,15 +5310,15 @@ def test_emerge_ask_read_news_sigint_exits_before_resolve_like_real(
     assert "Calculating dependencies" not in r.stdout
 
 
-def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_real(
+def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #240: the same Ctrl-C at the merge prompt (real
+    """Backlog #240: the same Ctrl-C at the merge prompt (Portage
     `_emerge/actions.py:527-536` through
     `_emerge/UserQuery.py:74-76`). EOF there used to print a spurious
     `Quitting.` after `Interrupted.`; a `^C` died by signal with
     neither line. Now: `Interrupted.` exactly once, no `Quitting.`,
-    exit 130 -- real exits from inside `query`, so its `Quitting.`
+    exit 130 -- Portage exits from inside `query`, so its `Quitting.`
     never runs either."""
     import shutil
 
@@ -5347,12 +5345,11 @@ def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_real(
     assert not (root / "var/db/pkg/dev-libs/schedok-1.0").exists()
 
 
-def test_emerge_config_select_sigint_prints_interrupted_without_quitting_like_real(
+def test_emerge_config_select_sigint_prints_interrupted_without_quitting_like_portage(
     emerge_binary, tmp_path
 ):
     """Backlog #240 follow-up: the config `Selection?` menu goes
-    through the same `UserQuery.query` in real
-    (`_emerge/actions.py:746` through
+    through the same `UserQuery.query` in Portage (`_emerge/actions.py:746` through
     `_emerge/UserQuery.py:74-76`), so Ctrl-C there prints
     `Interrupted.` and exits `128 + SIGINT` -- `X`'s own `Quitting.`
     (`actions.py:747-748`) never runs. Two stub vdb entries make
@@ -5379,8 +5376,8 @@ def test_emerge_config_select_sigint_prints_interrupted_without_quitting_like_re
     assert "Quitting." not in r.stdout
 
 
-def test_emerge_ask_read_news_true_spellings_prompt_like_real(emerge_binary, tmp_path):
-    """Backlog #234 (b): real `true_y_or_n` (`main.py:321-322,625`)
+def test_emerge_ask_read_news_true_spellings_prompt_like_portage(emerge_binary, tmp_path):
+    """Backlog #234 (b): Portage `true_y_or_n` (`main.py:321-322,625`)
     accepts `--ask=True` / `--read-news=True` (a bare flag inserts
     `"True"` via `insert_optional_args`, the choices admit it, and `in
     true_y` normalizes it at `main.py:802-805,950-953`). The `=True`
@@ -5406,10 +5403,10 @@ def test_emerge_ask_read_news_true_spellings_prompt_like_real(emerge_binary, tmp
     assert not marker.exists()
 
 
-def test_emerge_ask_true_spelling_hits_the_tty_gate_like_real(emerge_binary, tmp_path):
-    """Backlog #234 (b): `--ask=True` parses as ask-on (real
+def test_emerge_ask_true_spelling_hits_the_tty_gate_like_portage(emerge_binary, tmp_path):
+    """Backlog #234 (b): `--ask=True` parses as ask-on (Portage
     `true_y_or_n` choices + `in true_y` normalization,
-    `main.py:321-322,802-805`), so a non-terminal stdin hits real
+    `main.py:321-322,802-805`), so a non-terminal stdin hits Portage
     `actions.py:3920-3926`'s gate exactly like a bare `--ask` (before
     the fix `--ask=True` died as an unrecognized option)."""
     root, env = _news_env(tmp_path, "root-ask-true-gate")
@@ -5422,12 +5419,12 @@ def test_emerge_ask_true_spelling_hits_the_tty_gate_like_real(emerge_binary, tmp
     assert '"--ask" should only be used in a terminal' in r.stderr
 
 
-def test_emerge_ask_read_news_without_eselect_prints_real_hint(
+def test_emerge_ask_read_news_without_eselect_prints_portage_hint(
     emerge_binary, tmp_path
 ):
-    """Backlog #231 (c): real catches the spawn's `OSError` (eselect
+    """Backlog #231 (c): Portage catches the spawn's `OSError` (eselect
     missing) and prints `Please install eselect to use this feature.`
-    (real `_emerge/actions.py:4284-4287`). `PATH` is emptied so the
+    (Portage `_emerge/actions.py:4284-4287`). `PATH` is emptied so the
     spawn must fail; the "Yes" is still consumed and the declined merge
     prompt still exits 130. (`script` merges the child's stderr into
     the pty, so the message is asserted on stdout here; the dedicated
@@ -5441,27 +5438,27 @@ def test_emerge_ask_read_news_without_eselect_prints_real_hint(
     assert "Please install eselect to use this feature." in r.stdout
 
 
-def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
+def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #174 (review fixes): real `emerge --oneshot --usepkgonly
+    """Backlog #174 (review fixes): Portage's `emerge --oneshot --usepkgonly
     l32/faultpkg` with the gpkg truncated to half (the `Packages` index
-    still carries the whole-file `SIZE`) *selects* the binary -- real's
+    still carries the whole-file `SIZE`) *selects* the binary -- Portage's
     default `FEATURES=pkgdir-index-trusted` trusts the index at scan --
     and fails at merge: `>>> Emerging binary (1 of 1)` then
     `!!! Digest verification failed:` / `!!! <path>` /
     `!!! Reason: Failed on size verification` / `!!! Got:` /
     `!!! Expected:` / `File renamed to
-    '<path>._checksum_failure_.<8 x [a-z0-9_]>'` (real
+    '<path>._checksum_failure_.<8 x [a-z0-9_]>'` (Portage
     `tempfile.mkstemp` shape) / `>>> Failed to emerge <cpv> for <root>,
-    Log file:` / blank / `>>>  '<build.log>'` (real
+    Log file:` / blank / `>>>  '<build.log>'` (Portage
     `Scheduler._failed_pkg_msg`, with the ` for <root>` suffix since
-    `ROOT != "/"`) -- and nothing else: no resume-list notice (real's
+    `ROOT != "/"`) -- and nothing else: no resume-list notice (Portage's
     notices fire only for resolution-time failures), no `emerge: ...`
     line (a merge failure exits via `FAILURE`), rc 1, clean root.
     Portuale used to fully parse the container at scan, drop the
     candidate with `!!! Invalid binary package`, and end in `there are
-    no ebuilds to satisfy` -- none of real's block, its strings, or
+    no ebuilds to satisfy` -- none of Portage's block, its strings, or
     the rename appeared.
 
     Real-execution shape: build `dev-libs/packagepkg` into a scratch
@@ -5498,7 +5495,7 @@ def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 1, (r.stdout, r.stderr)
-    # The binary is selected (not dropped at scan): real's merge block.
+    # The binary is selected (not dropped at scan): Portage's merge block.
     assert f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}" in r.stdout
     assert "\n!!! Digest verification failed:\n" in r.stdout
     assert f"!!! {built}\n" in r.stdout
@@ -5507,23 +5504,23 @@ def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
     assert f"!!! Expected: {whole}\n" in r.stdout
     assert "there are no ebuilds to satisfy" not in r.stderr
     assert "Invalid binary package" not in r.stderr
-    # Real `Scheduler._failed_pkg_msg(..., "emerge", "for")`: the
+    # Portage `Scheduler._failed_pkg_msg(..., "emerge", "for")`: the
     # ` for <root>` suffix (`ROOT != "/"` here), the `, Log file:`
     # suffix, then `>>>  '<log>'` -- each on its own `>>>` line with a
     # leading blank line. And nothing else: no resume-list notice, no
-    # `emerge:` line (both absent in real's log for this case).
+    # `emerge:` line (both absent in Portage's log for this case).
     log = tmp_path / "ptmp-merge/portage/dev-libs/packagepkg-1.0/temp/build.log"
     assert f"\n>>> Failed to emerge dev-libs/packagepkg-1.0 for {root}, Log file:\n" in r.stdout
     assert f"\n>>>  '{log}'\n" in r.stdout
     assert "The resume list contains" not in r.stderr
     assert "binpkg digest verification failed" not in r.stderr
-    # Real `SchedulerInterface.output(msg, log_path)`: the block lands
-    # in the package build.log too (non-empty, so real
+    # Portage `SchedulerInterface.output(msg, log_path)`: the block lands
+    # in the package build.log too (non-empty, so Portage
     # `_locate_failure_log` reports it).
     logged = log.read_text()
     assert "!!! Digest verification failed:\n" in logged
     assert "!!! Reason: Failed on size verification\n" in logged
-    # Real's `._checksum_failure_.<rand>` rename in the same directory:
+    # Portage's `._checksum_failure_.<rand>` rename in the same directory:
     # `tempfile.mkstemp` shape, 8 characters over `[a-z0-9_]`.
     renamed = sorted((root / "pkgdir/dev-libs").glob(f"{built.name}._checksum_failure_.*"))
     assert len(renamed) == 1, [p.name for p in (root / "pkgdir/dev-libs").iterdir()]
@@ -5537,7 +5534,7 @@ def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_real(
 
 
 def test_getbinpkg_merge_honours_env_install_mask(emerge_binary, tmp_path):
-    """`INSTALL_MASK` is in real portage's `environ_whitelist` and is
+    """`INSTALL_MASK` is in Portage's `environ_whitelist` and is
     non-incremental, so an `INSTALL_MASK="…" emerge -k --getbinpkg <atom>`
     from the calling environment overrides make.conf and is applied to
     the binary merge. Regression test for L1-d (the `--getbinpkg` merge
@@ -5685,7 +5682,7 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
     """Backlog #301 (`LLM/backlog-tasks-2026-10.md`). The binhost lists two
     builds of `dev-libs/packagepkg-1.0` -- BUILD_ID 1 (BUILD_TIME 100)
     first, BUILD_ID 2 (BUILD_TIME 200) second, like the live `seed-desk`
-    index -- each with its own `PATH`. Real fetches the instance the
+    index -- each with its own `PATH`. Portage fetches the instance the
     resolver planned (the newest, `-2`) into `$PKGDIR`. Portuale used to
     look the record up by `CPV` alone and take the *first* entry, so the
     plan said `-2` but `-1` was downloaded -- and, sitting in `$PKGDIR`,
@@ -5693,9 +5690,8 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
     (#300).
 
     The pin is the download choice, not the merge: both copies carry the
-    same gpkg bytes (built once below, BUILD_ID 1 inside), which real
-    rejects at extraction time for the renamed `-2` copy -- the file it
-    fetched is still `-2`, confirmed on real Portage 3.0.x. So only the
+    same gpkg bytes (built once below, BUILD_ID 1 inside), which Portage rejects at extraction time for the renamed `-2` copy -- the file it
+    fetched is still `-2`, confirmed on Portage 3.0.x. So only the
     resulting `$PKGDIR` listing is asserted."""
     import shutil
 
@@ -5766,7 +5762,7 @@ def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_p
             capture_output=True, text=True, check=False, env=env,
         )
         assert result.returncode == 0, result.stderr
-        # Real's own pair (stderr, shaped from the fetch -- see
+        # Portage's own pair (stderr, shaped from the fetch -- see
         # portuale's `emerge_getbinpkg::binhost_fetch_warning`).
         assert (
             f"!!! [http500] Error fetching binhost package info from "
@@ -5793,18 +5789,18 @@ def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_p
         server.server_close()
 
 
-def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
+def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_portage(
     emerge_binary, tmp_path
 ):
     """Backlog #187 (the #175 case (a) residue): the only binhost 500s,
     but the local `$PKGDIR/Packages` still lists a binary whose file is
-    gone (stale index). Real trusts the index (default
+    gone (stale index). Portage trusts the index (default
     `FEATURES=pkgdir-index-trusted` runs `bintree._populate_local` with
     `reindex=False`, `bintree.py:937-938,1057-1064`), selects that binary
     (`>>> Emerging binary (1 of 1)`) and aborts rc 1 at merge:
     `!!! Tried to use non-existent binary for '<cpv>'` +
     `!!! Likely caused by an outdated index. Run 'emaint binhost -f'.`
-    (`BinpkgVerifier.py:48-52`), then real's `>>> Failed to emerge
+    (`BinpkgVerifier.py:48-52`), then Portage's `>>> Failed to emerge
     <cpv>[ for <root>], Log file:` tail -- installing nothing, with no
     `emerge:` line (a merge failure exits via `FAILURE`). Expected bytes
     are the bed's real F3a log (run `l32-20260927T163413Z`,
@@ -5860,7 +5856,7 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
             f">>> Emerging binary (1 of 1) dev-libs/packagepkg-1.0::testrepo for {root}"
             in result.stdout
         )
-        # Real's stale-index pair, byte for byte (`BinpkgVerifier.py`).
+        # Portage's stale-index pair, byte for byte (`BinpkgVerifier.py`).
         assert (
             "!!! Tried to use non-existent binary for 'dev-libs/packagepkg-1.0'"
             in result.stdout
@@ -5869,13 +5865,13 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
             "!!! Likely caused by an outdated index. Run 'emaint binhost -f'."
             in result.stdout
         )
-        # Real's failure tail, with this run's `for <root>` and log.
+        # Portage's failure tail, with this run's `for <root>` and log.
         assert (
             f">>> Failed to emerge dev-libs/packagepkg-1.0 for {root}, Log file:"
             in result.stdout
         )
         assert ">>>  '" in result.stdout and "temp/build.log'" in result.stdout
-        # The tail is the whole failure: no `emerge:` line (real exits
+        # The tail is the whole failure: no `emerge:` line (Portage exits
         # via `FAILURE`, not the action error path) and none of
         # portuale's old `no binpkg file under ...` wording.
         assert "emerge: " not in result.stderr
@@ -5888,7 +5884,7 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_real(
 
 
 def test_emerge_atom_oneshot_does_not_touch_the_world_file(emerge_binary, tmp_path):
-    """--oneshot/-1 (real Scheduler._world_atom's own suppression set):
+    """--oneshot/-1 (Portage Scheduler._world_atom's own suppression set):
     the package still merges, but its atom is NOT recorded in world."""
     import shutil
 
@@ -6010,7 +6006,7 @@ def test_emerge_custom_set_is_recorded_in_world_sets(emerge_binary, tmp_path):
 
 
 def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_path):
-    """`emerge -jN <atom>` (real `_emerge/Scheduler.py`'s `_max_jobs`):
+    """`emerge -jN <atom>` (Portage `_emerge/Scheduler.py`'s `_max_jobs`):
     run up to N `install` phases concurrently, dispatching a build only
     once every dependency it has is merged, and serializing the vdb merge.
     `dev-libs/schedparent` RDEPENDs the two independent leaves
@@ -6026,7 +6022,7 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     env["ROOT"] = str(root)
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
-    # Real `dblink.merge()`'s post-merge `clean` removes `${T}` after a
+    # Portage `dblink.merge()`'s post-merge `clean` removes `${T}` after a
     # successful merge unless `FEATURES=keepwork` (backlog #42); the
     # build.log assertion below needs the real keepwork state.
     env["FEATURES"] = "keepwork"
@@ -6041,7 +6037,7 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     assert result.returncode == 0, result.stderr
     out = result.stdout
 
-    # Backlog #177: real `PackageMerge` prints `Installing` then
+    # Backlog #177: Portage `PackageMerge` prints `Installing` then
     # `Completed`, each `(N of M) cpv::repo`, per merged package.
     for i, pkg in enumerate(("schedleaf-a-1.0", "schedleaf-b-1.0", "schedparent-1.0")):
         assert f">>> Completed ({i + 1} of 3) dev-libs/{pkg}::testrepo to {root}" in out
@@ -6049,7 +6045,7 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
         assert (root / f"var/db/pkg/dev-libs/{pkg}/CONTENTS").is_file()
 
     # Both leaves' builds start before either one merges -- the mark of
-    # real parallel dispatch, not a serial build+merge per package.
+    # Portage parallel dispatch, not a serial build+merge per package.
     emerge_a = out.index(f">>> Emerging (1 of 3) dev-libs/schedleaf-a-1.0::testrepo for {root}")
     emerge_b = out.index(f">>> Emerging (2 of 3) dev-libs/schedleaf-b-1.0::testrepo for {root}")
     first_leaf_merge = min(
@@ -6065,15 +6061,15 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
         out.index(f">>> Completed (2 of 3) dev-libs/schedleaf-b-1.0::testrepo to {root}"),
     )
 
-    # Real `Scheduler.JobStatusDisplay`: a running "X of Y complete" line.
+    # Portage `Scheduler.JobStatusDisplay`: a running "X of Y complete" line.
     assert ">>> Jobs: 1 of 3 complete" in out
     assert ">>> Jobs: 3 of 3 complete" in out
 
-    # Backlog #197 (n197 container probe, real
+    # Backlog #197 (n197 container probe, Portage
     # `_emerge/JobStatusDisplay.py::_display_status` on a non-tty): the
     # `>>> Jobs:` line shape is `Jobs: C of M complete[, R running][,
-    # F failed][, W merge wait]` plus real's space padding to the
-    # 68-column jobs field. Real's `Load avg:` trailer is cut (fix
+    # F failed][, W merge wait]` plus Portage's space padding to the
+    # 68-column jobs field. Portage's `Load avg:` trailer is cut (fix
     # round 1, coordinator ruling B14: repeated-run determinism is a
     # jointly-owned gate, nondeterministic values never go to stdout --
     # exactly like #185 cut the resolution seconds); the counters, arms
@@ -6104,18 +6100,18 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     ) > out.index(
         f">>> Completed (3 of 3) dev-libs/schedparent-1.0::testrepo to {root}"
     )
-    # Background mode (real `Scheduler._background_mode`): no leading
+    # Background mode (Portage `Scheduler._background_mode`): no leading
     # blank line anywhere between the first and the last `>>> Jobs:`
     # line -- every status line prints unblanked.
     jobs_first = out.index(">>> Jobs:")
     jobs_last = out.rindex(">>> Jobs: 3 of 3 complete")
     assert "" not in out[jobs_first:jobs_last].splitlines()
 
-    # Real `--quiet-build` (on by default under `--jobs`): each build's
+    # Portage `--quiet-build` (on by default under `--jobs`): each build's
     # own phase output is captured to `${T}/build.log`, NOT interleaved on
     # the parsable stdout. Every stdout line is a portuale-emitted `>>>` /
     # `[ebuild` line, never a stray phase / shell diagnostic -- plus, since
-    # backlog #185, real's resolution-phase display: a non-`--pretend` run
+    # backlog #185, Portage's resolution-phase display: a non-`--pretend` run
     # prints `Calculating dependencies ... done!` and the timing line
     # (with its trailing blank line) before the first merge line (m185
     # container probe; no header and no list without
@@ -6136,12 +6132,11 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     ).is_file()
 
 
-def test_emerge_serial_merge_status_lines_carry_reals_leading_blank(
+def test_emerge_serial_merge_status_lines_carry_portages_leading_blank(
     emerge_binary, tmp_path
 ):
-    """Backlog #197, S1 (real `_emerge/Scheduler.py::_status_msg`): a
-    serial non-`--quiet` merge is not in background mode, so real
-    prefixes every `>>>` status line with a blank line -- and prints no
+    """Backlog #197, S1 (Portage `_emerge/Scheduler.py::_status_msg`): a
+    serial non-`--quiet` merge is not in background mode, so Portage prefixes every `>>>` status line with a blank line -- and prints no
     `>>> Jobs:` lines at all (the display is quiet). Merges the same
     three-package `schedparent` set the `-j2` pin above merges, one job
     at a time. Grounded in the n197 container probe (serial shape)."""
@@ -6178,7 +6173,7 @@ def test_emerge_serial_merge_status_lines_carry_reals_leading_blank(
     # Completed) print, each immediately preceded by exactly one blank
     # line -- fix round 1: the pre-merge `println!` duplicated the
     # first one, so the first line's predecessors are pinned too (its
-    # second predecessor is real's resolution-timing trailer, whose own
+    # second predecessor is Portage's resolution-timing trailer, whose own
     # blank is the only other blank allowed there).
     assert len(statuses) == 9
     for i in statuses:
@@ -6195,13 +6190,13 @@ def test_emerge_serial_merge_status_lines_carry_reals_leading_blank(
 def test_emerge_quiet_verbose_shows_jobs_lines_without_blanks(
     emerge_binary, tmp_path
 ):
-    """Backlog #197, S2 (real `Scheduler._background_mode` +
+    """Backlog #197, S2 (Portage `Scheduler._background_mode` +
     `JobStatusDisplay`): `--quiet --verbose` is background mode with the
     display live, so a serial merge prints `>>> Jobs:` lines (start,
     build-end, merge-land, like the n197 probe's s3 shape) with no
     leading blanks anywhere; `--quiet` alone prints the same status
     lines with neither blanks nor Jobs lines (the probe's s4 shape).
-    Real's `Load avg:` trailer is cut (fix round 1, coordinator ruling
+    Portage's `Load avg:` trailer is cut (fix round 1, coordinator ruling
     B14 -- see the `-j2` pin above), so the lines pin byte-for-byte."""
     import shutil
 
@@ -6255,20 +6250,20 @@ def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
     emerge_binary, tmp_path
 ):
     """Backlog #197 fix round 1 (review Important 2): one failed build
-    fires each failure event exactly once. Real `_build_exit`'s failure
+    fires each failure event exactly once. Portage `_build_exit`'s failure
     arm assigns absolutely (`3rdparty/portage`
     `lib/_emerge/Scheduler.py:1641-1658`, `failed = len(_failed_pkgs)`
     -- 1 for a single failure) before the freed build slot (`running`)
-    drops, so real prints exactly two `>>> Jobs:` lines: the failed-set
+    drops, so Portage prints exactly two `>>> Jobs:` lines: the failed-set
     line, then the running-drop line. Both the `--quiet-build=y`
     serial-captured split (`run_source_merge`'s captured branch) and
     the `-j2` scheduler are pinned: a single `schedbad` under `-j2`
-    would take real's one-package serial reset (no Jobs lines at all),
+    would take Portage's one-package serial reset (no Jobs lines at all),
     so the parallel leg pairs it with `schedslow` (still asleep in
     `src_compile` when `schedbad`'s `src_install` dies -- the same
     pairing the kill-in-flight test uses). `, 2 failed` is the pre-fix
     double-fire regressing. The run exits 1 naming the failed package;
-    real's `>>> Failed to emerge` tail is binary-path-only, so the
+    Portage's `>>> Failed to emerge` tail is binary-path-only, so the
     source failure surfaces on stderr instead."""
     import shutil
 
@@ -6291,8 +6286,8 @@ def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
         assert "dev-libs/schedbad-1.0" in r.stderr, (r.stdout, r.stderr)
         return r.stdout
 
-    # Serial-captured split: dispatch, failed-set, running-drop -- real's
-    # exact lines with real's padding (68-column field, no `Load avg:`
+    # Serial-captured split: dispatch, failed-set, running-drop -- Portage's
+    # exact lines with Portage's padding (68-column field, no `Load avg:`
     # trailer: B14).
     out = _run(["--quiet-build=y"], ["dev-libs/schedbad"], 0)
     assert ">>> Jobs: 0 of 1 complete, 1 running" + " " * 36 in out
@@ -6315,7 +6310,7 @@ def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
 def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     emerge_binary, tmp_path
 ):
-    """`--quiet-build[=y|n]` (real `Scheduler._background_mode`): at the
+    """`--quiet-build[=y|n]` (Portage `Scheduler._background_mode`): at the
     default `-j1`, `--quiet-build=y` redirects a package's phase output to
     `${T}/build.log` instead of the terminal -- the same capture a `-j` >1
     run always does. Without it (the default) the output streams and no
@@ -6330,7 +6325,7 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
         env["ROOT"] = str(root)
         env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
         env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{n}")
-        # Real `dblink.merge()`'s post-merge `clean` removes `${T}` after
+        # Portage `dblink.merge()`'s post-merge `clean` removes `${T}` after
         # a successful merge unless `FEATURES=keepwork` (backlog #42);
         # the build.log assertions below need the real keepwork state.
         env["FEATURES"] = "keepwork"
@@ -6340,7 +6335,7 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
 
     # --quiet-build=y: stdout carries only portuale's own `>>>` /
     # `[ebuild` lines; the phase output landed in build.log. Since backlog
-    # #185, real's resolution-phase display also lands here: `Calculating
+    # #185, Portage's resolution-phase display also lands here: `Calculating
     # dependencies ... done!` and the timing line (with its trailing blank
     # line) precede the first merge line on every non-`--quiet`
     # non-`--pretend` run (m185 container probe) -- none of them a
@@ -6377,13 +6372,13 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
 
 
 def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path):
-    """`FEATURES=compress-build-logs` (backlog Tier 1): real
-    `prepare_build_dirs.py` suffixes the log paths with `.gz` and real
+    """`FEATURES=compress-build-logs` (backlog Tier 1): Portage
+    `prepare_build_dirs.py` suffixes the log paths with `.gz` and Portage
     `EbuildPhase._open_log` gzip-encodes every phase's output into the
     file (one member per phase), with the failure tail and QA readers
     gunzipping on the way back. A `--quiet-build=y` build of
     `dev-libs/packagepkg` must therefore leave a `${T}/build.log.gz`
-    (a symlink into `PORTAGE_LOGDIR` when set, real's
+    (a symlink into `PORTAGE_LOGDIR` when set, Portage's
     `<CATEGORY><sep><PF><sep><logid_time>.log.gz` name) whose gunzipped
     bytes carry the phase output -- and a failing build
     (`dev-libs/schedbaddep`) must still fold the *decoded* tail into
@@ -6402,7 +6397,7 @@ def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path)
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
     env["PORTAGE_LOGDIR"] = str(logdir)
-    # `keepwork`: real `dblink.merge()`'s post-merge `clean` removes
+    # `keepwork`: Portage `dblink.merge()`'s post-merge `clean` removes
     # `${T}` (including the `build.log.gz` symlink asserted below) after
     # a successful merge unless `FEATURES=keepwork` (backlog #42). The
     # real log file in PORTAGE_LOGDIR survives either way.
@@ -6441,7 +6436,7 @@ def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path)
 
 
 def test_emerge_pre_cleans_a_dirty_builddir_before_rebuilding(emerge_binary, tmp_path):
-    """Backlog #42: real `_emerge/EbuildBuild._start_pre_clean` runs the
+    """Backlog #42: Portage `_emerge/EbuildBuild._start_pre_clean` runs the
     `clean` phase before every build, and `dblink.merge()`'s tail runs
     it after a successful merge unless `FEATURES=noclean`. A second
     `emerge -1` in the same `${PORTAGE_BUILDDIR}` must therefore discard
@@ -6489,7 +6484,7 @@ def test_emerge_pre_cleans_a_dirty_builddir_before_rebuilding(emerge_binary, tmp
 
 
 def test_emerge_jobs_with_load_average_still_builds_everything(emerge_binary, tmp_path):
-    """`emerge -j4 --load-average <LA>` (real `main.py` `type=float`): the
+    """`emerge -j4 --load-average <LA>` (Portage `main.py` `type=float`): the
     scheduler holds off on an *additional* build while the 1-minute system
     load exceeds LA, but never blocks the first -- so with a huge LA the
     throttle is a no-op and all three sched packages still build+merge,
@@ -6521,7 +6516,7 @@ def test_emerge_jobs_with_load_average_still_builds_everything(emerge_binary, tm
 def test_emerge_jobs_keep_going_skips_a_failed_builds_dependents(emerge_binary, tmp_path):
     """`emerge -j2 --keep-going`: a failed build (`schedbad`'s src_install
     dies) drops its transitive dependents (`schedbaddep`) from the merge
-    set (real `Scheduler._calc_resume_list`), the independent `schedok`
+    set (Portage `Scheduler._calc_resume_list`), the independent `schedok`
     still merges, and the run exits non-zero listing what failed and what
     was skipped."""
     import shutil
@@ -6555,10 +6550,10 @@ def test_emerge_jobs_keep_going_skips_a_failed_builds_dependents(emerge_binary, 
 
 def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_path):
     """`emerge <atom>` handles an Upgrade too now: merge the new version,
-    then unmerge the replaced same-slot version (real
+    then unmerge the replaced same-slot version (Portage
     `dblink.treewalk()`'s merge-then-unmerge). `dev-libs/binpkgrmpkg`'s
     two versions define all five `pkg_*` hooks, each appending
-    `<phase>-<PVR>` to a `${ROOT}` log -- so the full real interleave is
+    `<phase>-<PVR>` to a `${ROOT}` log -- so the full Portage interleave is
     checkable end to end."""
     import shutil
 
@@ -6604,22 +6599,22 @@ def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_p
 def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(
     emerge_binary, tmp_path
 ):
-    """Real `post_emerge()`'s info block (`lib/_emerge/post_emerge.py:
+    """Portage `post_emerge()`'s info block (`lib/_emerge/post_emerge.py:
     126-130` + `lib/portage/util/_info_files.py::chk_updated_info_files`):
     `emerge dev-libs/dirregenpkg` into a scratch ROOT merges
     `usr/share/info/dirregenpkg.info` (whose `START-INFO-DIR-ENTRY` block
     names `* dirregenpkg:`), and the post-merge step regenerates
     `usr/share/info/dir` with the host `/usr/bin/install-info`, records
-    the dir's mtime in `mtimedb["info"]`, and prints the real
+    the dir's mtime in `mtimedb["info"]`, and prints the Portage
     `Regenerating...` / `Processed 1 info files.` lines. Skips when the
-    host has no `install-info` (real silently no-ops there too)."""
+    host has no `install-info` (Portage silently no-ops there too)."""
     if not Path("/usr/bin/install-info").exists():
         pytest.skip("no /usr/bin/install-info on this host")
 
     root = tmp_path / "root"
     shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
     # INFOPATH reaches the post-merge step through the env.d collation
-    # real `settings.reload(); settings.regenerate()` derives
+    # Portage `settings.reload(); settings.regenerate()` derives
     # `${ROOT}/etc/profile.env` from.
     (root / "etc" / "env.d").mkdir(parents=True)
     (root / "etc" / "env.d" / "50-test").write_text('INFOPATH="/usr/share/info"\n')
@@ -6671,13 +6666,13 @@ def _passwordless_sudo() -> list[str] | None:
 
 
 def test_merge_skips_an_identical_file_preserving_ownership(emerge_binary, tmp_path):
-    """Real `dblink._needs_move` (`vartree.py:6363`, bug #722270): a
+    """Portage `dblink._needs_move` (`vartree.py:6363`, bug #722270): a
     re-merge whose destination is already a regular file with the same
     mode and byte-identical content does not move the file at all, so the
     destination's inode and ownership survive; a *different* file is
     replaced and takes the source's own ownership. This is exactly the L3
     ncurses `OWNER 1:1` case: the stage3 image ships `/usr/include/
-    curses.h` `1:1`, the rebuilt copy is byte-identical, and real keeps
+    curses.h` `1:1`, the rebuilt copy is byte-identical, and Portage keeps
     `1:1` while a blind copy writes `0:0`.
 
     Runs as root via `sudo -n` because observing the difference needs a
@@ -6729,7 +6724,7 @@ def test_merge_skips_an_identical_file_preserving_ownership(emerge_binary, tmp_p
     )
     assert st.st_ino == ino, "an identical re-merge must not replace the inode"
 
-    # Negative control: content differs -> real moves the file, which
+    # Negative control: content differs -> Portage moves the file, which
     # takes the source's own 0:0 ownership.
     bumped = subprocess.run(
         [*sudo, "sh", "-c", f"printf 'changed\\n' >> '{dest}'"],
@@ -6751,11 +6746,11 @@ def test_merge_skips_an_identical_file_preserving_ownership(emerge_binary, tmp_p
 def test_emerge_unmerge_without_pretend_really_removes_and_deselects(
     emerge_binary, tmp_path
 ):
-    """`emerge -C <atom>` WITHOUT `--pretend` is a real removal now (real
+    """`emerge -C <atom>` WITHOUT `--pretend` is a real removal now (Portage
     `_emerge/unmerge.py::unmerge`'s own loop): after the `_unmerge_display`
     preview, each selected package's `pkg_prerm` (from its own vdb-saved
     env) runs, its files and vdb entry go, its `pkg_postrm` runs, and it's
-    deselected from the world file (real
+    deselected from the world file (Portage
     `WorldSelectedPackagesSet.cleanPackage`). `dev-libs/binpkgrmpkg`'s
     five hooks each append `<phase>-<PVR>` to a `${ROOT}` log."""
     import shutil
@@ -6811,7 +6806,7 @@ def test_emerge_unmerge_without_pretend_really_removes_and_deselects(
     os.geteuid() == 0, reason="the privilege gate only fires for a non-root caller"
 )
 def test_emerge_and_ebuild_refuse_to_merge_into_a_root_owned_tree(emerge_binary, tmp_path):
-    """Real `actions.py:3964-4012`: an install/uninstall operation into a
+    """Portage `actions.py:3964-4012`: an install/uninstall operation into a
     filesystem the caller does not own needs superuser access. Portuale
     checks this up front for `emerge` (merge / -C / --depclean / --prune /
     --deselect / --config) and for `ebuild ... merge|qmerge|unmerge`.
@@ -6866,10 +6861,10 @@ def _ask_offer_env(tmp_path, tag):
 @pytest.mark.skipif(
     os.geteuid() == 0, reason="the privilege gate only fires for a non-root caller"
 )
-def test_emerge_ask_offers_pretend_to_unprivileged_caller_like_real(
+def test_emerge_ask_offers_pretend_to_unprivileged_caller_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #246: real `_emerge/actions.py:3983-4006` offers a
+    """Backlog #246: Portage `_emerge/actions.py:3983-4006` offers a
     non-privileged caller `Would you like to add --pretend to options?`
     when `--ask` is set, instead of refusing outright. `emerge --ask
     --oneshot dev-libs/schedok` with an unowned ROOT must print `This
@@ -6901,10 +6896,10 @@ def test_emerge_ask_offers_pretend_to_unprivileged_caller_like_real(
 @pytest.mark.skipif(
     os.geteuid() == 0, reason="the privilege gate only fires for a non-root caller"
 )
-def test_emerge_ask_pretend_offer_yes_continues_as_pretend_like_real(
+def test_emerge_ask_pretend_offer_yes_continues_as_pretend_like_portage(
     emerge_binary, tmp_path
 ):
-    """Backlog #246, the "Yes" arm: real sets `opts["--pretend"] =
+    """Backlog #246, the "Yes" arm: Portage sets `opts["--pretend"] =
     True`, pops `--ask`, and the run continues as a pretend run
     (`actions.py:4004-4006`). Host probe 2026-09-29 (`printf 'y\\n' |
     script -qec "emerge --ask --depclean"`): after the offer the run
@@ -6928,7 +6923,7 @@ def test_emerge_ask_pretend_offer_yes_continues_as_pretend_like_real(
 
 
 def test_emerge_preserved_libs_advisory_and_rebuild_set(emerge_binary, tmp_path):
-    """Real `post_emerge()` + `display_preserved_libs()`
+    """Portage `post_emerge()` + `display_preserved_libs()`
     (`post_emerge.py:141-152`): after `emerge -C` preserves a still-linked
     library, emerge prints `!!! existing preserved libs:` with the
     consumer and tells the user to run `emerge @preserved-rebuild` -- and
@@ -6996,7 +6991,7 @@ def test_emerge_preserved_libs_advisory_and_rebuild_set(emerge_binary, tmp_path)
 
 
 def test_emerge_two_consecutive_soname_bumps_replace_the_registry_record(emerge_binary, tmp_path):
-    """Backlog #178 (S0 oracle: real portage 3.0.82.2,
+    """Backlog #178 (S0 oracle: Portage 3.0.82.2,
     `PreservedLibsRegistry.register()` +
     `dblink.treewalk()`'s `register(self.mycpv, slot, counter,
     sorted(preserve_paths))`): two consecutive soname bumps
@@ -7068,7 +7063,7 @@ def test_emerge_two_consecutive_soname_bumps_replace_the_registry_record(emerge_
 
 
 def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
-    """Real `_emerge/Scheduler.py::_save_resume_list` + `--resume`: a
+    """Portage `_emerge/Scheduler.py::_save_resume_list` + `--resume`: a
     failed `emerge <atoms>` writes the still-unmerged packages to
     `mtimedb["resume"]`; `emerge --resume` replays them in order,
     `emerge --resume --skipfirst` drops the first (the one that failed).
@@ -7098,7 +7093,7 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     assert saved["resume"]["favorites"] == ["dev-libs/schedbad", "dev-libs/schedok"]
 
     # --resume --pretend: show the saved list, merge nothing, leave the
-    # resume list intact (real `_emerge/actions.py`: display + return 0).
+    # resume list intact (Portage `_emerge/actions.py`: display + return 0).
     r = subprocess.run(
         [str(emerge_binary), "--resume", "--pretend"],
         capture_output=True, text=True, check=False, env=env,
@@ -7145,7 +7140,7 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     `--resume --skipfirst` then merges `dev-libs/usebuildpkg` (records
     the run-wide flags) and `dev-libs/penvbuildpkg` (records its
     `package.env` values for the keys the process does not carry, and
-    the process values where it does -- real's `env`-over-`pkg` layer
+    the process values where it does -- Portage's `env`-over-`pkg` layer
     order, backlog #101)."""
     import shutil
 
@@ -7192,7 +7187,7 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
 
 
 def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
-    """Real `mtimedb["resume"]["myopts"]`: a failed `emerge --oneshot
+    """Portage `mtimedb["resume"]["myopts"]`: a failed `emerge --oneshot
     <atoms>` records `--oneshot`, so `emerge --resume` replays without
     adding the recovered packages to the world file (before this the
     resume always world-recorded its favorites)."""
@@ -7228,7 +7223,7 @@ def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
 
 
 def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
-    """Backlog #179: real `_emerge/actions.py` returns from the
+    """Backlog #179: Portage `_emerge/actions.py` returns from the
     `--pretend` branch (`display(...)`, `return os.EX_OK`) before
     `Scheduler` exists -- and before the `resume_backup` rotation -- so
     a preview never touches `mtimedb["resume"]`. A stale multi-item list
@@ -7325,16 +7320,16 @@ def _nothing_to_merge_env(root):
 def test_emerge_verbose_nothing_to_merge_leaves_the_resume_list_alone(
     emerge_binary, tmp_path
 ):
-    """Backlog #225: real `_emerge/actions.py:496-521` (`action_build`)
+    """Backlog #225: Portage `_emerge/actions.py:496-521` (`action_build`)
     -- with a display flag (`--ask`/`--tree`/`--verbose`,
-    `actions.py:464-469`) and `mergecount == 0`, real prints `Nothing to
+    `actions.py:464-469`) and `mergecount == 0`, Portage prints `Nothing to
     merge; quitting.` on stdout and returns `EX_OK` before the
     `resume_backup` rotation (`:664-672`) and before `Scheduler`, so the
     resume list and its backup stay untouched -- while the merge list and
     `Total:` are shown first (`:485` plus the verbose counters). The
     all-noop plan is `emerge --oneshot -u dev-libs/samepkg` (`samepkg`
     is installed at the only visible version; the `-u` matters -- a bare
-    `--oneshot` reinstalls a top-level installed package, real's own
+    `--oneshot` reinstalls a top-level installed package, Portage's own
     `is_top_level and not selective` bare `R` -- and `--oneshot` keeps
     the selective-deferral arm at bay, `actions.py:514-516`)."""
     root = tmp_path / "root"
@@ -7375,7 +7370,7 @@ def test_emerge_tree_nothing_to_merge_leaves_the_resume_list_alone(
 
 def test_emerge_ask_nothing_to_merge_never_prompts(emerge_binary, tmp_path):
     """Backlog #225 (`_emerge/actions.py:496-521`), the `--ask` display
-    flag: real returns before `UserQuery`, so no prompt is ever shown --
+    flag: Portage returns before `UserQuery`, so no prompt is ever shown --
     the `No` answer piped on the pty goes unread. Same assertions as the
     `--verbose`/`--tree` pins, plus `Would you like to merge` absent.
     Same all-noop plan (`--oneshot -u dev-libs/samepkg`)."""
@@ -7397,7 +7392,7 @@ def test_emerge_ask_nothing_to_merge_never_prompts(emerge_binary, tmp_path):
 def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
     emerge_binary, tmp_path
 ):
-    """Backlog #225 negative: with no display flag real never enters the
+    """Backlog #225 negative: with no display flag Portage never enters the
     `actions.py:464-469` branch, so `mergecount` stays `None`,
     `Scheduler` runs, and `_save_resume_list` commits the (empty) list
     (#179) -- after the `resume_backup` rotation (`:664-672`), which
@@ -7426,7 +7421,7 @@ def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
 def test_emerge_selective_noop_without_oneshot_rotates_and_records(
     emerge_binary, tmp_path
 ):
-    """Backlog #232: real's selective-without-`--oneshot` deferral arm
+    """Backlog #232: Portage's selective-without-`--oneshot` deferral arm
     (`_emerge/actions.py:514-516`) does not return early -- it falls
     through to the `resume_backup` rotation (`:664-672`) and
     `saveNomergeFavorites` (the world-file record), skipping only
@@ -7436,7 +7431,7 @@ def test_emerge_selective_noop_without_oneshot_rotates_and_records(
     `Nothing to merge` anywhere, the stale two-item list rotated into
     `resume_backup` (and no fresh `resume` section -- no `Scheduler`
     write), and `dev-libs/samepkg` recorded in the world file with the
-    real `>>> Recording ...` line on stdout."""
+    Portage `>>> Recording ...` line on stdout."""
     import json
 
     root = tmp_path / "root"
@@ -7466,7 +7461,7 @@ def test_emerge_selective_noop_without_oneshot_ask_prompts_for_world(
 ):
     """Backlog #232, the `--ask` half of the deferral arm
     (`_emerge/actions.py:514-516` plus `depgraph.py:11376-11386`): with
-    `--ask` real asks `Would you like to add these packages to your
+    `--ask` Portage asks `Would you like to add these packages to your
     world favorites?` inside `saveNomergeFavorites` instead of the merge
     prompt -- so `Would you like to merge` stays absent while the stale
     list still rotates. Same all-noop plan (`-u dev-libs/samepkg`, no
@@ -7499,7 +7494,7 @@ def test_emerge_selective_noop_without_oneshot_ask_prompts_for_world(
 def test_emerge_onlydeps_selective_noop_keeps_the_resume_list_alone(
     emerge_binary, tmp_path
 ):
-    """Backlog #232 review (Critical-1): real folds `--onlydeps` into the
+    """Backlog #232 review (Critical-1): Portage folds `--onlydeps` into the
     gate variable (`_emerge/actions.py:257`: `oneshot = "--oneshot" in
     myopts or "--onlydeps" in myopts`), and the deferral arm tests that
     folded value (`:499`, `:514`). So `-u --onlydeps` on an
@@ -7562,8 +7557,8 @@ def test_emerge_selective_noop_without_oneshot_buildpkgonly_rotates_without_reco
     emerge_binary, tmp_path
 ):
     """Backlog #232 review (Minor-6): `--buildpkgonly` defers (it is not
-    part of real's gate fold at `_emerge/actions.py:257`, so the `:514`
-    arm still fires) but records nothing (it is in real's
+    part of Portage's gate fold at `_emerge/actions.py:257`, so the `:514`
+    arm still fires) but records nothing (it is in Portage's
     `saveNomergeFavorites` suppression set, `depgraph.py:11308`). Same
     all-noop plan (`--verbose -u dev-libs/samepkg`, no `--oneshot`):
     exit 0 with no `Nothing to merge` anywhere, the stale two-item list
@@ -7595,7 +7590,7 @@ def _non_candidate_set_configroot(tmp_path, tag, world_candidate):
     configroot plus a `@noworldset` file set naming the installed
     `dev-libs/samepkg`. With `world_candidate=False` a `sets.conf`
     flips the `[usersets]` default to `world-candidate = false` --
-    real's documented override shape (man portage.5 `sets.conf`;
+    Portage's documented override shape (man portage.5 `sets.conf`;
     same-named sections merge across files with later wins, and
     `_sets/__init__.py` marks every file set the multiset builds with
     that flag). Per-test copies only: no committed fixture churn."""
@@ -7623,7 +7618,7 @@ def _non_candidate_set_env(root, configroot):
 def test_emerge_non_candidate_set_selective_noop_is_not_deferred(
     emerge_binary, tmp_path
 ):
-    """Backlog #232 review (Important-2): real filters sets with
+    """Backlog #232 review (Important-2): Portage filters sets with
     `world-candidate = false` out of `world_candidates`
     (`_emerge/actions.py:500-512`), and the deferral arm tests the
     filtered list (`:514`). With the default config `-u @noworldset`
@@ -7673,7 +7668,7 @@ def test_emerge_non_candidate_set_is_not_recorded_on_the_deferral_arm(
     emerge_binary, tmp_path
 ):
     """Backlog #232 review (Important-2), the record half on the arm:
-    real's `saveNomergeFavorites` skips non-candidate sets
+    Portage's `saveNomergeFavorites` skips non-candidate sets
     (`depgraph.py:11366`). A mixed run (`-u dev-libs/samepkg
     @noworldset`, all noop) still defers via the plain atom -- rotation
     plus the `samepkg` world record -- but `@noworldset` is never
@@ -7732,14 +7727,14 @@ def test_emerge_non_candidate_set_is_not_recorded_on_success_path(
 
 
 def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary, tmp_path):
-    """Backlog #186: real `depgraph.py::_loadResumeCommand` re-resolves a
+    """Backlog #186: Portage `depgraph.py::_loadResumeCommand` re-resolves a
     `["binary", root, cpv, "merge"]` resume item from the bintree, so the
     resumed `(N of M) cpv::repo` line names the *binary's* repository (the
     `Packages` index `REPO` field), never the ebuild repo. Portuale
     re-derived the repo from the ebuild repos, so a resumed binary with no
     ebuild anywhere printed a bare `cpv::`. `dev-libs/binaryonlypkg`
     exists only as a local binpkg whose `Packages` stanza carries no
-    `REPO` -- a fresh `-k` merge shows `::__unknown__` (real
+    `REPO` -- a fresh `-k` merge shows `::__unknown__` (Portage
     `portage.versions._unknown_repo`, the resolver's own fallback), and
     the resumed merge must show the same. The resume list itself arises
     naturally: `dev-libs/schedbad` (source, its `src_install` dies)
@@ -7806,7 +7801,7 @@ def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary
 
 
 def test_emerge_elog_echo_prints_a_message_summary(emerge_binary, tmp_path):
-    """Real `elog_process` / `mod_echo` (default-on via `make.globals`
+    """Portage `elog_process` / `mod_echo` (default-on via `make.globals`
     `PORTAGE_ELOG_SYSTEM`): after the merge, the `elog`/`ewarn` messages an
     ebuild emitted (routed to `${T}/logging/<phase>` by
     `bin/isolated-functions.sh`) are echoed as a
@@ -7845,11 +7840,11 @@ def test_emerge_elog_echo_prints_a_message_summary(emerge_binary, tmp_path):
 
 
 def test_emerge_elog_save_and_save_summary_write_log_files(emerge_binary, tmp_path):
-    """Real `mod_save` / `mod_save_summary` (the latter ON by default via
+    """Portage `mod_save` / `mod_save_summary` (the latter ON by default via
     `make.globals` `PORTAGE_ELOG_SYSTEM`): after the merge, each package's
     class-filtered elog messages are written to
     `<logdir>/elog/<cat>:<pf>:<stamp>.log` (`save`) and appended to
-    `<logdir>/elog/summary.log` (`save_summary`), in real
+    `<logdir>/elog/summary.log` (`save_summary`), in Portage
     `_combine_logentries` format. (`mail`/`mail_summary` delivery itself
     is covered by the dedicated tests below -- they are off here so no
     delivery is attempted.)"""
@@ -7930,7 +7925,7 @@ def _mail_env(tmp_path, root, extra=None):
 
 
 def test_emerge_elog_mail_sends_via_sendmail_binary(emerge_binary, tmp_path):
-    """Real `mod_mail` (backlog Tier 1): one MIME mail per merged
+    """Portage `mod_mail` (backlog Tier 1): one MIME mail per merged
     package, piped to the sendmail binary named by
     `PORTAGE_ELOG_MAILURI` (`<sendmail> -f <from> <recipient>` on
     argv, message on stdin). Parsed here with Python's own `email`
@@ -7979,7 +7974,7 @@ def test_emerge_elog_mail_sends_via_sendmail_binary(emerge_binary, tmp_path):
 
 
 def test_emerge_elog_mail_summary_sends_one_multipart_mail(emerge_binary, tmp_path):
-    """Real `mod_mail_summary` (backlog Tier 1): nothing per package --
+    """Portage `mod_mail_summary` (backlog Tier 1): nothing per package --
     one `multipart/mixed` mail at process exit, subject's `${PACKAGE}`
     the `one package`/`multiple packages` count, body listing every
     package, each package's messages as an attachment. Merging
@@ -8018,7 +8013,7 @@ def test_emerge_elog_mail_summary_sends_one_multipart_mail(emerge_binary, tmp_pa
 
 
 def test_emerge_elog_mail_sends_via_smtp(emerge_binary, tmp_path):
-    """Real `portage.mail.send_mail` over SMTP (backlog Tier 1): EHLO,
+    """Portage `portage.mail.send_mail` over SMTP (backlog Tier 1): EHLO,
     `AUTH LOGIN`, `MAIL`/`RCPT`/`DATA` with the MIME bytes, `QUIT` --
     against an in-test fake server on 127.0.0.1, asserting the envelope
     and that the DATA parses as the package's mail."""
@@ -8108,8 +8103,8 @@ def test_emerge_elog_mail_sends_via_smtp(emerge_binary, tmp_path):
 
 
 def test_emerge_elog_mail_smtp_failure_is_a_warning_not_a_failure(emerge_binary, tmp_path):
-    """Real `PortageException` handling: an unreachable SMTP host prints
-    real's own `!!! A network error occurred ... Sure you configured
+    """Portage `PortageException` handling: an unreachable SMTP host prints
+    Portage's own `!!! A network error occurred ... Sure you configured
     PORTAGE_ELOG_MAILURI correctly?` line but the merge still succeeds
     (delivery of the other modules is unaffected)."""
     import socket
@@ -8144,7 +8139,7 @@ def test_standalone_ebuild_merge_applies_package_env_build_vars(emerge_binary, t
     `dev-libs/penvbuildpkg` records its phase flags into the merged
     `/usr/share/${PN}/flags` file: with
     `package.env -> penv-buildflags` they come from the env file, not
-    make.conf -- `CFLAGS`/`MAKEOPTS` plus real's toolchain selectors
+    make.conf -- `CFLAGS`/`MAKEOPTS` plus Portage's toolchain selectors
     `CC`/`CXX`/`AR`/`RUSTFLAGS` and the `ENV_UNSET` incremental
     (backlog #95). The `USE=` half needs no separate step (the
     standalone USE display already folds `package_env_use` in)."""
@@ -8176,18 +8171,17 @@ def test_standalone_ebuild_package_applies_per_entry_binpkg_compress(
     ebuild_binary, tmp_path
 ):
     """Standalone `ebuild <file> package` reads `BINPKG_COMPRESS`
-    from the package's own settings (real `doebuild.py:697` on the
-    setcpv'd config -- backlog #147 S3, oracle S0 C2: real writes a
-    gzip artefact with run-wide zstd). `dev-libs/penvcmppkg` carries
+    from the package's own settings (Portage `doebuild.py:697` on the
+    setcpv'd config -- backlog #147 S3, oracle S0 C2: Portage writes a gzip artefact with run-wide zstd). `dev-libs/penvcmppkg` carries
     the `penv-compress` match (`BINPKG_COMPRESS=gzip`); the run-wide
     value is deliberately left unset (no calling-env
     `BINPKG_COMPRESS`, which would mask the match per #101 on both
     sides -- same rule the `--buildpkgonly` pin documents). The
     artefact stays on the single-instance layout: S3 moves no layout
-    (the STOPPED S1 arm owns that question, and real's standalone
+    (the STOPPED S1 arm owns that question, and Portage's standalone
     `inject` uses the run-wide allocator either way). `FEATURES`
     matching is deliberately not pinned here: no per-package
-    `FEATURES` token has a real-honored standalone-`package`
+    `FEATURES` token has a Portage-honored standalone-`package`
     artefact effect (layout is run-wide, signing needs its own
     oracle), so per O9 it is not implemented."""
     pkgdir = tmp_path / "pkgdir"
@@ -8220,7 +8214,7 @@ def test_standalone_ebuild_package_applies_per_entry_binpkg_compress(
 def test_standalone_ebuild_package_env_cc_reaches_the_tc_is_lto_probe(
     emerge_binary, tmp_path
 ):
-    """Backlog #95's live failure shape, hermetically: real
+    """Backlog #95's live failure shape, hermetically: Portage
     `_grab_pkg_env` accepts `CC` from a package.env env file, so
     `toolchain-funcs.eclass`'s `tc-getCC` yields it and `tc-is-lto`'s
     probe runs it (host capture: `ebuild ... setup` with the host
@@ -8274,7 +8268,7 @@ def test_standalone_ebuild_package_env_cc_reaches_the_tc_is_lto_probe(
 
 
 def test_emerge_unmerge_processes_prerm_postrm_elog(emerge_binary, tmp_path):
-    """Real `dblink.unmerge()` -> `self._elog_process(phasefilter=("prerm",
+    """Portage `dblink.unmerge()` -> `self._elog_process(phasefilter=("prerm",
     "postrm"))`: the `elog`/`ewarn` a removed package's `pkg_prerm` /
     `pkg_postrm` emit are echoed (`* Messages for package <cpv>:`) and
     written to `<logdir>/elog/summary.log`, exactly like a merge --
@@ -8325,7 +8319,7 @@ def test_emerge_unmerge_processes_prerm_postrm_elog(emerge_binary, tmp_path):
 def test_emerge_upgrade_in_place_processes_the_old_versions_rm_elog(
     emerge_binary, tmp_path
 ):
-    """Real `dblink.unmerge()` runs `_elog_process(phasefilter=("prerm",
+    """Portage `dblink.unmerge()` runs `_elog_process(phasefilter=("prerm",
     "postrm"))` for the SUPERSEDED version during an in-place replace too,
     not just under `emerge -C`. `elogrmpkg-1.0`'s `pkg_prerm`/`pkg_postrm`
     emit `ewarn`/`elog`; upgrading it to 2.0 (same SLOT) must echo and
@@ -8376,7 +8370,7 @@ def test_emerge_upgrade_in_place_processes_the_old_versions_rm_elog(
 
 
 def test_emerge_applies_portage_niceness_and_ionice(emerge_binary, fixture_env):
-    """Real `_emerge/actions.py::apply_priorities` (via `run_action`):
+    """Portage `_emerge/actions.py::apply_priorities` (via `run_action`):
     `PORTAGE_NICENESS` -> `renice -n <n> <pid>`, `PORTAGE_IONICE_COMMAND`
     -> spawned with `${PID}` expanded. A failing renice / ionice prints
     an eerror-style line and the run continues; unset -> nothing."""
@@ -8406,7 +8400,7 @@ def test_emerge_applies_portage_niceness_and_ionice(emerge_binary, fixture_env):
     assert "PORTAGE_IONICE_COMMAND returned" in r.stderr
     assert "make.conf(5)" in r.stderr
 
-    # PORTAGE_IONICE_COMMAND is shlex-split now (real `shlex.split`): a
+    # PORTAGE_IONICE_COMMAND is shlex-split now (Portage `shlex.split`): a
     # quoted argument stays one word rather than splitting on its space.
     env = dict(clean, PORTAGE_IONICE_COMMAND="/bin/sh -c 'exit 7' ${PID}")
     r = subprocess.run(base, capture_output=True, text=True, check=False, env=env)
@@ -8415,9 +8409,9 @@ def test_emerge_applies_portage_niceness_and_ionice(emerge_binary, fixture_env):
 
 
 def test_emerge_applies_portage_scheduling_policy(emerge_binary, fixture_env):
-    """`PORTAGE_SCHEDULING_POLICY` -> real `os.sched_setscheduler` (real
+    """`PORTAGE_SCHEDULING_POLICY` -> Portage `os.sched_setscheduler` (Portage
     `_emerge/actions.py::set_scheduling_policy`). `batch` maps to
-    `SCHED_BATCH`; an unknown name prints the real "Invalid policy" eerror
+    `SCHED_BATCH`; an unknown name prints the Portage "Invalid policy" eerror
     pair. Either way the action still proceeds."""
     base = [str(emerge_binary), "--pretend", "dev-libs/newpkg"]
     clean = dict(fixture_env)
@@ -8437,7 +8431,7 @@ def test_emerge_applies_portage_scheduling_policy(emerge_binary, fixture_env):
     assert "Invalid policy" not in r.stderr
     assert r.stdout.strip() == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}'
 
-    # An unknown policy name -> the real eerror pair, run still proceeds.
+    # An unknown policy name -> the Portage eerror pair, run still proceeds.
     env = dict(clean, PORTAGE_SCHEDULING_POLICY="turbo")
     r = subprocess.run(base, capture_output=True, text=True, check=False, env=env)
     assert r.returncode == 0
@@ -8454,7 +8448,7 @@ def test_emerge_applies_portage_scheduling_policy(emerge_binary, fixture_env):
 
 
 def _run_with_ask_pty(binary, args, answer, env):
-    """Run `emerge --ask ...` with a **real pty on stdin**: real's gate
+    """Run `emerge --ask ...` with a **real pty on stdin**: Portage's gate
     (`actions.py:3920-3926`) rejects a non-tty stdin outright, so a
     `subprocess.run(input=...)` pipe can never reach the prompt loop.
     `answer` is written to the master side once the child is up;
@@ -8488,7 +8482,7 @@ def _run_with_ask_pty(binary, args, answer, env):
 def test_emerge_ask_prompts_before_a_real_merge_and_honours_the_answer(
     emerge_binary, tmp_path
 ):
-    """`emerge --ask <atom>` (real `_emerge/actions.py:525`): after the
+    """`emerge --ask <atom>` (Portage `_emerge/actions.py:525`): after the
     merge list, prompt `Would you like to merge these packages? [Yes/No]`.
     A `No` prints `Quitting.` and exits 130 without building; a `Yes` (or
     bare Enter) proceeds. Ignored under `--pretend`."""
@@ -8588,8 +8582,7 @@ def test_emerge_unmerge_with_pretend_still_only_previews(emerge_binary, tmp_path
 def test_emerge_deselect_without_pretend_rewrites_world_and_world_sets(
     emerge_binary, tmp_path
 ):
-    """`emerge --deselect` WITHOUT `--pretend` is a real write now (real
-    action_deselect's `world_set.replace(remaining)`): the matching atoms
+    """`emerge --deselect` WITHOUT `--pretend` is a real write now (Portage action_deselect's `world_set.replace(remaining)`): the matching atoms
     leave var/lib/portage/world and matching @sets leave world_sets, both
     files rewritten sorted with comment lines dropped; `--pretend` still
     only previews."""
@@ -8628,7 +8621,7 @@ def test_emerge_deselect_without_pretend_rewrites_world_and_world_sets(
 
 
 def test_emerge_deselect_ask_prompts_before_rewriting_world(emerge_binary, tmp_path):
-    """`emerge --deselect --ask` (real `action_deselect`): after the
+    """`emerge --deselect --ask` (Portage `action_deselect`): after the
     `>>> Removing ...` lines, prompt `Would you like to remove these
     packages from your world favorites? [Yes/No]`; `n` aborts (exit 130)
     with the world file untouched, empty answer proceeds."""
@@ -8670,7 +8663,7 @@ def _seed_binpkgrmpkg(emerge_binary, root, env, version):
 
 def test_emerge_depclean_without_pretend_really_removes_orphans(emerge_binary, tmp_path):
     """`emerge --depclean` (no args) WITHOUT `--pretend` really removes
-    the cleanlist now (real `action_depclean` -> `unmerge(..., "unmerge",
+    the cleanlist now (Portage `action_depclean` -> `unmerge(..., "unmerge",
     cleanlist, ordered=True)`). A lone installed `binpkgrmpkg-1.0` that no
     world/@system member needs is an orphan -> removed, its
     prerm/postrm run, and the stats block reads `Number removed:`."""
@@ -8706,7 +8699,7 @@ def test_emerge_depclean_without_pretend_really_removes_orphans(emerge_binary, t
 
 def test_emerge_prune_without_pretend_really_removes_lower_versions(emerge_binary, tmp_path):
     """`emerge --prune` WITHOUT `--pretend` really removes every installed
-    version of a multi-version cp except the highest (real
+    version of a multi-version cp except the highest (Portage
     `action_depclean` `action="prune"` -> `unmerge(...)`). Seed 1.0 + 2.0,
     prune -> 1.0 gone, 2.0 kept."""
     root = tmp_path / "root"
@@ -8745,7 +8738,7 @@ def test_emerge_prune_without_pretend_really_removes_lower_versions(emerge_binar
 
 
 def test_emerge_config_runs_pkg_config_from_the_vdb(emerge_binary, tmp_path):
-    """`emerge --config <atom>` (real `action_config`): resolve the single
+    """`emerge --config <atom>` (Portage `action_config`): resolve the single
     installed match, print `Configuring pkg...`, run its `pkg_config` from
     the vdb-stored environment.bz2 + <pf>.ebuild. `dev-libs/emergeconfigpkg`'s
     pkg_config writes `${EROOT}/var/lib/emergeconfigpkg.configured`."""
@@ -8798,7 +8791,7 @@ def test_emerge_config_runs_pkg_config_from_the_vdb(emerge_binary, tmp_path):
 
 
 def test_emerge_config_rejects_multiple_atoms_and_reports_missing(emerge_binary, tmp_path):
-    """Real `action_config`: `len(myfiles) != 1` -> the red one-liner,
+    """Portage `action_config`: `len(myfiles) != 1` -> the red one-liner,
     exit 1; a valid atom matching nothing installed -> `No packages
     found.` exit 0."""
     env = dict(os.environ)
@@ -8821,7 +8814,7 @@ def test_emerge_config_rejects_multiple_atoms_and_reports_missing(emerge_binary,
 
 
 def test_emerge_info_runs_pkg_info_for_an_ebuild_and_a_binary(emerge_binary, tmp_path):
-    """Real `action_info`'s `>>> Attempting to run pkg_info() for '<cpv>'`
+    """Portage `action_info`'s `>>> Attempting to run pkg_info() for '<cpv>'`
     + `doebuild(ebuildpath, "info", ...)` step -- Rust actually runs the
     phase (the deterministic message is contract-tested; the phase's real
     execution is Rust-only, like `--config`). `dev-libs/pkginfopkg`
@@ -8862,7 +8855,7 @@ def test_emerge_config_shell_flag_selects_the_pkg_config_backend(
     emerge_binary, tmp_path
 ):
     """`emerge --config --shell bash|brush <atom>`: the portuale-only
-    `--shell` flag now reaches the `pkg_config` phase too (real
+    `--shell` flag now reaches the `pkg_config` phase too (Portage
     `action_config` -> `doebuild(ebuildpath, "config", ...)`), not just a
     real merge. Both backends run `dev-libs/emergeconfigpkg`'s own
     `pkg_config` and must produce the identical real marker file."""
@@ -8941,7 +8934,7 @@ def test_emerge_unmerge_shell_flag_reaches_prerm_postrm(emerge_binary, tmp_path)
 
 
 def test_emerge_unmerge_backup_quickpkgs_before_removing(emerge_binary, tmp_path):
-    """`FEATURES=unmerge-backup` (real `dblink._pre_unmerge_backup` ->
+    """`FEATURES=unmerge-backup` (Portage `dblink._pre_unmerge_backup` ->
     quickpkg): `emerge -C` builds a binpkg of the *installed* package into
     $PKGDIR from its CONTENTS files, THEN removes it. Reuses
     `dev-libs/emergeconfigpkg` (installs
@@ -8977,7 +8970,7 @@ def test_emerge_unmerge_backup_quickpkgs_before_removing(emerge_binary, tmp_path
     assert result.returncode == 0, result.stderr
     assert ">>> Building backup package for dev-libs/emergeconfigpkg-1.0" in result.stdout
 
-    # The backup binpkg exists -- a `.gpkg.tar` by the real
+    # The backup binpkg exists -- a `.gpkg.tar` by the Portage
     # `make.globals` default (backlog #173; was an xpak `.tbz2`
     # pre-#173) -- holds the installed file, and got a Packages
     # index entry.
@@ -9009,8 +9002,8 @@ def test_emerge_unmerge_backup_multi_instance_uses_the_subdir_layout(
     emerge_binary, tmp_path
 ):
     """`FEATURES="unmerge-backup binpkg-multi-instance"`: the quickpkg
-    backup lands at real `_allocate_filename_multi`'s
-    `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.gpkg.tar` (real `bin/quickpkg` ->
+    backup lands at Portage `_allocate_filename_multi`'s
+    `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.gpkg.tar` (Portage `bin/quickpkg` ->
     `bintree.inject` -> `getname(..., allocate_new=True)` -- `.xpak`
     pre-#173, when the xpak shape was still the default; backlog #173),
     not the bare single-instance path -- and the `Packages` entry
@@ -9060,18 +9053,18 @@ def test_emerge_unmerge_backup_make_conf_binpkg_format_xpak_is_obeyed(
     """Backlog #173 review: `execute_unmerge`'s `FEATURES=unmerge-backup`
     quickpkg resolves `BINPKG_FORMAT` through the same chain as every
     other `PackageOptions` site (calling env over `make.conf`/profile/
-    `make.globals`, real `config` precedence) -- a `make.conf` value is
+    `make.globals`, Portage `config` precedence) -- a `make.conf` value is
     not ignored for the backup. Hermetically: copy the configroot and
     put `BINPKG_FORMAT="xpak"` in the copy's `make.conf` (no calling-env
-    value). The `emerge -C` backup then names the old xpak `.tbz2` (real
+    value). The `emerge -C` backup then names the old xpak `.tbz2` (Portage
     `XPAKSTOP` trailer, installed file inside); setting the calling env
     to `gpkg` on top flips that same config back to `.gpkg.tar`, proving
     the env beats `make.conf`. Reuses `dev-libs/emergeconfigpkg`, so no
     md5-cache entry is needed. Backlog #202: the reinstall forces the
     first backup's `Packages` `BUILD_TIME` into the re-merged vdb entry
     before the second `emerge -C`, deterministically reproducing the
-    same-second re-merge state (real `BUILD_TIME` is epoch seconds) in
-    which the old code skipped the second backup with rc 0 -- real
+    same-second re-merge state (Portage `BUILD_TIME` is epoch seconds) in
+    which the old code skipped the second backup with rc 0 -- Portage
     `emerge -C` never consults the index there (its bintree is
     unpopulated), so it always rebuilds."""
     import shutil
@@ -9170,7 +9163,7 @@ def _merge_slotopdepspkg(emerge_binary, root, env):
 
 
 def test_merge_binds_the_slot_operator_in_stored_dep_metadata(emerge_binary, tmp_path):
-    """Real `_post_src_install_write_metadata` ->
+    """Portage `_post_src_install_write_metadata` ->
     `evaluate_slot_operator_equal_deps`: a merged package records its `:=`
     deps bound to the installed dependency's `<slot>/<sub-slot>=`.
     `dev-libs/slotopdepspkg` RDEPENDs `dev-libs/slotoptarget:=`."""
@@ -9192,7 +9185,7 @@ def test_merge_binds_the_slot_operator_in_stored_dep_metadata(emerge_binary, tmp
 
 
 def test_merge_leaves_an_unresolvable_slot_operator_bare(emerge_binary, tmp_path):
-    """Real `_eval_deps`: a `:=` dep with nothing installed to satisfy it
+    """Portage `_eval_deps`: a `:=` dep with nothing installed to satisfy it
     is left as-is (`dev-libs/slotoptarget:=`)."""
     root = tmp_path / "root"
     root.mkdir()
@@ -9217,7 +9210,7 @@ def test_ebuild_install_really_fetches_via_the_already_verified_skip_path(
     already-verified skip-fetch path end-to-end through the compiled
     CLI, with no live network access needed at all -- the fixture's own
     `src_install` records the real `A`/`AA` it observed. `A` carries the
-    unconditionally-fetched rename; `AA` is unset (real `config.environ()`
+    unconditionally-fetched rename; `AA` is unset (Portage `config.environ()`
     pops it for every EAPI >= 4, `config.py:3331-3333`), so the
     conditional group never appears."""
     ebuild_path = str(
@@ -9257,12 +9250,12 @@ def test_ebuild_install_restrict_fetch_never_downloads_the_plain_uri(
     ebuild_binary, tmp_path
 ):
     """`dev-libs/fetchrestrictpkg` has `RESTRICT="fetch"` and a plain
-    `https://example.invalid/...` SRC_URI. Real `fetch.py:1167`: a plain
+    `https://example.invalid/...` SRC_URI. Portage `fetch.py:1167`: a plain
     URI is barred from the fetchable-candidate list under RESTRICT=fetch,
     and the public mirrors too -- so with the distfile ABSENT from
     DISTDIR the install fails, first running the ebuild's own pkg_nofetch
     phase (its `elog` "download it from ..." lines print above the error,
-    real fetch.py's spawn_nofetch), and crucially never tries to reach
+    Portage fetch.py's spawn_nofetch), and crucially never tries to reach
     example.invalid. With the distfile PRESENT (user-placed) and
     Manifest-verified, the install succeeds via the already-verified
     skip path."""
@@ -9341,7 +9334,7 @@ def test_ebuild_install_really_inherits_a_real_eclass(ebuild_binary, tmp_path):
     # No spurious "inherited illegally" QA notice: `phase_env_vars`
     # exports `INHERITED` (from the ebuild's md5-cache) so `bin/ebuild.sh`
     # snapshots it into `__INHERITED_QA_CACHE` before a non-`depend`
-    # phase re-sources the ebuild -- exactly as real portage does.
+    # phase re-sources the ebuild -- exactly as Portage does.
     assert "inherited illegally" not in (result.stdout + result.stderr), (
         result.stdout + result.stderr
     )
@@ -9355,7 +9348,7 @@ def test_ebuild_install_does_not_deadlock_on_a_large_eclass_scope(
     re-do of the still-open reubeno/brush#1276 -- see
     LLM/what-this-proves.md's eclass section for the full root-cause
     writeup): a shell function used as a non-last pipeline
-    stage used to run inline rather than as a background task, so real
+    stage used to run inline rather than as a background task, so Portage
     `bin/phase-functions.sh`'s own post-phase `__save_ebuild_env |
     __filter_readonly_variables` pipe (both sides real shell functions)
     deadlocked once `__save_ebuild_env`'s own `declare -f` dump exceeded
@@ -9394,7 +9387,7 @@ def test_ebuild_shell_bash_and_brush_produce_the_same_real_result(
 ):
     """`--shell bash|brush` (default `bash`) selects which real shell
     backend executes every phase: a genuine `bash <bin_dir>/ebuild.sh
-    <phase>` subprocess (the default -- matching real portage's own
+    <phase>` subprocess (the default -- matching Portage's own
     `_doebuild_spawn()` invocation shape), or the embedded
     `brush_core::Shell` (see `ebuild_phases::ShellBackend`'s own doc
     comment and LLM/what-this-proves.md's eclass section for the full
@@ -9432,7 +9425,7 @@ def test_ebuild_shell_bash_and_brush_compile_a_quoted_heredoc_ebuild(
     backends must compile the fixture and produce an identical `image/`
     file set, not merely matching exit codes. Hermetic configroot: the
     host profile enables `splitdebug`, which splits debug info with
-    tmpdir-dependent build-id paths, so no two tmpdirs -- real's
+    tmpdir-dependent build-id paths, so no two tmpdirs -- Portage's
     included -- can produce identical file sets; the backend parity
     this pins does not depend on it (the fixture config resolves no
     `splitdebug`)."""
@@ -9553,7 +9546,7 @@ def test_ebuild_network_sandbox_gives_src_phases_a_fresh_network_namespace(
 ):
     """FEATURES=network-sandbox (SCOPE_BACKLOG Part 2.D): the six real
     `src_*` phases run inside a fresh network namespace via
-    `unshare --net --map-root-user` (real portage's own
+    `unshare --net --map-root-user` (Portage's own
     `unshare(CLONE_NEWNET)`). `dev-libs/netsandboxpkg`'s src_compile
     records `readlink /proc/self/ns/net`, its visible interfaces (from
     the per-netns `/proc/net/dev`), and an outbound-connect result. Run
@@ -9640,7 +9633,7 @@ def test_ebuild_sandbox_features_each_unshare_their_own_namespace(
 ):
     """FEATURES=ipc-sandbox / mount-sandbox / pid-sandbox (SCOPE_BACKLOG
     Part 2.D): each puts the src_* phases in its own namespace via the
-    matching `unshare(1)` flag (real _doebuild_spawn's
+    matching `unshare(1)` flag (Portage _doebuild_spawn's
     unshare_{ipc,mount,pid}). `dev-libs/netsandboxpkg` records
     `readlink /proc/self/ns/{ipc,mnt,pid}`; with the feature on that id
     must differ from the portuale process's own."""
@@ -9683,7 +9676,7 @@ def test_ebuild_sandbox_denies_and_fails_on_a_write_outside_the_build_tree(
     ebuild_binary, tmp_path
 ):
     """FEATURES=sandbox (SCOPE_BACKLOG Part 2.D): the six real src_* phases
-    run wrapped in the sys-apps/sandbox binary (real portage's own
+    run wrapped in the sys-apps/sandbox binary (Portage's own
     spawn_sandbox). `dev-libs/fssandboxpkg`'s src_install writes a legit
     file into ${D} and also tries to write /var/lib/portage-portuale-sandbox-
     probe; with the feature on, `sandbox` denies the stray write, records

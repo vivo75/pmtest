@@ -2,7 +2,7 @@
 # #38 S4 -- merge-time `instprep` repro: both PMs merge porttest/{docs,setuid}
 # with FEATURES="-binpkg-dostrip -binpkg-docompress" (source merge, then a
 # binpkg merge of the unstripped archive), in two fresh containers; the
-# snapshots are diffed. Real strips/compresses at merge
+# snapshots are diffed. Portage strips/compresses at merge
 # (`vartree.py:4440-4450` -> `__dyn_instprep`); a diff is the #38b gap.
 #
 #   differential-test-bed/run/l2-instprep-repro.sh

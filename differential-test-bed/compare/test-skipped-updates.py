@@ -3,7 +3,7 @@
 
 Exercises parse()/compare() in resolve-compare.py (L0 + fixture
 oracle): the `WARNING: One or more updates/rebuilds have been skipped
-due to a dependency conflict:` block real prints from
+due to a dependency conflict:` block Portage prints from
 `_show_missed_update_slot_conflicts`
 (`3rdparty/portage/lib/_emerge/depgraph.py:1652`, 3.0.82.2) and
 portuale renders from `GraphResult::skipped_updates`
@@ -18,7 +18,7 @@ package list, are findings; the explanation text (USE/USE_EXPAND
 displays, `^` markers, `to '<root>'` suffixes) is compared only when
 both sides print the block; staged-root paths normalise to a
 placeholder; portuale's one-block-per-parent grouping merges back to
-real's one-block-per-slot shape.
+Portage's one-block-per-slot shape.
 
 Run: python3 differential-test-bed/compare/test-skipped-updates.py   (exit 0 = all good)
 """
@@ -53,7 +53,7 @@ MERGE = """[ebuild  N     ] dev-libs/r25up-2.0 [1.0]
 """
 
 # Portuale's r25 shape (contract pin
-# test_emerge_pretend_contract.py: the warning real never prints).
+# test_emerge_pretend_contract.py: the warning Portage never prints).
 PTL_R25 = MERGE + """WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:
 
 dev-libs/r25lib:0
@@ -64,9 +64,9 @@ dev-libs/r25lib:0
 
 """
 
-# Real's blk0 shape: one group, two parents, USE_EXPAND displays and
+# Portage's blk0 shape: one group, two parents, USE_EXPAND displays and
 # `merge to '<ROOT>'` suffixes (ROOT != "/" in the fixture-oracle bed).
-REAL_BLK0 = MERGE + """WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:
+PORTAGE_BLK0 = MERGE + """WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:
 
 dev-libs/blk0x:0
 
@@ -97,11 +97,11 @@ dev-libs/blk0x:0
 """
 
 
-def run_case(real_text, ptl_text, rrc=0, prc=0):
+def run_case(portage_text, ptl_text, rrc=0, prc=0):
     with tempfile.TemporaryDirectory() as tmp:
         rp = Path(tmp) / "r.txt"
         pp = Path(tmp) / "p.txt"
-        rp.write_text(real_text)
+        rp.write_text(portage_text)
         pp.write_text(ptl_text)
         return mod.compare("probe", "case", rrc, prc, rp, pp)
 
@@ -131,16 +131,16 @@ def main() -> int:
     check("identical blocks: no findings", pr.findings == [], repr(pr.findings))
 
     # 3. different skipped package list (extra header on one side)
-    pr = run_case(REAL_BLK0, REAL_BLK0 + PTL_R25.split(MERGE)[1])
+    pr = run_case(PORTAGE_BLK0, PORTAGE_BLK0 + PTL_R25.split(MERGE)[1])
     s = skipped(pr.findings)
     check("extra skipped header is a finding",
           len(s) == 1 and "present for portuale, absent for real: dev-libs/r25lib:0"
           in s[0]["detail"], repr(pr.findings))
 
     # 4. same header, different conflict atoms
-    other = REAL_BLK0.replace("<dev-libs/blk0x-3 required by",
+    other = PORTAGE_BLK0.replace("<dev-libs/blk0x-3 required by",
                               "<dev-libs/blk0x-4 required by")
-    pr = run_case(REAL_BLK0, other)
+    pr = run_case(PORTAGE_BLK0, other)
     s = skipped(pr.findings)
     check("different conflict atoms are a package-list finding",
           len(s) == 1 and "skipped package list differs" in s[0]["detail"]
@@ -148,7 +148,7 @@ def main() -> int:
 
     # 5. same packages, different explanation (the live blk0 divergence:
     # USE_EXPAND displays + `to '<root>'` suffixes vs bare USE)
-    pr = run_case(REAL_BLK0, PTL_BLK0)
+    pr = run_case(PORTAGE_BLK0, PTL_BLK0)
     s = skipped(pr.findings)
     check("same packages: no package-list finding",
           not [f for f in s if "package list differs" in f["detail"]
@@ -159,11 +159,11 @@ def main() -> int:
           repr(pr.findings))
 
     # 6. staged-root paths normalise away (same block, different roots)
-    alt = REAL_BLK0.replace("/tmp/l0-fixture-oracle/fixtures/", "/tmp/other-stage/fx/")
-    pr = run_case(REAL_BLK0, alt)
+    alt = PORTAGE_BLK0.replace("/tmp/l0-fixture-oracle/fixtures/", "/tmp/other-stage/fx/")
+    pr = run_case(PORTAGE_BLK0, alt)
     check("staged-root path is volatile, not signal", pr.findings == [], repr(pr.findings))
 
-    # 7. grouping merges: portuale's split blocks vs real's grouped
+    # 7. grouping merges: portuale's split blocks vs Portage's grouped
     # block with otherwise identical text compare clean
     grouped = PTL_BLK0.replace(
         '\ndev-libs/blk0x:0\n\n  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge) USE="" conflicts with\n'
@@ -184,7 +184,7 @@ def main() -> int:
     # its bare `cat/pkg:slot` lines do not become phantom groups
     tail = ("!!! The following update(s) have been skipped due to unsatisfied dependencies\n"
             "!!! triggered by backtracking:\n\ndev-libs/mgxb:0\ndev-libs/mgfb:0\n")
-    pr = run_case(REAL_BLK0 + "\n" + tail, PTL_BLK0)
+    pr = run_case(PORTAGE_BLK0 + "\n" + tail, PTL_BLK0)
     s = skipped(pr.findings)
     check("tail does not corrupt the skipped parse",
           len(s) == 1 and "explanation differs" in s[0]["detail"], repr(pr.findings))
@@ -193,9 +193,9 @@ def main() -> int:
           repr(pr.findings))
 
     # 9. different missed versions under the same header
-    other = REAL_BLK0.replace("(dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge)",
+    other = PORTAGE_BLK0.replace("(dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge)",
                               "(dev-libs/blk0x-2:0/0::testrepo, ebuild scheduled for merge)")
-    pr = run_case(REAL_BLK0, other)
+    pr = run_case(PORTAGE_BLK0, other)
     s = skipped(pr.findings)
     check("different missed versions are a package-list finding",
           len(s) == 1 and "skipped package list differs" in s[0]["detail"],
@@ -211,8 +211,8 @@ def main() -> int:
           and len(groups["dev-libs/blk0x:0"]["rows"]) == 2
           and len(groups["dev-libs/blk0x:0"]["with"]) == 1, repr(groups))
 
-    # 11. real's ` for <root>` header suffix (non-"/" ROOT, #210 g210 cells)
-    real_for_root = (
+    # 11. Portage's ` for <root>` header suffix (non-"/" ROOT, #210 g210 cells)
+    portage_for_root = (
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:\n"
         "\n"
         "dev-libs/reinstslottarget:0 for /tmp/l0-fixture-oracle/fixtures/\n"
@@ -223,19 +223,19 @@ def main() -> int:
     )
     with tempfile.TemporaryDirectory() as tmp:
         p = Path(tmp) / "x.txt"
-        p.write_text(real_for_root)
+        p.write_text(portage_for_root)
         _, _, _, _, _, groups = mod.parse(p)
     check("a ` for <root>` header still opens a group keyed on the slot atom",
           list(groups) == ["dev-libs/reinstslottarget:0"], repr(groups))
 
-    # 12. backlog #230 fix round 1: a merge parent with real's
+    # 12. backlog #230 fix round 1: a merge parent with Portage's
     # `to '<root>'` suffix equals portuale's bare one. USE content is
     # identical on both sides here (post-#220 both render
     # `USE="" ELIBC="glibc"` on the parents); the live blk0 cells keep
     # an explanation finding only through the missed line's
     # running-root `ABI_X86` group, which is deliberately NOT
     # normalised.
-    real_to_suffix = MERGE + (
+    portage_to_suffix = MERGE + (
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:\n"
         "\n"
         "dev-libs/blk0x:0\n"
@@ -245,14 +245,14 @@ def main() -> int:
         "    ^               ^\n"
         "\n"
     )
-    ptl_bare = real_to_suffix.replace("ebuild scheduled for merge to '/tmp/l0-fixture-oracle/fixtures/'",
+    ptl_bare = portage_to_suffix.replace("ebuild scheduled for merge to '/tmp/l0-fixture-oracle/fixtures/'",
                                       "ebuild scheduled for merge")
-    pr = run_case(real_to_suffix, ptl_bare)
+    pr = run_case(portage_to_suffix, ptl_bare)
     check("merge-parent `to '<root>'` suffix is not an explanation finding",
           pr.findings == [], repr(pr.findings))
     # ... but USE content still is: restoring a USE delta on the same
     # pair must fire again (no USE normalisation).
-    pr = run_case(real_to_suffix.replace('USE="" ELIBC="glibc" conflicts',
+    pr = run_case(portage_to_suffix.replace('USE="" ELIBC="glibc" conflicts',
                                         'USE="" ABI_X86="(64)" conflicts'),
                   ptl_bare)
     s = skipped(pr.findings)

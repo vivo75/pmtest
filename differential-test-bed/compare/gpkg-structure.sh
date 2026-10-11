@@ -6,7 +6,7 @@
 #   gpkg-structure.sh --dir <PKGDIR> [--packages]
 #
 # Format-level checks, not byte-level: container member set/shape, inner
-# tar roots, the metadata key set real Portage always writes, the
+# tar roots, the metadata key set Portage always writes, the
 # embedded Manifest record set, and (with --packages) the
 # `<PKGDIR>/Packages` index entry for each archive. Comparing two builds
 # is gpkg-diff.sh's job, not this one's.
@@ -23,7 +23,7 @@
 #     <prefix>/image.tar[.<comp>]     (members `image/...`)
 #     <prefix>/Manifest               (DATA lines: SHA512 + BLAKE2B)
 #     [optional *.sig sidecars]
-#   Real writer: lib/portage/gpkg.py:763 (`gpkg-1`), :1002-1054
+#   Portage writer: lib/portage/gpkg.py:763 (`gpkg-1`), :1002-1054
 #   (image), :1297-1338 (metadata); metadata key set from
 #   `__dyn_install` + `_post_src_install_write_metadata`
 #   (doebuild.py:2700-3005). Portuale reader/writer:
@@ -40,7 +40,7 @@ FINDINGS=0
 ARCHIVES=0
 fail() { printf '[%s] %s: %s\n' "$1" "$2" "$3"; FINDINGS=$((FINDINGS + 1)); }
 
-# Metadata keys every real Portage gpkg carries. This is the exact
+# Metadata keys every Portage gpkg carries. This is the exact
 # intersection of the member sets of all 78 archives in the L1 pkgcache
 # (2026-09-13) -- LICENSE/HOMEPAGE/INHERITED/*DEPEND/NEEDED* vary with
 # the package and are deliberately not required. `BUILD_ID` is
@@ -118,7 +118,7 @@ check_archive() {
   local stray
   stray=$(find "$tmp" -maxdepth 1 -mindepth 1 ! -name "$prefix" -printf '%f\n' | head -1)
   [ -z "$stray" ] || fail OUTER "$archive" "top-level member outside $prefix/: $stray"
-  # real `_allocate_filename_multi` ties the on-disk name to the inner
+  # Portage `_allocate_filename_multi` ties the on-disk name to the inner
   # `<pf>-<BUILD_ID>` prefix; a renamed copy is not a valid archive.
   local fname=${abspath##*/}; fname=${fname%.gpkg.tar}
   [ "$fname" = "$prefix" ] || fail MULTI "$archive" "filename '$fname' != inner prefix '$prefix'"
@@ -293,7 +293,7 @@ check_dir() {
 
   [ "$want_index" = 1 ] || return 0
   if [ ! -f "$pkgdir/Packages" ]; then
-    fail INDEX "$pkgdir" "no Packages index (real Portage under pkgdir-index-trusted cannot see any archive)"
+    fail INDEX "$pkgdir" "no Packages index (Portage under pkgdir-index-trusted cannot see any archive)"
     return 0
   fi
   while IFS= read -r a; do

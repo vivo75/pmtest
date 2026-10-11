@@ -1,6 +1,6 @@
 # #25 S1a — the installed-nomerge-node residue cell, run with
 # `FX_WORLD_EXTRA=dev-libs/r25consumer` (the installed consumer must be a
-# world member so real's complete-graph walk reaches it as a nomerge node
+# world member so Portage's complete-graph walk reaches it as a nomerge node
 # without walking its own upgrade -- the same staging pattern as the
 # `whpin` cell below; the consumer must stay out of the committed world
 # file, which every other fixture-ROOT test shares):
@@ -13,8 +13,8 @@
 # RDEPEND `dev-libs/r25lib:=`) and `r25up` (plain 1.0->2.0 update, forces
 # complete-mode auto-enable); installed world consumer `r25consumer`
 # carries `<dev-libs/r25lib-2.0:=` against the `r25lib` 1.0->2.0 upgrade.
-# Real merges `r25up-2.0` + `r25target-1.0` silently (`backtrack: 0/20`);
-# since #236 (batch-2026-09-28_236_107 Slices A-C: real's
+# Portage merges `r25up-2.0` + `r25target-1.0` silently (`backtrack: 0/20`);
+# since #236 (batch-2026-09-28_236_107 Slices A-C: Portage's
 # `_minimize_children` plus the slot-operator update probe's forcing
 # half) portuale does the same in one pass (`--json` restarts 0). The
 # fixture-oracle comparator does not compare the "One or more
@@ -22,7 +22,7 @@
 # checks the merge rows; the no-warning / restarts-0 end state is pinned
 # by the contract suite (`test_236_r25_default_backtracking_settles_in_one_silent_pass`).
 --update --deep --newuse --oneshot dev-libs/r25target
-# Backlog #209 — the same shape with backtracking off. Real's
+# Backlog #209 — the same shape with backtracking off. Portage's
 # `_resolve_conflicts` (`_emerge/depgraph.py:9444`) runs
 # `_complete_graph()` (`:8562`) with no `_allow_backtracking` gate, so
 # the consumer pin still withholds `r25lib-2.0` in-pass (`backtrack:
@@ -31,7 +31,7 @@
 --backtrack=0 --update --deep --newuse --oneshot dev-libs/r25target
 # Backlog #237 — the same world, but the hard requirement is an explicit
 # `=dev-libs/r25lib-2.0` argument the consumer's `<2.0` pin cannot hold
-# alongside. Real's reporting chain (`_resolve_conflicts` ->
+# alongside. Portage's reporting chain (`_resolve_conflicts` ->
 # `_complete_graph` -> unsatisfied-dep loop -> `_process_slot_conflicts`
 # -> `_solve_non_slot_operator_slot_conflicts`, `3rdparty/portage`
 # 3.0.82.2) carries no `_allow_backtracking` gate on any link, so the pin

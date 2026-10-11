@@ -22,7 +22,7 @@
 #             public key (ro). sshd + the pre-merge vdb record come from
 #             layers/l31b/client-init.sh; the post-merge snapshot from
 #             layers/l31b/client-snapshot.sh.
-#   reference -- real Portage consuming the same gpkgs in a fresh server
+#   reference -- Portage consuming the same gpkgs in a fresh server
 #             container (layers/l1/consume.sh, exactly l31's reference
 #             side). The host normalises + diffs reference vs. client
 #             with the same compare/ tooling. Expected: 0 hard /
@@ -148,7 +148,7 @@ SERVER_HASH16=${SERVER_DIGEST:0:16}
 } > "$OUT/header.txt"
 echo ">>> run $RUN -> $OUT (server=$SERVER_IMAGE client=$CLIENT_IMAGE net=$NET)"
 
-# --- build the gpkg set once with real Portage (cached, shared w/ l31) --
+# --- build the gpkg set once with Portage (cached, shared w/ l31) --
 [ "${L31B_REBUILD:-0}" = 1 ] && { echo ">>> L31B_REBUILD: wiping $PKGCACHE"; rm -rf "${PKGCACHE:?}"/*; }
 
 if [ "${L31B_SKIP_BUILD:-0}" != 1 ]; then
@@ -186,8 +186,8 @@ if ! "$PODMAN" exec "$CLIENT" /bin/bash \
   exit 2
 fi
 
-# --- reference side: real Portage consume (l31's reference, verbatim) ---
-echo ">>> merging with real Portage (reference)"
+# --- reference side: Portage consume (l31's reference, verbatim) ---
+echo ">>> merging with Portage (reference)"
 if ! podman_run_pm "porttest-l31b-ref-$$" \
     -v "$PKGCACHE:/pkgs:ro" "${ovl_mount[@]}" \
     -e PKGDIR=/pkgs \

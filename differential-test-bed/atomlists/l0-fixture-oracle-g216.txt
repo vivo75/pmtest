@@ -4,10 +4,10 @@
 # mid-graph consumer).
 #
 # Run under default staging plus `FX_HOST_RUNNING_ROOT=1` (backlog #287):
-# the bed's `ROOT=$FX` with `ROOT != "/"` already splits real's BDEPEND
+# the bed's `ROOT=$FX` with `ROOT != "/"` already splits Portage's BDEPEND
 # across the running root `/`, so no `FX_HOST_ROOTS=1`; but portuale must
 # be told the same running root (drop the `PORTAGE_RUNNING_ROOT=$FX` pin),
-# or it walks single-root and the `--backtrack=0` cells' `Total:` (real's
+# or it walks single-root and the `--backtrack=0` cells' `Total:` (Portage's
 # dual rows: 4 / 2) can never match. Track X Slice C (#242) ships the
 # multi-root graph modeling the old header called residual.
 # The comparator ignores `to <ROOT>` suffixes and collapses the dual
@@ -16,11 +16,11 @@
 #
 #   differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g216.txt
 #
-# Shape (real 3.0.82.2, the L0 pin;
+# Shape (Portage 3.0.82.2, the L0 pin;
 # `LLM/evidence/2026-09-29-242-inventory/probes/default-g216*.txt`):
 # `g216top` RDEPENDs `g216mid`, `g216mid` RDEPENDs `g216comp`,
 # `g216comp` BDEPENDs `|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )`.
-# Real's pass 1 keeps the in-graph `>=g216comp` branch live
+# Portage's pass 1 keeps the in-graph `>=g216comp` branch live
 # (`dep_zapdeps` `preferred_in_graph`, `dep_check.py`), dead-ends on
 # the running-root self cycle (`_serialize_tasks`, `depgraph.py:10262`),
 # and re-resolves with the `circular_dependency` map to `g216boot`

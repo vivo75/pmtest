@@ -3,6 +3,6 @@
 # this is the capture set S1's pin asserts against.
 # The clean control (bare atom matches only 2.0 — no conflict on either side)
 -D dev-libs/slotusetarget
-# #148 — the surviving-conflict merge list (real prints both instances;
+# #148 — the surviving-conflict merge list (Portage prints both instances;
 # portuale only 1.0; notices identical, rc 1 both sides)
 -D dev-libs/slotusegroup

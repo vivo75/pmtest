@@ -1,7 +1,7 @@
 """Black-box contract suite for the `emerge --pretend` slice (see
 LLM/agent-context.md and crates/portage-repo/src/lib.rs for the full
 scope writeup, including the dependency-recursion follow-up in
-resolve_pretend_graph, the profile/make.conf -> real USE/ACCEPT_KEYWORDS
+resolve_pretend_graph, the profile/make.conf -> Portage USE/ACCEPT_KEYWORDS
 follow-up in portage-profile, the package.mask/.unmask/.accept_keywords/
 .use follow-up on top of that, the blocker-reporting follow-up on top of
 that, the overlays (multiple repos.conf repos) follow-up on top of that,
@@ -10,17 +10,17 @@ virtuals check confirming, against a fixture shaped exactly like the
 real virtual/pager, that virtual/* atoms need no dedicated code at all:
 they're ordinary packages with an any-of RDEPEND, already covered by
 existing machinery -- and the CLI-surface-recognition follow-up, which
-enumerates every real emerge option/action from lib/_emerge/main.py so
+enumerates every Portage emerge option/action from lib/_emerge/main.py so
 each one gets a specific "recognized, not implemented" message instead
 of a generic "unsupported option" one). Drives the real compiled
 `emerge` binary (portuale, dispatched via a real symlink
 -- not a neutral harness, since emerge is an actual product surface per
 LLM/agent-context.md's testing decision) against the synthetic fixture
 tree at fixtures (whose repos.conf/make.profile/make.conf/package.mask/
-package.unmask/package.accept_keywords/package.use now drive real config
+package.unmask/package.accept_keywords/package.use now drive Portage config
 resolution, not hardcoded values, and whose repos.conf now defines a
 second, higher-priority overlay repo alongside the main one), and pins
-stdout, stderr and exit codes to real Portage's behaviour.
+stdout, stderr and exit codes to Portage's behaviour.
 
 Until 2026-09-15 every case also ran the Python reference
 (`python-harness/emerge_pretend_reference.py`) and asserted Rust == Python; that
@@ -45,10 +45,10 @@ import corpus
 
 # (description, args, expected_exit_code) -- exit codes: 0 success,
 # 1 resolution/parse error OR autounmask config change still needed
-# (real `action_build`: `if not success: return 1` fires for any
+# (Portage `action_build`: `if not success: return 1` fires for any
 # autounmask keyword/mask/use/license change, `--pretend` included --
 # `--autounmask-only` is the one exception), 2 CLI-usage error (portuale's
-# own convention, not real emerge's own exit codes).
+# own convention, not Portage emerge's own exit codes).
 CASES = [
     ("new install", ["--pretend", "dev-libs/newpkg"], 0),
     (
@@ -82,12 +82,12 @@ CASES = [
         0,
     ),
     (
-        "the needer/othermod triangle reports the installed-instance conflict (#57, #62: rc 1 like real)",
+        "the needer/othermod triangle reports the installed-instance conflict (#57, #62: rc 1 like Portage)",
         ["--pretend", "dev-libs/needer", "dev-libs/othermod"],
         1,
     ),
     (
-        "the same triangle, argv reversed, reports the same conflict (#57, #62: rc 1 like real)",
+        "the same triangle, argv reversed, reports the same conflict (#57, #62: rc 1 like Portage)",
         ["--pretend", "dev-libs/othermod", "dev-libs/needer"],
         1,
     ),
@@ -170,19 +170,19 @@ CASES = [
     ("-a bundled with -p", ["-pa", "dev-libs/newpkg"], 0),
     ("-a bundled deep in a short-flag run", ["-pauvDN", "dev-libs/newpkg"], 0),
     ("--ask=n inline form", ["--pretend", "--ask=n", "dev-libs/newpkg"], 0),
-    ("--ask=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
-    ("--read-news=True spelling (real true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
-    ("--verbose=True spelling (real true_y_or_n, same as bare --verbose)", ["--pretend", "--verbose=True", "dev-libs/newpkg"], 0),
-    ("--quiet=True spelling (real true_y_or_n, same as bare --quiet)", ["--pretend", "--quiet=True", "dev-libs/newpkg"], 0),
-    ("--deselect=True spelling (real true_y_or_n, same as bare --deselect)", ["--pretend", "--deselect=True", "dev-libs/foo"], 0),
-    ("--changed-deps=True spelling (real true_y_or_n, same as bare --changed-deps)", ["--pretend", "--changed-deps=True", "dev-libs/changeddepspkg"], 0),
-    ("--changed-deps-report=True spelling (real true_y_or_n, same as bare --changed-deps-report)", ["--pretend", "--changed-deps-report=True", "dev-libs/changeddepspkg"], 0),
-    ("--selective=True spelling (real true_y_or_n, same as bare --selective)", ["--pretend", "--selective=True", "dev-libs/samepkg"], 0),
-    ("--changed-slot=True spelling (real true_y_or_n, same as bare --changed-slot)", ["--pretend", "--changed-slot=True", "dev-libs/changedslotpkg"], 0),
-    ("--quiet-build=True spelling (real true_y_or_n, same as bare --quiet-build)", ["--pretend", "--quiet-build=True", "dev-libs/newpkg"], 0),
-    ("--with-test-deps=True spelling (real true_y_or_n, same as bare --with-test-deps)", ["--pretend", "--with-test-deps=True", "dev-libs/withtestdeppkg"], 0),
-    ("--autounmask-keep-keywords=True spelling (real true_y_or_n, same as bare, rc 0 like =y)", ["--pretend", "--autounmask-keep-keywords=True", "dev-libs/akk0a"], 0),
-    ("--autounmask-keep-masks=True spelling (real true_y_or_n, mask kept so fatal like the default)", ["--pretend", "--autounmask-keep-masks=True", "dev-libs/hardmaskedpkg"], 1),
+    ("--ask=True spelling (Portage true_y_or_n, inert under --pretend)", ["--pretend", "--ask=True", "dev-libs/newpkg"], 0),
+    ("--read-news=True spelling (Portage true_y_or_n, inert under --pretend)", ["--pretend", "--read-news=True", "dev-libs/newpkg"], 0),
+    ("--verbose=True spelling (Portage true_y_or_n, same as bare --verbose)", ["--pretend", "--verbose=True", "dev-libs/newpkg"], 0),
+    ("--quiet=True spelling (Portage true_y_or_n, same as bare --quiet)", ["--pretend", "--quiet=True", "dev-libs/newpkg"], 0),
+    ("--deselect=True spelling (Portage true_y_or_n, same as bare --deselect)", ["--pretend", "--deselect=True", "dev-libs/foo"], 0),
+    ("--changed-deps=True spelling (Portage true_y_or_n, same as bare --changed-deps)", ["--pretend", "--changed-deps=True", "dev-libs/changeddepspkg"], 0),
+    ("--changed-deps-report=True spelling (Portage true_y_or_n, same as bare --changed-deps-report)", ["--pretend", "--changed-deps-report=True", "dev-libs/changeddepspkg"], 0),
+    ("--selective=True spelling (Portage true_y_or_n, same as bare --selective)", ["--pretend", "--selective=True", "dev-libs/samepkg"], 0),
+    ("--changed-slot=True spelling (Portage true_y_or_n, same as bare --changed-slot)", ["--pretend", "--changed-slot=True", "dev-libs/changedslotpkg"], 0),
+    ("--quiet-build=True spelling (Portage true_y_or_n, same as bare --quiet-build)", ["--pretend", "--quiet-build=True", "dev-libs/newpkg"], 0),
+    ("--with-test-deps=True spelling (Portage true_y_or_n, same as bare --with-test-deps)", ["--pretend", "--with-test-deps=True", "dev-libs/withtestdeppkg"], 0),
+    ("--autounmask-keep-keywords=True spelling (Portage true_y_or_n, same as bare, rc 0 like =y)", ["--pretend", "--autounmask-keep-keywords=True", "dev-libs/akk0a"], 0),
+    ("--autounmask-keep-masks=True spelling (Portage true_y_or_n, mask kept so fatal like the default)", ["--pretend", "--autounmask-keep-masks=True", "dev-libs/hardmaskedpkg"], 1),
     ("--selective bare form, same as --noreplace", ["--pretend", "--selective", "dev-libs/samepkg"], 0),
     ("--selective=y inline form", ["--pretend", "--selective=y", "dev-libs/samepkg"], 0),
     (
@@ -452,7 +452,7 @@ CASES = [
     ("--json: with --verbose, includes use_flags", ["--pretend", "-v", "--json", "dev-libs/useflagpkg"], 0),
     ("--json: diamond dependency, required_by lists both owners", ["--pretend", "--json", "dev-libs/diamond"], 0),
     ("--json: upgrade includes from_version", ["--pretend", "--update", "--json", "dev-libs/upgradepkg"], 0),
-    ("--json: blocker match (satisfied -> rc 0, real `b`)", ["--pretend", "--json", "dev-libs/blockerpkg"], 0),
+    ("--json: blocker match (satisfied -> rc 0, Portage `b`)", ["--pretend", "--json", "dev-libs/blockerpkg"], 0),
     ("--json: solvable slot conflict reconciled", ["--pretend", "--json", "dev-libs/slotconflictparent"], 0),
     ("--json: unsolvable slot conflict reported (#62: rc 1 like the text path)", ["--pretend", "--json", "dev-libs/slotconflictunsolvable"], 1),
     ("--json: combined with --deep", ["--pretend", "--update", "--deep", "--json", "dev-libs/deeppkg"], 0),
@@ -570,177 +570,177 @@ CASES = [
         1,
     ),
     (
-        "circular dep: slot-pinned || build dep takes -bin over the older self slot like real (rc 0; g221c L0 rust, pinned below)",
+        "circular dep: slot-pinned || build dep takes -bin over the older self slot like Portage (rc 0; g221c L0 rust, pinned below)",
         ["--pretend", "dev-libs/slcirc"],
         0,
     ),
     (
-        "circular dep: slot-pinned || build dep --backtrack=0 reports the self cycle like real (rc 1; g221c L0 rust, not pinned)",
+        "circular dep: slot-pinned || build dep --backtrack=0 reports the self cycle like Portage (rc 1; g221c L0 rust, not pinned)",
         ["--pretend", "--backtrack=0", "dev-libs/slcirc"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like real (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like Portage (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-1"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-2 fails like Portage (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-2"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-3 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0z-3 fails like Portage (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0z-3"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0w-1 fails like real (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-1 fails like Portage (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0w-1"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0w-2 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-2 fails like Portage (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0w-2"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0w-3 fails like real (rc 1; autounmask bar matches the oracle use_changes, still fails; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0w-3 fails like Portage (rc 1; autounmask bar matches the oracle use_changes, still fails; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0w-3"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0b-1 fails like real (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0b-1 fails like Portage (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0b-1"],
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like real (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
+        "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like Portage (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
         ["--pretend", "=dev-libs/cyc0b-2"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_parent pg0 =aup0b-1 fails like real (rc 1; D lacks the foo/bar flags the (-)? defaults gate on)",
+        "autounmask: upstream test_autounmask_parent pg0 =aup0b-1 fails like Portage (rc 1; D lacks the foo/bar flags the (-)? defaults gate on)",
         ["--pretend", "--autounmask", "=dev-libs/aup0b-1"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_breakage pg0 c/b/a fails like real (rc 1; D wanted with foo and -foo at once)",
+        "autounmask: upstream test_autounmask_use_breakage pg0 c/b/a fails like Portage (rc 1; D wanted with foo and -foo at once)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0c", "dev-libs/aub0b", "dev-libs/aub0a"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_breakage pg0 c/a/b fails like real (rc 1; D wanted with foo and -foo at once)",
+        "autounmask: upstream test_autounmask_use_breakage pg0 c/a/b fails like Portage (rc 1; D wanted with foo and -foo at once)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0c", "dev-libs/aub0a", "dev-libs/aub0b"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_breakage pg0 b/c/a fails like real (rc 1; D wanted with foo and -foo at once)",
+        "autounmask: upstream test_autounmask_use_breakage pg0 b/c/a fails like Portage (rc 1; D wanted with foo and -foo at once)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0b", "dev-libs/aub0c", "dev-libs/aub0a"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_breakage pg0 b/a/c fails like real (rc 1; D wanted with foo and -foo at once)",
+        "autounmask: upstream test_autounmask_use_breakage pg0 b/a/c fails like Portage (rc 1; D wanted with foo and -foo at once)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0b", "dev-libs/aub0a", "dev-libs/aub0c"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_breakage pg0 a/c/b fails like real (rc 1; D wanted with foo and -foo at once)",
+        "autounmask: upstream test_autounmask_use_breakage pg0 a/c/b fails like Portage (rc 1; D wanted with foo and -foo at once)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0a", "dev-libs/aub0c", "dev-libs/aub0b"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_breakage pg0 a/b/c fails like real (rc 1; D wanted with foo and -foo at once)",
+        "autounmask: upstream test_autounmask_use_breakage pg0 a/b/c fails like Portage (rc 1; D wanted with foo and -foo at once)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/aub0a", "dev-libs/aub0b", "dev-libs/aub0c"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like real (rc 1; USE changes necessary, bug 632598; pristine-world cell matches real's A-3+x, the world=B fall to A-2 is pinned separately)",
+        "autounmask: upstream test_autounmask_use_backtrack pg0 dev-libs/abk0d fails like Portage (rc 1; USE changes necessary, bug 632598; pristine-world cell matches Portage's A-3+x, the world=B fall to A-2 is pinned separately)",
         ["--pretend", "--autounmask-backtrack=y", "--backtrack=2", "dev-libs/abk0d"],
         1,
     ),
     (
-        "backtrack: upstream test_backtracking pg1 A B selective-update merges nothing like real (rc 0; missed A-2 warned, not pinned)",
+        "backtrack: upstream test_backtracking pg1 A B selective-update merges nothing like Portage (rc 0; missed A-2 warned, not pinned)",
         ["--pretend", "--update", "--deep", "--selective", "dev-libs/bkt1a", "dev-libs/bkt1b"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg1 B A selective-update merges nothing like real (rc 0; missed A-2 warned, not pinned)",
+        "backtrack: upstream test_backtracking pg1 B A selective-update merges nothing like Portage (rc 0; missed A-2 warned, not pinned)",
         ["--pretend", "--update", "--deep", "--selective", "dev-libs/bkt1b", "dev-libs/bkt1a"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg3 C D merges like real (rc 0; backtrack not needed, pinned below)",
+        "backtrack: upstream test_backtracking pg3 C D merges like Portage (rc 0; backtrack not needed, pinned below)",
         ["--pretend", "--backtrack=1", "dev-libs/bkt3c", "dev-libs/bkt3d"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg3 D C merges like real (rc 0; backtrack not needed; missed-update warnings unverified, not pinned)",
+        "backtrack: upstream test_backtracking pg3 D C merges like Portage (rc 0; backtrack not needed; missed-update warnings unverified, not pinned)",
         ["--pretend", "--backtrack=1", "dev-libs/bkt3d", "dev-libs/bkt3c"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg4 B A merges like real (rc 0; Z-2 upgrade unblocks, pinned below)",
+        "backtrack: upstream test_backtracking pg4 B A merges like Portage (rc 0; Z-2 upgrade unblocks, pinned below)",
         ["--pretend", "dev-libs/bkt4b", "dev-libs/bkt4a"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg4 A B merges like real (rc 0; Z-2 upgrade unblocks, pinned below)",
+        "backtrack: upstream test_backtracking pg4 A B merges like Portage (rc 0; Z-2 upgrade unblocks, pinned below)",
         ["--pretend", "dev-libs/bkt4a", "dev-libs/bkt4b"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg5 =A-1 B merges like real (rc 0; pinned below)",
+        "backtrack: upstream test_backtracking pg5 =A-1 B merges like Portage (rc 0; pinned below)",
         ["--pretend", "=dev-libs/bkt5a-1", "dev-libs/bkt5b"],
         0,
     ),
     (
-        "backtrack: upstream test_backtracking pg5 B =A-1 merges like real (rc 0; pinned below)",
+        "backtrack: upstream test_backtracking pg5 B =A-1 merges like Portage (rc 0; pinned below)",
         ["--pretend", "dev-libs/bkt5b", "=dev-libs/bkt5a-1"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg0 dylan pulls -bin like real (rc 0; pinned below)",
+        "circular: upstream test_circular_choices pg0 dylan pulls -bin like Portage (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd0a"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg1 cmake --backtrack=0 fails like real (rc 1; bug 703440 circular, not pinned)",
+        "circular: upstream test_circular_choices pg1 cmake --backtrack=0 fails like Portage (rc 1; bug 703440 circular, not pinned)",
         ["--pretend", "--backtrack=0", "dev-libs/ccd1c"],
         1,
     ),
     (
-        "circular: upstream test_circular_choices pg1 cmake backtracks to bootstrap like real (rc 0; bug 703440, pinned below)",
+        "circular: upstream test_circular_choices pg1 cmake backtracks to bootstrap like Portage (rc 0; bug 703440, pinned below)",
         ["--pretend", "dev-libs/ccd1c"],
         0,
     ),
     (
-        "or-pick: in-graph || self branch re-resolves to bootstrap like real (rc 0; #216, pinned below)",
+        "or-pick: in-graph || self branch re-resolves to bootstrap like Portage (rc 0; #216, pinned below)",
         ["--pretend", "app-misc/g216top"],
         0,
     ),
     (
-        "or-pick: in-graph || self branch re-resolves to bootstrap like real, direct target (rc 0; #216, pinned below)",
+        "or-pick: in-graph || self branch re-resolves to bootstrap like Portage, direct target (rc 0; #216, pinned below)",
         ["--pretend", "dev-lang/g216comp"],
         0,
     ),
     (
-        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like real (rc 1; #216, pinned below)",
+        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like Portage (rc 1; #216, pinned below)",
         ["--pretend", "--backtrack=0", "app-misc/g216top"],
         1,
     ),
     (
-        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like real, direct target (rc 1; #216, pinned below)",
+        "or-pick: in-graph || self branch --backtrack=0 reports the self cycle like Portage, direct target (rc 1; #216, pinned below)",
         ["--pretend", "--backtrack=0", "dev-lang/g216comp"],
         1,
     ),
     (
-        "circular: upstream test_circular_choices pg3 cmake via virtual USE pulls bootstrap like real (rc 0; pinned below)",
+        "circular: upstream test_circular_choices pg3 cmake via virtual USE pulls bootstrap like Portage (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd3c"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg4 pypy backtracks to -bin like real (rc 0; bug 705986, pinned below)",
+        "circular: upstream test_circular_choices pg4 pypy backtracks to -bin like Portage (rc 0; bug 705986, pinned below)",
         ["--pretend", "dev-libs/ccd4a"],
         0,
     ),
@@ -750,267 +750,267 @@ CASES = [
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg4 pypy --backtrack=0 fails like real (rc 1; bug 705986 circular, not pinned)",
+        "circular: upstream test_circular_choices pg4 pypy --backtrack=0 fails like Portage (rc 1; bug 705986 circular, not pinned)",
         ["--pretend", "--backtrack=0", "dev-libs/ccd4a"],
         1,
     ),
     (
-        "circular: upstream test_circular_choices pg5 icedtea pulls -bin like real (rc 0; pinned below)",
+        "circular: upstream test_circular_choices pg5 icedtea pulls -bin like Portage (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccd5a"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices pg5 icedtea --backtrack=0 fails like real (rc 1; runtime-closing ring, not pinned)",
+        "circular: upstream test_circular_choices pg5 icedtea --backtrack=0 fails like Portage (rc 1; runtime-closing ring, not pinned)",
         ["--pretend", "--backtrack=0", "dev-libs/ccd5a"],
         1,
     ),
     (
-        "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like real (rc 0; pinned below)",
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 reinstalls like Portage (rc 0; pinned below)",
         ["--pretend", "=dev-libs/ccr0r-1.46*"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --update merges nothing like real (rc 0; empty merge, not pinned)",
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --update merges nothing like Portage (rc 0; empty merge, not pinned)",
         ["--pretend", "--update", "=dev-libs/ccr0r-1.46*"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --deep --update merges nothing like real (rc 0; empty merge, not pinned)",
+        "circular: upstream test_circular_choices_rust pg0 =r-1.46 --deep --update merges nothing like Portage (rc 0; empty merge, not pinned)",
         ["--pretend", "--deep", "--update", "=dev-libs/ccr0r-1.46*"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices_rust pg0 r upgrades to 1.47 like real (rc 0; pinned below)",
+        "circular: upstream test_circular_choices_rust pg0 r upgrades to 1.47 like Portage (rc 0; pinned below)",
         ["--pretend", "dev-libs/ccr0r"],
         0,
     ),
     (
-        "circular: upstream test_circular_choices_rust pg0 r --update upgrades to 1.47 like real (rc 0; pinned below)",
+        "circular: upstream test_circular_choices_rust pg0 r --update upgrades to 1.47 like Portage (rc 0; pinned below)",
         ["--pretend", "--update", "dev-libs/ccr0r"],
         0,
     ),
     (
-        "complete: upstream test_complete_graph pg0 libxml2 new-use=n rebuilds like real (rc 0; pinned below)",
+        "complete: upstream test_complete_graph pg0 libxml2 new-use=n rebuilds like Portage (rc 0; pinned below)",
         ["--pretend", "--complete-graph-if-new-use=n", "dev-libs/cgp0x"],
         0,
     ),
     (
-        "complete: upstream test_complete_graph pg1 >=x-2 new-ver=n rebuild-if-new-slot=n merges like real (rc 0; pinned below)",
+        "complete: upstream test_complete_graph pg1 >=x-2 new-ver=n rebuild-if-new-slot=n merges like Portage (rc 0; pinned below)",
         ["--pretend", "--complete-graph-if-new-ver=n", "--rebuild-if-new-slot=n", ">=dev-libs/cgp1x-2"],
         0,
     ),
     (
-        "complete: upstream test_complete_graph pg1 <x-1 new-ver=n rebuild-if-new-slot=n merges like real (rc 0; pinned below)",
+        "complete: upstream test_complete_graph pg1 <x-1 new-ver=n rebuild-if-new-slot=n merges like Portage (rc 0; pinned below)",
         ["--pretend", "--complete-graph-if-new-ver=n", "--rebuild-if-new-slot=n", "<dev-libs/cgp1x-1"],
         0,
     ),
     (
-        "complete: upstream test_complete_graph pg0 libxml2 --ignore-world merges like real (rc 0; pinned below)",
+        "complete: upstream test_complete_graph pg0 libxml2 --ignore-world merges like Portage (rc 0; pinned below)",
         ["--pretend", "--ignore-world", "dev-libs/cgp0x"],
         0,
     ),
     (
-        "complete: upstream test_complete_graph pg1 >=x-2 --ignore-world merges like real (rc 0; pinned below)",
+        "complete: upstream test_complete_graph pg1 >=x-2 --ignore-world merges like Portage (rc 0; pinned below)",
         ["--pretend", "--ignore-world", ">=dev-libs/cgp1x-2"],
         0,
     ),
     (
-        "complete: upstream test_complete_graph pg1 <x-1 --ignore-world merges like real (rc 0; pinned below)",
+        "complete: upstream test_complete_graph pg1 <x-1 --ignore-world merges like Portage (rc 0; pinned below)",
         ["--pretend", "--ignore-world", "<dev-libs/cgp1x-1"],
         0,
     ),
     (
-        "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like real (rc 1; K wanted with foo and -foo at once, bug 615824)",
+        "autounmask: upstream test_autounmask_use_slot_conflict pg0 L+M fails like Portage (rc 1; K wanted with foo and -foo at once, bug 615824)",
         ["--pretend", "--backtrack=0", "dev-libs/aus0l", "dev-libs/aus0m"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=n fails like real (rc 1; newest A-2 via unstable B-1)",
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=n fails like Portage (rc 1; newest A-2 via unstable B-1)",
         ["--pretend", "--autounmask-keep-keywords=n", "dev-libs/akk0a"],
         1,
     ),
     (
-        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y merges like real (rc 0; missing-dep backtrack masks A-2, A-1 merges, foo already on)",
+        "autounmask: upstream test_autounmask_keep_keywords pg0 keep=y merges like Portage (rc 0; missing-dep backtrack masks A-2, A-1 merges, foo already on)",
         ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"],
         0,
     ),
     (
-        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-1 fails like real (rc 1; B[foo?] unsatisfiable, B lacks foo)",
+        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-1 fails like Portage (rc 1; B[foo?] unsatisfiable, B lacks foo)",
         ["--pretend", "=dev-libs/mia0a-1"],
         1,
     ),
     (
-        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-2 fails like real (rc 1; B[foo?,bar] unsatisfiable)",
+        "iuse: upstream test_missing_iuse_and_evaluated_atoms pg0 =mia0a-2 fails like Portage (rc 1; B[foo?,bar] unsatisfiable)",
         ["--pretend", "=dev-libs/mia0a-2"],
         1,
     ),
     (
-        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-1 fails like real (rc 1; D[-baz] unsatisfiable with --autounmask=n)",
+        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-1 fails like Portage (rc 1; D[-baz] unsatisfiable with --autounmask=n)",
         ["--pretend", "--autounmask=n", "=dev-libs/odc0a-1"],
         1,
     ),
     (
-        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-2 fails like real (rc 1; C keyword-masked with --autounmask=n)",
+        "depchain: upstream test_old_dep_chain_display pg0 =odc0a-2 fails like Portage (rc 1; C keyword-masked with --autounmask=n)",
         ["--pretend", "--autounmask=n", "=dev-libs/odc0a-2"],
         1,
     ),
     (
-        "slotconflict: upstream test_slot_conflict_mask_update pg0 dev-libs/scm0a merges like real (rc 0; backtrack masks highest C first: C-1 + B-1 + A-1)",
+        "slotconflict: upstream test_slot_conflict_mask_update pg0 dev-libs/scm0a merges like Portage (rc 0; backtrack masks highest C first: C-1 + B-1 + A-1)",
         ["--pretend", "dev-libs/scm0a"],
         0,
     ),
     (
-        "usedep: upstream test_use_dep_defaults pg0 =udd0a-1 merges like real (rc 0; B[foo] via B-1 with +foo, pinned below)",
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-1 merges like Portage (rc 0; B[foo] via B-1 with +foo, pinned below)",
         ["--pretend", "=dev-libs/udd0a-1"],
         0,
     ),
     (
-        "usedep: upstream test_use_dep_defaults pg0 =udd0a-2 merges like real (rc 0; B[foo(+)] default-on via B-2, pinned below)",
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-2 merges like Portage (rc 0; B[foo(+)] default-on via B-2, pinned below)",
         ["--pretend", "=dev-libs/udd0a-2"],
         0,
     ),
     (
-        "usedep: upstream test_use_dep_defaults pg0 =udd0a-3 merges like real (rc 0; B[foo(-)] resolves to B-1, pinned below)",
+        "usedep: upstream test_use_dep_defaults pg0 =udd0a-3 merges like Portage (rc 0; B[foo(-)] resolves to B-1, pinned below)",
         ["--pretend", "=dev-libs/udd0a-3"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0a-2 merges like real (rc 0; bar default-on satisfies || ( foo bar ) via bar, not foo)",
+        "requse: upstream test_required_use pg0 =rqu0a-2 merges like Portage (rc 0; bar default-on satisfies || ( foo bar ) via bar, not foo)",
         ["--pretend", "=dev-libs/rqu0a-2"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0a-3 merges like real (rc 0; +foo satisfies || ( foo bar ))",
+        "requse: upstream test_required_use pg0 =rqu0a-3 merges like Portage (rc 0; +foo satisfies || ( foo bar ))",
         ["--pretend", "=dev-libs/rqu0a-3"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0a-4 merges like real (rc 0; +foo +bar satisfies || ( foo bar ))",
+        "requse: upstream test_required_use pg0 =rqu0a-4 merges like Portage (rc 0; +foo +bar satisfies || ( foo bar ))",
         ["--pretend", "=dev-libs/rqu0a-4"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0b-2 merges like real (rc 0; exactly one of foo/bar satisfies ^^ ( foo bar ))",
+        "requse: upstream test_required_use pg0 =rqu0b-2 merges like Portage (rc 0; exactly one of foo/bar satisfies ^^ ( foo bar ))",
         ["--pretend", "=dev-libs/rqu0b-2"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0b-3 merges like real (rc 0; +foo alone satisfies ^^ ( foo bar ))",
+        "requse: upstream test_required_use pg0 =rqu0b-3 merges like Portage (rc 0; +foo alone satisfies ^^ ( foo bar ))",
         ["--pretend", "=dev-libs/rqu0b-3"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-1 merges like real (rc 0; +foo with bar off satisfies foo? ( !bar ))",
+        "requse: upstream test_required_use pg0 =rqu0c-1 merges like Portage (rc 0; +foo with bar off satisfies foo? ( !bar ))",
         ["--pretend", "=dev-libs/rqu0c-1"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-4 fails like real (rc 1; +foo with bar off violates foo? ( bar ))",
+        "requse: upstream test_required_use pg0 =rqu0c-4 fails like Portage (rc 1; +foo with bar off violates foo? ( bar ))",
         ["--pretend", "=dev-libs/rqu0c-4"],
         1,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-7 merges like real (rc 0; profile foo makes !foo? ( bar ) vacuous where real needs default +bar)",
+        "requse: upstream test_required_use pg0 =rqu0c-7 merges like Portage (rc 0; profile foo makes !foo? ( bar ) vacuous where Portage needs default +bar)",
         ["--pretend", "=dev-libs/rqu0c-7"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-8 merges like real (rc 0; +foo makes !foo? ( bar ) vacuous)",
+        "requse: upstream test_required_use pg0 =rqu0c-8 merges like Portage (rc 0; +foo makes !foo? ( bar ) vacuous)",
         ["--pretend", "=dev-libs/rqu0c-8"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-9 merges like real (rc 0; +foo makes !foo? ( bar ) vacuous)",
+        "requse: upstream test_required_use pg0 =rqu0c-9 merges like Portage (rc 0; +foo makes !foo? ( bar ) vacuous)",
         ["--pretend", "=dev-libs/rqu0c-9"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-11 merges like real (rc 0; profile foo makes !foo? ( !bar ) vacuous where real checks !bar)",
+        "requse: upstream test_required_use pg0 =rqu0c-11 merges like Portage (rc 0; profile foo makes !foo? ( !bar ) vacuous where Portage checks !bar)",
         ["--pretend", "=dev-libs/rqu0c-11"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-13 merges like real (rc 0; +foo makes !foo? ( !bar ) vacuous)",
+        "requse: upstream test_required_use pg0 =rqu0c-13 merges like Portage (rc 0; +foo makes !foo? ( !bar ) vacuous)",
         ["--pretend", "=dev-libs/rqu0c-13"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0c-14 merges like real (rc 0; +foo makes !foo? ( !bar ) vacuous)",
+        "requse: upstream test_required_use pg0 =rqu0c-14 merges like Portage (rc 0; +foo makes !foo? ( !bar ) vacuous)",
         ["--pretend", "=dev-libs/rqu0c-14"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0d-1 merges like real (rc 0; +w +x satisfies w? ( x || ( y z ) ))",
+        "requse: upstream test_required_use pg0 =rqu0d-1 merges like Portage (rc 0; +w +x satisfies w? ( x || ( y z ) ))",
         ["--pretend", "=dev-libs/rqu0d-1"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0d-2 merges like real (rc 0; +w +x +y +z satisfies w? ( x || ( y z ) ))",
+        "requse: upstream test_required_use pg0 =rqu0d-2 merges like Portage (rc 0; +w +x +y +z satisfies w? ( x || ( y z ) ))",
         ["--pretend", "=dev-libs/rqu0d-2"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0d-3 fails like real (rc 1; +w +x without y/z violates w? ( x || ( y z ) ))",
+        "requse: upstream test_required_use pg0 =rqu0d-3 fails like Portage (rc 1; +w +x without y/z violates w? ( x || ( y z ) ))",
         ["--pretend", "=dev-libs/rqu0d-3"],
         1,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0d-4 fails like real (rc 1; +w without x violates w? ( x || ( y z ) ))",
+        "requse: upstream test_required_use pg0 =rqu0d-4 fails like Portage (rc 1; +w without x violates w? ( x || ( y z ) ))",
         ["--pretend", "=dev-libs/rqu0d-4"],
         1,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0d-5 merges like real (rc 0; w off makes w? ( x || ( y z ) ) vacuous)",
+        "requse: upstream test_required_use pg0 =rqu0d-5 merges like Portage (rc 0; w off makes w? ( x || ( y z ) ) vacuous)",
         ["--pretend", "=dev-libs/rqu0d-5"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0e-1 merges like real (rc 0; profile foo with bar off satisfies ?? ( foo bar ) the other way vs real)",
+        "requse: upstream test_required_use pg0 =rqu0e-1 merges like Portage (rc 0; profile foo with bar off satisfies ?? ( foo bar ) the other way vs Portage)",
         ["--pretend", "=dev-libs/rqu0e-1"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0e-2 merges like real (rc 0; exactly one of foo/bar satisfies ?? ( foo bar ))",
+        "requse: upstream test_required_use pg0 =rqu0e-2 merges like Portage (rc 0; exactly one of foo/bar satisfies ?? ( foo bar ))",
         ["--pretend", "=dev-libs/rqu0e-2"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0e-3 merges like real (rc 0; +foo alone satisfies ?? ( foo bar ))",
+        "requse: upstream test_required_use pg0 =rqu0e-3 merges like Portage (rc 0; +foo alone satisfies ?? ( foo bar ))",
         ["--pretend", "=dev-libs/rqu0e-3"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0e-5 merges like real (rc 0; empty ?? ( ) imposes nothing)",
+        "requse: upstream test_required_use pg0 =rqu0e-5 merges like Portage (rc 0; empty ?? ( ) imposes nothing)",
         ["--pretend", "=dev-libs/rqu0e-5"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0f-1 fails like real (rc 1; empty || ( ) unsatisfiable under EAPI 7)",
+        "requse: upstream test_required_use pg0 =rqu0f-1 fails like Portage (rc 1; empty || ( ) unsatisfiable under EAPI 7)",
         ["--pretend", "=dev-libs/rqu0f-1"],
         1,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0f-2 fails like real (rc 1; empty ^^ ( ) unsatisfiable under EAPI 7)",
+        "requse: upstream test_required_use pg0 =rqu0f-2 fails like Portage (rc 1; empty ^^ ( ) unsatisfiable under EAPI 7)",
         ["--pretend", "=dev-libs/rqu0f-2"],
         1,
     ),
     (
-        "requse: upstream test_required_use pg0 =rqu0f-3 merges like real (rc 0; empty ?? ( ) imposes nothing)",
+        "requse: upstream test_required_use pg0 =rqu0f-3 merges like Portage (rc 0; empty ?? ( ) imposes nothing)",
         ["--pretend", "=dev-libs/rqu0f-3"],
         0,
     ),
     (
-        "requse: upstream test_required_use pg1 =rqu1p-1 fails like real (rc 1; preferred || alternative A-1 violates ^^ ( x y ))",
+        "requse: upstream test_required_use pg1 =rqu1p-1 fails like Portage (rc 1; preferred || alternative A-1 violates ^^ ( x y ))",
         ["--pretend", "=app-misc/rqu1p-1"],
         1,
     ),
     (
-        "eapi: upstream test_eapi pg0 =epi0b-1.0 merges like real (rc 0; BDEPEND pulls A-1.0 first, pinned below)",
+        "eapi: upstream test_eapi pg0 =epi0b-1.0 merges like Portage (rc 0; BDEPEND pulls A-1.0 first, pinned below)",
         ["--pretend", "=dev-libs/epi0b-1.0"],
         0,
     ),
     (
-        "eapi: upstream test_eapi pg2 =epi2b-1.0 merges like real (rc 0; IDEPEND pulls A-1.0 first, pinned below)",
+        "eapi: upstream test_eapi pg2 =epi2b-1.0 merges like Portage (rc 0; IDEPEND pulls A-1.0 first, pinned below)",
         ["--pretend", "=dev-libs/epi2b-1.0"],
         0,
     ),
@@ -1025,7 +1025,7 @@ CASES = [
         1,
     ),
     (
-        "use-conditional: a USE-conditional-only || group that reduces to empty fails at EAPI 7+ (#238: rc 1 like real)",
+        "use-conditional: a USE-conditional-only || group that reduces to empty fails at EAPI 7+ (#238: rc 1 like Portage)",
         ["--pretend", "dev-libs/condanyof"],
         1,
     ),
@@ -1090,7 +1090,7 @@ CASES = [
         1,
     ),
     (
-        "recursion: conditional [flip=] deep miss under --autounmask-use=n aborts with real's parent-flip row and the [qml]-qualified chain (#135 (a)+(b))",
+        "recursion: conditional [flip=] deep miss under --autounmask-use=n aborts with Portage's parent-flip row and the [qml]-qualified chain (#135 (a)+(b))",
         ["--pretend", "-D", "--autounmask-use=n", "dev-libs/r135consumer"],
         1,
     ),
@@ -1254,7 +1254,7 @@ CASES = [
         1,
     ),
     (
-        "--autounmask-use: an opt= dep whose child flag is masked is a bare miss like real (rc 1; untouchable child, no parent flip: #195)",
+        "--autounmask-use: an opt= dep whose child flag is masked is a bare miss like Portage (rc 1; untouchable child, no parent flip: #195)",
         ["--pretend", "dev-libs/parentflipeqpkg"],
         1,
     ),
@@ -1264,22 +1264,22 @@ CASES = [
         1,
     ),
     (
-        "--autounmask-use parent flip, default: masked-child opt= dep is a bare miss like real (rc 1; untouchable child, no parent flip: #195)",
+        "--autounmask-use parent flip, default: masked-child opt= dep is a bare miss like Portage (rc 1; untouchable child, no parent flip: #195)",
         ["--pretend", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, --autounmask-backtrack=y: same bare miss like real (rc 1; no recorded flip, nothing to re-resolve: #195)",
+        "--autounmask-use parent flip, --autounmask-backtrack=y: same bare miss like Portage (rc 1; no recorded flip, nothing to re-resolve: #195)",
         ["--pretend", "--autounmask-backtrack=y", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, -pv: same bare miss like real (rc 1: #195)",
+        "--autounmask-use parent flip, -pv: same bare miss like Portage (rc 1: #195)",
         ["--pretend", "-v", "dev-libs/pfgraphparent"],
         1,
     ),
     (
-        "--autounmask-use parent flip, --autounmask-use=n: same bare miss like real (rc 1: #195)",
+        "--autounmask-use parent flip, --autounmask-use=n: same bare miss like Portage (rc 1: #195)",
         ["--pretend", "--autounmask-use=n", "dev-libs/pfgraphparent"],
         1,
     ),
@@ -2013,7 +2013,7 @@ CASES = [
     ("bare name + version, ambiguous: still rejected after stripping the version", ["--pretend", "ambigpkg-1.0"], 1),
     ("profile defaults walk: a leaf make.defaults cancels a parent package.use", ["--pretend", "-v", "dev-libs/interleavepkg"], 0),
     ("profile USE_EXPAND default is folded per-level, so a same-level package.use satisfies `^^`", ["--pretend", "-v", "dev-libs/singletargetpkg"], 0),
-    ("blocker: strong (!!) blocker vs an installed package no walk pulls in is satisfied (rc 0, real `b`)", ["--pretend", "dev-libs/blockerpkg"], 0),
+    ("blocker: strong (!!) blocker vs an installed package no walk pulls in is satisfied (rc 0, Portage `b`)", ["--pretend", "dev-libs/blockerpkg"], 0),
     (
         "blocker: upstream test_blocker pg0 order a/b/c merges X-1 + uninstalls Y-1 clean, pinned below (#50 batch 1, #142)",
         ["--pretend", "--backtrack=0", "dev-libs/blk0a", "dev-libs/blk0b", "dev-libs/blk0c"],
@@ -2045,36 +2045,36 @@ CASES = [
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 A, hard DEPEND !!X aborts under buildpkgonly (rc 1 like real — #143)",
+        "blocker: upstream test_blocker pg1 A, hard DEPEND !!X aborts under buildpkgonly (rc 1 like Portage — #143)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1a"],
         1,
     ),
     (
-        "blocker: upstream test_blocker pg1 B, hard BDEPEND !!X aborts under buildpkgonly (rc 1 like real — #143)",
+        "blocker: upstream test_blocker pg1 B, hard BDEPEND !!X aborts under buildpkgonly (rc 1 like Portage — #143)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1b"],
         1,
     ),
     (
-        "blocker: upstream test_blocker pg1 C, soft BDEPEND !X (rc 0 like real; bare like real since #143, pinned below)",
+        "blocker: upstream test_blocker pg1 C, soft BDEPEND !X (rc 0 like Portage; bare like Portage since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1c"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 D, soft DEPEND !X (rc 0 like real; bare like real since #143, pinned below)",
+        "blocker: upstream test_blocker pg1 D, soft DEPEND !X (rc 0 like Portage; bare like Portage since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1d"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 E, RDEPEND blockers ignored under buildpkgonly (rc 0 like real; bare like real since #143, pinned below)",
+        "blocker: upstream test_blocker pg1 E, RDEPEND blockers ignored under buildpkgonly (rc 0 like Portage; bare like Portage since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1e"],
         0,
     ),
     (
-        "blocker: upstream test_blocker pg1 F, PDEPEND blockers ignored under buildpkgonly (rc 0 like real; bare like real since #143, pinned below)",
+        "blocker: upstream test_blocker pg1 F, PDEPEND blockers ignored under buildpkgonly (rc 0 like Portage; bare like Portage since #143, pinned below)",
         ["--pretend", "--buildpkgonly", "dev-libs/blk1f"],
         0,
     ),
-    ("blocker: weak (!) merge-vs-merge match is unsolvable (real `B`, rc 1)", ["--pretend", "dev-libs/graphblockerparent"], 1),
+    ("blocker: weak (!) merge-vs-merge match is unsolvable (Portage `B`, rc 1)", ["--pretend", "dev-libs/graphblockerparent"], 1),
     ("blocker: -v widens the [blocks b ] bracket by the mask column", ["--pretend", "-v", "dev-libs/blockerpkg"], 0),
     ("blocker: line prints after every package line, not inline", ["--pretend", "dev-libs/blockerorderpkg"], 0),
     ("blocker: a [use]-dep blocker the blocked package doesn't satisfy is dropped, not printed", ["--pretend", "dev-libs/blockusedepconsumer"], 0),
@@ -2140,32 +2140,32 @@ CASES = [
     ("repos.conf explicit masters=: inherits a non-main declared master's mask", ["--pretend", "dev-libs/independentmasteroverlaypkg"], 1),
     ("layout.conf masters= middle tier + repo-name= override", ["--pretend", "dev-libs/layoutmasterpkg"], 1),
     ("slot conflict: solvable, reconciled by backtracking", ["--pretend", "dev-libs/slotconflictparent"], 0),
-    ("slot conflict: --backtrack=0 reconciles the solvable shape silently like real (#90 S1: rc 0)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"], 0),
+    ("slot conflict: --backtrack=0 reconciles the solvable shape silently like Portage (#90 S1: rc 0)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictparent"], 0),
     ("slot conflict: --backtrack 1 still reconciles a one-step conflict", ["--pretend", "--backtrack", "1", "dev-libs/slotconflictparent"], 0),
-    ("slot conflict: unsolvable, survives backtracking and is reported (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconflictunsolvable"], 1),
+    ("slot conflict: unsolvable, survives backtracking and is reported (#62: rc 1 like Portage)", ["--pretend", "dev-libs/slotconflictunsolvable"], 1),
     ("slot conflict: unsolvable, resolved by masking a puller version", ["--pretend", "dev-libs/btparent"], 0),
-    ("slot conflict: --backtrack=0 also disables the runtime_pkg_mask trial (#62: rc 1 like real)", ["--pretend", "--backtrack=0", "dev-libs/btparent"], 1),
-    ("slot conflict: --backtrack=30 suppresses the try-a-larger-value hint (#62: rc 1 like real)", ["--pretend", "--backtrack=30", "dev-libs/slotconflictunsolvable"], 1),
-    ("slot conflict: pkg_use_display renders non-empty USE on instance + parent lines (#62: rc 1 like real)", ["--pretend", "dev-libs/scuseparent"], 1),
+    ("slot conflict: --backtrack=0 also disables the runtime_pkg_mask trial (#62: rc 1 like Portage)", ["--pretend", "--backtrack=0", "dev-libs/btparent"], 1),
+    ("slot conflict: --backtrack=30 suppresses the try-a-larger-value hint (#62: rc 1 like Portage)", ["--pretend", "--backtrack=30", "dev-libs/slotconflictunsolvable"], 1),
+    ("slot conflict: pkg_use_display renders non-empty USE on instance + parent lines (#62: rc 1 like Portage)", ["--pretend", "dev-libs/scuseparent"], 1),
     ("slot conflict: --json carries the per-instance / per-parent pkg_use_display (#62: rc 1 like the text path)", ["--pretend", "--json", "dev-libs/scuseparent"], 1),
-    ("slot conflict: three same-reason parents collapse to one + '(and N more)' (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconfgroup"], 1),
-    ("slot conflict: --color=y colours violated spans, markers stay aligned (#62: rc 1 like real)", ["--pretend", "--color=y", "dev-libs/slotconfgroup"], 1),
-    ("slot conflict: USE reason keys, unconditional before violated (#62: rc 1 like real)", ["--pretend", "dev-libs/slotusegroup"], 1),
-    ("slot conflict: --verbose-conflicts shows every omitted parent (#62: rc 1 like real)", ["--pretend", "--verbose-conflicts", "dev-libs/slotconfgroup"], 1),
-    ("slot conflict: --verbose-conflicts=n is the default (collapsed) (#62: rc 1; real rejects =n with rc 2, separate surface)", ["--pretend", "--verbose-conflicts=n", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: three same-reason parents collapse to one + '(and N more)' (#62: rc 1 like Portage)", ["--pretend", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: --color=y colours violated spans, markers stay aligned (#62: rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: USE reason keys, unconditional before violated (#62: rc 1 like Portage)", ["--pretend", "dev-libs/slotusegroup"], 1),
+    ("slot conflict: --verbose-conflicts shows every omitted parent (#62: rc 1 like Portage)", ["--pretend", "--verbose-conflicts", "dev-libs/slotconfgroup"], 1),
+    ("slot conflict: --verbose-conflicts=n is the default (collapsed) (#62: rc 1; Portage rejects =n with rc 2, separate surface)", ["--pretend", "--verbose-conflicts=n", "dev-libs/slotconfgroup"], 1),
     ("slot conflict: different slots of the same package coexist", ["--pretend", "dev-libs/multislotparent"], 0),
     ("merge order: a slot-qualified dep does not edge to a sibling slot", ["--pretend", "dev-libs/slotorderroot"], 0),
     ("merge order: --json for the slot-qualified sibling-slot fixture", ["--pretend", "--json", "dev-libs/slotorderroot"], 0),
     ("virtual: resolved directly", ["--pretend", "virtual/texteditor"], 0),
     ("virtual: resolved as a dependency", ["--pretend", "dev-libs/virtualconsumerpkg"], 0),
-    ("virtual cycle: a virtual satisfied by an ebuild that depends on itself fails (#193: rc 1 like real)", ["--pretend", "app-misc/bar"], 1),
-    ("virtual cycle: a virtual ring through virtual providers fails (#193: rc 1 like real)", ["--pretend", "app-misc/foo"], 1),
+    ("virtual cycle: a virtual satisfied by an ebuild that depends on itself fails (#193: rc 1 like Portage)", ["--pretend", "app-misc/bar"], 1),
+    ("virtual cycle: a virtual ring through virtual providers fails (#193: rc 1 like Portage)", ["--pretend", "app-misc/foo"], 1),
     ("multi-atom: two independent new packages", ["--pretend", "dev-libs/newpkg", "dev-libs/withdeps"], 0),
     ("multi-atom: literal duplicate atom dedupes silently", ["--pretend", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("multi-atom: dependency shared between two targets dedupes", ["--pretend", "dev-libs/shared-a", "dev-libs/shared-b"], 0),
     ("multi-atom: solvable slot conflict between two targets is reconciled", ["--pretend", "dev-libs/slotconflictnewconsumer", "dev-libs/slotconflictoldconsumer"], 0),
-    ("multi-atom: reversed two-target order withholds with a skip notice at --backtrack=0 (#90 S2: rc 0 like real)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictoldconsumer", "dev-libs/slotconflictnewconsumer"], 0),
-    ("multi-atom: unsolvable slot conflict between two targets is reported (#62: rc 1 like real)", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 1),
+    ("multi-atom: reversed two-target order withholds with a skip notice at --backtrack=0 (#90 S2: rc 0 like Portage)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictoldconsumer", "dev-libs/slotconflictnewconsumer"], 0),
+    ("multi-atom: unsolvable slot conflict between two targets is reported (#62: rc 1 like Portage)", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 1),
     ("multi-atom: all requested atoms already installed", ["--pretend", "dev-libs/samepkg", "dev-libs/samepkg"], 0),
     ("multi-atom: a nonexistent atom aborts the whole run, first-bad-wins", ["--pretend", "dev-libs/does-not-exist", "dev-libs/newpkg"], 1),
     ("multi-atom: a later nonexistent atom still aborts the whole run", ["--pretend", "dev-libs/newpkg", "dev-libs/does-not-exist"], 1),
@@ -2175,7 +2175,7 @@ CASES = [
     ("--debug: resolver trace on both streams", ["--pretend", "--debug", "dev-libs/newpkg"], 0),
     ("-d: --debug short alias, resolver trace", ["--pretend", "-d", "dev-libs/newpkg"], 0),
     ("-pd: --debug bundles with -p", ["-pd", "dev-libs/newpkg"], 0),
-    ("--debug + a slot conflict: resolver trace survives backtracking (#62: rc 1 like real)", ["--pretend", "--debug", "dev-libs/slotconfgroup"], 1),
+    ("--debug + a slot conflict: resolver trace survives backtracking (#62: rc 1 like Portage)", ["--pretend", "--debug", "dev-libs/slotconfgroup"], 1),
     ("--verbose is now implemented, not rejected", ["--pretend", "--verbose", "dev-libs/newpkg"], 0),
     ("-v short alias is now implemented, not rejected", ["--pretend", "-v", "dev-libs/newpkg"], 0),
     ("without --verbose, USE= is never shown even for a package with IUSE", ["--pretend", "dev-libs/useflagpkg"], 0),
@@ -2938,12 +2938,12 @@ CASES = [
 
 
 def _assert_abort_preamble(stdout: str) -> None:
-    """#135 (c): an aborted resolve prints real's merge-list preamble on
+    """#135 (c): an aborted resolve prints Portage's merge-list preamble on
     stdout before the abort block on stderr -- the header, the blank,
     `Calculating dependencies ... done!`, and the timing line (whose
     seconds are wall time, so only the `backtrack: N/M` suffix is
     asserted)."""
-    # Determinism cut: the wall-clock seconds real prints are omitted
+    # Determinism cut: the wall-clock seconds Portage prints are omitted
     # (byte-identical repeated runs are a jointly-owned gate); the line
     # carries the `backtrack: N/M` signal only.
     lines = stdout.splitlines()
@@ -2973,7 +2973,7 @@ def _assert_harvested(result: subprocess.CompletedProcess) -> None:
 
 
 def _all_masked(atom: str, cpv_repo: str, reason: str) -> str:
-    """Real `_show_unsatisfied_dep`'s "All ebuilds that could satisfy
+    """Portage `_show_unsatisfied_dep`'s "All ebuilds that could satisfy
     <atom> have been masked" report, stripped (as the assertions below
     compare `.stderr.strip()`). Emitted for a top-level atom whose only
     matching ebuilds are all masked -- what portuale prints instead of
@@ -2987,7 +2987,7 @@ def _all_masked(atom: str, cpv_repo: str, reason: str) -> str:
     )
 
 
-# Real `_display_autounmask`'s tail, emitted on stderr after every
+# Portage `_display_autounmask`'s tail, emitted on stderr after every
 # autounmask change block when `--autounmask-backtrack` is off (the
 # default) -- `--pretend` included. Appended to the pinned stderr of
 # every autounmask-abort test below.
@@ -3035,12 +3035,12 @@ _SLOT_COLLISION_PREAMBLE = (
 
 def _assert_slot_collision_block(stdout, slot_atom, instances, backtrack_hint=True):
     """`instances` is a list of (cpv, [(parent_cpv_or_None, atom), ...]).
-    Checks the real `get_conflict()` `!!! Multiple package instances ...`
+    Checks the Portage `get_conflict()` `!!! Multiple package instances ...`
     block rather than pinning the whole multi-line paragraph in every
-    test. Each instance header and parent line carries real
+    test. Each instance header and parent line carries Portage
     `pkg_use_display` -- `USE=""` plus the implicit `ELIBC="glibc"`
     group on this fixture profile (backlog #264) -- and a `^` marker
-    line (real `highlight_violations`) -- both checked here
+    line (Portage `highlight_violations`) -- both checked here
     structurally; the exact caret columns are pinned once in the
     slotconfgroup test."""
     assert _SLOT_COLLISION_PREAMBLE in stdout
@@ -3086,7 +3086,7 @@ def test_debug_resolver_trace_stage1_digraph_dump(
     emerge_binary, fixture_env
 ):
     """`emerge --pretend --debug` Stage 1: the `\\ndigraph:\\n\\n` +
-    `debug_print()` dump on stderr (real depgraph.py:9461), in real's
+    `debug_print()` dump on stderr (Portage depgraph.py:9461), in Portage's
     node/edge format -- plain-text node labels, top-level atoms as
     pseudo-arg nodes. Diamond: a leaf with `(no children)`, two
     consumers, the root, then the `dev-libs/diamond depends on` arg
@@ -3116,7 +3116,7 @@ def test_debug_resolver_trace_stage3_candidate_list(
     emerge_binary, fixture_env
 ):
     """Stage 3: `Arg:`/`Atom:` on stdout, the width-10 `   ebuild:` /
-    `installed:` candidate list on stderr (real depgraph.py:8347)."""
+    `installed:` candidate list on stderr (Portage depgraph.py:8347)."""
     args = ["--pretend", "--debug", "dev-libs/diamond"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert "\n      Arg: dev-libs/diamond\n     Atom: dev-libs/diamond\n" in rust.stdout
@@ -3143,18 +3143,18 @@ def test_debug_resolver_trace_stages_2_4_walk(
     assert "\nExiting... (dev-libs/common-1.0:0/0::testrepo, ebuild scheduled for merge)\n" in rust.stdout
 
 
-def test_debug_oldslot_conflict_cons_chain_prints_provider_like_real(
+def test_debug_oldslot_conflict_cons_chain_prints_provider_like_portage(
     emerge_binary, fixture_env, tmp_path
 ):
     """#277 chain 1: `--backtrack=0` on the oldslot shape narrates the
-    consumer-to-provider chain like real's innermost visit.
+    consumer-to-provider chain like Portage's innermost visit.
 
     Shape: installed `dev-libs/oldslotcons-1` (vdb `RDEPEND` recorded as
     `>=dev-libs/oldslotprov-1.0:0/0=`, the built form of the ebuild's
     `dev-libs/oldslotprov:=`) plus tree `oldslotprov-1.0` (`SLOT="0/0"`)
     / `-2.0` (`SLOT="0/1"`, both `RDEPEND="dev-libs/oldslotabi"`) /
     `oldslotabi-1.0` (`RDEPEND="dev-libs/oldslotcons
-    =dev-libs/oldslotprov-1.0"`). Grounded in real 3.0.82.2, host
+    =dev-libs/oldslotprov-1.0"`). Grounded in Portage 3.0.82.2, host
     staged-fixture probe 2026-10-01 (`PORTAGE_CONFIGROOT` at the staged
     fixtures, ad-hoc `ROOT` with the installed cons above,
     `PYTHONHASHSEED=0`, argv `emerge --pretend --backtrack=0 --color=n
@@ -3203,15 +3203,15 @@ def test_debug_oldslot_conflict_cons_chain_prints_provider_like_real(
     )
 
 
-def test_debug_oldslot_conflict_provider_chain_redescends_like_real(
+def test_debug_oldslot_conflict_provider_chain_redescends_like_portage(
     emerge_binary, fixture_env, tmp_path
 ):
     """#277 chain 2: `--backtrack=0` on the oldslot shape re-narrates the
-    provider's inner ring like real's live walk does.
+    provider's inner ring like Portage's live walk does.
 
     Same shape and grounding as
-    `test_debug_oldslot_conflict_cons_chain_prints_provider_like_real`:
-    real's --debug re-narrates every visit, so `oldslotabi-1.0`'s stanza
+    `test_debug_oldslot_conflict_cons_chain_prints_provider_like_portage`:
+    Portage's --debug re-narrates every visit, so `oldslotabi-1.0`'s stanza
     (`Depstring: dev-libs/oldslotcons =dev-libs/oldslotprov-1.0`) is
     followed by the re-descended `Child:` blocks for both resolved
     children -- `oldslotcons-1.0` (`Parent Dep: dev-libs/oldslotcons
@@ -3258,7 +3258,7 @@ def test_debug_resolver_trace_stage5_rebuild_summaries(
     emerge_binary, fixture_env, tmp_path
 ):
     """Stage 5: `forced reinstall atoms:` / `slot operator dependencies:`
-    / `forced rebuilds:` on stdout (real depgraph.py:1011-1206), driven
+    / `forced rebuilds:` on stdout (Portage depgraph.py:1011-1206), driven
     off portuale's `abi_rebuilds` set."""
     env = dict(fixture_env)
     env["ROOT"] = str(_slotbind_root(tmp_path))
@@ -3279,19 +3279,19 @@ def test_debug_parent_dep_names_the_atom_and_the_child_instance(
 ):
     """Backlog #59 S1: `Parent Dep:` carries the dependency **atom** and
     is filed under the **child instance** the atom actually resolved to,
-    exactly as real `_add_pkg` does (`depgraph.py:3583-3604`). On the
+    exactly as Portage `_add_pkg` does (`depgraph.py:3583-3604`). On the
     `needer`/`othermod` triangle `othermod`'s `<dev-libs/paired-2.0`
     resolves to the *installed* `paired-1.0`, while `needer`'s
     `>=dev-libs/paired-2.0` resolves to the merge-bound `paired-2.0`;
     the old cp-keyed narration filed both under `paired-2.0` and printed
     `(Argument)` on the argument rows.
 
-    Real 3.0.82.2 capture (container, 2026-09-16): the argument rows are
+    Portage 3.0.82.2 capture (container, 2026-09-16): the argument rows are
     the bare atom (`Parent Dep:    dev-libs/needer`), the installed
     child block is
     `Child: (dev-libs/paired-1.0:0/0::testrepo, installed in '<root>')`,
     and the two atoms sit under their own instances. Portuale's
-    `installed` label omits real's `in '<root>'` (pre-existing, all
+    `installed` label omits Portage's `in '<root>'` (pre-existing, all
     installed labels do) and its block comes after the entries loop
     (documented BFS-order divergence), so the assertions are per-line.
     """
@@ -3326,20 +3326,20 @@ def test_debug_parent_dep_names_the_atom_and_the_child_instance(
 
 
 def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
-    """Backlog #59 S2, K1 option (a): the deterministic half of real's
+    """Backlog #59 S2, K1 option (a): the deterministic half of Portage's
     `_show_resolution_report` footer (`Dependency resolution took <T> s
     (backtrack: N/M).`, printed on **every** non-quiet run,
     `depgraph.py:12135-12145`) rides out as
     `"backtrack":{"restarts":N,"max":M}` in portuale's `--json`. No
-    stdout line is added (real's timing is non-deterministic, and a
+    stdout line is added (Portage's timing is non-deterministic, and a
     plain-output line would move every contract pin); K2 keeps the
     static `These are the packages...` / `Calculating dependencies...
     done!` preamble a recorded cut.
 
     `restarts` is portuale's own pass count minus one (a failed
     iteration with candidates left counts, #297), so it is deterministic
-    but not expected to equal real's `N` (the two search orders differ;
-    real's triangle capture is `4/20`). `max` is
+    but not expected to equal Portage's `N` (the two search orders differ;
+    Portage's triangle capture is `4/20`). `max` is
     portuale's resolved `--backtrack` budget."""
     plain = _run(
         [str(emerge_binary)],
@@ -3348,7 +3348,7 @@ def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
     )
     assert plain.returncode == 1  # #62: the triangle records a slot conflict
     data = json.loads(plain.stdout)
-    assert data["backtrack"] == {"restarts": 3, "max": 20}  # #297: 2 before; real 4
+    assert data["backtrack"] == {"restarts": 3, "max": 20}  # #297: 2 before; Portage 4
 
     simple = _run(
         [str(emerge_binary)],
@@ -3391,7 +3391,7 @@ def test_root_deps_pinned_output(
 
     rust_without = _run([str(emerge_binary)], args_without, env)
     assert rust_without.returncode == 1
-    # #135 (d): real's plain-miss sentence, not the bare NVC line
+    # #135 (d): Portage's plain-miss sentence, not the bare NVC line
     assert "there are no ebuilds to satisfy" in rust_without.stderr
 
     rust_with = _run([str(emerge_binary)], args_with, env)
@@ -3403,7 +3403,7 @@ def test_root_deps_pinned_output(
 def test_bdepend_routes_to_the_running_root_for_a_cross_root_build_without_root_deps(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real EAPI-7+ portage resolves BDEPEND/IDEPEND against the running
+    """Portage resolves (EAPI 7+) BDEPEND/IDEPEND against the running
     root `/` unconditionally, not only under --root-deps -- observable for
     a genuine cross-root build (ROOT != running root). Here ROOT is an
     empty tmp tree and PORTAGE_RUNNING_ROOT points at the fixture tree
@@ -3436,7 +3436,7 @@ def test_root_deps_disjunctive_branch_selection_pinned_output(
     is "|| ( dev-libs/rootdepsnonexistent dev-libs/rootdepsprovider )" --
     neither branch has an ebuild anywhere in the fixture repo tree.
     rootdepsprovider IS installed in the fixture vdb (used as the target
-    root regardless of --root-deps), so even WITHOUT --root-deps, real
+    root regardless of --root-deps), so even WITHOUT --root-deps, Portage
     dep_zapdeps' other_installed bin (backlog #22 slice 4) already beats
     rootdepsnonexistent's plain other -- the || group resolves to
     rootdepsprovider alone (dropping rootdepsnonexistent entirely), which
@@ -3454,7 +3454,7 @@ def test_root_deps_disjunctive_branch_selection_pinned_output(
 
     rust_without = _run([str(emerge_binary)], args_without, env)
     assert rust_without.returncode == 1
-    # #135 (d): real's plain-miss sentence, not the bare NVC line
+    # #135 (d): Portage's plain-miss sentence, not the bare NVC line
     assert "there are no ebuilds to satisfy" in rust_without.stderr
 
     rust_with = _run([str(emerge_binary)], args_with, env)
@@ -3466,7 +3466,7 @@ def test_root_deps_disjunctive_branch_selection_pinned_output(
 def test_root_deps_recursive_build_entry_pinned_output(
     emerge_binary, fixture_env
 ):
-    """Real "recursively pull in and build a new package against the
+    """Portage "recursively pull in and build a new package against the
     running root" (--root-deps's own last remaining documented gap, see
     resolve_root_deps_build_entry's own doc comment in portage-repo/src/
     lib.rs): unlike rootdepspkg/rootdepsorpkg above, rootdepsbuildpkg's
@@ -3479,7 +3479,7 @@ def test_root_deps_recursive_build_entry_pinned_output(
     slice) "BDEPEND resolved as an ordinary ROOT-targeted dependency"
     fallback, with --root-deps via the new targets_running_root entry
     instead. The --root-deps case now carries a " to <running root>"
-    marker on the build entry (real output.py:841-862) that the fallback
+    marker on the build entry (Portage output.py:841-862) that the fallback
     never has -- see
     test_root_deps_build_entry_output_marks_the_running_root below for a
     dedicated, deterministic (PORTAGE_RUNNING_ROOT=/) check of that
@@ -3524,7 +3524,7 @@ def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
     """--root-deps (#133, #132 S5 residue): dev-libs/deeprootdepparent is
     installed with vdb USE="" (built -flip) and BDEPENDs
     `~dev-libs/deeprootdepchild-1.0[flip=]`; the running root has the child
-    installed +flip. Real evaluates the atom to `[-flip]` (use_reduce with
+    installed +flip. Portage evaluates the atom to `[-flip]` (use_reduce with
     token_class=Atom: `token.evaluate_conditionals(uselist)`), which the
     +flip instance does not satisfy, and rebuilds the child against the
     running root with flip off. Portuale used to flatten the producers
@@ -3533,19 +3533,19 @@ def test_root_deps_evaluates_conditional_use_deps_before_the_satisfied_check(
     `[flip=]` was vacuously satisfied and the child was silently dropped.
 
     Oracle: bed `l0-fx-20260922T082944Z` (`## #133 S0` in
-    differential-test-bed/findings/l0.md) — real prints the consumer N row
+    differential-test-bed/findings/l0.md) — Portage prints the consumer N row
     plus the child R rebuild (`USE="-flip*"`, rc 0); portuale printed the
     consumer row alone. The `-D` control without --root-deps is clean on
     both (the S5-evaluated ordinary walk already rebuilds), so this pin
     isolates the two producers. Portuale's shape is its single
-    `targets_running_root` entry (` to <running root>`), not real's doubled
+    `targets_running_root` entry (` to <running root>`), not Portage's doubled
     child row (running-root entry plus target entry) — but the `USE="-flip*"`
-    column is real's, and since #141 (Phase 5b S1) portuale prints it too:
+    column is Portage's, and since #141 (Phase 5b S1) portuale prints it too:
     the running-root build entry's display fields are populated from the
     same `refresh_entry_use_display` seam the main walk uses, so the
-    rebuild row's flipped flag renders with real's `*` marker. Oracle:
+    rebuild row's flipped flag renders with Portage's `*` marker. Oracle:
     bed `l0-fx-20260922T192350Z` (`## #141/#135/#138/#134/#136 S0`),
-    real's row `… deeprootdepchild-1.0 to <root>/ USE="-flip*"`.
+    Portage's row `… deeprootdepchild-1.0 to <root>/ USE="-flip*"`.
     """
     env = dict(fixture_env)
     env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
@@ -3574,10 +3574,10 @@ def test_root_deps_build_entry_output_marks_the_running_root(
     emerge_binary, fixture_env
 ):
     """The " to <running root>" marker portuale adds to a --root-deps
-    running-root build entry (real lib/_emerge/resolver/output.py:841-862's
+    running-root build entry (Portage lib/_emerge/resolver/output.py:841-862's
     own darkgreen("to " + pkg.root), narrowed -- see pretend.rs's own
     root_suffix docstring). PORTAGE_RUNNING_ROOT is pinned to "/" here so
-    the marker text is deterministic ("to /", real portage's own common
+    the marker text is deterministic ("to /", Portage's own common
     case) rather than a per-checkout mktemp path; "/" genuinely has no
     dev-libs/rootdepsbuildtool installed, so the atom still resolves to a
     real New entry. Checked across all three output modes -- plain,
@@ -3614,7 +3614,7 @@ def test_root_deps_recursion_walks_the_build_entrys_own_deps(
     emerge_binary, fixture_env
 ):
     """A running-root build entry's own DEPEND/BDEPEND/RDEPEND are now
-    walked against the running root too, recursively (real
+    walked against the running root too, recursively (Portage
     depgraph.py:4207-4271: a package whose pkg.root is the running root
     has all three keys resolved there). rdrapp BDEPENDs rdrtool, which
     itself BDEPENDs rdrtooldep and RDEPENDs rdrlib -- so all four appear,
@@ -3648,7 +3648,7 @@ def test_root_deps_recursion_walks_the_build_entrys_own_deps(
 def test_root_deps_recursion_walks_a_build_entrys_own_idepend(
     emerge_binary, fixture_env
 ):
-    """Real portage resolves IDEPEND against the running root always
+    """Portage resolves IDEPEND against the running root always
     (depgraph.py:4247-4252, independent of --root-deps). The recursion
     into a running-root build entry now covers IDEPEND alongside
     DEPEND/BDEPEND/RDEPEND: rdriapp BDEPENDs rdritool, whose own IDEPEND
@@ -3671,7 +3671,7 @@ def test_root_deps_recursion_walks_a_build_entrys_own_idepend(
 def test_root_deps_top_level_idepend_resolves_against_the_running_root(
     emerge_binary, fixture_env
 ):
-    """Real portage resolves IDEPEND (and BDEPEND) against the running
+    """Portage resolves IDEPEND (and BDEPEND) against the running
     root for *every* package, not just under --root-deps and not just for
     recursed running-root build entries (depgraph.py:4247-4252). The two
     ordinary dep-walk sites route a top-level package's own IDEPEND to the
@@ -3736,10 +3736,10 @@ def test_build_time_cycle_between_two_installed_packages_is_not_circular(
     emerge_binary, fixture_env
 ):
     """instcyclea BDEPENDs instcycleb which BDEPENDs instcyclea -- but
-    both are already installed. Real `DepPriority.satisfied` (a build-time
+    both are already installed. Portage `DepPriority.satisfied` (a build-time
     dep provided by an installed package) lets `_serialize_tasks`'
     `DepPrioritySatisfiedRange` ignore that edge when breaking a cycle, so
-    real orders the two by their installed versions instead of reporting a
+    Portage orders the two by their installed versions instead of reporting a
     circular dependency. Under `--emptytree` both become `[ebuild R]`; the
     resolve still succeeds, exit 0, no `* Error: circular dependencies:`.
     This is the `app-arch/xz-utils` <-> `app-portage/elt-patches`
@@ -3762,14 +3762,14 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
 ):
     """hardcyclea DEPENDs hardcycleb which DEPENDs hardcyclea, both
     unbuilt, empty RDEPEND, no IUSE -- every edge an unsatisfied
-    build-time dep with no run-time alternative, so real portage's
+    build-time dep with no run-time alternative, so Portage's
     `_ignore_runtime` scan can't linearize it. Since backlog #206 the
-    merge list is the stuck remainder rendered as real's forced
+    merge list is the stuck remainder rendered as Portage's forced
     `--verbose --tree` display (`_show_circular_deps` pops `--quiet`
     and forces both before `display(handler.merge_list)`): tree
     indentation with a `[nomerge]` row, `::repo`, `0 KiB` sizes, the
     `Total:` counters line. The `* Error: circular dependencies:`
-    block (real `_show_circular_deps`) goes to stderr with real's own
+    block (Portage `_show_circular_deps`) goes to stderr with Portage's own
     three leading newlines and `Package.__str__` node text; exit 1.
     With no IUSE, `_find_suggestions` finds nothing and the generic
     advisory prints (the `else` branch) -- see
@@ -3777,23 +3777,23 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
     contrast the pure-RDEPEND cycle-a/cycle-b cycle stays exit 0 (a
     CASES entry).
 
-    Row format grounded on live real (n206 container probe,
+    Row format grounded on live Portage (n206 container probe,
     `localhost/test-portuale:latest`, display paths diff-verified
-    identical to 3rdparty 3.0.82.2): real shows the argument as the
+    identical to 3rdparty 3.0.82.2): Portage shows the argument as the
     first merge row with its `to <ROOT>` suffix (a portuale display cut
     — see `root_suffix` — so no pinned row carries it), then the
     `[nomerge]` row and the nested repeats, then
     `Total: 3 packages (3 new), Size of downloads: 0 KiB`. Portuale
     reuses its own tree renderer for the shape, which nests the
     argument cycle the other way round (leading `[nomerge]` row), so
-    the pin records portuale's three rows with real's decorations and
+    the pin records portuale's three rows with Portage's decorations and
     a `Total:` that counts the rendered merge rows, exactly like
-    real's counters count its own rows.
+    Portage's counters count its own rows.
 
-    Backlog #278: the cycle starts where real's single-root rendering
-    starts (`shortest_cycle[0]` — here `hardcycleb`, matching real's
+    Backlog #278: the cycle starts where Portage's single-root rendering
+    starts (`shortest_cycle[0]` — here `hardcycleb`, matching Portage's
     `FX_HOST_ROOTS=1` capture; portuale
-    `LLM/evidence/2026-09-30-278/`). Real's default-staging rendering
+    `LLM/evidence/2026-09-30-278/`). Portage's default-staging rendering
     starts at the other node (cross-root graph, Track X #242)."""
     base = ["--pretend", "dev-libs/hardcyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -3823,7 +3823,7 @@ def test_ccd4b_tree_follows_the_cycle_breaking_branch(
 ):
     """Backlog #221 (M3): `--tree` map-awareness on a post-backtrack
     cell. Requesting `dev-libs/ccd4b` (the exe) re-resolves past the
-    pg4 ring to `[ccd4c, ccd4a, ccd4b]` (real's own answer for the
+    pg4 ring to `[ccd4c, ccd4a, ccd4b]` (Portage's own answer for the
     direct request -- g221 S0 `ResolverPlayground` probe: requesting
     `pypy-exe` merges `[exe-bin, pypy, exe]`), and the tree nests each
     package under its requirer (exe -> pypy -> exe-bin) instead of
@@ -3859,17 +3859,17 @@ def test_softened_build_time_cycle_reports_the_persisting_ring(
     `Complete` -- rc 1 WITH backtracking on (contrast the bt0-only
     legs, which never retry).
 
-    Grounded in real runs (`/tmp/opencode/g221b/probe_sbr.py`,
+    Grounded in Portage runs (`/tmp/opencode/g221b/probe_sbr.py`,
     3rdparty portage 3.0.82.2 `ResolverPlayground`, debug
     `backtracking try` count): backtracking on fails after exactly 1
-    retry, `--backtrack=0` fails with none. The message shape is real
+    retry, `--backtrack=0` fails with none. The message shape is Portage
     `_prepare_circular_dep_message`
     (`resolver/circular_dependency.py`: one `priorities[-1]` label per
     edge; priorities are `bisect.insort`-sorted so `[-1]` is the
     hardest -- `DepPriority.__int__` ranks buildtime (-1) above runtime
     (-3), hence `(buildtime)` on the dual edge, matching portuale's own
     `cycle_edge_labels` max); stdout is the forced verbose-tree stuck
-    remainder with real's decorations and the `Total:` counters line,
+    remainder with Portage's decorations and the `Total:` counters line,
     exactly like the `hardcyclea` pin above."""
     base = ["--pretend", "dev-libs/sbrA"]
     rust = _run([str(emerge_binary)], base, fixture_env)
@@ -3894,32 +3894,32 @@ def test_softened_build_time_cycle_reports_the_persisting_ring(
     )
 
 
-def test_mixed_priority_cycle_prints_each_edge_real_label(
+def test_mixed_priority_cycle_prints_each_edge_portage_label(
     emerge_binary, fixture_env
 ):
     """Backlog #228: `dev-libs/slopcyca -RDEPEND:=-> dev-libs/slopcycb
     -DEPEND-> dev-libs/slopcyca` is unserializable -- the `RDEPEND` `:=`
-    edge is an unsatisfied `runtime_slot_op` priority, which no real
-    `ignore_priority` rung relaxes (real `_emerge/DepPriority.py`
+    edge is an unsatisfied `runtime_slot_op` priority, which no Portage
+    `ignore_priority` rung relaxes (Portage `_emerge/DepPriority.py`
     `__str__`, `_emerge/DepPriorityNormalRange.py`, `_emerge/
     DepPrioritySatisfiedRange.py`). Each stderr cycle line carries its
-    own edge's `priorities[-1]` label (real `_prepare_circular_dep_-
+    own edge's `priorities[-1]` label (Portage `_prepare_circular_dep_-
     message`, `resolver/circular_dependency.py`), not the hardcoded
     `(buildtime)` every earlier pin shows.
 
-    Grounded on one live-real probe (`localhost/test-portuale:latest`,
-    real 3.0.81.3; the label paths -- `DepPriority.__str__`, the
+    Grounded on one live-Portage probe (`localhost/test-portuale:latest`,
+    Portage 3.0.81.3; the label paths -- `DepPriority.__str__`, the
     circular message and suggestions, `DepPrioritySatisfiedRange` -- are
     byte-identical to 3rdparty 3.0.82.2, the display path per the n206
-    probe): real exits 1 with `slopcycb depends on / slopcyca
+    probe): Portage exits 1 with `slopcycb depends on / slopcyca
     (buildtime) / slopcycb (runtime_slot_op)` plus the generic advisory
     (unconditional atoms give `_find_suggestions` nothing). Backlog
-    #278 starts the printed cycle where real does
+    #278 starts the printed cycle where Portage does
     (`shortest_cycle[0]`; portuale `LLM/evidence/2026-09-30-278/` —
-    real starts here under both stagings), so the pin now records
-    real's bytes; stdout is portuale's own forced verbose-tree
+    Portage starts here under both stagings), so the pin now records
+    Portage's bytes; stdout is portuale's own forced verbose-tree
     stuck-remainder shape (leading `[nomerge]` row, `Total:` counting
-    the rendered merge rows) with real's decorations, exactly like the
+    the rendered merge rows) with Portage's decorations, exactly like the
     `hardcyclea` pin above. Full probe outputs:
     `/tmp/opencode/n228probe/out/slopcyc[a|b].{stdout,stderr}.txt`."""
     base = ["--pretend", "dev-libs/slopcyca"]
@@ -3952,20 +3952,20 @@ def test_circular_dep_use_flag_suggestion(
     on dev-libs/usecycleb only when x is on; usecycleb unconditionally
     build-depends back. `circular_dependency_handler._find_suggestions`
     finds that disabling x on usecyclea drops the offending atom without
-    violating REQUIRED_USE, so real prints `It might be possible to break
+    violating REQUIRED_USE, so Portage prints `It might be possible to break
     this cycle / by applying the following change: / - dev-libs/
     usecyclea-1.0 (Change USE: -x)` instead of the generic advisory.
     The `-x` renders blue under --color y.
 
-    Since backlog #206 the stdout list is real's forced `--verbose
-    --tree` stuck-remainder display and the stderr block carries real's
+    Since backlog #206 the stdout list is Portage's forced `--verbose
+    --tree` stuck-remainder display and the stderr block carries Portage's
     three leading newlines plus `Package.__str__` node text — row format
     grounded on the live n206 probe (`localhost/test-portuale:latest`,
     display paths diff-verified identical to 3rdparty 3.0.82.2), shape
     from portuale's own tree renderer (see
     test_unbreakable_build_time_cycle_prints_the_circular_deps_error).
-    Backlog #278: the cycle starts where real's single-root rendering
-    starts (`shortest_cycle[0]` — here `usecycleb`, matching real's
+    Backlog #278: the cycle starts where Portage's single-root rendering
+    starts (`shortest_cycle[0]` — here `usecycleb`, matching Portage's
     `FX_HOST_ROOTS=1` capture; portuale
     `LLM/evidence/2026-09-30-278/`). The `-x` suggestion is
     unaffected (it names the USE-gated member, not the start node)."""
@@ -3993,7 +3993,7 @@ def test_circular_dep_use_flag_suggestion(
         "Note that this change can be reverted, once the package has been installed.\n"
     )
 
-    # --color y: the -x flag renders blue (real colorize("blue", ...))
+    # --color y: the -x flag renders blue (Portage colorize("blue", ...))
     c = ["--pretend", "--color", "y", "dev-libs/usecyclea"]
     rc = _run([str(emerge_binary)], c, fixture_env)
     assert "(Change USE: \x1b[34;01m-x\x1b[39;49;00m)" in rc.stderr
@@ -4008,19 +4008,19 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     `dev-libs/usecyclea`/`usecycleb` (here `gpcyclea`/`gpcycleb`), but
     `dev-libs/gpcyclec` -- the top-level target and a "grandparent" of
     the cycle -- build-depends on `dev-libs/gpcyclea[x]` with a *hard*
-    USE-dep. Real `_find_suggestions` step 9: the otherwise-viable "flip
+    USE-dep. Portage `_find_suggestions` step 9: the otherwise-viable "flip
     x off on gpcyclea" fix would violate gpcyclec's own hard requirement,
-    so the suggestion is disqualified and dropped -- real prints the
+    so the suggestion is disqualified and dropped -- Portage prints the
     generic "temporarily disabling USE flags" advisory instead of a
     `Change USE:` line.
 
-    Since backlog #206 the stdout list is real's forced `--verbose
-    --tree` stuck-remainder display and the stderr block carries real's
+    Since backlog #206 the stdout list is Portage's forced `--verbose
+    --tree` stuck-remainder display and the stderr block carries Portage's
     three leading newlines plus `Package.__str__` node text. The n206
-    probe shows live real starting this cycle at `gpcycleb-1.0`
+    probe shows live Portage starting this cycle at `gpcycleb-1.0`
     (`gpcycleb → gpcyclea → gpcycleb`); backlog #278 starts portuale's
     printed cycle there too (`shortest_cycle[0]`; portuale
-    `LLM/evidence/2026-09-30-278/`), so the pin records real's bytes."""
+    `LLM/evidence/2026-09-30-278/`), so the pin records Portage's bytes."""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4048,19 +4048,19 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
 def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     emerge_binary, fixture_env
 ):
-    """Backlog #154 (`--tree dev-libs/gpcyclec`, real 3.0.82.2 live
+    """Backlog #154 (`--tree dev-libs/gpcyclec`, Portage 3.0.82.2 live
     oracle): a merge node's ancestor occurrence renders as a `[nomerge]`
-    row that still carries the package's `USE="…"` display -- real
+    row that still carries the package's `USE="…"` display -- Portage
     `Display.__call__` runs `_display_use` for every package with no
     ordered/merge gate, and `print_messages` appends `" " + verboseadd`
-    (`_create_use_string`'s own trailing space makes real's row end
+    (`_create_use_string`'s own trailing space makes Portage's row end
     `USE="x" `; portuale's established convention omits trailing spaces,
     as its merge rows already do, so the pinned row ends `USE="x"`).
     `verbose_size` is merge-gated, so no size suffix follows on this arm.
     Since backlog #206 the circular display runs forced-verbose whether
     or not the user passed `--tree`, so these rows carry `::repo`,
     `0 KiB` on the merge arms, and the `Total:` counters line (all
-    grounded on the live n206 probe); the `to <ROOT>` suffix on real's
+    grounded on the live n206 probe); the `to <ROOT>` suffix on Portage's
     argument row stays a portuale display cut. Full stdout pinned; the
     stderr error block is the grandparent cell's."""
     args = ["--pretend", "--tree", "dev-libs/gpcyclec"]
@@ -4080,15 +4080,15 @@ def test_invalid_use_conditional_in_depend_masks_the_package(
     emerge_binary, fixture_env
 ):
     """Backlog #153 (P19): `dev-libs/fucyclec` has no `IUSE` but its
-    `DEPEND` names `dev-libs/fucyclea[x?]` -- real `Package._validate_deps`
+    `DEPEND` names `dev-libs/fucyclea[x?]` -- Portage `Package._validate_deps`
     (`Atom._validate_conditional_flags`) masks the whole candidate
     `invalid` at construction, so the resolve fails with the all-masked
     report before any cycle is ever walked (the fucyclea/fucycleb cycle is
     still in the tree, unreachable). This pin replaces the old
     `test_circular_dep_conditional_grandparent_keeps_the_suggestion_with_followup`,
-    whose `Change USE: -x` + followup trailer described a merge real never
-    makes (real 3.0.82.2, oracle captured against a `cp -a` copy of this
-    tree; portuale omits real's `for <root>.` suffix by the
+    whose `Change USE: -x` + followup trailer described a merge Portage never
+    makes (Portage 3.0.82.2, oracle captured against a `cp -a` copy of this
+    tree; portuale omits Portage's `for <root>.` suffix by the
     fixture-miss-message-unsuffixed convention). Full stderr pinned; the
     `--tree` twin is the l131-s1 bed cell."""
     args = ["--pretend", "dev-libs/fucyclec"]
@@ -4112,24 +4112,24 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
 ):
     """The Tier 2.21 slice on one fixture: dev-libs/cyc4a through
     dev-libs/cyc4d form a four-ring of build-time deps with the
-    cyc4a→cyc4b edge gated behind USE=x (default on). Real
+    cyc4a→cyc4b edge gated behind USE=x (default on). Portage
     `digraph.get_cycles` records one ring per node (rotations count
     separately), so four records trip `large_cycle_count` (verified live
     against 3.0.82.2 on the same shape). Since backlog #206 the merge
-    list is the stuck remainder rendered as real's forced `--verbose
+    list is the stuck remainder rendered as Portage's forced `--verbose
     --tree` display (tree rows with a `[nomerge]` arm, `::repo`,
     `0 KiB`, the `Total:` counters line), then the error block with
-    real's three leading newlines, `Package.__str__` node text, the
+    Portage's three leading newlines, `Package.__str__` node text, the
     `-x` suggestion and the lot-of-cycles trailer. Exit 1. Both streams
     pinned.
 
     Row format and counters grounded on the live n206 probe
     (`localhost/test-portuale:latest`, display paths diff-verified
     identical to 3rdparty 3.0.82.2); shape from portuale's own tree
-    renderer. Backlog #278 starts the printed ring where real's
+    renderer. Backlog #278 starts the printed ring where Portage's
     single-root rendering starts (`shortest_cycle[0]` — `cyc4b`,
-    matching real's `FX_HOST_ROOTS=1` capture; portuale
-    `LLM/evidence/2026-09-30-278/`; real's default-staging rendering
+    matching Portage's `FX_HOST_ROOTS=1` capture; portuale
+    `LLM/evidence/2026-09-30-278/`; Portage's default-staging rendering
     starts at `cyc4c`, cross-root Track X #242)."""
     args = ["--pretend", "dev-libs/cyc4a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -4214,12 +4214,12 @@ def _merge_lines(stdout: str) -> list[str]:
 def test_abort_path_masked_unsat_suppresses_merge_list(
     atom, mode, emerge_binary, fixture_env
 ):
-    """Oracle-pinned (live-captured against real 3.0.81.3, see
+    """Oracle-pinned (live-captured against Portage 3.0.81.3, see
     `fixtures/abort-captures/` + `docs/abort-path-spec.md`): a masked-only
     or unsatisfiable dependency aborts the resolve — exit 1, zero merge
     lines and no `Total:` line on stdout in every output mode (the error
     block alone goes to stderr). The `-last` siblings pin that the failing
-    dep's declared position is unobservable: real admits nothing observable
+    dep's declared position is unobservable: Portage admits nothing observable
     either way. Slice 4 renders the (empty) partial instead of the full
     list with the gate on; the `--debug` cases for the `-mid` atoms and
     `abort-masked-cycle` stay xfailed below (pre-existing dump-order gap
@@ -4244,7 +4244,7 @@ def test_abort_path_masked_cycle_hides_circular_block(
     atom, mode, emerge_binary, fixture_env
 ):
     """Slice 3 precedence oracle: masked dep + hard cycle in one top --
-    real abandons the walk before serialization ever runs, so no list and
+    Portage abandons the walk before serialization ever runs, so no list and
     no circular block either. Slice 4 suppresses the list; Slice 5
     suppresses the circular block for a MaskedDep outcome."""
     args = [*mode, atom]
@@ -4295,16 +4295,16 @@ def test_abort_path_cycle_shows_reduced_list_only(
     1 and the merge list is the stuck remainder only — the unrelated
     leaves (`abort-leaf-a/b`, drained before the give-up) are absent while
     the top and both cycle arms stay. Mid/last pin that the cycle entry's
-    declared position is unobservable in real's output. Slice 4 renders
+    declared position is unobservable in Portage's output. Slice 4 renders
     the remainder as the only list; the `abort-au-*` fourth-shape order
     stays xfailed below. Since backlog #206 the remainder renders as
-    real's forced `--verbose --tree` display with the `Total:` counters
-    line in every mode — including `--debug` without `-v`: real
+    Portage's forced `--verbose --tree` display with the `Total:` counters
+    line in every mode — including `--debug` without `-v`: Portage
     `_show_circular_deps` forces `--verbose` before the display, and the
     oracle `--debug` capture shows `Total: 4 packages (4 new)` (the old
     no-`Total:`-under-`--debug` assertion contradicted the capture). The
     counters count the rendered merge rows, repeats included
-    (`nomerge` excluded), exactly like real's own counters count its
+    (`nomerge` excluded), exactly like Portage's own counters count its
     rows. The forced display is always the plain tree renderer, never
     `--columns`-shaped (portuale's tree walk hardcodes the non-columns
     arms, same as for a user-passed `--tree`)."""
@@ -4350,7 +4350,7 @@ def test_abort_path_au_cycle_orders_use_block_after_circular(
     """Fourth shape (spec §4d): autounmask changes coinciding with the
     cycle -- the same stuck remainder, the circular block, and then the
     USE-changes block. Slice 4 renders the remainder; Slice 5 orders the
-    circular block before the autounmask section (real display_problems
+    circular block before the autounmask section (Portage display_problems
     order). The `--debug` au-restart narration stays xfailed below
     (pre-flip USE staleness, unrelated to rendering)."""
     args = [*mode, atom]
@@ -4419,7 +4419,7 @@ def test_abort_path_json_carries_partial_list_and_aborted_reason(
     stuck remainder for cycles) and `aborted` carries the reason (+
     atom/parent for dep shapes, members for cycles); `null` on the
     complete path (pinned by the diamond case). Exit 1 like every other
-    format (real `actions.py:460-462` runs before any format split).
+    format (Portage `actions.py:460-462` runs before any format split).
     """
     args = ["--pretend", "--json", atom]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -4503,7 +4503,7 @@ def test_abort_path_gate_off_restores_legacy_exit_code(
     """Slice 3+4: the abort outcome is produced for a masked-only or
     unsatisfiable dependency of a merge-bound package, so with the gate on
     (default) the resolve exits 1 with the list suppressed (Slice 4 --
-    empty stdout) like real (`actions.py:460-462`); with
+    empty stdout) like Portage (`actions.py:460-462`); with
     `PORTUALE_ABORT_PATH=0` the legacy "report, don't enforce" full list
     and exit 0 stay. The stderr error content is byte-identical either
     way -- only the list presence and the exit
@@ -4515,7 +4515,7 @@ def test_abort_path_gate_off_restores_legacy_exit_code(
     assert rust_on.returncode == 1
     assert rust_off.returncode == 0
     # #135 (c) (O7): the Slice-4 suppression is reversed -- gate-ON
-    # prints real's merge-list preamble before the abort block, not
+    # prints Portage's merge-list preamble before the abort block, not
     # empty stdout. Gate-OFF keeps the legacy full list.
     _assert_abort_preamble(rust_on.stdout)
     assert _merge_lines(rust_off.stdout) != []
@@ -4528,7 +4528,7 @@ def test_autounmask_only_resolve_prints_no_terminated_early_notice(
     """Live-captured (`fixtures/abort-captures/dev-libs_abort-au-plain.*`):
     a fresh-candidate `[auflag]` flip with no other problem shows the full
     4-package list, the USE-changes block, exit 1, and NO "terminated
-    early" notice (real `need_config_change`, depgraph.py:11713-11717,
+    early" notice (Portage `need_config_change`, depgraph.py:11713-11717,
     returns on `_success_without_autounmask` before the notice's flag at
     :11759 is ever set). The notice does appear when another failure
     coincides (`abort-au-cycle`, `aucasctop`). Outside backlog #19's abort
@@ -4546,7 +4546,7 @@ def test_autounmask_only_resolve_prints_no_terminated_early_notice(
 def test_autounmask_cascade_flip_before_dep_walk_pulls_the_gated_leaf(
     emerge_binary, fixture_env
 ):
-    """Live-captured (`fixtures/abort-captures/dev-libs_aucasctop.*`, real
+    """Live-captured (`fixtures/abort-captures/dev-libs_aucasctop.*`, Portage
     3.0.81.3, `backtrack: 0/20`): `aucasctop`'s two deps are both added to
     the digraph before either's own deps are walked (`_add_dep` -> `_add_pkg`
     only pushes onto `_dep_stack`, depgraph.py:3254-3271); `aucasclate` pops
@@ -4575,7 +4575,7 @@ def test_root_deps_recursion_reports_an_unbuildable_build_dep(
     rdrnothere, which has no ebuild anywhere and isn't installed. Since
     Slice 4 the unbuildable build dep aborts the resolve like any other
     unsatisfiable dependency of a merge-bound parent (exit 1, no merge
-    list -- real abandons the same way); the renderer's "!!! no visible
+    list -- Portage abandons the same way); the renderer's "!!! no visible
     ebuild for dependency" note still names it on stderr."""
     env = dict(fixture_env)
     env["PORTAGE_RUNNING_ROOT"] = "/"
@@ -4591,7 +4591,7 @@ def test_root_deps_recursion_reports_an_unbuildable_build_dep(
 def test_diamond_dependency_is_deduped_and_ordered(emerge_binary, fixture_env):
     """Pins the exact recursion output for the diamond fixture (diamond ->
     shared-a, shared-b -> common): "common" appears exactly once despite
-    being reachable two ways, and the list is in real portage's
+    being reachable two ways, and the list is in Portage's
     dependency-first *merge* order (portage_repo::topological_merge_order,
     mirrored _topological_merge_order) -- the shared leaf `common` first,
     then its two consumers in RDEPEND-string order, then the root
@@ -4632,10 +4632,10 @@ def test_slot_qualified_dep_does_not_edge_to_a_sibling_slot(emerge_binary, fixtu
 
 
 def test_libc_merges_asap_in_merge_order(emerge_binary, fixture_env):
-    """Real `_serialize_tasks`' libc/os-headers `asap_nodes` seeding (bug
+    """Portage `_serialize_tasks`' libc/os-headers `asap_nodes` seeding (bug
     #303567): `sys-libs/fakeglibc` provides `virtual/libc`, and nothing
     in the merge set has a dependency edge that forces it before the
-    unrelated leaf `dev-libs/plainleaf`. Real merges libc first anyway
+    unrelated leaf `dev-libs/plainleaf`. Portage merges libc first anyway
     (almost every ebuild has an implicit build-time dep on it), by
     seeding `asap_nodes` from the graphed `virtual/libc`'s providers.
     Without the seeding portuale emitted `plainleaf, fakeglibc,
@@ -4657,7 +4657,7 @@ def test_json_entries_are_merge_ordered_with_an_explicit_index(
     merge order as the plain-text list, and every entry carries an
     explicit "merge_order" integer (its 0-based position in that order) --
     so a consumer that re-sorts or filters the array keeps the schedule.
-    Mirrors real portage's `mylist` being the single merge schedule."""
+    Mirrors Portage's `mylist` being the single merge schedule."""
     import json
 
     args = ["--pretend", "--json", "dev-libs/diamond"]
@@ -4669,16 +4669,16 @@ def test_json_entries_are_merge_ordered_with_an_explicit_index(
 
 
 def test_any_of_group_prefers_the_installed_alternative(emerge_binary, fixture_env):
-    """Real `dep_zapdeps` preference order (see use_reduce_flat_
+    """Portage `dep_zapdeps` preference order (see use_reduce_flat_
     disjunctive's `AltPreference`, portage-use-reduce): of
     `|| ( dev-libs/newpkg dev-libs/samepkg )`, dev-libs/samepkg is
-    already installed, so real files it in choice bin 0
+    already installed, so Portage files it in choice bin 0
     (`preferred_installed`) and dev-libs/newpkg -- which would need a
     merge -- in bin 1 (`preferred_non_installed`). The first entry of the
     best non-empty bin wins, so `samepkg` is chosen even though it's
     listed second, and `newpkg` is never merged. Under plain --pretend an
     AlreadyInstalled dependency is silent, so stdout is just anyof itself.
-    (This is the same rule that makes real portage resolve `virtual/wine`
+    (This is the same rule that makes Portage resolve `virtual/wine`
     to the installed `wine-staging` instead of the first-listed
     `wine-vanilla`, whose only visible version fails REQUIRED_USE.)"""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/anyof"], fixture_env)
@@ -4691,7 +4691,7 @@ def test_any_of_group_prefers_the_installed_alternative(emerge_binary, fixture_e
 def test_or_group_prefers_a_branch_already_in_the_graph(
     emerge_binary, fixture_env
 ):
-    """Real `dep_zapdeps` `all_in_graph` (dep_check.py:636-649) files a
+    """Portage `dep_zapdeps` `all_in_graph` (dep_check.py:636-649) files a
     `||` alternative every atom of which is already a merge-bound graph
     node into choice bin 0 -- the same list `preferred_installed` uses.
     dev-libs/ingraphsvc's `|| ( dev-libs/ingraphkeyring
@@ -4722,7 +4722,7 @@ def test_or_group_installed_preference_skips_a_required_use_broken_first_alterna
     `|| ( dev-libs/requsefail dev-libs/samepkg )`. requsefail is
     first-listed and has a visible ebuild, but its only version fails
     REQUIRED_USE (`brokenflag? ( !brokenflag )` with `+brokenflag`);
-    samepkg is already installed. Real `dep_zapdeps` files samepkg in
+    samepkg is already installed. Portage `dep_zapdeps` files samepkg in
     choice bin 0 (`preferred_installed`) and picks it -- requsefail is
     never enqueued, so its REQUIRED_USE is never evaluated and the
     resolve succeeds. Before the `AltPreference` change portuale took the
@@ -4739,7 +4739,7 @@ def test_or_group_in_bin_ordering_promotes_the_upgrade_over_the_first_listed_alt
     emerge_binary, fixture_env
 ):
     """Backlog #22 slice 2 (in-bin ordering, `docs/022-agent-task-22-
-    zapdeps.fable.md` §4): real `dep_zapdeps` doesn't just take the
+    zapdeps.fable.md` §4): Portage `dep_zapdeps` doesn't just take the
     first-listed alternative at the best-ranked bin -- within a tied bin
     it promotes an upgrade via `vercmp` over the intersecting `cp_map`
     (`dep_check.py` soft 738-802, the exact comment: "this helps for deps
@@ -4749,9 +4749,9 @@ def test_or_group_in_bin_ordering_promotes_the_upgrade_over_the_first_listed_alt
     slot 2 (2.0); dev-libs/orupgrade's RDEPEND is `|| (
     dev-libs/orupgradealt:1 dev-libs/orupgradealt:2 )` -- both
     alternatives tie at the `Installed` bin (cp-level `all_installed`,
-    real's aliased bin 0), since neither has a `[use]` block to fail.
+    Portage's aliased bin 0), since neither has a `[use]` block to fail.
     Before this slice, portuale's `resolve_disjunctions` always kept the
-    first tied alternative (`:1`); real promotes `:2` (the higher
+    first tied alternative (`:1`); Portage promotes `:2` (the higher
     version) instead. Each slot RDEPENDs its own marker package so a
     `--deep` walk into the (already-installed, unaffected either way)
     `orupgradealt` reveals which slot was actually chosen: `:1`'s marker
@@ -4780,7 +4780,7 @@ def test_or_group_in_bin_ordering_promotes_in_graph_over_installed_only(
     ( dev-libs/oringraphinstalled dev-libs/oringraphpulled )` is
     resolved. Both alternatives tie at the Installed bin
     (`oringraphinstalled` cp-installed, `oringraphpulled` already
-    in-graph); real promotes the in-graph one (`oringraphpulled`, listed
+    in-graph); Portage promotes the in-graph one (`oringraphpulled`, listed
     SECOND) ahead of the merely-installed one (`oringraphinstalled`,
     listed FIRST). `oringraphinstalled` RDEPENDs its own marker so a
     `--deep` walk would reveal it if the || group wrongly chose it."""
@@ -4808,7 +4808,7 @@ def test_or_group_in_bin_ordering_promotes_all_installed_slots_over_any_slot(
     version) is visible but not installed. dev-libs/oranyslot's RDEPEND
     is `|| ( dev-libs/oranyslotalt:2 dev-libs/oranyslotalt:1 )` -- slot 2
     listed first. Both tie at the Installed bin (cp-installed via slot
-    1); real promotes slot 1 (the exact installed slot) ahead of slot 2
+    1); Portage promotes slot 1 (the exact installed slot) ahead of slot 2
     despite slot 2 being both first-listed AND the higher version --
     avoiding an unwanted new-slot merge. Before this slice, portuale
     always kept the first-listed alternative regardless, merging the
@@ -4825,7 +4825,7 @@ def test_or_group_in_bin_ordering_promotes_all_installed_slots_over_any_slot(
 def test_or_group_installed_alternative_use_dep_matches_its_vdb_use(
     emerge_binary, fixture_env
 ):
-    """#74 S1 (real `dep_check.dep_zapdeps`'s `_dep_check_composite_db` +
+    """#74 S1 (Portage `dep_check.dep_zapdeps`'s `_dep_check_composite_db` +
     `dbapi._match_use`'s built-package branch): an installed `||`
     alternative's `[use]` deps are checked against its recorded vdb USE,
     not the current tree's profile-derived USE. dev-libs/altconsumer's
@@ -4835,7 +4835,7 @@ def test_or_group_installed_alternative_use_dep_matches_its_vdb_use(
     *tree* candidate for `:1.1` fails the atom's use-dep and the
     *uninstalled* `:1.0` slot used to win with a spurious `[ebuild NS]
     dev-libs/altprov-1.0 [1.1]` -- the #74 host probe's
-    `dev-lang/rust-1.94.0` class. Real keeps the installed `:1.1` (its
+    `dev-lang/rust-1.94.0` class. Portage keeps the installed `:1.1` (its
     own container capture is the fixture-oracle bed entry for
     `dev-libs/altconsumer`), so the whole group contributes no merge at
     all."""
@@ -4851,7 +4851,7 @@ def test_or_group_installed_alternative_use_dep_matches_its_vdb_use(
 def test_deep_walk_visits_every_installed_slot_of_a_dependency(
     emerge_binary, fixture_env
 ):
-    """#74 S2a: real's installed nodes are per `pkg.slot_atom`
+    """#74 S2a: Portage's installed nodes are per `pkg.slot_atom`
     (`_package_tracker`), so two installed instances of one cp in
     different slots are two nodes whose deps are both walked. The
     fixture installs `dev-libs/slotdedup-1.0` (slot 1, no deps) and
@@ -4861,7 +4861,7 @@ def test_deep_walk_visits_every_installed_slot_of_a_dependency(
     `AlreadyInstalled` dedup let slot 1's visit claim the cp and dropped
     slot 2's, so `slotdedupmarker` never entered the graph -- the #74
     class B1 shape (`llvm-core/clang:22` shadowing `:23`, losing
-    myst-parser/mdit-py-plugins). Real's fixture-oracle capture agrees
+    myst-parser/mdit-py-plugins). Portage's fixture-oracle capture agrees
     byte for byte (bed case `-D dev-libs/slotdedupconsumer`)."""
     args = ["--pretend", "-D", "dev-libs/slotdedupconsumer"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -4877,7 +4877,7 @@ def test_or_group_other_installed_bin_beats_plain_other_in_the_allow_masked_pass
 ):
     """Backlog #22 slice 4 (`docs/history/022-agent-task-22-zapdeps.fable.md` §4,
     dep_check.py soft 715-724 + the two-pass `allow_masked` return, soft
-    812-816): when NO alternative anywhere is `all_available`, real
+    812-816): when NO alternative anywhere is `all_available`, Portage
     still picks one instead of falling back to the literal `||` --
     preferring `other_installed` (every non-blocker atom's FULL vdb
     match, version/slot/`[use]`, succeeds) over plain `other`.
@@ -4924,7 +4924,7 @@ def test_or_group_other_installed_some_bin_beats_plain_other(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     _assert_abort_preamble(rust.stdout)
-    # #135 (d): real's plain-miss block per miss, not the bare NVC lines.
+    # #135 (d): Portage's plain-miss block per miss, not the bare NVC lines.
     assert rust.stderr.strip().splitlines() == [
         'emerge: there are no ebuilds to satisfy "dev-libs/opartlya".',
         '(dependency required by "dev-libs/opartly-1.0::testrepo" [ebuild])',
@@ -4985,7 +4985,7 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
     dev-libs/doesnotexist-unsatuseor )`. The first alternative's only
     ebuild is visible but `[unsatuseorflag]` is unsatisfiable by default
     (the flag IS in IUSE, nothing enables it); the second alternative has
-    no ebuild at all. Real dep_zapdeps still files alternative 1 in
+    no ebuild at all. Portage dep_zapdeps still files alternative 1 in
     `unsat_use_non_installed` (dep_check.py soft 705-712 -- selectable,
     the flags that would have to change sit in neither `use.mask` nor
     `use.force`, bug-515584), and with `--autounmask-use` the flip is
@@ -4995,7 +4995,7 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
     the     dead alternative was enqueued and reported (`!!! no visible
     ebuild for dependency "dev-libs/doesnotexist-unsatuseor"`). Backlog
     #217: no "terminated early" trailer -- the flip lands on the fresh
-    `||`-branch pick, so real reaches the `_success_without_autounmask`
+    `||`-branch pick, so Portage reaches the `_success_without_autounmask`
     tail (depgraph.py:5793) and `need_config_change` returns before the
     notice's flag is set (:11713-11717)."""
     args = ["--pretend", "dev-libs/unsatuseor"]
@@ -5026,7 +5026,7 @@ def test_or_group_use_unsat_alternative_reports_the_dependency_it_enqueued_witho
     selectable regardless), so `unsatusealt` is enqueued as a dependency
     -- but with no autounmask flip available it has no visible ebuild and
     aborts the resolve (exit 1, no merge list since Slice 4), reported as
-    real `_show_unsatisfied_dep`'s "no ebuilds built with USE flags to
+    Portage `_show_unsatisfied_dep`'s "no ebuilds built with USE flags to
     satisfy" block (backlog #20): the latest `Change USE:` candidate plus
     the `(dependency required by …)` chain. The dead second alternative is
     again never enqueued. Before the fine-bin wiring both alternatives
@@ -5067,8 +5067,8 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
 
     The `--autounmask-use=n` half aborts (rc 1, no list): with no flip
     available the installed parent's USE-unsatisfiable dep is a hard miss,
-    and real agrees (bed `l0-fx-20260921T233342Z`: real rc 1 with the same
-    block; portuale matches it byte-for-byte modulo real's `for <root>`
+    and Portage agrees (bed `l0-fx-20260921T233342Z`: Portage rc 1 with the same
+    block; portuale matches it byte-for-byte modulo Portage's `for <root>`
     suffix). #132 S5b removed the old installed-only rescue that had
     this half resolving rc 0."""
     args = ["--pretend", "-D", "dev-libs/unsatuseinstconsumer"]
@@ -5106,7 +5106,7 @@ def test_use_unsat_conditional_miss_reports_the_parent_flip_row(
     `--autounmask-use=n`. dev-libs/r135parent is installed -flip and
     RDEPENDs `~dev-libs/r135leaf-1.0[flip=]`; the leaf is installed +flip
     and flip-on in the ebuild pool too (base `package.use`), so no pool
-    satisfies the `[-flip]` the parent evaluates `[flip=]` into. Real
+    satisfies the `[-flip]` the parent evaluates `[flip=]` into. Portage
     `_show_unsatisfied_dep` (`depgraph.py:6768-6858`: the violated
     `[flip=]` is entirely conditional, so the requirer joins
     `missing_use_reasons` with its own flip) prints the child row *and*
@@ -5138,13 +5138,13 @@ def test_use_unsat_conditional_miss_qualifies_the_chain_row_with_affecting_use(
 ):
     """Backlog #135 arm (b): the same cell's chain. New
     dev-libs/r135consumer (IUSE default-on `qml`) pulls the installed
-    parent behind `qml? ( ... )`, so real `_get_dep_chain`
+    parent behind `qml? ( ... )`, so Portage `_get_dep_chain`
     (`depgraph.py:6257+` via `extract_affecting_use`: qml gates the edge
     and is enabled) qualifies the consumer row `[qml]`. Same oracle as
     arm (a)'s pin above; live shapes `real-rest-1.log`
     (`dev-qt/qt5compat-6.11.2::gentoo[qml]`,
     `sys-auth/polkit-126-r3::gentoo[kde]`). Pins the whole block
-    byte-exact (modulo real's `for <root>.` suffix, the adjudicated
+    byte-exact (modulo Portage's `for <root>.` suffix, the adjudicated
     `fixture-miss-message-unsuffixed` class)."""
     args = ["--pretend", "-D", "--autounmask-use=n", "dev-libs/r135consumer"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -5166,7 +5166,7 @@ def test_use_unsat_missing_iuse_reports_the_missing_flag(
     emerge_binary, fixture_env
 ):
     """Backlog #20, reason kind 2: a `[flag]` dep whose flag is not in the
-    target's IUSE at all. Real `_show_unsatisfied_dep` reads
+    target's IUSE at all. Portage `_show_unsatisfied_dep` reads
     `pkg.iuse.get_missing_iuse(atom.unevaluated_atom.use.required)` and
     prints `(Missing IUSE: <flags>)` (depgraph.py:6724-6727, :6980-6990),
     with no `Change USE:` row and no autounmask suggestion (there is no
@@ -5192,12 +5192,12 @@ def test_use_unsat_conditional_flag_on_iuse_less_target_is_missing_iuse(
     emerge_binary, fixture_env
 ):
     """Backlog #265(a), first cell: `=dev-libs/mia0a-1` depends on
-    `dev-libs/mia0b[foo?]` while `mia0b`'s own IUSE has no `foo`. Real
-    counts the conditional flag toward `Missing IUSE:` (real
+    `dev-libs/mia0b[foo?]` while `mia0b`'s own IUSE has no `foo`. Portage
+    counts the conditional flag toward `Missing IUSE:` (Portage
     `use.required` is every no-default flag, conditionals included,
     `lib/portage/dep/__init__.py:1363`) and prints the USE block with
     `- dev-libs/mia0b-1::testrepo (Missing IUSE: foo)` plus the
-    `(dependency required by …)` chain. Grounded on a fresh real 3.0.82.2
+    `(dependency required by …)` chain. Grounded on a fresh Portage 3.0.82.2
     staged-fixture probe with identical options (`emerge
     --ignore-default-opts --pretend "=dev-libs/mia0a-1"`,
     `LLM/evidence/2026-09-30-265/real/mia0a-1.txt` in the portuale
@@ -5222,9 +5222,9 @@ def test_use_unsat_conditional_flag_beside_plain_flag_is_missing_iuse(
 ):
     """Backlog #265(a), second cell: `=dev-libs/mia0a-2` depends on
     `dev-libs/mia0b[foo?,bar]`; `bar` is satisfiable but the conditional
-    `foo` still counts toward `Missing IUSE:`, so real prints
+    `foo` still counts toward `Missing IUSE:`, so Portage prints
     `- dev-libs/mia0b-1::testrepo (Missing IUSE: foo)` -- not a
-    `Change USE: +bar` row. Grounded on a fresh real 3.0.82.2
+    `Change USE: +bar` row. Grounded on a fresh Portage 3.0.82.2
     staged-fixture probe with identical options (`emerge
     --ignore-default-opts --pretend "=dev-libs/mia0a-2"`,
     `LLM/evidence/2026-09-30-265/real/mia0a-2.txt` in the portuale
@@ -5247,11 +5247,11 @@ def test_use_unsat_conditional_flag_beside_plain_flag_is_missing_iuse(
 def test_use_unsat_lists_only_the_latest_change_use_candidate(
     emerge_binary, fixture_env
 ):
-    """Backlog #20: real `_show_unsatisfied_dep`'s "Only show the latest
+    """Backlog #20: Portage `_show_unsatisfied_dep`'s "Only show the latest
     version" rule for the `Change USE:` path (`unmasked_use_reasons` is
     reduced to the first, highest-version entry, depgraph.py:6876-6890).
     `unsatusealtmulti-1.0` and `-2.0` are both visible and both miss on
-    `[unsatuseorflag]`; real lists only `-2.0`. Oracle capture (portage
+    `[unsatuseorflag]`; Portage lists only `-2.0`. Oracle capture (portage
     3.0.81.3, differential-test-bed/run/abort-capture.sh fixture tree) confirmed exactly
     that row and no `-1.0` row."""
     args = ["--pretend", "--autounmask-use=n", "dev-libs/unsatusealtmultidep"]
@@ -5272,14 +5272,14 @@ def test_use_unsat_lists_only_the_latest_change_use_candidate(
 def test_or_group_unsat_use_installed_bin_keys_on_the_targeted_slot_not_just_cp(
     emerge_binary, fixture_env
 ):
-    """Review finding F4: real dep_zapdeps' unsat_use_installed choice bin
+    """Review finding F4: Portage dep_zapdeps' unsat_use_installed choice bin
     keys on all_installed_slots (dep_check.py soft 599-607) -- every
     `slot_map` atom (`cat/pkg:<slot of the best USE-ignoring candidate>`)
     must match the vdb, not just the bare cp. dev-libs/unsatuseslot's
     RDEPEND is `|| ( dev-libs/unsatuseslotalt:2[unsatuseorflag]
     dev-libs/unsatuseslotother[unsatuseorflag] )`: unsatuseslotalt is
     installed in slot 1 only, but alternative 1 explicitly targets slot 2
-    (visible, flag off) -- cp-installed but NOT slot-installed, so real
+    (visible, flag off) -- cp-installed but NOT slot-installed, so Portage
     files it under unsat_use_non_installed (bin 4), not unsat_use_installed
     (bin 3). unsatuseslotother is installed in slot 0 and the visible
     ebuild is also slot 0 -- cp AND slot installed, unsat_use_installed
@@ -5310,7 +5310,7 @@ def test_or_group_preferred_non_installed_outranks_unsat_use_non_installed(
     dev-libs/unsatuseordertarget[unsatuseotherflag] )`, target IUSE
     `unsatuseorflag +unsatuseotherflag`: alternative 1's flag is off by
     default (unsat_use_non_installed, bin 4), alternative 2's is ON by
-    default (preferred_non_installed, bin 1) -- real picks alternative 2
+    default (preferred_non_installed, bin 1) -- Portage picks alternative 2
     outright, with NO autounmask change proposed at all, exit 0."""
     args = ["--pretend", "dev-libs/unsatuseorder"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -5332,7 +5332,7 @@ def test_or_group_use_mask_violation_demotes_to_other_never_selected(
     dev-libs/unsatuseordertarget[unsatuseorflag] )`; unsatusemaskedflag is
     globally use.mask'd for unsatusemaskedalt (profiles/package.use.mask),
     so alternative 1's [use]-dep can never be fixed by an autounmask flip
-    -- real demotes it to `other` (bin 8, never selected without the
+    -- Portage demotes it to `other` (bin 8, never selected without the
     `allow_masked` second pass portuale deliberately never takes).
     Alternative 2 is merely unsat_use_non_installed (bin 4, selectable),
     so it wins and an autounmask flip is proposed for it."""
@@ -5352,7 +5352,7 @@ def test_or_group_use_mask_violation_demotes_to_other_never_selected(
 def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
     emerge_binary, fixture_env
 ):
-    """Real `dep_zapdeps` re-choosing a `||` alternative once
+    """Portage `dep_zapdeps` re-choosing a `||` alternative once
     backtracking's `runtime_pkg_mask` hides the preferred one. dev-libs/
     orbtblocked's RDEPEND is
     `|| ( >=dev-libs/orbttool-2.0 dev-libs/orbtclean ) =dev-libs/orbttool-1.0`
@@ -5364,21 +5364,21 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
     `dev-libs/orbtclean` (the second alternative) is chosen -- no
     conflict. `orbttool-1.0` merges ahead of `orbtclean` because a `||`
     group's chosen atom is scheduled after the plain deps of the same
-    parent (real `_create_graph` drains `dep_stack` before
+    parent (Portage `_create_graph` drains `dep_stack` before
     `_dep_disjunctive_stack`). With `--backtrack=0` the conflict is
     reported instead, byte-identical to before this slice.
-    Container-verified against real portage 3.0.82.2
+    Container-verified against Portage 3.0.82.2
     (differential-test-bed/scripts/42-or-backtrack.sh).
 
     Backlog #129 (S1): the settled `orbttool-2.0` slot-conflict mask
-    now also prints real's skip `WARNING` after the rows (real
+    now also prints Portage's skip `WARNING` after the rows (Portage
     `_get_missed_updates`, `depgraph.py:1529-1565`, reports every
     masked version higher than the chosen one -- the 42 script's
     row-only filter never captured this block, but the mergelist it
     verifies proves the mask this notice reads). No abbreviated tail:
     no missing-dependency mask survives on this path.
 
-    Backlog #230: both lines render real's full `pkg_use_display`
+    Backlog #230: both lines render Portage's full `pkg_use_display`
     (`_emerge/UseFlagDisplay.py:55`) -- orbttool/orbtblocked are EAPI 8
     with no IUSE, so the profile globals mask out and only the implicit
     `ELIBC="glibc"` group survives (`USE="" ELIBC="glibc"`)."""
@@ -5410,7 +5410,7 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
 def test_or_group_alternative_yields_to_the_next_on_a_missing_transitive_dep(
     emerge_binary, fixture_env
 ):
-    """Real `backtracking.py::_feedback_missing_dep`: a dependency atom
+    """Portage `backtracking.py::_feedback_missing_dep`: a dependency atom
     with no matching package masks its parent and re-drives, so
     `dep_zapdeps` re-picks a `||` group whose chosen alternative had an
     unsatisfiable subtree. `dev-libs/ormisstop` RDEPENDs
@@ -5460,7 +5460,7 @@ def test_bdepend_pdepend_idepend_are_walked_same_as_depend_rdepend(
 
 def test_slot_operator_dependency_atoms_resolve_both_forms(emerge_binary, fixture_env):
     """dev-libs/slotoperatorpkg's own RDEPEND is
-    "dev-libs/newpkg:= dev-libs/multislotpkg:1=" -- both real slot-operator
+    "dev-libs/newpkg:= dev-libs/multislotpkg:1=" -- both Portage slot-operator
     forms (PMS 8.3.3). Prior to this slice, portage-dep's v1 grammar
     didn't parse slot operators AT ALL, and resolve_pretend_graph's BFS
     loop treats a parse failure as "not a dependency, skip it"
@@ -5532,7 +5532,7 @@ def test_sub_slot_restricted_dependency_atom_rejects_a_real_mismatch(
 def test_dependency_avoid_update_is_slot_aware(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real `avoid_update` for a dependency atom returns an installed
+    """Portage `avoid_update` for a dependency atom returns an installed
     package only when `vardb.match(atom)` -- which honours the atom's
     slot -- has a hit. dev-libs/avoidslotpkg-1.0 is installed at SLOT=2
     (a version/slot mismatch vs the repo ebuild's SLOT=1); a
@@ -5561,7 +5561,7 @@ def _slotbind_root(tmp_path):
     bound to the stale "dev-libs/slotbindtarget:2/2=", and slotbindfresh,
     already bound to "dev-libs/slotbindtarget:2/9=" (what -2.0 provides).
     Both consumers are in @world so the slot-operator-rebuild scan's
-    reachability gate (real _complete_graph's required-set re-walk) can
+    reachability gate (Portage _complete_graph's required-set re-walk) can
     see them. PORTAGE_CONFIGROOT stays at the shared fixtures so the
     slotbindtarget-2.0 (SLOT="2/9") ebuild is visible."""
     for name, files in {
@@ -5592,19 +5592,19 @@ def _slotbind_root(tmp_path):
 def test_slot_operator_rebuild_reinstalls_a_stale_equals_consumer(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real depgraph's _slot_operator_trigger_reinstalls: dev-libs/
+    """Portage depgraph's _slot_operator_trigger_reinstalls: dev-libs/
     slotbindconsumer's vdb RDEPEND is "dev-libs/slotbindtarget:2/2="
     (bound when the target was at SLOT="2"). Emerging the target picks
     slotbindtarget-2.0 (SLOT="2/9"), so that built ABI link is stale and
-    the consumer is scheduled for a reinstall -- `[ebuild rR]` (real tags
+    the consumer is scheduled for a reinstall -- `[ebuild rR]` (Portage tags
     every forced slot-op rebuild, and the triggering upgrade, with the
     red `r` -- PkgAttrDisplay.force_reinstall), no reason annotation (a
     slot-operator rebuild, not --newuse/--changed-*), in dependency-first
-    merge order after the target, plus real _show_abi_rebuild_info's "The
+    merge order after the target, plus Portage _show_abi_rebuild_info's "The
     following packages are causing rebuilds:" block
     (--verbose-slot-rebuilds, default on). dev-libs/slotbindfresh is
     already bound to "2/9=" -> NOT rebuilt. Both consumers are in @world
-    so the reachability gate (real _complete_graph's required-set
+    so the reachability gate (Portage _complete_graph's required-set
     re-walk, which auto-enables here because the target upgrade changes
     an installed package) lets the scan see them."""
     env = dict(fixture_env)
@@ -5613,7 +5613,7 @@ def test_slot_operator_rebuild_reinstalls_a_stale_equals_consumer(
     args = ["--pretend", "dev-libs/slotbindtarget"]
     result = _run([str(emerge_binary)], args, env)
     assert result.returncode == 0
-    # Real _show_abi_rebuild_info prints each side as str(Package):
+    # Portage _show_abi_rebuild_info prints each side as str(Package):
     # "(cpv:slot/sub_slot::repo, ebuild scheduled for merge to '<root>')".
     assert result.stdout.splitlines() == [
         f'[ebuild  r  U  ] dev-libs/slotbindtarget-2.0 [1.0] to {env["ROOT"]}',
@@ -5646,9 +5646,9 @@ def test_slot_operator_rebuild_is_a_walked_node_and_off_at_backtrack_zero(
     the `Backtracker` instead of synthesising an entry after the settle.
 
     1. **Walked node.** The consumer is scheduled into
-       `slot_operator_replace_installed` (real
+       `slot_operator_replace_installed` (Portage
        `backtrack_infos["config"]["slot_operator_replace_installed"]`,
-       `depgraph.py:2400`), seeded on the next pass as real's
+       `depgraph.py:2400`), seeded on the next pass as Portage's
        `@__auto_slot_operator_replace_installed__` `SetArg`
        (`_gen_reinstall_sets` 5457-5480, `force_reinstall=True`,
        `reset_depth=False`) and resolved by the ordinary walk. So it
@@ -5656,9 +5656,9 @@ def test_slot_operator_rebuild_is_a_walked_node_and_off_at_backtrack_zero(
        against merges *before* it, and there is exactly one `--json` row
        for it (the synthesiser left an `already_installed` row beside
        the `reinstall` one whenever the walk had reached the consumer).
-       It is not an `(Argument)` puller either -- real's auto set is
+       It is not an `(Argument)` puller either -- Portage's auto set is
        internal.
-    2. **`--backtrack=0` turns it off.** Real gates
+    2. **`--backtrack=0` turns it off.** Portage gates
        `_slot_operator_trigger_reinstalls` on `_allow_backtracking`
        (`depgraph.py:2131`), which `_backtrack_depgraph` sets from
        `allow_backtracking = max_retries > 0` (12190): with no search
@@ -5744,8 +5744,8 @@ def test_self_referential_bootstrap_branch_merges_before_its_consumers(
 def test_ignore_built_slot_operator_deps_suppresses_the_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real --ignore-built-slot-operator-deps (main.py:470, y_or_n): real
-    portage strips the built := operator parts out of every installed
+    """Portage --ignore-built-slot-operator-deps (main.py:470, y_or_n): Portage
+    strips the built := operator parts out of every installed
     package's recorded *DEPEND, so _slot_operator_trigger_reinstalls
     finds nothing. Same net effect here -- the whole scan is skipped.
     Same fixture as
@@ -5810,7 +5810,7 @@ def _slotcascade_root(tmp_path):
 def test_slot_operator_rebuild_cascades_through_a_multi_level_chain(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real _backtrack_depgraph's slot-operator re-drive to a fixpoint: a
+    """Portage _backtrack_depgraph's slot-operator re-drive to a fixpoint: a
     scheduled rebuild lands at its tree ebuild's SLOT (not the vdb's), so
     when cascmid's tree ebuild has moved 0/1 -> 0/2 since it was
     installed, rebuilding it is itself a sub-slot shift that breaks
@@ -5830,7 +5830,7 @@ def test_slot_operator_rebuild_cascades_through_a_multi_level_chain(
     assert result.stdout.splitlines() == [
         f'[ebuild  r  U  ] dev-libs/casctarget-2.0 [1.0] to {env["ROOT"]}',
         # cascmid's tree ebuild moved 0/1 -> 0/2, so the rebuild lands at
-        # a different sub-slot than the installed instance -> real shows
+        # a different sub-slot than the installed instance -> Portage shows
         # the `[1.0]` bracket (output.py::_get_installed_best 723-732).
         f'[ebuild  rR    ] dev-libs/cascmid-1.0 [1.0] to {env["ROOT"]}',
         # casctail's tree SLOT is unchanged (0/1), so no bracket.
@@ -5852,14 +5852,14 @@ def test_slot_operator_rebuild_cascades_through_a_multi_level_chain(
 def test_invalid_defaulted_use_dep_conditional_masks_the_package(emerge_binary, fixture_env):
     """Backlog #153 (P19): `dev-libs/usedeppkg` has no `IUSE` but its
     `RDEPEND` names `dev-libs/multislotpkg:1[baz(+)?]` -- the `(+)`
-    default does NOT exempt the conditional from real
+    default does NOT exempt the conditional from Portage
     `Atom._validate_conditional_flags` (the default only matters for
     *matching* against the target's IUSE; validation is against the
-    *owner's*), so real masks the candidate `invalid` and the resolve
-    fails with the all-masked report (real 3.0.82.2, oracle against a
+    *owner's*), so Portage masks the candidate `invalid` and the resolve
+    fails with the all-masked report (Portage 3.0.82.2, oracle against a
     `cp -a` copy of this tree). This pin replaces
     `test_use_dep_dependency_atoms_are_resolved_not_dropped`, whose merge
-    list described a merge real never makes; the resolution side of that
+    list described a merge Portage never makes; the resolution side of that
     test lives on in `test_autounmask_use_resolves_a_dependency_use_dep_mismatch`
     (unconditional `[-foo]`, unaffected -- unconditional use-deps are
     never owner-validated) and the slot-operator twin below. The atoms
@@ -5884,9 +5884,9 @@ def test_invalid_defaulted_use_dep_conditional_masks_the_package(emerge_binary, 
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
     """Backlog #153 (P19), the group half: `dev-vcs/somercurial-5.5.1` has
     no `IUSE` but its `RDEPEND` gates `dev-python/sopypy` behind
-    `soflag? ( … )` -- real `_validate_deps` runs `use_reduce` with
+    `soflag? ( … )` -- Portage `_validate_deps` runs `use_reduce` with
     `matchall=True`, so the inactive group is still validated and the
-    candidate is masked `invalid` (real 3.0.82.2, oracle against a `cp -a`
+    candidate is masked `invalid` (Portage 3.0.82.2, oracle against a `cp -a`
     copy of this tree; the group message has no `in atom` part, unlike
     the use-dep one). Full stderr pinned."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-vcs/somercurial"], fixture_env)
@@ -5912,12 +5912,12 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
     globally, so "-foo" isn't satisfied by default. With --autounmask-use
     on by default, the graph RESOLVES: both packages print as New on
     stdout, and the `The following USE changes are necessary to proceed:`
-    block on stderr carries the real two-line dep chain (`#required by
+    block on stderr carries the Portage two-line dep chain (`#required by
     <parent cpv>::<repo>` then `#required by <parent atom> (argument)`).
     (--autounmask-use=n keeps the old "no visible ebuild" behavior -- see
     test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n.)
     Backlog #217: no "terminated early" trailer -- the flip lands on the
-    fresh pick (the package is graphed with the flip, so real's
+    fresh pick (the package is graphed with the flip, so Portage's
     `want_restart_for_use_change` stays False), the resolve reaches the
     `_success_without_autounmask` tail (depgraph.py:5793), and
     `need_config_change` returns before the notice's flag (:11713-11717)."""
@@ -5945,15 +5945,15 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     the bare atom) then aucasclate, whose RDEPEND is
     dev-libs/aucascmid[cascade]. The already-resolved-slot re-check sees
     `[cascade]` unsatisfied and folds `cascade -> on` into the loop's
-    autounmask_use_config (real _needed_use_config_changes).
+    autounmask_use_config (Portage _needed_use_config_changes).
 
-    Default (real --autounmask-backtrack off, depgraph.py:11736): the
-    graph is NOT re-driven -- and needs no re-drive, because real's DFS
+    Default (Portage --autounmask-backtrack off, depgraph.py:11736): the
+    graph is NOT re-driven -- and needs no re-drive, because Portage's DFS
     applies the flip before the flipped node's walk (`_add_dep` only
     pushes onto `_dep_stack`, depgraph.py:3254-3271, so `aucasclate` pops
     first and flips the still-unwalked `aucascmid`): `aucascleaf` IS
     listed here (live-captured in
-    `fixtures/abort-captures/dev-libs_aucasctop.*`, real 3.0.81.3,
+    `fixtures/abort-captures/dev-libs_aucasctop.*`, Portage 3.0.81.3,
     `backtrack: 0/20`), alongside the standard "USE changes are
     necessary" block and the "terminated early" notice, exit 1.
     Backlog #218: the in-walk delta re-expansion ports that ordering, so
@@ -6017,10 +6017,10 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         [str(emerge_binary)], ["--pretend", "--autounmask-use=n", "dev-libs/aucasctop"], fixture_env
     )
     assert "aucascleaf" not in n.stdout
-    # Backlog #20: real's "no ebuilds built with USE flags to satisfy"
+    # Backlog #20: Portage's "no ebuilds built with USE flags to satisfy"
     # block (oracle: portage 3.0.81.3, differential-test-bed/run/abort-capture.sh tree,
     # `--pretend --autounmask-use=n dev-libs/aucasctop`) -- same rows and
-    # chain as real (minus the `for <root>` xinfo suffix, portuale's
+    # chain as Portage (minus the `for <root>` xinfo suffix, portuale's
     # standing convention).
     assert n.stderr.splitlines() == [
         "",
@@ -6040,7 +6040,7 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     dev-libs/aubreakwant (needs aubreaksub[brk]) and dev-libs/aubreakunwant
     (needs aubreaksub[-brk]) -- the same flag wanted both ways.
 
-    Default (real --autounmask-backtrack off): the loop is not re-driven,
+    Default (Portage --autounmask-backtrack off): the loop is not re-driven,
     so the contradiction is never noticed -- brk is collected for
     aubreakwant, aubreaksub's USE line re-renders to "brk", and the block
     reports `>=aubreaksub-1.0 brk` (aubreakunwant's opposite need is left
@@ -6050,16 +6050,16 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     unflippable --autounmask-use=n / breakage paths below abort).
 
     --autounmask-backtrack=y: the loop re-drives, spots brk wanted both
-    ways, and real _autounmask_breakage (depgraph.py:12262) drops every
+    ways, and Portage _autounmask_breakage (depgraph.py:12262) drops every
     autounmask change and re-resolves once with suggestion off -- NO 'USE
     changes are necessary' block, aubreaksub at its default USE="-brk",
     aubreakwant's [brk] as the ordinary non-fatal dependency warning.
 
-    Backlog #244 (real 3.0.82.2, fixture-oracle `l0-fx-20260929T152543Z`,
+    Backlog #244 (Portage 3.0.82.2, fixture-oracle `l0-fx-20260929T152543Z`,
     portuale `LLM/evidence/2026-09-28-244/fixture-oracle-2/real/`): the
     default block's chain starts at the requester that needed the change
     (`aubreakwant`, three lines), not at whoever pulled `aubreaksub` in
-    first; under `=y` real's clean pass stops at the first failing atom,
+    first; under `=y` Portage's clean pass stops at the first failing atom,
     so the chain is that atom's own path only (`aubreakwant` ->
     `aubreaktop` -> argument) -- the old four-line union was the
     "#19-parked multi-branch narrowing" this batch closes.
@@ -6089,7 +6089,7 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     _assert_abort_preamble(rust_ab.stdout)
     assert "USE changes are necessary" not in rust_ab.stderr
     # Backlog #20: the block, not the bare line. Backlog #244: the chain
-    # is the first failing atom's own path, as real's fail-fast clean
+    # is the first failing atom's own path, as Portage's fail-fast clean
     # pass reports it (`aubreakwant` -> `aubreaktop` -> argument).
     assert rust_ab.stderr == (
         '\n'
@@ -6117,7 +6117,7 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
     unresolvable (a non-fatal dependency warning), same as before.
 
     Backlog #217: no "terminated early" trailer -- the slot settles on
-    2.0 with a lone keyword change, so real reaches the
+    2.0 with a lone keyword change, so Portage reaches the
     `_success_without_autounmask` tail (depgraph.py:5793).
     """
     # default: no keyword suggestions -> >=2.0 unresolvable, top still merges
@@ -6149,7 +6149,7 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
 def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
     emerge_binary, fixture_env
 ):
-    """Per-level version re-scan (real `_select_pkg_highest_available_imp`
+    """Per-level version re-scan (Portage `_select_pkg_highest_available_imp`
     re-runs its highest-first match for each `_autounmask_levels` step).
     dev-libs/multimaskdep-2.0 is ~amd64 keyword-masked AND @EULA
     license-masked; multimaskdep-1.0 is only keyword-masked. Level 1
@@ -6159,7 +6159,7 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
     same version. Before, portuale's flat `keyword_masked_only` fallback
     dropped 2.0 (it also had a license problem) and settled on 1.0.
     Backlog #217: no "terminated early" trailer -- both changes are lone
-    fresh-candidate picks, so real reaches the
+    fresh-candidate picks, so Portage reaches the
     `_success_without_autounmask` tail (depgraph.py:5793).
     """
     a = ["--pretend", "--autounmask", "dev-libs/multimaskconsumer"]
@@ -6196,7 +6196,7 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
 def test_autounmask_levels_prefer_license_over_a_higher_keyword_masked_version(
     emerge_binary, fixture_env
 ):
-    """Real _autounmask_levels (depgraph.py:7446) tries relaxations least-
+    """Portage _autounmask_levels (depgraph.py:7446) tries relaxations least-
     to most-invasive -- +license (level 1) before +~arch (level 2) -- and
     stops at the first level yielding a candidate. dev-libs/levelpkg-1.0
     is @EULA-license-masked (stable keyword); levelpkg-2.0 is ~amd64
@@ -6223,21 +6223,21 @@ def test_autounmask_keep_keywords_y_falls_back_to_the_older_stable_version(
     `_feedback_missing_dep`). With `--autounmask-keep-keywords=y` no
     allowed `_autounmask_levels` step unmasks `~amd64` `akk0b-1`, so the
     `akk0b` dep of the newest `akk0a-2` is unsatisfiable even USE-free;
-    real records the missing dependency, restarts, and masks the parent
+    Portage records the missing dependency, restarts, and masks the parent
     (`akk0a-2`), falling back to `akk0a-1` (`backtrack: 1/20` on the
     fixture cell). `foo` is globally on in the fixture profile, so no
     USE change is needed and the run succeeds (rc 0); the masked `A-2`
-    is reported through real `_show_missed_update_unsatisfied_dep`'s
+    is reported through Portage `_show_missed_update_unsatisfied_dep`'s
     full form (`depgraph.py:1592`), not the abbreviated backtracking
-    tail. Expected text is real 3.0.81.3 `emerge -p` on the staged
+    tail. Expected text is Portage 3.0.81.3 `emerge -p` on the staged
     fixtures verbatim (one rule-13 probe; the mechanism is 3.0.82.2
-    source), minus real's `to <root>` / `for <root>` destination
+    source), minus Portage's `to <root>` / `for <root>` destination
     suffixes, which no portuale pin carries."""
     args = ["--pretend", "--autounmask-keep-keywords=y", "dev-libs/akk0a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
-    # Portuale prints real's missed-update notices on stdout after the
-    # merge rows (the orbtblocked `WARNING` precedent); real prints
+    # Portuale prints Portage's missed-update notices on stdout after the
+    # merge rows (the orbtblocked `WARNING` precedent); Portage prints
     # them on stderr. The masked-`akk0b` disclosure rides inside the
     # notice unit, so it is stdout here too.
     assert rust.stdout.splitlines() == [
@@ -6269,7 +6269,7 @@ def test_autounmask_keep_keywords_n_takes_the_newest_via_unstable_keywords(
     """Backlog #198 contrast cell: upstream `test_autounmask_keep_keywords.py`
     with `--autounmask-keep-keywords=n`. The `+~arch` level is allowed,
     so `akk0b-1` is keyword-autounmasked and the newest `akk0a-2` merges
-    (rc 1, keyword change). Expected text is real 3.0.81.3 `emerge -p`
+    (rc 1, keyword change). Expected text is Portage 3.0.81.3 `emerge -p`
     on the staged fixtures verbatim (same rule-13 probe as the `=y`
     twin), minus the `to <root>` destination suffixes."""
     args = ["--pretend", "--autounmask-keep-keywords=n", "dev-libs/akk0a"]
@@ -6293,10 +6293,10 @@ def _abk0_worldb_root(tmp_path):
     (`test_autounmask_use_backtrack.py`, bug 632598): installed
     `abk0a-1` (`RDEPEND=abk0c`), `abk0b-1` (`RDEPEND=<abk0a-3`) and
     `abk0c-1`, with `abk0b` in `@world` so the installed bound is
-    required-set reachable (real `_complete_graph` re-walks `@world`).
+    required-set reachable (Portage `_complete_graph` re-walks `@world`).
     Mirrors the fixture vdb files exactly, minus the `repository` file
     the fixtures omit (so the consumer renders `__unknown__`, like
-    real). `PORTAGE_CONFIGROOT` stays at the shared fixtures so the
+    Portage). `PORTAGE_CONFIGROOT` stays at the shared fixtures so the
     `abk0*` ebuilds are visible."""
     for name, files in {
         "abk0a-1": {"RDEPEND": "dev-libs/abk0c\n"},
@@ -6320,14 +6320,14 @@ def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
 ):
     """Backlog #205, pristine-world cell (the shared fixture world has
     no `abk0b`, so installed `B-1`'s `<A-3` bound is unreachable):
-    real settles on `A-3` plus the `x` USE change (`backtrack: 0/2`,
+    Portage settles on `A-3` plus the `x` USE change (`backtrack: 0/2`,
     rc 1) -- one rule-13 probe on 3.0.81.3, mechanism from 3.0.82.2
     source. The USE block names only the forcing chain
     (`_get_dep_chain(..., unsatisfied_dependency=True)` picks `abk0d-1`,
     whose `C[x]` the change satisfies, not `abk0a-3`'s plain `C`).
-    The `R` row carries real's `[1]` oldbest bracket: the staged vdb
+    The `R` row carries Portage's `[1]` oldbest bracket: the staged vdb
     omits `repository`, so the installed instance reads as
-    `__unknown__` against the `testrepo` ebuild (real
+    `__unknown__` against the `testrepo` ebuild (Portage
     `lib/_emerge/resolver/output.py:721-731` third disjunct, backlog
     #247; fresh host `/usr/sbin/emerge` 3.0.82.2 staged-fixture probe
     2026-09-29 confirms `[ebuild   R    ] dev-libs/abk0c-1 [1] ...
@@ -6354,31 +6354,31 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
 ):
     """Backlog #205, upstream shape (bug 632598): with `abk0b` in
     `@world`, installed `B-1`'s `<A-3` bound breaks the `A-3` pick, so
-    real's `_complete_graph` broken-deep-dep path reports it as a slot
+    Portage's `_complete_graph` broken-deep-dep path reports it as a slot
     collision (`depgraph.py:8756-8770`), backtracking masks `A-3`
     (`backtrack: 2/2`), and the run settles on `[C-1, A-2, D-1]` with
     USE changes `x y` (rc 1). The masked `A-3` rides out as a
-    `WARNING` skipped-update row (real `_conflict_missed_update`,
+    `WARNING` skipped-update row (Portage `_conflict_missed_update`,
     `:2085-2106`); the USE block names the forcing chain only
     (`abk0d-1`, not `abk0a-2`). Expected text is the rule-13 probe on
-    3.0.81.3 verbatim, minus real's `to <root>` / `for <root>`
+    3.0.81.3 verbatim, minus Portage's `to <root>` / `for <root>`
     destination suffixes, which no portuale pin carries (the merge line
     stays bare, the header stays bare). The installed consumer carries
-    real's ` in '<root>'` suffix (real's `Package.__str__` appends it
+    Portage's ` in '<root>'` suffix (Portage's `Package.__str__` appends it
     iff `ROOT != "/"`), interpolated from the test ROOT. The `R` row
-    carries real's `[1]` oldbest bracket (same vdb-repo-mismatch
+    carries Portage's `[1]` oldbest bracket (same vdb-repo-mismatch
     disjunct as the pristine cell, backlog #247; fresh host
     `/usr/sbin/emerge` 3.0.82.2 staged-fixture probe 2026-09-29
     confirms `[ebuild   R    ] dev-libs/abk0c-1 [1] ...
-    USE="x* y*"`). Probe note: real's USE-chain first hop flaps
+    USE="x* y*"`). Probe note: Portage's USE-chain first hop flaps
     across runs between the two unsatisfied parents (`# required by
     dev-libs/abk0a-2::testrepo` present or not -- a hash-order
     tie-break in `_get_dep_chain`, not a version change); the pin
     holds the deterministic two-line variant portuale stably renders.
     The
-    skipped row carries real's `ELIBC="glibc"` group while the
+    skipped row carries Portage's `ELIBC="glibc"` group while the
     installed consumer stays bare `USE=""`, both byte-for-byte from
-    the probe (the staged vdb has no USE file, so real shows no expand
+    the probe (the staged vdb has no USE file, so Portage shows no expand
     group there either)."""
     env = dict(fixture_env)
     env["ROOT"] = str(_abk0_worldb_root(tmp_path))
@@ -6435,14 +6435,14 @@ def test_use_dep_enforcement_negated_flag_declared_but_enabled_does_not_match(
     (autounmask-use is on by default and would otherwise resolve this via
     an implicit package.use flip -- see the resolution test below) there's
     no visible candidate for this atom at all, so the run aborts with
-    real `_show_unsatisfied_dep`'s "no ebuilds built with USE flags"
+    Portage `_show_unsatisfied_dep`'s "no ebuilds built with USE flags"
     block (backlog #265(b) with #273): the `(Change USE: -foo)` row and,
-    like real for an argument parent, no `(dependency required by …)`
-    lines. Grounded on a fresh real 3.0.82.2 staged-fixture probe with
+    like Portage for an argument parent, no `(dependency required by …)`
+    lines. Grounded on a fresh Portage 3.0.82.2 staged-fixture probe with
     identical options (`emerge --ignore-default-opts --pretend
     --autounmask-use=n 'dev-libs/useflagpkg[-foo]'`,
     `LLM/evidence/2026-09-30-265/real/useflagpkg-autounmask-use-n.txt`
-    in the portuale checkout). Portuale omits real's staging
+    in the portuale checkout). Portuale omits Portage's staging
     `for <root>.` suffix (the `fixture-miss-message-unsuffixed` class)."""
     result = _run(
         [str(emerge_binary)],
@@ -6475,21 +6475,21 @@ def test_use_dep_enforcement_plain_flag_declared_but_disabled_does_not_match(
 
 
 def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fixture_env):
-    """--autounmask-use is on by default (real create_depgraph_params; no
+    """--autounmask-use is on by default (Portage create_depgraph_params; no
     --autounmask-keep-keywords-style asymmetry): a top-level atom whose
     plain USE-dep a `package.use` flip would satisfy RESOLVES, applying
     the implicit change. `useflagpkg[-foo]` -> `foo` (default on) flipped
     off; `-v` shows the adjusted `USE="-foo …"`, the `The following USE
-    changes are necessary to proceed:` block (real _display_autounmask's
+    changes are necessary to proceed:` block (Portage _display_autounmask's
     use_changes_msg -- `>=<cpv>` form via check_if_latest, `(see
-    "package.use" …)`) goes to stderr, and the run exits **1** -- real
+    "package.use" …)`) goes to stderr, and the run exits **1** -- Portage
     `action_build`'s `if not success: display_problems(); return 1`
     fires for any autounmask config change, `--pretend` included
     (verified against a live `emerge -pv www-client/firefox`). Backlog
     #217: no "terminated early" trailer -- the top-level flip is a
-    fresh-candidate one, so real reaches the
+    fresh-candidate one, so Portage reaches the
     `_success_without_autounmask` tail (depgraph.py:5793). Backlog #248:
-    the chain is exactly one line -- real `_get_dep_chain` never prints
+    the chain is exactly one line -- Portage `_get_dep_chain` never prints
     the start node (fresh host 3.0.82.2 staged-fixture probe 2026-09-29:
     only `# required by dev-libs/useflagpkg[-foo] (argument)`)."""
     result = _run(
@@ -6530,7 +6530,7 @@ def test_use_dep_enforcement_negated_flag_declared_and_disabled_matches(
 def test_use_dep_enforcement_undeclared_flag_with_no_default_never_matches(
     emerge_binary, fixture_env
 ):
-    """Real _use_dep.required (see use_deps_satisfied's own doc comment):
+    """Portage _use_dep.required (see use_deps_satisfied's own doc comment):
     a use-dep flag with no (+)/(-) default marker must be a real,
     declared IUSE flag on the candidate, or the atom simply doesn't match
     at all -- "nonexistentflag" isn't in useflagpkg's own IUSE anywhere,
@@ -6568,7 +6568,7 @@ def test_required_use_satisfied_resolves_normally(emerge_binary, fixture_env):
     """dev-libs/requireduseokpkg's own REQUIRED_USE is "foo? ( bar )" --
     "foo" is enabled globally by the fixture profile chain, and "bar" is
     forced on by this package's own package.use entry, so the
-    use-conditional group is genuinely satisfied (its own real
+    use-conditional group is genuinely satisfied (its own Portage
     check_required_use, PMS 7.3.4/8.2) -- resolves exactly like any
     other New package, no different treatment at all."""
     result = _run(
@@ -6584,7 +6584,7 @@ def test_iuse_plus_minus_defaults_apply_when_nothing_else_says_otherwise(
     emerge_binary, fixture_env
 ):
     """A real, previously-undetected gap, found by comparing portuale's
-    own output against the real, installed system emerge on a real
+    own output against the installed system Portage on a real
     package (media-video/ffmpeg) -- REQUIRED_USE reported violated for a
     USE combination that's actually fully satisfied once IUSE's own
     "+"/"-" markers are honored. dev-libs/iusedefaultpkg's own IUSE is
@@ -6611,7 +6611,7 @@ def test_iuse_plus_minus_defaults_apply_when_nothing_else_says_otherwise(
 def test_iuse_names_a_flag_twice_and_it_renders_once(emerge_binary, fixture_env):
     """Found live against gnome-extra/gnome-color-manager, whose
     md5-cache carries `IUSE=test test` (an eclass and the ebuild both
-    declare it). Real portage builds the USE display from
+    declare it). Portage builds the USE display from
     `sorted(pkg.iuse.all)`, where `iuse.all` is a `frozenset`
     (`_emerge/Package.py`), so a doubly-named flag still renders exactly
     once; portuale split the raw `IUSE` string and showed `-test -test`.
@@ -6633,8 +6633,8 @@ def test_required_use_referencing_an_implicit_arch_flag_resolves_normally(
     """A second, related gap from the same ffmpeg investigation -- this
     one surfaced on a downstream dependency, real media-libs/mesa, whose
     own REQUIRED_USE references "x86" without ever declaring it in its
-    own IUSE. Real portage validates a REQUIRED_USE-referenced flag
-    against pkg.iuse.is_valid_flag, which real config.py's own
+    own IUSE. Portage validates a REQUIRED_USE-referenced flag
+    against pkg.iuse.is_valid_flag, which Portage config.py's own
     _get_implicit_iuse() extends with PORTAGE_ARCHLIST (profiles/
     arch.list) among other things -- "x86" is a real, valid arch.list
     entry even on an amd64 profile, just not the active arch, so it's
@@ -6659,7 +6659,7 @@ def test_required_use_referencing_an_implicit_arch_flag_resolves_normally(
 def test_global_use_force_and_use_mask_win_over_a_contradicting_package_use_entry(
     emerge_binary, fixture_env
 ):
-    """Found by reading real config.py's own regenerate() end to end
+    """Found by reading Portage config.py's own regenerate() end to end
     (lib/portage/package/ebuild/config.py, ~line 3024):
     myflags.update(self.useforce) followed by
     myflags.difference_update(self.usemask) runs as the literal *last*
@@ -6671,7 +6671,7 @@ def test_global_use_force_and_use_mask_win_over_a_contradicting_package_use_entr
     slice, portuale folded global use_force/use_mask into `base` early
     (inside portage_profile::resolve_config), before package.use ever
     ran in effective_use_flags -- so a package.use entry could
-    previously override a global force/mask decision real portage never
+    previously override a global force/mask decision Portage never
     lets it override. dev-libs/globalprecedencepkg's own IUSE is
     "globalforceflag globalmaskflag" (both markerless, genuinely
     undecided by IUSE itself); its own package.use entry is
@@ -6695,7 +6695,7 @@ def test_global_use_force_and_use_mask_win_over_a_contradicting_package_use_entr
 def test_later_level_global_use_mask_cancels_earlier_package_use_stable_mask(
     emerge_binary, fixture_env
 ):
-    """Found by reading real UseManager.getUseMask end to end
+    """Found by reading Portage UseManager.getUseMask end to end
     (lib/portage/package/ebuild/_config/UseManager.py): the four sources
     (use.mask, use.stable.mask, package.use.mask, package.use.stable.mask)
     are stacked *interleaved per profile level* --
@@ -6709,7 +6709,7 @@ def test_later_level_global_use_mask_cancels_earlier_package_use_stable_mask(
 
     This is the real `dev-libs/glib`/`sysprof` case: `base/
     package.use.stable.mask` masks `sysprof` for glib, then `arch/amd64/
-    use.mask` un-masks it globally with `-sysprof` -- real portage shows
+    use.mask` un-masks it globally with `-sysprof` -- Portage shows
     `-sysprof` (plain, changeable), portuale used to show `(-sysprof)`
     (forced). The fixture mirrors it exactly:
     `base/package.use.stable.mask` = `dev-libs/crossmaskcancelpkg xmc`,
@@ -6730,7 +6730,7 @@ def test_profile_level_minus_flag_genuinely_cancels_an_iuse_plus_default(
     emerge_binary, fixture_env
 ):
     """The gap portuale's own IUSE-defaults slice originally left open,
-    now closed: real regenerate() runs ONE continuous incremental walk
+    now closed: Portage regenerate() runs ONE continuous incremental walk
     (pkginternal -> defaults -> conf -> pkg), so a genuine "-flag" in
     profile/make.conf really does cancel an earlier IUSE "+flag" default
     -- not just fail to add on top of it. Before this slice, this
@@ -6753,7 +6753,7 @@ def test_profile_level_minus_flag_genuinely_cancels_an_iuse_plus_default(
 def test_required_use_violated_top_level_aborts_the_whole_run(emerge_binary, fixture_env):
     """dev-libs/requiredusebadpkg's own REQUIRED_USE is "foo? ( bar )" --
     "foo" is enabled globally, but "bar" is never forced on for this
-    package, so the use-conditional group is genuinely violated. Real
+    package, so the use-conditional group is genuinely violated. Portage
     depgraph.py's own REQUIRED_USE check happens right after package
     selection and, on failure, aborts the whole run (NOTE comment in
     depgraph.py: "REQUIRED_USE checks are delayed until after package
@@ -6761,7 +6761,7 @@ def test_required_use_violated_top_level_aborts_the_whole_run(emerge_binary, fix
     unresolvable dependency (report, don't fail): here nothing is
     printed to stdout at all, and the run exits nonzero.
 
-    Real `_show_unsatisfied_dep`'s REQUIRED_USE block: the atom as
+    Portage `_show_unsatisfied_dep`'s REQUIRED_USE block: the atom as
     `xinfo`, the candidate + `pkg_use_display`, and the minimal
     unsatisfied sub-expression (here the whole one-clause expression, so
     no "complete expression" line; top-level atom, so no dep chain)."""
@@ -6789,7 +6789,7 @@ def test_required_use_violated_dependency_still_aborts_the_whole_run(
     deep in the graph, unlike a dependency's own NoVisibleCandidate.
 
     Reached as a dependency -> the block gains the `(dependency required
-    by "..." [ebuild])` chain (real `_get_dep_chain`), and since the
+    by "..." [ebuild])` chain (Portage `_get_dep_chain`), and since the
     parent is itself the command-line argument, a trailing
     `[argument]` line."""
     result = _run(
@@ -6815,7 +6815,7 @@ def test_required_use_violated_dependency_still_aborts_the_whole_run(
 def test_required_use_violations_are_collected_across_the_whole_walk_not_just_the_first(
     emerge_binary, fixture_env
 ):
-    """Real depgraph.py's own _add_pkg sets
+    """Portage depgraph.py's own _add_pkg sets
     _dynamic_config._required_use_unsatisfied = True and returns 0 on a
     violation -- it does NOT abort the whole graph walk (unlike a
     top-level atom's own NoVisibleCandidate). Before this slice, this
@@ -6824,8 +6824,8 @@ def test_required_use_violations_are_collected_across_the_whole_walk_not_just_th
     top-level atom passed on the same command line (here,
     dev-libs/requiredusebadpkg2's own "baz? ( qux )", unrelated to
     dev-libs/requiredusebadpkg's own "foo? ( bar )") would never even be
-    attempted, let alone reported -- exactly the same failure mode real
-    portage doesn't have. Both violations now show up together, in walk
+    attempted, let alone reported -- exactly the same failure mode Portage
+    doesn't have. Both violations now show up together, in walk
     order (last-declared-first per #90 S1, so badpkg2 leads)."""
     result = _run(
         [str(emerge_binary)],
@@ -6850,14 +6850,14 @@ def test_required_use_violations_are_collected_across_the_whole_walk_not_just_th
 
 
 def test_autounmask_no_keyword_suggestion_by_default(emerge_binary, fixture_env):
-    """Real --autounmask-keep-keywords defaults to True (suppress keyword
+    """Portage --autounmask-keep-keywords defaults to True (suppress keyword
     suggestions) whenever --autounmask itself was never explicitly given
     at all -- confirmed by reading create_depgraph_params.py's own
     default-resolution logic end to end. dev-libs/autounmaskkeywordpkg's
     own KEYWORDS is "~amd64", never accepted by the fixture profile's own
     ACCEPT_KEYWORDS and never granted a package.accept_keywords entry --
     masked by KEYWORDS alone. With no --autounmask flag at all (the
-    common case), no suggestion is appended, matching real portage's own
+    common case), no suggestion is appended, matching Portage's own
     "quiet by default" behavior for this specific sub-flag."""
     result = _run(
         [str(emerge_binary)],
@@ -6874,23 +6874,23 @@ def test_autounmask_no_keyword_suggestion_by_default(emerge_binary, fixture_env)
 
 
 def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fixture_env):
-    """Real portage's own asymmetry (create_depgraph_params.py):
+    """Portage's own asymmetry (create_depgraph_params.py):
     --autounmask-keep-keywords defaults to False (i.e. keyword changes
     ARE applied) once --autounmask itself was explicitly given, unlike
     the ambient always-on default (see the sibling test above) --
     "explicitly asking for autounmask implies wanting its keyword changes
-    too." Real --autounmask then *resolves the graph* with the implicit
+    too." Portage --autounmask then *resolves the graph* with the implicit
     `=cpv ~arch` change applied: the package prints as a normal New entry
-    on stdout, real depgraph.py::_display_autounmask's `The following
+    on stdout, Portage depgraph.py::_display_autounmask's `The following
     keyword changes are necessary to proceed:` block goes to stderr
-    (real _writemsg + _get_dep_chain_as_comment: the `#required by ...`
+    (Portage _writemsg + _get_dep_chain_as_comment: the `#required by ...`
     dep chain -- one line here, the argument package's own change, since
-    real never prints the start node (fresh host 3.0.82.2 staged-fixture
-    probe 2026-09-29) -- then `=<cpv> <kw>`), and the run exits **1** -- real
+    Portage never prints the start node (fresh host 3.0.82.2 staged-fixture
+    probe 2026-09-29) -- then `=<cpv> <kw>`), and the run exits **1** -- Portage
     `action_build` returns 1 for any autounmask change under `--pretend`
     too. v1 covers the "masked by KEYWORDS alone" case only. Backlog
     #217: no "terminated early" trailer -- a lone keyword change reaches
-    real's `_success_without_autounmask` tail (depgraph.py:5793)."""
+    Portage's `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/autounmaskkeywordpkg"],
@@ -6943,19 +6943,19 @@ def test_autounmask_continue_and_backtrack_are_inert_without_autounmask_changes(
 
 
 def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
-    """--autounmask-only (real actions.py:456-458) returns 0 before the
-    normal display(), but real `_display_autounmask` re-shows the merge
+    """--autounmask-only (Portage actions.py:456-458) returns 0 before the
+    normal display(), but Portage `_display_autounmask` re-shows the merge
     list itself via `_show_merge_list` (depgraph.py:10625, :10488-10495,
     called from each change loop at :10686/:10733/:10767/:10803) whenever
     it has changes to report. So under `--pretend --autounmask
-    --autounmask-only` real prints the SAME merge list as the control
+    --autounmask-only` Portage prints the SAME merge list as the control
     (without --autounmask-only) plus the changes block, rc 0. Backlog
-    #271. Grounded on a fresh host real 3.0.82.2 (`/usr/sbin/emerge`)
+    #271. Grounded on a fresh host Portage 3.0.82.2 (`/usr/sbin/emerge`)
     staged-fixture probe with identical options (`--ignore-default-opts`,
-    `LLM/evidence/2026-09-30-271/` in the portuale checkout): real's
+    `LLM/evidence/2026-09-30-271/` in the portuale checkout): Portage's
     only-run stdout is byte-identical to its control stdout (modulo the
     timing line and the first-run Global Updates noise), stderr
-    byte-identical, rc 0 vs 1. Portuale omits real's staging `to <root>`
+    byte-identical, rc 0 vs 1. Portuale omits Portage's staging `to <root>`
     row suffix, the preamble/timing lines and the news notice (standing
     pretend-shape cuts). Replaces
     `test_autounmask_only_suppresses_the_merge_list`, which asserted the
@@ -6984,7 +6984,7 @@ def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
     assert full.stderr == rust.stderr
 
     # USE-change cell: the implicit flip re-resolves the gated deps, so
-    # the re-shown list carries all three rows (real's bytes, same cuts).
+    # the re-shown list carries all three rows (Portage's bytes, same cuts).
     use_args = ["--pretend", "--autounmask", "--autounmask-only", "dev-libs/useflagpkg[missingflag]"]
     use = _run([str(emerge_binary)], use_args, fixture_env)
     assert use.returncode == 0
@@ -7008,7 +7008,7 @@ def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
     assert use_full.stdout == use.stdout
     assert use_full.stderr == use.stderr
 
-    # No changes (a plain package): real's change loops never fire
+    # No changes (a plain package): Portage's change loops never fire
     # `_show_merge_list`, so still nothing on either stream, rc 0.
     plain = _run(
         [str(emerge_binary)],
@@ -7028,7 +7028,7 @@ def test_autounmask_dependency_gets_no_keyword_suggestion_by_default(emerge_bina
     "no visible ebuild" line, regardless of --autounmask. With no
     --autounmask flag at all (the real, correct default), no suggestion
     is appended here either, matching the top-level case's own default --
-    but the masked-dependency disclosure still names the mask (real
+    but the masked-dependency disclosure still names the mask (Portage
     `_show_unsatisfied_dep`). Since Slice 4 the abort suppresses the
     merge list (no consumer line); the disclosure block is unchanged."""
     result = _run(
@@ -7056,10 +7056,10 @@ def test_autounmask_dependency_gets_a_keyword_suggestion_once_enabled(emerge_bin
     resolves with the implicit `=cpv ~arch` change applied, so BOTH
     packages print as normal New entries on stdout, and the `The
     following keyword changes are necessary to proceed:` block on stderr
-    carries the real two-line dep chain (`#required by <parent
-    cpv>::<repo>` then `#required by <parent atom> (argument)` -- real
+    carries the Portage two-line dep chain (`#required by <parent
+    cpv>::<repo>` then `#required by <parent atom> (argument)` -- Portage
     _get_dep_chain_as_comment). Backlog #217: no "terminated early"
-    trailer -- a lone keyword change reaches real's
+    trailer -- a lone keyword change reaches Portage's
     `_success_without_autounmask` tail (depgraph.py:5793)."""
     result = _run(
         [str(emerge_binary)],
@@ -7111,7 +7111,7 @@ def test_autounmask_keyword_changes_appear_in_json(emerge_binary, fixture_env):
 
 
 def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fixture_env):
-    """--autounmask-license (real `_display_autounmask`'s `license_msg`):
+    """--autounmask-license (Portage `_display_autounmask`'s `license_msg`):
     dev-libs/licensemaskedpkg's LICENSE="SomeEula" is in the fixture's
     @EULA group, so the default `* -@EULA` ACCEPT_LICENSE masks it, with
     no package.license unmask. dev-libs/licensemaskedconsumer RDEPENDs on
@@ -7119,10 +7119,10 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
     the graph with the implicit accept applied -- BOTH print as normal New
     entries -- and the `The following license changes are necessary to
     proceed:` block on stderr carries the two-line dep chain and the
-    `>=<cpv> <license>` line (real `check_if_latest(pkg)` -> `>=` since
+    `>=<cpv> <license>` line (Portage `check_if_latest(pkg)` -> `>=` since
     1.0 is the only version). Off without `--autounmask`. Backlog #217:
     no "terminated early" trailer -- a lone license change reaches
-    real's `_success_without_autounmask` tail (depgraph.py:5793)."""
+    Portage's `_success_without_autounmask` tail (depgraph.py:5793)."""
     off = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/licensemaskedconsumer"], fixture_env
     )
@@ -7130,7 +7130,7 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
     # atom's is), so the consumer still resolves; the dep just isn't there.
     assert off.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     # License-masked with no autounmask: the masked-dependency disclosure
-    # (real `_show_unsatisfied_dep`), not the bare line.
+    # (Portage `_show_unsatisfied_dep`), not the bare line.
     _assert_masked_dep_block(
         off.stderr,
         "dev-libs/licensemaskedpkg",
@@ -7195,16 +7195,16 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
 
 
 def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_env):
-    """--autounmask-keep-masks=n (real `_display_autounmask`'s
+    """--autounmask-keep-masks=n (Portage `_display_autounmask`'s
     `p_mask_change_msg`): dev-libs/hardmaskedpkg is package.mask'd (via
     the fixture repo/profile/user package.mask chain), everything else
-    visible. Real portage KEEPS masks by default -- even `--autounmask`
+    visible. Portage KEEPS masks by default -- even `--autounmask`
     alone doesn't unmask -- so only `--autounmask-keep-masks=n` resolves
     it. The `The following mask changes are necessary to proceed:` block
     has the `#required by` dep chain + a bare `=<cpv>` line (no token --
     a mask unmask has no keyword/flag). The `[ebuild N #]` bracket marker
     reflects the still-`package.mask`'d state. Backlog #217: no
-    "terminated early" trailer -- a lone mask change reaches real's
+    "terminated early" trailer -- a lone mask change reaches Portage's
     `_success_without_autounmask` tail (depgraph.py:5793)."""
     assert (
         _run([str(emerge_binary)], ["--pretend", "dev-libs/hardmaskedpkg"], fixture_env).returncode
@@ -7277,7 +7277,7 @@ def test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n(
     # Backlog #20; oracle (portage 3.0.81.3, abort-capture tree,
     # `--pretend --autounmask-use=n dev-libs/usedeprejectedpkg`) prints
     # exactly this block. The fixture ebuild now declares the IUSE the
-    # cache always had (it was missing from the ebuild, so real parsed
+    # cache always had (it was missing from the ebuild, so Portage parsed
     # the fixture as invalid metadata and showed the masked block).
     assert result.stderr.splitlines() == [
         "",
@@ -7295,7 +7295,7 @@ def test_autounmask_use_changes_appear_in_json(emerge_binary, fixture_env):
     "use_suggestion" field -- that was for the unresolved case), and the
     implicit change is exposed as a top-level "autounmask_use_changes"
     array ({"atom", "token", "dep_chain"} -- atom is the `>=<cpv>` form
-    real check_if_latest picks for USE, bug #536392)."""
+    Portage check_if_latest picks for USE, bug #536392)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--json", "dev-libs/usedeprejectedpkg"],
@@ -7323,11 +7323,11 @@ def test_autounmask_use_resolves_the_opt_conditional_dependency_via_the_child_fl
 ):
     """dev-libs/useeqparentoffpkg's own RDEPEND on dev-libs/useeqchildpkg
     "[eqflag=]" evaluates to "[-eqflag]" (parent's eqflag off); the child
-    has eqflag on. With --autounmask-use on by default, real portage
+    has eqflag on. With --autounmask-use on by default, Portage
     resolves this by flipping the *child's* own eqflag off (the plain
-    candidate flip -- real _needed_use_config_changes[child]), so both
+    candidate flip -- Portage _needed_use_config_changes[child]), so both
     packages resolve as New and a single "USE changes" block covers the
-    child change. Real portage's opt=-aware *parent* flip (flipping
+    child change. Portage's opt=-aware *parent* flip (flipping
     useeqparentoffpkg's own eqflag on instead) is only a fallback when
     the child flip is impossible -- not exercised by this fixture, and a
     separate future increment."""
@@ -7367,7 +7367,7 @@ def test_autounmask_use_parent_flip_suggestion_is_suppressed_by_autounmask_use_n
     )
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     _assert_abort_preamble(result.stdout)
-    # Backlog #20: the child row plus the parent-conditional row real
+    # Backlog #20: the child row plus the parent-conditional row Portage
     # appends (`violated_conditionals`' all-conditional branch,
     # depgraph.py:6768-6858; oracle: abort-capture tree,
     # `--pretend --autounmask-use=n dev-libs/useeqparentoffpkg`).
@@ -7382,13 +7382,13 @@ def test_autounmask_use_parent_flip_suggestion_is_suppressed_by_autounmask_use_n
     ]
 
 
-def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_masked(
+def test_autounmask_use_parent_flip_fails_like_portage_when_the_child_flag_is_masked(
     emerge_binary, fixture_env
 ):
-    """Live real reports the BARE miss here (no rows, no USE block):
+    """Live Portage reports the BARE miss here (no rows, no USE block):
     dev-libs/parentflipeqpkg (IUSE +feat) RDEPENDs
     parentflipchildpkg[feat=]; the child's own `feat` is use.mask'd, so
-    real's untouchable-child `continue`
+    Portage's untouchable-child `continue`
     (`lib/_emerge/depgraph.py:6732-6736`) skips the parent probe -- no
     parent flip is ever recorded.
 
@@ -7418,7 +7418,7 @@ def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_maske
         (dependency required by "dev-libs/parentflipeqpkg" [argument])
         rc=1
 
-    (Portuale omits real's staging `for <root>.` suffix here -- the
+    (Portuale omits Portage's staging `for <root>.` suffix here -- the
     long-standing `fixture-miss-message-unsuffixed` class, same as the
     `--autounmask-use=n` half below.)
 
@@ -7430,7 +7430,7 @@ def test_autounmask_use_parent_flip_fails_like_real_when_the_child_flag_is_maske
     flip-then-resolve model. No live `emerge` ever ran for this cell:
     no container probe (the test bed did not exist yet), the fixture
     profile USE unexamined, `--autounmask` defaults unexamined (the pin
-    ran bare `--pretend`), no image version recorded. The "Real portage
+    ran bare `--pretend`), no image version recorded. The "Portage
     flips ..." sentence was a source-reading inference, never a
     measurement."""
     args = ["--pretend", "dev-libs/parentflipeqpkg"]
@@ -7468,10 +7468,10 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     """Upstream `test_autounmask_parent.py` (`aup0b`): `dev-libs/aup0b`
     (IUSE `+bar +foo`) DEPENDs `dev-libs/aup0d[foo(-)?,bar(-)?]`; the
     fixture profile leaves the parent at `{foo}`, so only the `foo(-)?`
-    conditional is parent-active. Live real records `-foo` on the parent
+    conditional is parent-active. Live Portage records `-foo` on the parent
     and FAILS (no rows): stdout is the merge header only, stderr is the
     `-foo` USE block plus the "backtracking has terminated early"
-    notice, exit 1. Real `_apply_parent_use_changes`
+    notice, exit 1. Portage `_apply_parent_use_changes`
     (`lib/_emerge/depgraph.py:5820`) re-probes with
     `violated_conditionals` (`:6779-6798`) and the
     `_success_without_autounmask` tail (`:5793`) returns False.
@@ -7514,13 +7514,13 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     )
 
 
-def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_real(
+def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_portage(
     emerge_binary, fixture_env
 ):
-    """Live real reports the BARE miss here (no rows, no USE block):
+    """Live Portage reports the BARE miss here (no rows, no USE block):
     dev-libs/pfgraphparent (IUSE +pf) RDEPENDs pfgraphchild[pf=] AND
     `pf? ( dev-libs/pfgraphextra )`; pfgraphchild's `pf` is use.mask'd, so
-    real's untouchable-child `continue`
+    Portage's untouchable-child `continue`
     (`lib/_emerge/depgraph.py:6732-6736`) skips the parent probe -- no
     parent flip is ever recorded, and there is nothing to re-resolve.
 
@@ -7549,20 +7549,20 @@ def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_real(
         (dependency required by "dev-libs/pfgraphparent" [argument])
         rc=1
 
-    (Portuale omits real's staging `for <root>.` suffix here -- the
+    (Portuale omits Portage's staging `for <root>.` suffix here -- the
     long-standing `fixture-miss-message-unsuffixed` class, same as the
     parentflipeqpkg pin above.)
 
     Why the old docstring's parity claim was wrong: the
     resolve+rows+`-pf`-block expectation (Slice 4 backtrack-off arm and
     whole-graph re-resolve) was a source-reading inference about the
-    parent flip, never a live measurement -- real never records the flip
+    parent flip, never a live measurement -- Portage never records the flip
     for this cell, so neither the default single-dep re-resolve (which
     kept `pf? ( pfgraphextra )` in the list) nor the
     `--autounmask-backtrack=y` whole-graph re-resolve (which dropped it)
     ever happens. Renamed from
     `test_autounmask_use_parent_flip_re_resolves_the_whole_graph`, which
-    stated the opposite of what real does (coordinator ruling B20,
+    stated the opposite of what Portage does (coordinator ruling B20,
     option (a))."""
     args = ["--pretend", "dev-libs/pfgraphparent"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -7613,12 +7613,12 @@ def test_unresolvable_dependency_is_reported_not_silently_dropped(
 ):
     """The abort path owns the resolve: an unsatisfiable dependency of a
     merge-bound parent suppresses the whole merge list (no list at all,
-    like real -- Slice 4) while the unresolvable dependency is still
+    like Portage -- Slice 4) while the unresolvable dependency is still
     reported on stderr, not silently dropped."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/missingdep"], fixture_env)
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     _assert_abort_preamble(result.stdout)
-    # #135 (d) (Phase 5b S2): real's plain-miss block with the queued
+    # #135 (d) (Phase 5b S2): Portage's plain-miss block with the queued
     # atom and the `_get_dep_chain` rows, not the bare NVC line.
     assert result.stderr.strip().splitlines() == [
         'emerge: there are no ebuilds to satisfy "dev-libs/doesnotexist-anywhere".',
@@ -7629,7 +7629,7 @@ def test_unresolvable_dependency_is_reported_not_silently_dropped(
 
 def test_usepkg_makes_a_binary_only_package_eligible(emerge_binary, fixture_env):
     """dev-libs/binaryonlypkg exists only in PKGDIR's own Packages index
-    (see fixtures/pkgdir/Packages), no ebuild anywhere. Real depgraph.py's
+    (see fixtures/pkgdir/Packages), no ebuild anywhere. Portage depgraph.py's
     own _dynamic_depgraph_config.__init__ only adds the "binary" db to the
     candidate-pool list when --usepkg is True -- without it, the package
     is entirely invisible, matching the ebuild-only-package "no visible
@@ -7647,7 +7647,7 @@ def test_usepkg_makes_a_binary_only_package_eligible(emerge_binary, fixture_env)
 def test_binpkg_respect_use_rejects_a_use_mismatched_binary_by_default(
     emerge_binary, fixture_env
 ):
-    """Real create_depgraph_params.py's own default-resolution: with
+    """Portage create_depgraph_params.py's own default-resolution: with
     --usepkg alone (not --usepkgonly), --binpkg-respect-use defaults to
     on. dev-libs/binaryusemismatchpkg's own binary entry has USE: (empty),
     while the fixture profile's own global USE=confflag/foo would select
@@ -7689,13 +7689,13 @@ def test_use_mismatched_remote_binary_at_the_ebuilds_key_does_not_hide_the_ebuil
 def test_binary_wins_a_version_tie_against_the_ebuild(
     emerge_binary, fixture_env
 ):
-    """Real `_wrapped_select_pkg_highest_available_imp` builds
+    """Portage `_wrapped_select_pkg_highest_available_imp` builds
     `matched_packages` in `dbs` order -- ebuild before binary -- and
     returns `matched_packages[-1]`: "ebuild type is the last resort"
     (`depgraph.py:8492`). So a `--usepkg`/`--getbinpkg` binary that
     passed `--binpkg-respect-use` beats the same-version ebuild.
     Portuale gave binary candidates `repo_priority = i32::MIN`, so the
-    ebuild always won -- a misreading of real (`dbs` order is
+    ebuild always won -- a misreading of Portage (`dbs` order is
     iteration order, not preference; the *last* match wins).
     `dev-libs/binebuildtie` has a USE-matching `::testrepo` binhost
     binary at its tree ebuild's version."""
@@ -7710,11 +7710,11 @@ def test_binary_wins_a_version_tie_against_the_ebuild(
 def test_usepkgonly_defaults_binpkg_respect_use_off(emerge_binary, fixture_env):
     """The opposite asymmetry: create_depgraph_params.py:47-55 defaults
     --binpkg-respect-use to off once --usepkgonly is given (no ebuild
-    fallback exists to reject *to*, so real portage doesn't bother
+    fallback exists to reject *to*, so Portage doesn't bother
     rejecting). The same USE-mismatched binary from the sibling test
     above is accepted here -- and its USE line shows the flags it was
     *built* with (`USE="-foo"`: IUSE `foo`, baked USE empty), not a
-    fresh profile recompute (which would enable `foo`). Real `-p` for a
+    fresh profile recompute (which would enable `foo`). Portage `-p` for a
     `[binary]` line renders `pkg.use.enabled`, = the baked set for a
     built package."""
     result = _run(
@@ -7732,7 +7732,7 @@ def test_usepkgonly_defaults_binpkg_respect_use_off(emerge_binary, fixture_env):
 def test_useoldpkg_atoms_prefers_the_old_binary_over_a_newer_ebuild(
     emerge_binary, fixture_env
 ):
-    """--useoldpkg-atoms ATOMS (real main.py:713 -> WildcardPackageSet;
+    """--useoldpkg-atoms ATOMS (Portage main.py:713 -> WildcardPackageSet;
     depgraph.py:7936 + matched_oldpkg/visible_matches): for a matching
     package, prefer an existing binary package over a newer unbuilt
     ebuild. dev-libs/useoldpkgpkg: binary 1.0 in PKGDIR, ebuild 2.0 in
@@ -7763,8 +7763,8 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
     emerge_binary, tmp_path
 ):
     """`--useoldpkg-atoms` + `binpkg-multi-instance`: when the matched
-    "old binary" cpv has several builds (different `BUILD_ID`s), real
-    portage's `_iter_match_pkgs` yields them newest-`BUILD_TIME` first and
+    "old binary" cpv has several builds (different `BUILD_ID`s), Portage's
+    `_iter_match_pkgs` yields them newest-`BUILD_TIME` first and
     the selection loop `break`s on the first acceptable one -- so the
     highest-`(BUILD_TIME, BUILD_ID)` build is the one preferred over the
     newer ebuild.
@@ -7824,7 +7824,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
 def test_quickpkg_direct_injects_source_root_packages(
     emerge_binary, fixture_env, fixtures_root
 ):
-    """--quickpkg-direct / --quickpkg-direct-root (real actions.py:150-164
+    """--quickpkg-direct / --quickpkg-direct-root (Portage actions.py:150-164
     + bintree._populate_additional): when --usepkg + --quickpkg-direct=y
     and the source root differs from the target ROOT, every package
     installed in the source root joins the binary-candidate pool for the
@@ -7869,7 +7869,7 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=Non
     """An ad-hoc PORTAGE_CONFIGROOT whose `PKGDIR` points at a directory
     that holds `binpkg_files` (copied from fixtures) but NO
     `Packages` index -- so `--usepkg`/`--usepkgonly` must fall back to
-    the real `bintree._populate_local` `$PKGDIR` directory scan. With
+    the Portage `bintree._populate_local` `$PKGDIR` directory scan. With
     `packages_text` the index is written with that content instead
     (backlog #199: a staged stale index)."""
     cfg = tmp_path / "cfg"
@@ -7898,22 +7898,22 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=Non
 def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
     emerge_binary, tmp_path, fixtures_root
 ):
-    """Real `bintree._populate_local`'s "no trusted index" branch: a
+    """Portage `bintree._populate_local`'s "no trusted index" branch: a
     `$PKGDIR` holding binpkg *files* but no `Packages` is scanned, each
     file's own embedded metadata read (`portuale/src/binpkg.rs` --
-    real `xpak`/`gpkg`), and the synthesized candidates resolve exactly
+    Portage `xpak`/`gpkg`), and the synthesized candidates resolve exactly
     as if a `Packages` entry had listed them.
 
     Both fixture binpkgs are genuine: `packagepkg-1.0.tbz2` was built by
-    portuale's own `ebuild <file> package` (real `xpak.py`);
-    `gpkgreadpkg-1.0.gpkg.tar` is a hand-built real gpkg container."""
+    portuale's own `ebuild <file> package` (Portage `xpak.py`);
+    `gpkgreadpkg-1.0.gpkg.tar` is a hand-built Portage gpkg container."""
     env = _binscan_configroot(
         tmp_path,
         fixtures_root,
         ["packagepkg-1.0.tbz2", "gpkgreadpkg-1.0.gpkg.tar"],
     )
-    # Each scanned binpkg carries real dependency metadata (packagepkg's
-    # xpak has `RDEPEND=dev-libs/samepkg` from real `build-info`;
+    # Each scanned binpkg carries Portage dependency metadata (packagepkg's
+    # xpak has `RDEPEND=dev-libs/samepkg` from Portage `build-info`;
     # gpkgreadpkg's gpkg metadata has `dev-libs/newpkg`), and those deps
     # are actually walked -- the ad-hoc root has neither, so each aborts
     # the resolve (exit 1, no merge list since Slice 4) with the dep note
@@ -7943,9 +7943,9 @@ def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
     emerge_binary, tmp_path, fixtures_root
 ):
     """Backlog #199: with `FEATURES=-pkgdir-index-trusted` the local
-    `$PKGDIR` scan runs real `_populate_local(reindex=True)`
+    `$PKGDIR` scan runs Portage `_populate_local(reindex=True)`
     (`bintree.py:936-938`): a `Packages` stanza whose file is gone is
-    dropped from the pool (real `bintree.py:1353-1356`), instead of
+    dropped from the pool (Portage `bintree.py:1353-1356`), instead of
     being re-injected like the trusted default (backlog #187). A file
     whose `_mtime_` changed is re-parsed from disk either way the pool
     can tell, and a file no stanza covers is picked up in both modes.
@@ -8042,7 +8042,7 @@ def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
 def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     emerge_binary, tmp_path, fixtures_root
 ):
-    """Real `BinRepoConfigLoader._parse` runs `_recursive_file_list` over
+    """Portage `BinRepoConfigLoader._parse` runs `_recursive_file_list` over
     the `binrepos.conf` path, so it may be a **directory** of `*.conf`
     fragments -- the standard portage "file or dir" pattern, and how the
     release profile ships it (`gentoobinhost.conf`). Portuale read it as
@@ -8091,10 +8091,10 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
 def test_pkgdir_scan_finds_both_indexed_and_loose_binpkgs(
     emerge_binary, fixture_env
 ):
-    """Real `bintree._populate_local`'s own default (`reindex=True`
+    """Portage `bintree._populate_local`'s own default (`reindex=True`
     unless `FEATURES=pkgdir-index-trusted`, a real *non-default* opt-in
-    -- `bintree.py:936-937`): every run walks `$PKGDIR` for real, real
-    portage never just trusts a present `Packages` index outright. An
+    -- `bintree.py:936-937`): every run walks `$PKGDIR` for real, Portage
+    never just trusts a present `Packages` index outright. An
     index entry whose own `_mtime_`/`SIZE` still agree with the real
     file on disk is reused verbatim (a real perf optimization, not a
     "skip the walk" one -- see `binpkg::populate_local_pkgdir`'s own
@@ -8126,19 +8126,19 @@ def test_pkgdir_scan_finds_both_indexed_and_loose_binpkgs(
 def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     emerge_binary, tmp_path, fixtures_root
 ):
-    """Real `FEATURES=binpkg-multi-instance` writes an xpak binpkg to
-    `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.xpak` (real
+    """Portage `FEATURES=binpkg-multi-instance` writes an xpak binpkg to
+    `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.xpak` (Portage
     `bintree._allocate_filename_multi`: a `<cat>/<pn>` subdir, a
     `-<build_id>` suffix, `.xpak` -- not `.tbz2` -- extension). A `.xpak`
-    file is byte-format-identical to a `.tbz2` (real `bin/misc-functions.
+    file is byte-format-identical to a `.tbz2` (Portage `bin/misc-functions.
     sh` builds `[image][XPAK]` regardless of `BUILD_ID`), so the
     no-`Packages`-index scan reads it with the same reader, takes the
-    `BUILD_ID` from the filename, and the resolver renders the real
+    `BUILD_ID` from the filename, and the resolver renders the Portage
     `_append_build_id` `-<build_id>` version suffix. Both implementations
     must agree.
 
     The fixture is the genuine `packagepkg-1.0.tbz2` (built by portuale's
-    own `ebuild <file> package`, real `xpak.py`) placed under the
+    own `ebuild <file> package`, Portage `xpak.py`) placed under the
     multi-instance layout -- its embedded `PF` is what validates the
     `<pf>-<build_id>` filename."""
     cfg = tmp_path / "cfg"
@@ -8170,31 +8170,31 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
     off_env = dict(env, PORTUALE_ABORT_PATH="0")
     legacy = _run([str(emerge_binary)], args, off_env)
-    # Real `output.py::_append_build_id`: the `-3` from the filename.
+    # Portage `output.py::_append_build_id`: the `-3` from the filename.
     assert legacy.stdout.splitlines()[0].startswith(
         "[binary  N     ] dev-libs/packagepkg-1.0-3 "
     ), legacy.stdout
 
 
-def test_pkgdir_scan_skips_real_invalid_class_and_aborts_the_rest(
+def test_pkgdir_scan_skips_portage_invalid_class_and_aborts_the_rest(
     emerge_binary, tmp_path, fixtures_root
 ):
-    """Backlog #60: real `bintree._populate_local` catches
+    """Backlog #60: Portage `bintree._populate_local` catches
     `(PortagePackageException, SignatureException)` around each file's
-    metadata read, prints real's own
+    metadata read, prints Portage's own
     `!!! Invalid binary package: '<path>', <msg>` and skips that file
     (`bintree.py:1185-1199`); anything else propagates (S0 live capture:
     cell i8's inner `other/KEY` is InvalidBinaryPackageFormat, cell i1's
     inner symlink to `/etc/hostname` is `KeyError`). Portuale used to
     abort the whole `$PKGDIR` scan on either -- one crafted file hid
-    every valid candidate. Now the invalid class is skipped with real's
+    every valid candidate. Now the invalid class is skipped with Portage's
     message (path once, then the reader's own reason) while the fatal
     class still aborts, so the warning shape and both exit codes are
     pinned here.
 
     The crafted archives are the #58 S0 cells
-    (`scripts/gpkg_crafted_members.py --mode build`: real-writer-shaped
-    with a recomputed Manifest), so real's own reader produces the same
+    (`scripts/gpkg_crafted_members.py --mode build`: Portage-writer-shaped
+    with a recomputed Manifest), so Portage's own reader produces the same
     classification. Skipped if the host lacks `zstd` for the cells.
     """
     if shutil.which("zstd") is None:
@@ -8242,7 +8242,7 @@ def test_pkgdir_scan_skips_real_invalid_class_and_aborts_the_rest(
         text=True,
     )
 
-    # i8 (inner `other/KEY`): real's skip class -> warning, rc 0, and the
+    # i8 (inner `other/KEY`): Portage's skip class -> warning, rc 0, and the
     # valid candidate survives.
     (i8,) = cells.glob("i8-*.gpkg.tar")
     invalid = pkgdir / "dev-libs/invalidotherpkg-1.0.gpkg.tar"
@@ -8255,7 +8255,7 @@ def test_pkgdir_scan_skips_real_invalid_class_and_aborts_the_rest(
         'inner metadata member "other/KEY" is outside metadata/'
     ) in skipped.stderr
 
-    # i1 (inner symlink to a host path): real's abort class -> the scan
+    # i1 (inner symlink to a host path): Portage's abort class -> the scan
     # still stops (rc 1), and no candidate is resolved.
     invalid.unlink()
     (i1,) = cells.glob("i1-*.gpkg.tar")
@@ -8274,14 +8274,14 @@ def test_getbinpkg_makes_a_remote_binhost_binary_eligible(
     """dev-libs/remotebinpkg exists ONLY as a binary in the binhost's own
     Packages index (fixtures/binhost/Packages, reached via
     fixtures/etc/portage/binrepos.conf's `[testbinhost] sync-uri =
-    file://...`), with no ebuild and no local $PKGDIR entry. Real
+    file://...`), with no ebuild and no local $PKGDIR entry. Portage
     main.py's `--getbinpkg`/`-g` is what adds a binrepo's packages to the
-    candidate pool (real bintree._populate_remote); `--usepkg` alone
+    candidate pool (Portage bintree._populate_remote); `--usepkg` alone
     (local $PKGDIR only) leaves it invisible, exactly like an
     ebuild-only-package "no ebuilds to satisfy" failure. `-v` renders the
-    real `g` bracket column (output.py:648 `attr_display.remote_binary =
+    Portage `g` bracket column (output.py:648 `attr_display.remote_binary =
     pkg.remote`) and the binary's own SIZE feeds `Size of downloads:`
-    (real bindbapi.getfetchsizes); the REPO field in the index is
+    (Portage bindbapi.getfetchsizes); the REPO field in the index is
     surfaced as `::gentoo`."""
     # --usepkg alone: not eligible (local $PKGDIR only).
     up = _run(
@@ -8324,7 +8324,7 @@ def test_getbinpkg_makes_a_remote_binhost_binary_eligible(
 
 
 def test_emerge_default_opts_env_applies_and_argv_wins(emerge_binary, fixture_env):
-    """Real `_emerge/main.py:1352-1360` parses `EMERGE_DEFAULT_OPTS` tokens
+    """Portage `_emerge/main.py:1352-1360` parses `EMERGE_DEFAULT_OPTS` tokens
     before argv, so a bare invocation picks them up and a command-line
     option still wins. Backlog #63."""
     # Defaults alone: `--pretend --getbinpkg` on the environment turns a
@@ -8407,7 +8407,7 @@ def _configroot_with_profile_set(tmp_path, fixtures_root):
 def test_profile_set_packages_join_world_and_are_a_target(
     emerge_binary, fixture_env, fixtures_root, tmp_path
 ):
-    """Backlog #64: real `@world` is `@profile @selected @system`
+    """Backlog #64: Portage `@world` is `@profile @selected @system`
     (`portage/_sets/__init__.py:97-98`), and `@profile` is the unstarred
     `packages` lines of levels whose repo declares `profile-set`
     (`_sets/profiles.py:13-41`). The committed fixture repo declares only
@@ -8447,9 +8447,9 @@ def test_getbinpkg_slot_repo_decoration_on_a_remote_binary_line(
     emerge_binary, fixture_env
 ):
     """dev-libs/remotebinslotpkg is a binhost-only binary with SLOT=2/1 --
-    verbosity-3 `:slot/sub_slot` + `::repo` decoration (real _append_slot
+    verbosity-3 `:slot/sub_slot` + `::repo` decoration (Portage _append_slot
     / _append_repository) applies to a `[binary ... g]` line just like any
-    other bracket cpv. The `BUILD_ID` suffix (`-1`, real
+    other bracket cpv. The `BUILD_ID` suffix (`-1`, Portage
     _append_build_id) lands *before* the `:slot` decoration:
     `remotebinslotpkg-1.0-1:2/1::gentoo`."""
     v = _run(
@@ -8468,10 +8468,10 @@ def test_getbinpkg_slot_repo_decoration_on_a_remote_binary_line(
 def test_getbinpkg_equiv_ebuild_visible_rejects_an_orphaned_binary(
     emerge_binary, fixture_env
 ):
-    """_equiv_ebuild_visible (real depgraph.py:8015-8025): dev-libs/
+    """_equiv_ebuild_visible (Portage depgraph.py:8015-8025): dev-libs/
     eqebvispkg has only a 1.0 ebuild in the tree, but the binhost carries
     a 2.0 binary (its ebuild since removed). Because a visible ebuild
-    (1.0) matches the atom, real requires a visible ebuild at the
+    (1.0) matches the atom, Portage requires a visible ebuild at the
     binary's *exact* version -- there is none at 2.0, so the binary is
     dropped and the resolve is `[ebuild N] eqebvispkg-1.0`. Under
     --getbinpkgonly the check is skipped (the orphan 2.0 binary is
@@ -8501,7 +8501,7 @@ def test_usepkg_binary_of_a_since_removed_ebuild_is_reinstalled_only_when_it_dif
 ):
     """Real bug #354441 / `identical_binary` (`depgraph.py:8001-8014`)
     plus `_equiv_ebuild_visible` (`depgraph.py:7399`): when a package's
-    ebuild has since been removed, real rejects the *installed* built
+    ebuild has since been removed, Portage rejects the *installed* built
     instance for ebuild-invisibility and merges the available binary in
     its place -- `identical_binary` suppresses that reinstall only when
     the binary carries the *same* BUILD_TIME as what's installed.
@@ -8566,7 +8566,7 @@ def test_usepkg_binary_of_a_since_removed_ebuild_is_reinstalled_only_when_it_dif
     assert rust.returncode == 0, (rust.stdout, rust.stderr)
     assert rust.stdout.splitlines() == [f'[binary   R    ] dev-libs/idbinpkg-1.0 to {env["ROOT"]}']
 
-    # A bare top-level atom still reinstalls (matches real -- `emerge foo`
+    # A bare top-level atom still reinstalls (matches Portage -- `emerge foo`
     # always replaces), so this isn't a "never reinstall" regression.
     bare = _run([str(emerge_binary)], ["--pretend", "--usepkg", "dev-libs/idbinpkg"], env)
     assert bare.returncode == 0
@@ -8579,7 +8579,7 @@ def test_getbinpkg_binpkg_changed_deps_rejects_a_stale_binary(
     """--binpkg-changed-deps auto-enables whenever --usepkgonly is not
     given (create_depgraph_params.py:196-203). dev-libs/bcdeppkg's tree
     ebuild RDEPENDs dev-libs/bcdepnew, but the binhost binary was built
-    RDEPENDing dev-libs/bcdepold. Real _wrapped_select_pkg... rejects the
+    RDEPENDing dev-libs/bcdepold. Portage _wrapped_select_pkg... rejects the
     binary (self._changed_deps) and falls to the ebuild, so the resolve
     is `[ebuild N] bcdeppkg` + `[ebuild N] bcdepnew` -- never the binary,
     never bcdepold."""
@@ -8596,14 +8596,14 @@ def test_getbinpkg_binpkg_changed_deps_rejects_a_stale_binary(
 def test_usepkg_slot_operator_mask_built_rejects_a_stale_slot_binary(
     emerge_binary, fixture_env
 ):
-    """Real `_slot_change_backtrack` (`3rdparty/portage/lib/_emerge/
+    """Portage `_slot_change_backtrack` (`3rdparty/portage/lib/_emerge/
     depgraph.py:2383`) masks a non-installed binary whose built
     slot-operator dep cannot be satisfied the way it was built, and the
     backtrack-config restart (`:5703-5712`) resolves the dep to the tree
     ebuild instead. dev-libs/somaskchild-1.0's local-PKGDIR binary was
     built at SLOT="0/1" while the tree ebuild moved to SLOT="0/2"
     without a revbump; dev-libs/somaskparent-1.0 carries the unbuilt
-    RDEPEND="dev-libs/somaskchild:=". Expected value from real Portage
+    RDEPEND="dev-libs/somaskchild:=". Expected value from Portage
     3.0.82.2: the S0 probe on this branch merges `[ebuild N]
     somaskchild-1.0` + `[ebuild N] somaskparent-1.0` (rc 0); pre-#212
     portuale merged the stale `[binary N] somaskchild-1.0-1` instead."""
@@ -8619,7 +8619,7 @@ def test_usepkg_slot_operator_mask_built_rejects_a_stale_slot_binary(
 def test_binpkg_changed_deps_explicit_override(
     emerge_binary, fixture_env
 ):
-    """`--binpkg-changed-deps=y|n` (real `create_depgraph_params.py:196-203`
+    """`--binpkg-changed-deps=y|n` (Portage `create_depgraph_params.py:196-203`
     + `default_arg_opts`): the explicit override of the automatic default
     (on unless `--usepkgonly`). `=n` keeps the stale dev-libs/bcdeppkg
     binary that `--getbinpkg` would otherwise reject; `=y` forces the
@@ -8655,7 +8655,7 @@ def test_binpkg_changed_deps_explicit_override(
 def test_use_ebuild_visibility_enforces_the_check_under_usepkgonly(
     emerge_binary, fixture_env
 ):
-    """`--use-ebuild-visibility` (real `main.py:1103`, `depgraph.py:8027`'s
+    """`--use-ebuild-visibility` (Portage `main.py:1103`, `depgraph.py:8027`'s
     `not use_ebuild_visibility and (usepkgonly or useoldpkg)` guard):
     `_equiv_ebuild_visible` is normally skipped under `--usepkgonly`, so
     `--getbinpkgonly dev-libs/eqebvispkg` keeps the orphaned 2.0 binary
@@ -8678,7 +8678,7 @@ def test_getbinpkg_multi_instance_newest_build_time_wins(
 ):
     """binpkg-multi-instance: the binhost `Packages` lists three builds of
     dev-libs/multiinst-1.0 (BUILD_ID 1/3/2, BUILD_TIME 1000/3000/2000, in
-    that file order). Real `dbapi._cmp_cpv` orders same-version instances
+    that file order). Portage `dbapi._cmp_cpv` orders same-version instances
     by BUILD_TIME and `_iter_match_pkgs` yields them newest-first, so the
     selection lands on BUILD_ID 3 -- not the first in file order, nor the
     highest BUILD_ID by numeric luck."""
@@ -8699,7 +8699,7 @@ def _multi_instance_tree(tmp_path, remote_builds, local_builds=()):
     `remote_builds` / `local_builds` are `(build_id, build_time, rdepend,
     size)` tuples, written in the order given (oldest first, like the
     live binhost). The local ones go in `$PKGDIR/Packages` (with a
-    placeholder file of the declared size so real bintree keeps them),
+    placeholder file of the declared size so Portage bintree keeps them),
     the remote ones in a `file://` binhost. Returns the env dict."""
     cfg = tmp_path / "cfg"
     repo = tmp_path / "repo"
@@ -8709,7 +8709,7 @@ def _multi_instance_tree(tmp_path, remote_builds, local_builds=()):
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles/repo_name").write_text("main\n")
     (repo / "profiles/arch.list").write_text("amd64\n")
-    # A profile real Portage accepts (it rejects a bare `profiles/` dir):
+    # A profile Portage accepts (it rejects a bare `profiles/` dir):
     # `ARCH` set, EAPI declared, so the same tree is a valid oracle run.
     (repo / "profiles/default").mkdir()
     (repo / "profiles/default/eapi").write_text("8\n")
@@ -8764,7 +8764,7 @@ def test_getbinpkg_multi_instance_walks_the_selected_builds_own_deps(
 ):
     """Backlog #299. `dev-libs/mispectre-1.0` has two remote builds, listed
     oldest first: BUILD_ID 1 (BUILD_TIME 100, `RDEPEND=dev-libs/olddep`) and
-    BUILD_ID 2 (BUILD_TIME 200, `RDEPEND=dev-libs/newdep`). Real picks the
+    BUILD_ID 2 (BUILD_TIME 200, `RDEPEND=dev-libs/newdep`). Portage picks the
     newest build (`dbapi._cmp_cpv`) and walks *that* instance's own
     dependency metadata, so the plan carries `newdep` and never `olddep`.
     Portuale used to read the dependency strings from the first same-`CPV`
@@ -8790,7 +8790,7 @@ def test_getbinpkg_multi_instance_local_build_does_not_shadow_a_newer_remote_bui
 ):
     """Backlog #300. `$PKGDIR` already holds BUILD_ID 1 of
     `dev-libs/mispectre-1.0` (a stale download) while the binhost lists
-    builds 1 and 2. Real `bintree.isremote` is per instance (`cpv` +
+    builds 1 and 2. Portage `bintree.isremote` is per instance (`cpv` +
     `build_id` under binpkg-multi-instance), so only the remote *copy of
     build 1* is shadowed: build 2 stays a candidate, is the newest, and
     wins -- as a remote (`g`) binary, walking its own `newdep`. Portuale
@@ -8819,7 +8819,7 @@ def _slotop_pin_tree(tmp_path):
     built against the *old* sub-slot (`RDEPEND=dev-libs/mibar:0/1=`), so
     its recorded pin could only be met by downgrading `mibar` to 1.0.
     The host shape: installed `libfido2` bound to `libcbor:0/0.13=` while
-    `libcbor` 0.14 (`0/0.14`) is installed. Real Portage's first pass does
+    `libcbor` 0.14 (`0/0.14`) is installed. Portage's first pass does
     pick the downgrade, then backtracks on "missed slot abi update" and
     rebuilds the consumer instead. Returns the env dict."""
     cfg = tmp_path / "cfg"
@@ -8884,11 +8884,11 @@ def test_update_rebuilds_a_stale_consumer_instead_of_downgrading_its_provider(
     """Backlog #303. `dev-libs/mibar` is installed at 2.0 (`SLOT=0/2`); the
     installed `dev-libs/miholder-1.0` was built against the old sub-slot
     (`RDEPEND=dev-libs/mibar:0/1=`) and the tree still carries `mibar-1.0`
-    (`0/1`). Real's first pass honours the recorded pin by scheduling that
+    (`0/1`). Portage's first pass honours the recorded pin by scheduling that
     downgrade, then its `_slot_operator_update_probe` finds the installed
     2.0 as the missed update and backtracks ("backtracking due to missed
     slot abi update"): the consumer is rebuilt (`rR`) and `mibar` stays
-    put. Confirmed on real Portage 3.0.x with this exact tree; on the host
+    put. Confirmed on Portage 3.0.x with this exact tree; on the host
     the same shape was `libfido2`/`libcbor` and `libcdio-paranoia`/
     `libcdio`. Portuale used to settle on the downgrade of `mibar` and
     leave the consumer alone."""
@@ -8978,12 +8978,12 @@ def test_update_does_not_rebuild_a_consumer_whose_ebuild_pins_the_old_slot(
 ):
     """Backlog #304. `dev-libs/mislot` is installed in slot 0 and the tree
     also has it in slot 1. `dev-libs/pinned` (in world) is bound to
-    `mislot:0/1=` and its ebuild still says `mislot:0=`. Real's
+    `mislot:0/1=` and its ebuild still says `mislot:0=`. Portage's
     `_slot_operator_update_probe(new_child_slot=True)` only reports an
     update when a *replacement parent's* own atom accepts the new-slot
     candidate (`replacement_candidates`/`all_candidate_pkgs`): `mislot:0=`
     cannot pull in slot 1, so nothing is rebuilt and the update is empty
-    (confirmed on real Portage 3.0.x with this tree; on the host this was
+    (confirmed on Portage 3.0.x with this tree; on the host this was
     `gnome-keyring` and `mplayer` re-planned as `rR` after a complete
     upgrade). Portuale used to schedule the rebuild because it only
     checked that the consumer has *some* tree candidate."""
@@ -9000,12 +9000,12 @@ def test_update_does_not_rebuild_a_consumer_whose_ebuild_pins_the_old_slot(
 
 def test_downgrade_is_distinguished_from_upgrade(emerge_binary, fixture_env):
     """dev-libs/downgradepkg is installed at 2.0, but only 1.0 is visible
-    in the tree (its own 2.0 ebuild is gone) -- real output.py's own
+    in the tree (its own 2.0 ebuild is gone) -- Portage output.py's own
     in-slot best() check (around line 750) flags this as a genuine
     downgrade, not an "upgrade" to an older version; before this slice,
     resolve_pretend labeled ANY version change for an installed package
     as Upgrade without ever comparing versions. The installed version
-    (2.0) has no visible candidate of its own, so real avoid_update's
+    (2.0) has no visible candidate of its own, so Portage avoid_update's
     shortcut doesn't apply even without --update -- see resolve_pretend's
     own doc comment on requiring a *visible* candidate, not just a vdb
     entry."""
@@ -9021,7 +9021,7 @@ def test_keyword_masked_but_installed_top_level_atom_still_downgrades(emerge_bin
     """dev-libs/keywordmaskedpkg is installed at 2.0 (KEYWORDS="~amd64",
     not accepted under the fixture profile's own default
     ACCEPT_KEYWORDS="amd64") -- only 1.0 (KEYWORDS="amd64") is currently
-    visible. As a TOP-LEVEL atom, real depgraph.py's own later
+    visible. As a TOP-LEVEL atom, Portage depgraph.py's own later
     avoid_update block (`_pkg_visibility_check`) still requires
     visibility, so this stays a real downgrade -- distinct from the
     DEPENDENCY case in the very next test below."""
@@ -9038,7 +9038,7 @@ def test_keyword_masked_but_installed_dependency_is_kept_not_downgraded(
 ):
     """dev-libs/needskeywordmasked (New) RDEPENDs on the same
     dev-libs/keywordmaskedpkg as the test above -- but reached only as a
-    DEPENDENCY here, real depgraph.py's own EARLIER avoid_update return
+    DEPENDENCY here, Portage depgraph.py's own EARLIER avoid_update return
     (no visibility check at all, see resolve_pretend's own doc comment)
     means it's kept exactly as installed (2.0), never even considered
     for a downgrade. Confirmed live against a real system
@@ -9058,7 +9058,7 @@ def test_emptytree_downgrades_a_keyword_masked_installed_dependency(
     emerge_binary, fixture_env
 ):
     """#157: the same dev-libs/needskeywordmasked dependency as the test
-    above, but under `--emptytree`. Real drops every installed candidate
+    above, but under `--emptytree`. Portage drops every installed candidate
     before selection (`depgraph.py:7888-7899`: `if empty and
     pkg.installed ...: continue`), so the dependency avoid_update return
     (`depgraph.py:8453-8458`, `return inst_pkg`) never fires -- the
@@ -9111,7 +9111,7 @@ def test_installed_dependency_use_dep_flag_only_in_built_use_is_kept(
     dropped divergedflag from its IUSE -- so nothing in the tree can
     satisfy [divergedflag] (proven by the sibling top-level case).
 
-    Real dbapi._iuse_implicit_cnstr / _iuse_implicit_built (bug 640318):
+    Portage dbapi._iuse_implicit_cnstr / _iuse_implicit_built (bug 640318):
     for a built package, every flag in its recorded USE counts as a valid
     IUSE flag, independent of the profile's / ebuild's current IUSE. So
     the installed version satisfies the atom and the dependency is kept
@@ -9127,14 +9127,14 @@ def test_installed_dependency_use_dep_flag_only_in_built_use_is_kept(
 
     # As a top-level target the same atom still needs a *visible* ebuild
     # (the avoid-update-against-vdb path is dependency-only), so it fails --
-    # with real `_show_unsatisfied_dep`'s "no ebuilds built with USE flags"
+    # with Portage `_show_unsatisfied_dep`'s "no ebuilds built with USE flags"
     # block (backlog #265(b) with #273: the argument-atom half, same path
     # as the `useflagpkg[-foo]` cell): the `(Missing IUSE: divergedflag)`
-    # row and, like real for an argument parent, no `(dependency required
-    # by …)` lines. Grounded on a real 3.0.82.2 container probe over the
+    # row and, like Portage for an argument parent, no `(dependency required
+    # by …)` lines. Grounded on a Portage 3.0.82.2 container probe over the
     # oracle's own staging (`emerge --ignore-default-opts --pretend
     # 'dev-libs/builtusedivergedep[divergedflag]'`, rc 1, the block above
-    # with real's staging `for <root>.` suffix, which portuale omits per
+    # with Portage's staging `for <root>.` suffix, which portuale omits per
     # the `fixture-miss-message-unsuffixed` class).
     top = _run(
         [str(emerge_binary)],
@@ -9156,16 +9156,16 @@ def test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable(
     """dev-libs/anyofunresolvable's own RDEPEND is
     "|| ( dev-libs/doesnotexist-anywhere dev-libs/alsodoesnotexist-anywhere )"
     -- neither alternative has a visible candidate anywhere, NOR any vdb
-    entry, NOR even a bare cp-level installed match, so real dep_zapdeps
+    entry, NOR even a bare cp-level installed match, so Portage dep_zapdeps
     (backlog #22 slice 4) classifies BOTH as plain `other` (rank 1) --
     tied. `promote_tied_alternative` finds nothing to promote (neither
     has any installed/in-graph/cp_map fact at all), so the tie stays
-    first-listed: `doesnotexist-anywhere` is the one real's own
+    first-listed: `doesnotexist-anywhere` is the one Portage's own
     `allow_masked` second pass actually selects; `alsodoesnotexist-
     anywhere`, the never-chosen alternative, is dropped entirely rather
     than reported alongside it. Backlog #19's abort path then flips the
     overall exit code to 1 (a `NoVisibleCandidate` dependency of a
-    merge-bound package means real would abandon the resolve) and Slice 4
+    merge-bound package means Portage would abandon the resolve) and Slice 4
     suppresses the merge list -- the #22 fine-bin selection and the #19
     abort path are independent fixes that both apply: #22 decides WHICH
     dead alternative gets named, #19 decides that naming one at all is a
@@ -9186,7 +9186,7 @@ def test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable(
 def test_env_config_vars_override_the_profile_and_make_conf(
     emerge_binary, fixture_env
 ):
-    """Real `config.regenerate()`'s `env` USE_ORDER layer: config vars in
+    """Portage `config.regenerate()`'s `env` USE_ORDER layer: config vars in
     the process environment override / stack on the profile chain +
     make.conf. `ACCEPT_KEYWORDS=~amd64 emerge <~amd64-only pkg>` makes it
     visible; `USE=...`/`VIDEO_CARDS=...` flip a USE-conditional dep;
@@ -9217,13 +9217,13 @@ def test_env_config_vars_override_the_profile_and_make_conf(
     assert '\nACCEPT_KEYWORDS="amd64 ~amd64"\n' in info.stdout
 
 
-def test_real_use_flags_from_profile_gate_a_dependency(emerge_binary, fixture_env):
-    """Pins the profile/make.conf -> real USE follow-up end to end: the
+def test_portage_use_flags_from_profile_gate_a_dependency(emerge_binary, fixture_env):
+    """Pins the profile/make.conf -> Portage USE follow-up end to end: the
     fixture's profile chain + make.conf (see fixtures/repo/profiles
     and portage-profile's own contract test) resolves "foo" enabled and
     "missingflag" disabled, so useflagpkg's `foo? ( dev-libs/newpkg )`
     dependency must be pulled in and its
-    `missingflag? ( dev-libs/hiddendep )` must not be -- proving real
+    `missingflag? ( dev-libs/hiddendep )` must not be -- proving Portage
     profile-derived USE, not a hardcoded empty set, reaches use_reduce."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/useflagpkg"], fixture_env)
     assert result.returncode == 0
@@ -9236,7 +9236,7 @@ def test_real_use_flags_from_profile_gate_a_dependency(emerge_binary, fixture_en
 
 def test_use_expand_variable_drives_a_dependency(emerge_binary, fixture_env):
     """fixtures/repo/profiles/base/make.defaults declares
-    USE_EXPAND="VIDEO_CARDS" and VIDEO_CARDS="nvidia" -- real config.py's
+    USE_EXPAND="VIDEO_CARDS" and VIDEO_CARDS="nvidia" -- Portage config.py's
     own USE_EXPAND mechanism (PMS 7.3.4) expands that into the pseudo-USE
     flag "video_cards_nvidia", added to the global USE set exactly like
     an ordinary profile-declared flag would be. dev-libs/useexpandpkg's
@@ -9259,7 +9259,7 @@ def test_use_expand_variable_drives_a_dependency(emerge_binary, fixture_env):
 
 def test_package_use_expand_prefix_shorthand_drives_a_dependency(emerge_binary, fixture_env):
     """fixtures/etc/portage/package.use has "dev-libs/
-    packageuseexpandpkg PYTHON_TARGETS: python3_12" -- real
+    packageuseexpandpkg PYTHON_TARGETS: python3_12" -- Portage
     UseManager._parse_user_files_to_extatomdict's own shorthand syntax
     (PMS-adjacent, user-level package.use only -- see
     parse_package_use_lines's own doc comment, portage-profile) expands
@@ -9282,7 +9282,7 @@ def test_package_use_expand_prefix_shorthand_drives_a_dependency(emerge_binary, 
 
 def test_use_expand_unprefixed_variable_drives_a_dependency(emerge_binary, fixture_env):
     """fixtures/repo/profiles/arch/amd64/make.defaults declares
-    USE_EXPAND_UNPREFIXED="ARCH" and ARCH="amd64" -- real config.py's own
+    USE_EXPAND_UNPREFIXED="ARCH" and ARCH="amd64" -- Portage config.py's own
     USE_EXPAND_UNPREFIXED mechanism (the same one that makes "amd64"
     exist as a real USE flag in actual Gentoo at all) contributes the
     bare pseudo-USE flag "amd64" directly, with no "arch_" prefix at all
@@ -9306,7 +9306,7 @@ def test_use_expand_star_wildcard_expands_against_the_packages_own_iuse(
     emerge_binary, fixture_env
 ):
     """fixtures/etc/portage/package.use: "dev-libs/wildexpandpkg
-    linguas_*" -- real config.py setcpv's own _* wildcard: enable every
+    linguas_*" -- Portage config.py setcpv's own _* wildcard: enable every
     linguas_<x> flag declared in THIS package's own IUSE
     ("linguas_en linguas_de") that isn't masked. profiles/base/
     package.use.mask keeps linguas_en off, so USE ends up
@@ -9330,7 +9330,7 @@ def test_use_expand_star_wildcard_expands_against_the_packages_own_iuse(
 def test_pv_decorates_the_cpv_with_slot_and_repo(
     emerge_binary, fixture_env
 ):
-    """Real `emerge -pv` (verbosity 3) runs `_append_slot` +
+    """Portage `emerge -pv` (verbosity 3) runs `_append_slot` +
     `_append_repository` on the bracket cpv (and `convert_myoldbest` on
     each `[old-ver]`): `::repo` is always appended (quiet_repo_display
     defaults off), `:slot` only when the slot/sub-slot is other than
@@ -9353,7 +9353,7 @@ def test_pv_decorates_the_cpv_with_slot_and_repo(
     )
 
     # A new-slot New: the resolved `:1` and the other-slot `[1.0:0::…]`
-    # list (real `myoldbest = installed_versions`, all slots).
+    # list (Portage `myoldbest = installed_versions`, all slots).
     ns = _run([str(emerge_binary)], ["--pretend", "-v", "dev-libs/newslotpkg:1"], fixture_env)
     assert ns.stdout.splitlines()[0] == (
         f'[ebuild  NS    ] dev-libs/newslotpkg-2.0:1::testrepo [1.0:0::testrepo] to {fixture_env["ROOT"]}'
@@ -9376,12 +9376,12 @@ def test_pv_decorates_the_cpv_with_slot_and_repo(
 def test_pv_groups_use_by_use_expand_variable(
     emerge_binary, fixture_env
 ):
-    """Real output.py:_display_use / map_to_use_expand: `emerge -pv` shows
+    """Portage output.py:_display_use / map_to_use_expand: `emerge -pv` shows
     IUSE flags split into the plain USE="..." group plus one VAR="..."
     group per USE_EXPAND variable (prefix stripped), empty groups omitted.
     dev-libs/useexpandpkg (IUSE video_cards_nvidia video_cards_amdgpu,
     VIDEO_CARDS a USE_EXPAND var) shows VIDEO_CARDS="nvidia -amdgpu" and
-    no USE="" at all. Real `_create_use_string` appends one trailing
+    no USE="" at all. Portage `_create_use_string` appends one trailing
     space per group (backlog #272), so the row ends with `" `."""
     for pkg, expected in [
         ("useexpandpkg", 'VIDEO_CARDS="nvidia -amdgpu"'),
@@ -9399,7 +9399,7 @@ def test_pv_omits_a_use_expand_hidden_group(
     emerge_binary, fixture_env
 ):
     """USE_EXPAND_HIDDEN="CPU_FLAGS_X86" (fixtures/repo/profiles/base/
-    make.defaults): real output.py:map_to_use_expand's remove_hidden
+    make.defaults): Portage output.py:map_to_use_expand's remove_hidden
     drops that group from the -pv display entirely. dev-libs/
     hiddenexpandpkg (IUSE cpu_flags_x86_sse2 cpu_flags_x86_avx, sse2
     enabled via CPU_FLAGS_X86="sse2") therefore shows no USE display at
@@ -9420,7 +9420,7 @@ def test_pv_omits_a_use_expand_hidden_group(
 def test_pv_marks_use_changes_against_the_installed_version(
     emerge_binary, fixture_env
 ):
-    """Real output_helpers.py::_create_use_string, for an entry that
+    """Portage output_helpers.py::_create_use_string, for an entry that
     replaces an installed one (is_new=False), diffs each flag against the
     installed version's own recorded USE/IUSE and appends `*` (value
     changed) / `%` (flag newly in IUSE). `emerge -pv` always runs with
@@ -9467,7 +9467,7 @@ def test_use_expand_implicit_flag_is_valid_iuse_even_when_unlisted(
 ):
     """fixtures/repo/profiles/base/make.defaults declares
     USE_EXPAND_IMPLICIT="ELIBC", USE_EXPAND_VALUES_ELIBC="glibc musl",
-    ELIBC="glibc" -- real config.py's _calc_iuse_effective: elibc_glibc /
+    ELIBC="glibc" -- Portage config.py's _calc_iuse_effective: elibc_glibc /
     elibc_musl become valid *implicit* IUSE for every package (EAPI 5+
     pkg.iuse.is_valid_flag). dev-libs/implicitiusepkg RDEPENDs
     implicitiuseprov[elibc_glibc]; implicitiuseprov never lists
@@ -9487,10 +9487,10 @@ def test_use_expand_implicit_flag_is_valid_iuse_even_when_unlisted(
     bad = _run([str(emerge_binary)], ["--pretend", "dev-libs/implicitiusepkgmusl"], fixture_env)
     assert bad.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     _assert_abort_preamble(bad.stdout)
-    # Backlog #20: the block, not the bare line. Divergence note: real
+    # Backlog #20: the block, not the bare line. Divergence note: Portage
     # resolves this one through --autounmask-use (its blocked-change
     # suggestion names `>=dev-libs/implicitiuseprov-1.0 elibc_musl`),
-    # because real treats implicit IUSE flags as flippable; portuale's
+    # because Portage treats implicit IUSE flags as flippable; portuale's
     # autounmask suggestion does not cover implicit flags yet, so its
     # display falls back to this disclosure. The pinned text is
     # portuale's,
@@ -9508,7 +9508,7 @@ def test_use_stable_force_and_package_use_stable_mask_apply_when_stable(
     emerge_binary, fixture_env
 ):
     """dev-libs/stableusepkg's own KEYWORDS="amd64" (no "~") is genuinely
-    stable under real KeywordsManager.isStable (PMS-adjacent; see
+    stable under Portage KeywordsManager.isStable (PMS-adjacent; see
     portage-repo's own is_stable doc comment): converting it to "~amd64"
     would fall outside the fixture's own ACCEPT_KEYWORDS="amd64", so
     portage-repo's own is_stable check is True. use.stable.force (global,
@@ -9547,7 +9547,7 @@ def test_use_stable_force_and_package_use_stable_mask_skip_an_unstable_candidate
     assert result.returncode == 0
     # `~` bracket marker: unstableusepkg (KEYWORDS="~amd64") is visible
     # only via a "dev-libs/unstableusepkg ~amd64" package.accept_keywords
-    # entry -- a testing keyword for our own arch (real gen_mask_str).
+    # entry -- a testing keyword for our own arch (Portage gen_mask_str).
     assert result.stdout == (
         f'[ebuild  N    ~] dev-libs/unstableusepkg-1.0::testrepo to {fixture_env["ROOT"]} USE="maskflag -stableforceflag" \n\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n'
     )
@@ -9578,18 +9578,18 @@ def test_package_mask_minus_atom_removal_leaves_candidate_unaffected(
     same file -- it must resolve completely normally (visible, matched),
     proving -atom removal actually took effect rather than the mask
     lingering. A bare top-level atom with no other flags reports a plain
-    reinstall (real portage's own "selective" gap -- see resolve_pretend's
+    reinstall (Portage's own "selective" gap -- see resolve_pretend's
     own doc comment, portage-repo), not "already installed"."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/samepkg"], fixture_env)
     assert result.returncode == 0
     assert result.stdout.strip() == f'[ebuild   R    ] dev-libs/samepkg-1.0 [1.0] to {fixture_env["ROOT"]}'
 
 
-def test_license_eula_style_group_is_masked_by_the_real_default_accept_license(
+def test_license_eula_style_group_is_masked_by_the_portage_default_accept_license(
     emerge_binary, fixture_env
 ):
     """Neither the fixture profile chain nor make.conf sets
-    ACCEPT_LICENSE at all -- real portage's own "* -@EULA" default
+    ACCEPT_LICENSE at all -- Portage's own "* -@EULA" default
     applies, and fixtures/repo/profiles/base/license_groups
     defines EULA="SomeEula", so dev-libs/eulapkg's own
     LICENSE="SomeEula" is masked, same "All ebuilds ... masked" report
@@ -9606,7 +9606,7 @@ def test_license_any_of_group_is_visible_via_the_accepted_alternative(
     emerge_binary, fixture_env
 ):
     """dev-libs/anyoflicensepkg's own LICENSE="|| ( GPL-2 SomeEula )" --
-    GPL-2 is accepted via the real default's own "*" token, so the ||
+    GPL-2 is accepted via the Portage default's own "*" token, so the ||
     group is satisfied even though SomeEula alone would be masked."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/anyoflicensepkg"], fixture_env
@@ -9631,7 +9631,7 @@ def test_license_package_license_unmasks_an_otherwise_eula_masked_package(
 def test_an_overlay_own_license_groups_stacks_with_the_main_repo(
     emerge_binary, fixture_env
 ):
-    """Real LicenseManager reads license_groups from
+    """Portage LicenseManager reads license_groups from
     LocationsManager.profile_locations -- the `profiles/` directory of
     the main repo AND every overlay (LocationsManager.py:432), NOT the
     profile-chain levels. fixtures/overlay/profiles/license_groups
@@ -9639,7 +9639,7 @@ def test_an_overlay_own_license_groups_stacks_with_the_main_repo(
     fixtures/repo/profiles/license_groups "SomeEula" member,
     proving the two stack (main first, then overlay) rather than one
     replacing the other. dev-libs/crossrepolicensepkg's own
-    LICENSE="CrossRepoNonfree" is therefore masked by the real default
+    LICENSE="CrossRepoNonfree" is therefore masked by the Portage default
     "* -@EULA"."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/crossrepolicensepkg"], fixture_env
@@ -9661,10 +9661,10 @@ def test_license_use_conditional_visible_when_flag_off_masked_when_forced_on(
     sibling dev-libs/uselicensepkgforced has the identical LICENSE, but
     fixtures/etc/portage/package.use forces nonfreeflag on for
     it specifically, activating the conditional and masking it via the
-    same real default that masks dev-libs/eulapkg."""
+    same Portage default that masks dev-libs/eulapkg."""
     off = _run([str(emerge_binary)], ["--pretend", "dev-libs/uselicensepkg"], fixture_env)
     assert off.returncode == 0
-    # Real `_create_use_string` appends one trailing space per group
+    # Portage `_create_use_string` appends one trailing space per group
     # (backlog #272); compare unstripped so the byte is pinned.
     assert off.stdout == f'[ebuild  N     ] dev-libs/uselicensepkg-1.0 to {fixture_env["ROOT"]} USE="-nonfreeflag" \n'
 
@@ -9682,7 +9682,7 @@ def test_license_use_conditional_visible_when_flag_off_masked_when_forced_on(
 
 def test_properties_default_star_accepts_a_declared_property(emerge_binary, fixture_env):
     """dev-libs/propertiespkg's own PROPERTIES="live" is visible under
-    the real default ACCEPT_PROPERTIES=* (from real cnf/make.globals,
+    the Portage default ACCEPT_PROPERTIES=* (from Portage cnf/make.globals,
     replicated as a hardcoded fallback -- neither the fixture profile
     chain nor make.conf sets ACCEPT_PROPERTIES at all)."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/propertiespkg"], fixture_env)
@@ -9694,7 +9694,7 @@ def test_package_properties_narrows_acceptance_for_one_package(emerge_binary, fi
     """fixtures/etc/portage/package.properties revokes
     "interactive" for dev-libs/interactivepkg specifically ("-interactive"
     layered on top of the permissive global "*" default still narrows
-    that one package's own effective accept set), despite the same real
+    that one package's own effective accept set), despite the same Portage
     default that leaves dev-libs/propertiespkg (above) visible."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/interactivepkg"], fixture_env)
     assert result.returncode == 1
@@ -9719,7 +9719,7 @@ def test_package_accept_restrict_narrows_acceptance_for_one_package(emerge_binar
 
 def test_repo_level_package_mask_hides_a_package(emerge_binary, fixture_env):
     """fixtures/repo/profiles/package.mask (the main repo's own
-    repo-level mask -- real portage's most common real-world masking
+    repo-level mask -- Portage's most common real-world masking
     source, e.g. security/arch masks) hides dev-libs/repomaskedpkg with
     no matching unmask anywhere, same "no ebuilds to satisfy" outcome a
     user-level mask produces."""
@@ -9768,7 +9768,7 @@ def test_user_level_minus_atom_removes_a_repo_level_mask_entry(emerge_binary, fi
     profiles/package.mask; fixtures/etc/portage/package.mask's
     own "-dev-libs/repomaskedthenuserremovedpkg" line removes that entry
     even though it didn't add it -- proving -atom removal now applies
-    across the whole combined [repo, profile chain, user] stack (real
+    across the whole combined [repo, profile chain, user] stack (Portage
     MaskManager.py's stack_lists(incremental=1) semantics), not just
     within the single file that contains the "-atom" line, which is all
     portuale supported before this slice."""
@@ -9809,7 +9809,7 @@ def test_package_accept_keywords_negation_revokes_a_globally_accepted_keyword(
     """dev-libs/keywordrevokedpkg is stable amd64 (globally accepted),
     but fixtures/etc/portage/package.accept_keywords has a
     "dev-libs/keywordrevokedpkg -amd64" entry that revokes it
-    specifically -- real KeywordsManager._getEgroups folds "-token"
+    specifically -- Portage KeywordsManager._getEgroups folds "-token"
     removals over the combined global+package keyword list, not just
     unions everything a matching entry ever mentions."""
     result = _run(
@@ -9827,7 +9827,7 @@ def test_package_accept_keywords_star_accepts_any_stable_keyword(emerge_binary, 
     """dev-libs/starkeywordpkg is KEYWORDS="arm64" -- not globally
     accepted, and not otherwise mentioned anywhere -- but
     fixtures/etc/portage/package.accept_keywords has a
-    "dev-libs/starkeywordpkg *" entry, real portage's own "accept any
+    "dev-libs/starkeywordpkg *" entry, Portage's own "accept any
     stable keyword" wildcard (distinct from "**", which additionally
     accepts an empty KEYWORDS)."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/starkeywordpkg"], fixture_env)
@@ -9839,8 +9839,8 @@ def test_package_accept_keywords_tilde_star_accepts_any_testing_keyword(
     emerge_binary, fixture_env
 ):
     """dev-libs/tildestarkeywordpkg is KEYWORDS="~arm64" (testing-only),
-    made visible by a "dev-libs/tildestarkeywordpkg ~*" entry -- real
-    portage's own "accept any testing keyword" wildcard. "*" alone
+    made visible by a "dev-libs/tildestarkeywordpkg ~*" entry -- Portage's
+    own "accept any testing keyword" wildcard. "*" alone
     would NOT have accepted this (it only ever covers stable-classified
     keywords), proving the two wildcards are genuinely distinct, not
     just differently-spelled synonyms."""
@@ -9857,7 +9857,7 @@ def test_package_accept_keywords_bare_atom_implicitly_grants_tilde_arch(
     """dev-libs/bareacceptkeywordspkg is KEYWORDS="~amd64" (testing-only,
     not covered by the global ACCEPT_KEYWORDS="amd64"), made visible by
     a bare "dev-libs/bareacceptkeywordspkg" package.accept_keywords entry
-    -- no keyword tokens at all. Real accept_keywords_defaults
+    -- no keyword tokens at all. Portage accept_keywords_defaults
     (KeywordsManager.__init__/getPKeywords) gives a bare atom an
     implicit "~" + every plain global ACCEPT_KEYWORDS token, i.e.
     "~amd64" here -- not a no-op, the same outcome as if the user had
@@ -9870,20 +9870,20 @@ def test_package_accept_keywords_bare_atom_implicitly_grants_tilde_arch(
 
 
 def test_pv_bracket_mask_marker(emerge_binary, fixture_env):
-    """Real output.py::gen_mask_str: the [ebuild N] bracket gains a
+    """Portage output.py::gen_mask_str: the [ebuild N] bracket gains a
     one-character marker for a package pulled in despite not being visible
     via the global ACCEPT_KEYWORDS alone --
 
       - dev-libs/bareacceptkeywordspkg (~amd64 via a bare
         package.accept_keywords entry): '~' (a testing keyword for our
-        own arch, real get_keyword_mask "unstable")
+        own arch, Portage get_keyword_mask "unstable")
       - dev-libs/tildestarkeywordpkg (~arm64 via "~*"): '*' (a different
-        arch, real "missing")
+        arch, Portage "missing")
       - dev-libs/maskedandunmaskedpkg (package.mask'd then unmask'd): '#'
-        (real isHardMasked, ignores package.unmask, wins first)
+        (Portage isHardMasked, ignores package.unmask, wins first)
 
-    The marker column is real set_pkg_info's `if self.include_mask_str()`
-    (verbosity > 1), and real default `emerge -p` verbosity is 2, so it
+    The marker column is Portage set_pkg_info's `if self.include_mask_str()`
+    (verbosity > 1), and Portage default `emerge -p` verbosity is 2, so it
     shows at plain -p too, not only -v -- absent only under --quiet
     (verbosity 1), which portuale doesn't model. A plain stable-amd64
     package (dev-libs/newpkg) shows a bare space there regardless."""
@@ -9908,7 +9908,7 @@ def test_pv_bracket_mask_marker(emerge_binary, fixture_env):
 
 
 def test_pv_use_flag_list_is_natural_sorted(emerge_binary, fixture_env):
-    """Real output_helpers.py::_alnum_sort_key
+    """Portage output_helpers.py::_alnum_sort_key
     (`any_iuse.sort(key=_alnum_sort_key)` in `_create_use_string`): the
     `-pv` `USE="..."` flag list splits on digit runs and compares them as
     numbers, so `n9` sorts before `n10` (not after, as plain
@@ -9927,8 +9927,8 @@ def test_color_y_renders_real_ansi_bracket_line(emerge_binary, fixture_env):
     """Increment 2 of the -pv layout + colour buildout: `emerge --color y`
     (the explicit override that wins over NO_COLOR/NOCOLOR/isatty, so the
     output is deterministic even under a captured stdout) colours the
-    bracket line per real lib/portage/output.py -- the exact `\\x1b[` codes
-    from the real rgb_ansi_colors/ansi_codes table:
+    bracket line per Portage lib/portage/output.py -- the exact `\\x1b[` codes
+    from the Portage rgb_ansi_colors/ansi_codes table:
 
       - the type word + `pkg.cp` via `pkgprint`: PKG_MERGE_WORLD
         (green, `\\x1b[32;01m`) for a directly-requested / world-file
@@ -9960,7 +9960,7 @@ def test_color_y_renders_real_ansi_bracket_line(emerge_binary, fixture_env):
     )
 
     # --oneshot: the same favorite drops to PKG_MERGE (plain green
-    # `\x1b[32m`) -- real `_DisplayConfig.oneshot` / `check_system_world`:
+    # `\x1b[32m`) -- Portage `_DisplayConfig.oneshot` / `check_system_world`:
     # a --oneshot target won't be added to world, so it isn't coloured as
     # a would-be world member.
     one_args = ["--pretend", "--color=y", "--oneshot", "--update", "dev-libs/upgradepkg"]
@@ -9988,7 +9988,7 @@ def test_color_y_renders_real_ansi_bracket_line(emerge_binary, fixture_env):
     assert rn.stdout == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}\n'
     assert "\x1b" not in _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env).stdout
 
-    # Increment 3: the USE="..." tokens are coloured per real
+    # Increment 3: the USE="..." tokens are coloured per Portage
     # _create_use_string -- a plain enabled flag red, a plain disabled
     # -flag blue, and only the flag core, never the */% markers or a ()
     # wrap. A New: enabled `foo` red, disabled `-missingflag` blue.
@@ -10037,7 +10037,7 @@ def test_package_accept_keywords_profile_level_entry_extends_visibility(
     for it) but by fixtures/repo/profiles/arch/amd64's own
     package.accept_keywords -- proving package.accept_keywords is now
     stacked from the profile chain too, not just user-level, mirroring
-    real KeywordsManager.getPKeywords (which has no repo-level source for
+    Portage KeywordsManager.getPKeywords (which has no repo-level source for
     this file at all, unlike package.mask)."""
     result = _run(
         [str(emerge_binary)],
@@ -10076,12 +10076,12 @@ def test_package_use_wildcard_entry_enables_a_flag_and_pulls_in_a_dependency(
 def test_env_use_is_the_highest_tier_and_overrides_a_package_use_flag(
     emerge_binary, fixture_env
 ):
-    """Real `configdict["env"]` is the highest `USE_ORDER` tier -- above
+    """Portage `configdict["env"]` is the highest `USE_ORDER` tier -- above
     the user-level `/etc/portage/package.use`. `fixtures/etc/portage/
     package.use` enables `pkguseflag` for `dev-libs/packageuseenablepkg`
     (pulling `dev-libs/newpkg`); a process-env `USE="-pkguseflag"` now
     cancels it, so the dep is not pulled -- proving env `USE` reaches
-    `effective_use_flags` at its real position (was folded into the
+    `effective_use_flags` at its Portage position (was folded into the
     weaker `conf` tier before)."""
     env = dict(fixture_env)
     env["USE"] = "-pkguseflag"
@@ -10117,10 +10117,10 @@ def test_package_env_env_file_use_expands_dollar_vars(
 ):
     """`fixtures/etc/portage/package.env` maps "dev-libs/penvexppkg" to
     the env file "penv-expand", whose `USE="penvexp-${PENVSCOPE}
-    ${ARCH}-penvexp"` exercises real `_grab_pkg_env`'s per-package
+    ${ARCH}-penvexp"` exercises Portage `_grab_pkg_env`'s per-package
     expand map twice: `${ARCH}` from the global map (the arch profile
     level's `make.defaults`), `PENVSCOPE` from the same file's own
-    earlier line (real `getconfig` feeds every assignment back into the
+    earlier line (Portage `getconfig` feeds every assignment back into the
     map). Both flags land on, so the `penvexp-penvexpscope?` dependency
     (dev-libs/newpkg) is pulled in."""
     base = ["--pretend", "-v", "dev-libs/penvexppkg"]
@@ -10137,7 +10137,7 @@ def test_profile_defaults_walk_is_per_level_not_flat(
     emerge_binary, fixture_env
 ):
     """The `defaults` USE_ORDER tier is walked one profile chain level at
-    a time (real config.py::regenerate() over configdict["defaults"]):
+    a time (Portage config.py::regenerate() over configdict["defaults"]):
     make.defaults then package.use, per level. fixtures/repo/profiles/
     base/package.use enables "interleaveflag" for dev-libs/interleavepkg;
     the leaf profiles/default/make.defaults (applied *after* base's
@@ -10157,10 +10157,10 @@ def test_profile_defaults_walk_is_per_level_not_flat(
 def test_profile_use_expand_default_is_folded_per_level(
     emerge_binary, fixture_env
 ):
-    """Real config.py (2849-2889): a USE_EXPAND value set in a profile
+    """Portage config.py (2849-2889): a USE_EXPAND value set in a profile
     level's make.defaults is translated to its equivalent USE flag *in
     that level's* contribution, prepended before the raw USE=, so the
-    same level's package.use can still override it -- and real then skips
+    same level's package.use can still override it -- and Portage then skips
     re-folding USE_EXPAND for configdict["defaults"] (2964).
 
     fixtures/repo/profiles/base/make.defaults sets
@@ -10187,7 +10187,7 @@ def test_repo_make_defaults_use_enables_a_flag_and_pulls_in_a_dependency(
     emerge_binary, fixture_env
 ):
     """fixtures/repo/profiles/make.defaults (the main repo's top-level
-    make.defaults -- real config.py's _repo_make_defaults) sets
+    make.defaults -- Portage config.py's _repo_make_defaults) sets
     USE="repomakedefaultflag repo_${ARCH}". "repomakedefaultflag" is set
     nowhere else, so repomakedefaultpkg's own repomakedefaultflag?-gated
     dependency (dev-libs/newpkg) is pulled in only because this weakest
@@ -10206,7 +10206,7 @@ def test_repo_make_defaults_use_enables_a_flag_and_pulls_in_a_dependency(
 def test_envd_use_enables_a_flag_and_pulls_in_a_dependency(
     emerge_binary, fixture_env
 ):
-    """`fixtures/etc/profile.env` sets `USE='envdusetestflag'` -- real
+    """`fixtures/etc/profile.env` sets `USE='envdusetestflag'` -- Portage
     `config.py`'s `configdict["env.d"]["USE"]` (from `/etc/env.d/*` via
     `env-update`), the LOWEST `USE_ORDER` tier. `dev-libs/envdusepkg`
     (`IUSE="envdusetestflag other"`,
@@ -10226,7 +10226,7 @@ def test_envd_use_enables_a_flag_and_pulls_in_a_dependency(
 def test_envd_use_read_from_eroot_not_config_root(
     emerge_binary, fixture_env, tmp_path
 ):
-    """`env.d` (`etc/profile.env`) is read from `eroot` (real
+    """`env.d` (`etc/profile.env`) is read from `eroot` (Portage
     `_get_env_d`), not `config_root` -- the two coincide except on a
     split `--config-root`/`--root` setup. With `PORTAGE_CONFIGROOT` on
     the fixtures (whose `profile.env` sets `USE='envdusetestflag'`) but
@@ -10248,7 +10248,7 @@ def test_envd_use_read_from_eroot_not_config_root(
 def test_overlay_own_make_defaults_use_enables_a_flag_for_its_packages(
     emerge_binary, fixture_env
 ):
-    """Real `_repo_make_defaults` is per-repo: `fixtures/overlay/profiles/
+    """Portage `_repo_make_defaults` is per-repo: `fixtures/overlay/profiles/
     make.defaults` sets `USE="omdflag"`, which reaches
     `effective_use_flags` at the head of the `repo` tier but only for a
     candidate resolved from the `overlay` repo. `dev-libs/
@@ -10268,7 +10268,7 @@ def test_overlay_own_make_defaults_use_enables_a_flag_for_its_packages(
 def test_features_test_enables_the_test_use_flag_and_pulls_test_deps(
     emerge_binary, fixture_env
 ):
-    """Real `configdict["features"]["USE"]` (config.py ~2043): `FEATURES=test`
+    """Portage `configdict["features"]["USE"]` (config.py ~2043): `FEATURES=test`
     appends `test` to the `features` USE_ORDER tier (between `repo` and
     `pkginternal`), so `dev-libs/featuretestpkg` (`IUSE="test other"`,
     `RDEPEND="test? ( dev-libs/newpkg )"`) resolves with `test` on and
@@ -10300,7 +10300,7 @@ def test_package_use_entry_disables_a_globally_enabled_flag_for_one_package(
     """fixtures/etc/portage/package.use has a
     "dev-libs/packageusedisablepkg -foo" entry: "foo" IS enabled globally
     by the fixture profile chain (dev-libs/useflagpkg's own foo?-gated
-    dependency IS pulled in, per test_real_use_flags_from_profile_gate_a_dependency),
+    dependency IS pulled in, per test_portage_use_flags_from_profile_gate_a_dependency),
     but package.use disables it for this one package only, so its own
     foo?-gated dependency must not be pulled in -- proving package.use is
     applied per package, not globally."""
@@ -10402,7 +10402,7 @@ def test_package_use_mask_and_force_with_atom_specificity_ordering(emerge_binary
     overridden by a more-specific one from a LATER level. Final USE:
     forceflag on (forced), maskflag off (masked, nothing un-masks it),
     specflag off (un-masked but not enabled by anything else, so stays
-    at its off-by-default). In `-pv`, real `_create_use_string` wraps a
+    at its off-by-default). In `-pv`, Portage `_create_use_string` wraps a
     force-enabled / mask-disabled flag in `( … )` (`self.forced_flags =
     pkg.use.force | pkg.use.mask`): `(forceflag)` and `(-maskflag)`, but
     `-specflag` plain since its mask was cancelled by the more-specific
@@ -10419,24 +10419,24 @@ def test_package_use_mask_and_force_with_atom_specificity_ordering(emerge_binary
 def test_strong_blocker_matches_an_installed_package(emerge_binary, fixture_env):
     """dev-libs/blockerpkg's RDEPEND is "!!dev-libs/samepkg", and
     dev-libs/samepkg-1.0 is already installed per the fixture vdb.
-    Real ResolverOutput._blockers (output.py:75-123): a fixed-width
-    `[blocks <letter>]` bracket, the `!`-stripped (real dep_expand'd)
+    Portage ResolverOutput._blockers (output.py:75-123): a fixed-width
+    `[blocks <letter>]` bracket, the `!`-stripped (Portage dep_expand'd)
     atom, then `("<atom>" is hard blocking <parent cpv>)` -- `hard` for a
-    `!!` blocker (real blocker.atom.blocker.overlap.forbid).
+    `!!` blocker (Portage blocker.atom.blocker.overlap.forbid).
 
-    Real 3.0.82.2 oracle (container, 2026-09-16): other installed
+    Portage 3.0.82.2 oracle (container, 2026-09-16): other installed
     fixtures (changeddepspkg, movedkeydepspkg, ...) RDEPEND on
     dev-libs/samepkg, but a plain `emerge -p dev-libs/blockerpkg` does not
-    walk them into the graph, so real uninstall-orders samepkg and
+    walk them into the graph, so Portage uninstall-orders samepkg and
     reports the block **satisfied**: the teal lowercase `b`, rc 0. (#68
     S3 replaced the old vdb reverse scan, under which this was `B`/rc 1.)
-    Real also prints an `[uninstall] dev-libs/samepkg-1.0` merge-list row
+    Portage also prints an `[uninstall] dev-libs/samepkg-1.0` merge-list row
     that portuale does not yet model -- backlog #72."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/blockerpkg"], fixture_env)
     assert result.returncode == 0
     # plain --pretend (verbosity 2) shows no Total:/Conflict: line. #72 B4
-    # adds real's `[uninstall     ]` row between the owner and the blocker
-    # line (B0 u1; real's own row also carries `to <root>` for a non-"/"
+    # adds Portage's `[uninstall     ]` row between the owner and the blocker
+    # line (B0 u1; Portage's own row also carries `to <root>` for a non-"/"
     # ROOT, the pre-existing portuale-wide divergence).
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/blockerpkg-1.0 to {fixture_env["ROOT"]}',
@@ -10444,7 +10444,7 @@ def test_strong_blocker_matches_an_installed_package(emerge_binary, fixture_env)
         '[blocks b      ] dev-libs/samepkg ("dev-libs/samepkg" is hard blocking dev-libs/blockerpkg-1.0)',
     ]
 
-    # --columns suppresses the satisfied line too (real output.py:120
+    # --columns suppresses the satisfied line too (Portage output.py:120
     # appends a satisfied blocker to print_msg only when `not
     # self.conf.columns` -- the B0 u5a cell). The unresolved group is
     # never suppressed.
@@ -10463,11 +10463,11 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
 ):
     """Upstream `test_use_dep_defaults.py::testUseDepDefaultse` pg0,
     bulk-translated for #50 batch 5 (`dev-libs/udd0{a,b}`; oracle
-    `/tmp/opencode/o50c/perfile/udd.json`, captured from the real
+    `/tmp/opencode/o50c/perfile/udd.json`, captured from the Portage
     `ResolverPlayground`, not the source literal).
 
     A-1 wants `B[foo]`, A-2 `B[foo(+)]`, A-3 `B[foo(-)]`; B-1 is
-    `IUSE=+foo` (EAPI 1), B-2 has no IUSE. Real merges `[B-1, A-1]`,
+    `IUSE=+foo` (EAPI 1), B-2 has no IUSE. Portage merges `[B-1, A-1]`,
     `[B-2, A-2]`, `[B-1, A-3]` (all `success=True`). All three cells
     are clean today: portuale merges the same sets in the same order
     with no warnings and empty stderr, so the exact rows are pinned.
@@ -10489,27 +10489,27 @@ def test_upstream_use_dep_defaults_pg0_pins_mergelists(
 
 def test_onlydeps_with_rdeps_ideps_pins_mergelists(emerge_binary, fixture_env):
     """Backlog #194: `--onlydeps-with-rdeps` / `--onlydeps-with-ideps`
-    (real `_emerge/depgraph.py::_add_pkg_deps`, `main.py` parsing,
+    (Portage `_emerge/depgraph.py::_add_pkg_deps`, `main.py` parsing,
     `man/emerge.1`). Fixtures are #194's own EAPI-8 namespace
     (`dev-libs/odw0{a,b,c,d,e,f}`, root A carrying DEPEND B, BDEPEND F,
     RDEPEND C, PDEPEND D, IDEPEND E; plus an EAPI-7 root
     `dev-libs/odw0g-1` whose ebuild declares DEPEND/RDEPEND/PDEPEND/IDEPEND
     on B/C/D/E while its md5-cache entry carries no IDEPEND line -- what
-    real `egencache` emits, since `bin/ebuild.sh` unsets IDEPEND below
+    Portage `egencache` emits, since `bin/ebuild.sh` unsets IDEPEND below
     EAPI 8)
     instead of the upstream `odm0*`/`odi*` cells, which #220 owns. The
-    oracle (`/tmp/opencode/n194/oracle_odw.log`, captured from the real
+    oracle (`/tmp/opencode/n194/oracle_odw.log`, captured from the Portage
     `ResolverPlayground` on the same A/B/C/D/E/F + G shapes, not the
     source literal) merges, all `success=True`: default/`=y`/`=True`
     `[B, C, D, E, F]`; `=n` `[B, F]` (build-time only -- BDEPEND
     survives); `=n` + ideps `=y`/bare/`=True` `[B, E, F]`; `=n` + ideps
     `=n` `[B, F]`; EAPI-7 root default `[B, C, D]` and `=n` `[B]` (no E
-    -- real `bin/ebuild.sh` unsets IDEPEND below EAPI 8). The playground
-    `True` cells are the bare-flag shape (real `default_arg_opts`
+    -- Portage `bin/ebuild.sh` unsets IDEPEND below EAPI 8). The playground
+    `True` cells are the bare-flag shape (Portage `default_arg_opts`
     inserts `"True"`); the literal `=True` argv form is the same real
     code path (`_add_pkg_deps` only tests for `"n"`/`None`, and
-    `"True"` is in real `main.py`'s `choices: true_y_or_n`), pinned to
-    the same rows. The space-separated `n` form is what real
+    `"True"` is in Portage `main.py`'s `choices: true_y_or_n`), pinned to
+    the same rows. The space-separated `n` form is what Portage
     `insert_optional_args` consumes; both flags without `--onlydeps`
     are inert (consulted only behind `pkg.onlydeps`), so that cell pins
     the plain-merge rows including the root; `=foo` is a real argparse
@@ -10614,7 +10614,7 @@ def test_upstream_eapi_pg012_pins_mergelists(emerge_binary, fixture_env):
     """Upstream `test_eapi.py::testBdepend` (pg0) and `::testIdepend`
     (pg2), bulk-translated for #50 batch 6 (`dev-libs/epi0{a,b}`,
     `dev-libs/epi2{a,b}`; oracle `/tmp/opencode/o50d/perfile/eapi.json`,
-    captured from the real `ResolverPlayground`, not the source literal).
+    captured from the Portage `ResolverPlayground`, not the source literal).
 
     Backlog #220 dropped pg1 (`::testEAPI`, `dev-libs/epi1{a,b,c}`):
     every pg1 cell's point is EAPI gating below EAPI 7 (withdrawn #204;
@@ -10642,14 +10642,14 @@ def test_upstream_backtracking_pg345_pins_mergelists(emerge_binary, fixture_env)
     `::testBacktrackWithoutUpdates` (pg4) and `::testBacktracking` (pg5),
     bulk-translated for #50 batch 6 (`dev-libs/bkt3{a,b,c,d}`,
     `dev-libs/bkt4{a,b,z}`, `dev-libs/bkt5{a,b}`; oracle
-    `/tmp/opencode/o50d/perfile/bt.json`, captured from the real
+    `/tmp/opencode/o50d/perfile/bt.json`, captured from the Portage
     `ResolverPlayground`, not the source literal).
 
     The 5 cells below are clean today: portuale merges the oracle's
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned. Not pinned: pg1's two
     selective-update cells (empty merge under a missed-update WARNING
-    whose text is unverified vs real), pg3's D/C order (same set but
+    whose text is unverified vs Portage), pg3's D/C order (same set but
     with missed-update warnings for A-2/B-2), and the skipped @world
     playgrounds pg0/pg2 (they need shared world entries).
     """
@@ -10707,18 +10707,18 @@ def test_upstream_circular_choices_pg03_pins_mergelists(emerge_binary, fixture_e
     (pg0) and `::testVirtualCmakeBootstrapUseConditional` (pg3),
     bulk-translated for #50 batch 7 (`dev-libs/ccd0{a,b}`,
     `dev-libs/ccd3{a,b,c}` + `virtual/ccd3v`; oracle
-    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the Portage
     `ResolverPlayground`, not the source literal).
 
     The 2 cells below are clean today: portuale merges the oracle's
     exact set in the oracle's exact order with no warnings and empty
     stderr, so the exact rows are pinned. Not pinned: pg1's
-    `--backtrack=0` cell (rc 1 matches real but the circular-error
-    text is unverified vs real) and the pg2 `--depclean` cell (needs
+    `--backtrack=0` cell (rc 1 matches Portage but the circular-error
+    text is unverified vs Portage) and the pg2 `--depclean` cell (needs
     a shared world entry). pg1's default-backtrack cell, pg4 and pg5
     are pinned in `test_upstream_circular_choices_pg145_pins_mergelists`
     since #221 (backtracking switches to the cycle-breaking `||`
-    branch like real).
+    branch like Portage).
     """
     env = dict(fixture_env)
     cases = [
@@ -10753,7 +10753,7 @@ def test_upstream_circular_choices_pg145_pins_mergelists(emerge_binary, fixture_
     (`::testDirectVirtualCircularDependency`), bulk-translated for #50
     batch 7 (`dev-libs/ccd1{a,b,c}`, `dev-libs/ccd4{a,b,c}`,
     `dev-libs/ccd5{a,b}` + `virtual/ccd5v`; oracle
-    `/tmp/opencode/o50e/perfile/cc.json`, captured from the real
+    `/tmp/opencode/o50e/perfile/cc.json`, captured from the Portage
     `ResolverPlayground`, not the source literal).
 
     Each cell's first pass picks the in-graph `||` branch and strands
@@ -10761,8 +10761,8 @@ def test_upstream_circular_choices_pg145_pins_mergelists(emerge_binary, fixture_
     cycle and backtracks to the branch that breaks it, merging the
     oracle's exact set in the oracle's exact order with no warnings
     and empty stderr, so the exact rows are pinned: pg1
-    `[ccd1b, ccd1a, ccd1c]` (real `[cmake-bootstrap, jsoncpp,
-    cmake]`), pg4 `[ccd4c, ccd4a]` (real `[pypy-exe-bin, pypy]`, no
+    `[ccd1b, ccd1a, ccd1c]` (Portage `[cmake-bootstrap, jsoncpp,
+    cmake]`), pg4 `[ccd4c, ccd4a]` (Portage `[pypy-exe-bin, pypy]`, no
     `+low-memory` suggestion), pg5 `[ccd5b, ccd5v, ccd5a]` (real
     `[icedtea6-bin, jdk, icedtea]`).
     """
@@ -10806,11 +10806,11 @@ def test_slcirc_slot_pinned_branch_prefers_bin_over_older_slot(
     dep over an older slot of the package itself vs the `-bin` package,
     the older slot carrying its own self buildtime edge. The first pass
     self-picks and strands; the retry demotes the recorded self branch
-    and takes `-bin` -- real's exact set in real's exact order with no
+    and takes `-bin` -- Portage's exact set in Portage's exact order with no
     warnings and empty stderr, so the exact rows are pinned:
-    `[slcirc-bin-2.0, slcirc-2.0]` (real `[rust-bin-1.96.1,
+    `[slcirc-bin-2.0, slcirc-2.0]` (Portage `[rust-bin-1.96.1,
     rust-1.96.1]`, one backtrack on both sides; oracle
-    `/tmp/opencode/g221c/probe_slcirc.py`, captured from the real
+    `/tmp/opencode/g221c/probe_slcirc.py`, captured from the Portage
     `ResolverPlayground`, not the source literal).
     """
     env = dict(fixture_env)
@@ -10830,7 +10830,7 @@ def test_upstream_circular_choices_rust_pg0_pins_mergelists(
     bug 756961: no circular report when a package replaces its own
     buildtime dep), bulk-translated for #50 batch 7
     (`dev-libs/ccr0{r,b}`; oracle `/tmp/opencode/o50e/perfile/ccr.json`,
-    captured from the real `ResolverPlayground`, not the source
+    captured from the Portage `ResolverPlayground`, not the source
     literal).
 
     The 3 cells below are clean today: portuale merges the oracle's
@@ -10871,16 +10871,16 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     """Upstream `test_complete_graph.py::testCompleteGraphUseChange` (pg0)
     and `::testCompleteGraphVersionChange` (pg1), bulk-translated for
     #50 batch 7 (`dev-libs/cgp0{x,q}`, `dev-libs/cgp1{x,a}`;
-    oracle `/tmp/opencode/o50e/perfile/cg.json`, captured from the real
+    oracle `/tmp/opencode/o50e/perfile/cg.json`, captured from the Portage
     `ResolverPlayground`, not the source literal).
 
     The 3 cells below are clean today: portuale merges the oracle's
     exact set in the oracle's exact order with no warnings and empty
-    stderr, so the exact rows are pinned (`USE="icu*"` is real's
+    stderr, so the exact rows are pinned (`USE="icu*"` is Portage's
     changed-USE marker, `UD` the stock downgrade letters — both
     normal rendering, not warnings). The three `--ignore-world` cells
     (backlog #223: portuale now drops `@world` from the complete-graph
-    seeds exactly like real `depgraph.py:357-360`, so they merge the
+    seeds exactly like Portage `depgraph.py:357-360`, so they merge the
     oracle's exact rows too) are pinned in the same table — none of
     the six cells touches an old-EAPI rule on the merged package
     itself (plain atoms, no conditionals/slots on the merged rows;
@@ -10889,7 +10889,7 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     Not pinned here: pg0's `new-use=y` cell and pg1's two `new-ver=y`
     cells (oracle rc 1 with the consumer in world; the shared world
     file has no such consumer, so these exact argvs stay rc 0 here --
-    like real with that world). The failing shape is pinned instead by
+    like Portage with that world). The failing shape is pinned instead by
     the world-carrying twins below (backlog #222:
     `test_complete_graph_use_break_fails_with_world_consumer`,
     `test_complete_graph_ver_break_fails_with_world_consumer`).
@@ -10897,7 +10897,7 @@ def test_upstream_complete_graph_pg01_pins_mergelists(emerge_binary, fixture_env
     (`x11-libs/qt-webkit`,
     `sys-apps/a`) are not emitted as shared world entries, so the
     non-`--ignore-world` cells run against the shared world file;
-    the three rc-0 pins match real anyway.
+    the three rc-0 pins match Portage anyway.
     """
     env = dict(fixture_env)
     cases = [
@@ -10964,7 +10964,7 @@ def test_ignore_world_merges_only_the_arg_on_an_eapi_8_tree(
     above), but written at EAPI 8 instead of the bulk-translated EAPI 0
     the #220 raise has not reached yet: installed `igw0x-1` plus an
     installed world-shaped consumer `igw0a-1` bounding it
-    (`>=igw0x-1 <igw0x-2`). Oracle: the real `ResolverPlayground` run at
+    (`>=igw0x-1 <igw0x-2`). Oracle: the Portage `ResolverPlayground` run at
     EAPI 8 (`/tmp/opencode/n223/oracle_igw.py`, `PYTHONHASHSEED=0`,
     `world=["dev-libs/igw0a"]`) answers both `--ignore-world` cells rc 0
     with the requested version alone — EAPI raises nothing here, exactly
@@ -11001,12 +11001,12 @@ def test_ignore_world_contrast_against_a_world_bound_consumer(
     argument with and without the flag under a tmp ROOT whose world file
     contains the bounding consumer `dev-libs/igw0a`.
 
-    Real semantics (`3rdparty/portage` 3.0.82.2): `--ignore-world`
+    Portage semantics (`3rdparty/portage` 3.0.82.2): `--ignore-world`
     empties `_required_set_names` (`lib/_emerge/depgraph.py:357-360`),
     so `_complete_graph` (`:8677-8731`) no longer walks the world seeds;
     without the flag the installed world member `igw0a-1`'s own pin
     (`>=dev-libs/igw0x-1 <dev-libs/igw0x-2`) collides with the requested
-    out-of-range version. Grounded live against the real
+    out-of-range version. Grounded live against the Portage
     `ResolverPlayground` at EAPI 8 (`world=["dev-libs/igw0a"]`,
     `igw0{x,a}` ebuilds/installed as in the fixture): the plain
     `>=dev-libs/igw0x-2` cell answers `success=False` with empty
@@ -11059,20 +11059,20 @@ def test_complete_graph_use_break_fails_with_world_consumer(
     (shared world plus `dev-libs/cgp0q`), standing in for upstream's
     `world=["x11-libs/qt-webkit"]`: the bulk translation emits no
     world entries, so the shared-world cells can never see the
-    consumer. Grounded live against the real `ResolverPlayground`
+    consumer. Grounded live against the Portage `ResolverPlayground`
     (`3rdparty/portage` 3.0.82.2, EAPI-8 ebuilds mirroring the
     fixtures, `world=["dev-libs/cgp0q"]`, `PYTHONHASHSEED=0`): the
     `new-use=y` cell answers `success=False`,
     `mergelist=["dev-libs/cgp0x-2.8.0"]` with empty
     `slot_collision_solutions`, while the `new-use=n` and
     `--ignore-world` cells answer `success=True` with the same
-    mergelist. Real mechanism: `_complete_graph` auto-enables on the
+    mergelist. Portage mechanism: `_complete_graph` auto-enables on the
     USE change (`lib/_emerge/depgraph.py:8592-8648`,
     `complete_if_new_use` via the node-vs-installed USE diff) and its
     end-of-walk loop fails the newly-unsatisfied dep the vdb still
     matches (`:8751-8791`, installed `cgp0x` pulled in as a nomerge
     node). Portuale renders the evaluated parent atom
-    (`dev-libs/cgp0x:2[-icu]` -- real stores the edge-time
+    (`dev-libs/cgp0x:2[-icu]` -- Portage stores the edge-time
     `evaluate_conditionals` form) with the `("use", "icu")` reason
     (`lib/_emerge/resolver/slot_collision.py:331-389`) plus the bare
     `(Argument)` line (the `("AtomArg", None)` key, `:391-397`).
@@ -11107,7 +11107,7 @@ def test_complete_graph_ver_break_fails_with_world_consumer(
 
     Same `_world_extra_env` pattern (shared world plus
     `dev-libs/cgp1a`) for upstream's `world=["sys-apps/a"]`. Grounded
-    live against the real `ResolverPlayground` (`3rdparty/portage`
+    live against the Portage `ResolverPlayground` (`3rdparty/portage`
     3.0.82.2, EAPI-8 ebuilds mirroring the fixtures,
     `world=["dev-libs/cgp1a"]`, `PYTHONHASHSEED=0`): both `new-ver=y`
     cells (`>=dev-libs/cgp1x-2`, `<dev-libs/cgp1x-1`) answer
@@ -11169,11 +11169,11 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     """Upstream `test_blocker.py::testBlocker` pg0, bulk-translated for #50
     batch 1 (`dev-libs/blk0{a,b,c,x,y}`; oracle
     `differential-test-bed/logs/fx-b1-blocker.json` cases 0-5, captured
-    from the real `ResolverPlayground`, not the source literal).
+    from the Portage `ResolverPlayground`, not the source literal).
 
     A/B/C depend on `dev-libs/X`, `<dev-libs/X-2`, `<dev-libs/X-3`, so the
     only jointly satisfiable X is X-1; X-1's RDEPEND `!=dev-libs/Y-1`
-    uninstall-orders installed Y-1. Real's mergelist is `[X-1,
+    uninstall-orders installed Y-1. Portage's mergelist is `[X-1,
     [uninstall]Y-1, !=Y-1, A-1, B-1, C-1]` in every argv order
     (`--backtrack: 0`, `success=True`; the source marks A/B/C
     `ambiguous_merge_order`, but X-1/Y-1 are fixed). Portuale renders the
@@ -11184,31 +11184,31 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     the uninstall-scheduling dance): every order merges X-1,
     uninstalls exactly Y-1, and interleaves the blocker rows right after
     their owner (bed `l0-fx-20260922T101821Z` blk0 cells). The skipped-
-    update WARNINGs follow real's missed-update rule (a removed version
+    update WARNINGs follow Portage's missed-update rule (a removed version
     is reported against every rejecting parent atom); their per-order
     presence is bed-grounded for `a b c` (one X-2-vs-B block) and
     `a c b` (silent) and provisional for the other four orders — the
-    close-out bed adds those cells, and any divergence from real there
+    close-out bed adds those cells, and any divergence from Portage there
     reopens #142 instead of re-pinning here.
 
-    Order `b c a` is real-grounded, not provisional: bed
+    Order `b c a` is Portage-grounded, not provisional: bed
     `l0-fx-20260927T125711Z` (`--pretend --backtrack=0 dev-libs/blk0b
-    dev-libs/blk0c dev-libs/blk0a`) shows real printing exactly one
+    dev-libs/blk0c dev-libs/blk0a`) shows Portage printing exactly one
     `dev-libs/blk0x:0` block for the highest missed version (`-3`)
     with both parents (`<dev-libs/blk0x-2`/blk0b,
-    `<dev-libs/blk0x-3`/blk0c) inside it — real's one-entry-per-slot
+    `<dev-libs/blk0x-3`/blk0c) inside it — Portage's one-entry-per-slot
     rule (`_get_missed_updates`), pinned here by #129 (which resolves
     #142's divergence for this order).
 
-    Backlog #230: every line renders real's full `pkg_use_display`
+    Backlog #230: every line renders Portage's full `pkg_use_display`
     (`_emerge/UseFlagDisplay.py:55`). Post-#220 the blk0 ebuilds are
     EAPI 8 (fixture profiles `eapi` = 5) with no IUSE, so the globals
     mask out and only the implicit `ELIBC="glibc"` group survives:
-    `USE="" ELIBC="glibc"`. The parent lines are real's own text (fix
+    `USE="" ELIBC="glibc"`. The parent lines are Portage's own text (fix
     round 1 probe, one `podman run localhost/test-portuale:latest`
     over the four blk0 cells: every parent renders `USE=""
     ELIBC="glibc"`). The missed line keeps portuale's fixture-tree
-    display (`USE="" ELIBC="glibc"`); real renders `USE=""
+    display (`USE="" ELIBC="glibc"`); Portage renders `USE=""
     ABI_X86="(64)"` there because the missed instance resolves against
     the running-root `/` tree -- cross-root resolution is backlog #242
     (owner decision B17), covered on the bed side by the narrowed
@@ -11240,7 +11240,7 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     warn_x2_b = warn("2", "<dev-libs/blk0x-2", "blk0b")
     warn_x3_b = warn("3", "<dev-libs/blk0x-2", "blk0b")
     warn_x3_c = warn("3", "<dev-libs/blk0x-3", "blk0c")
-    # #129 review round 2: real's one-entry-per-slot shape for order
+    # #129 review round 2: Portage's one-entry-per-slot shape for order
     # `b c a` (bed `l0-fx-20260927T125711Z`) — one `-3` block with
     # both parents inside, not one block per parent.
     warn_x3_bc = [
@@ -11259,9 +11259,9 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
         (["blk0b", "blk0a", "blk0c"], warn_header + warn_x2_b),
         (["blk0b", "blk0c", "blk0a"], warn_header + warn_x3_bc),
         (["blk0c", "blk0a", "blk0b"], []),
-        # Order `c b a`: real prints the same one `-3` block with both
+        # Order `c b a`: Portage prints the same one `-3` block with both
         # parents as `b c a` (bed `l0-fx-20260927T132853Z`, all six orders
-        # oracled; #129's output equals real's in every order modulo the
+        # oracled; #129's output equals Portage's in every order modulo the
         # USE/ROOT normalisation above).
         (["blk0c", "blk0b", "blk0a"], warn_header + warn_x3_bc),
     ]
@@ -11284,18 +11284,18 @@ def test_upstream_blocker_pg1_buildpkgonly_gate(emerge_binary, fixture_env):
     """Upstream `test_blocker.py::testBlockerBuildpkgonly`, bulk-translated
     for #50 batch 1 (`dev-libs/blk1{a,b,c,d,e,f,x}`; oracle
     `differential-test-bed/logs/fx-b1-blocker.json` cases 6-11, captured
-    from the real `ResolverPlayground`, not the source literal).
+    from the Portage `ResolverPlayground`, not the source literal).
 
-    Under `--buildpkgonly` real evaluates only DEPEND/BDEPEND blockers:
+    Under `--buildpkgonly` Portage evaluates only DEPEND/BDEPEND blockers:
     a hard `!!` there aborts (`success=False`, mergelist `[A-1, !!X]`
-    with real's two `!!!` lines, rc 1), a soft `!` there is silently
+    with Portage's two `!!!` lines, rc 1), a soft `!` there is silently
     satisfied with X untouched (bare `[C-1]`/`[D-1]`), and
     RDEPEND/PDEPEND blockers are not evaluated at all (bare `[E-1]`/
     `[F-1]`). Fixed by #143 (the `--buildpkgonly` blocker gate:
     runtime-key blanking + soft-blocker satisfaction + the
     uninstall-anchored abort); the bed facet is
     `--buildpkgonly_dev-libs_blk1a` / `..._blk1c`
-    (`l0-fx-20260922T101821Z`: real rc 1 + two `!!!` lines vs bare).
+    (`l0-fx-20260922T101821Z`: Portage rc 1 + two `!!!` lines vs bare).
     """
     env = dict(fixture_env)
     abort_err = (
@@ -11324,10 +11324,10 @@ def test_weak_blocker_matches_another_new_package_in_the_same_graph(emerge_binar
     "!dev-libs/blockerpartnerpkg") as New in the same run, so the weak
     blocker is matched against blockerpartnerpkg's graph-resolved version,
     not just the (empty, for this package) vdb. `soft blocking` for a `!`
-    blocker; the line is printed after every `[ebuild ...]` line (real
+    blocker; the line is printed after every `[ebuild ...]` line (Portage
     Display.print_blockers, called after print_messages).
 
-    Real 3.0.82.2 oracle (container, 2026-09-16): merge-bound match with a
+    Portage 3.0.82.2 oracle (container, 2026-09-16): merge-bound match with a
     merging parent -> unresolved `B`, rc 1 (#68 S2)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/graphblockerparent"], fixture_env
@@ -11347,12 +11347,12 @@ def test_blocker_lines_print_after_every_package_line_not_inline(
     """dev-libs/blockerorderpkg RDEPENDs "!!dev-libs/samepkg" *and*
     dev-libs/newpkg, so its blocker's owner (blockerorderpkg itself) is
     the first graph entry while a non-blocker dep follows it. The
-    **unsatisfied** group still prints after every package line (real
+    **unsatisfied** group still prints after every package line (Portage
     Display.print_blockers) -- but a **satisfied** `b` line is inline
-    (T7): #72 B4 pins it right after the `[uninstall     ]` row real
+    (T7): #72 B4 pins it right after the `[uninstall     ]` row Portage
     appends when the uninstall task is selected, exactly B0 u3
     (`newpkg`, `blockerorderpkg`, `[uninstall] samepkg`, `[blocks b]`).
-    Real 3.0.82.2 oracle (container, 2026-09-16/17): samepkg is
+    Portage 3.0.82.2 oracle (container, 2026-09-16/17): samepkg is
     unwalked -> satisfied `b` + uninstall row, rc 0."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/blockerorderpkg"], fixture_env)
     assert result.returncode == 0
@@ -11365,11 +11365,11 @@ def test_blocker_lines_print_after_every_package_line_not_inline(
 
 
 def test_blocker_line_is_coloured_under_color_y(emerge_binary, fixture_env):
-    """Real _blockers wraps `blocks`, the letter, the resolved atom, and
+    """Portage _blockers wraps `blocks`, the letter, the resolved atom, and
     the parenthetical in colorize(PKG_BLOCKER, ...) -- style "red"
     (\\x1b[31;01m) for the unresolved `B`, "teal" (\\x1b[36m) for the
-    satisfied `b` (real PKG_BLOCKER_SATISFIED; #68 S2/S3). `-v` widens
-    the bracket by the mask column's own space (real
+    satisfied `b` (Portage PKG_BLOCKER_SATISFIED; #68 S2/S3). `-v` widens
+    the bracket by the mask column's own space (Portage
     empty_space_in_brackets)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--color=y", "-v", "dev-libs/blockerpkg"], fixture_env
@@ -11379,7 +11379,7 @@ def test_blocker_line_is_coloured_under_color_y(emerge_binary, fixture_env):
     Z = "\x1b[39;49;00m"
     R = "\x1b[31;01m"
     # #72 B4: the uninstall row's `uninstall` word and cpv are red
-    # (PKG_UNINSTALL, real output.py:285-286; B0 u5c), the satisfied `b`
+    # (PKG_UNINSTALL, Portage output.py:285-286; B0 u5c), the satisfied `b`
     # line stays teal right after it.
     assert result.stdout.splitlines()[1] == (
         f"[{R}uninstall{Z}     ] {R}dev-libs/samepkg-1.0::__unknown__{Z} \x1b[32mto {fixture_env['ROOT']}{Z}"
@@ -11393,13 +11393,13 @@ def test_blocker_line_is_coloured_under_color_y(emerge_binary, fixture_env):
 def test_oracle_b4_uninstall_row_counters_and_quiet_shape(emerge_binary, fixture_env):
     """Backlog #72 B4, B0 u2/u5b: the `-pv` row set is the B0 u2 capture --
     `[uninstall     ] dev-libs/samepkg-1.0::__unknown__ ` (the removed
-    instance's vdb repo decoration, real `_append_repository`), the
+    instance's vdb repo decoration, Portage `_append_repository`), the
     `uninstall` detail right after `new` in `Total:` and outside
     `total_installs`, and `Conflict: 1 block (all satisfied)`. Under `-q`
-    the bracket loses one pad space (`[uninstall    ]`, real
+    the bracket loses one pad space (`[uninstall    ]`, Portage
     `empty_space_in_brackets()` at verbosity 1).
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0",
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0",
     u2/u5b).
     """
     result = _run([str(emerge_binary)], ["--pretend", "-v", "dev-libs/blockerpkg"], fixture_env)
@@ -11429,16 +11429,16 @@ def test_oracle_b4_satisfied_blocker_prints_after_the_uninstall_row(
 ):
     """Backlog #72 B4, B0 u6: with a satisfied block and an unsatisfied one
     in the same run, the satisfied `b` line prints **inline right after
-    its uninstall row** (real `_serialize_tasks` appends the solved
+    its uninstall row** (Portage `_serialize_tasks` appends the solved
     blocker when it selects the uninstall node,
     `depgraph.py:10351-10358`), while the unresolved `B` stays in the
     trailing group after every package and satisfied line; rc 1 with the
     Error block on stderr.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0",
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0",
     u6) for the `b`-inline / `B`-tail / rc-1 properties. The ebuild order
-    follows real's uninstall-scheduling dance (#142 S2 F4b, proven
-    against real's own graph dumps and scheduling source: the blocker
+    follows Portage's uninstall-scheduling dance (#142 S2 F4b, proven
+    against Portage's own graph dumps and scheduling source: the blocker
     owner waits on its unscheduled removal, so `blockerpkg` schedules
     after the independent `blockerpartnerpkg`/`weakblockerparent` pair
     instead of first); the pre-#142 pin had the stale portuale order
@@ -11475,7 +11475,7 @@ def test_unrelated_package_reports_no_blockers(emerge_binary, fixture_env):
 def test_use_dep_blocker_that_the_target_does_not_satisfy_is_dropped(
     emerge_binary, fixture_env
 ):
-    """Real drops a `[blocks]` line for a blocker atom whose own `[use]`
+    """Portage drops a `[blocks]` line for a blocker atom whose own `[use]`
     deps the blocked package doesn't actually satisfy -- the block is a
     satisfied no-op. dev-libs/blockusedepconsumer RDEPENDs
     `!!dev-libs/blockusedeptarget[wantblock]` and
@@ -11531,7 +11531,7 @@ def test_same_version_tie_across_repos_is_broken_toward_higher_priority(
 def test_overlay_own_package_mask_hides_only_the_overlay_copy(emerge_binary, fixture_env):
     """dev-libs/overlaymaskedpkg exists in both the main repo and the
     overlay; only the overlay's own profiles/package.mask masks it, with
-    no explicit "::repo" constraint on the entry -- proving real
+    no explicit "::repo" constraint on the entry -- proving Portage
     append_repo's own auto-scoping ("::overlay") keeps the mask from
     also hiding the identically-named main-repo package."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/overlaymaskedpkg"], fixture_env)
@@ -11589,7 +11589,7 @@ def test_overlay_implicit_masters_inherits_the_main_repos_own_package_mask(
 ):
     """dev-libs/mastermaskedpkg exists only in the overlay repo, and is
     masked only by the MAIN repo's own profiles/package.mask -- never
-    mentioned in the overlay's own package.mask at all. Real portage's
+    mentioned in the overlay's own package.mask at all. Portage's
     own masters default (a repo with no explicit "masters =" implicitly
     masters the main repo) means the main repo's own mask entry is
     stacked in ahead of the overlay's own lines before "::overlay"
@@ -11619,7 +11619,7 @@ def test_overlay_package_unmask_cancels_a_masters_inherited_mask(emerge_binary, 
 
 
 def test_explicit_masters_does_not_inherit_the_main_repos_mask(emerge_binary, fixture_env):
-    """Real repos.conf explicit "masters =" key (real RepoConfigLoader.
+    """Portage repos.conf explicit "masters =" key (Portage RepoConfigLoader.
     __init__, lib/portage/repository/config.py:1229-1260), now parsed and
     resolved for the first time: the fixture repos.conf declares
     "[independentoverlay] masters = overlay", NOT the main repo. dev-libs/
@@ -11717,7 +11717,7 @@ def test_repo_name_section_mismatch_drops_the_repo_with_a_warning(
 ):
     """A repo whose profiles/repo_name differs from its repos.conf
     [section] name -- and with no matching alias -- is dropped entirely
-    with a "!!! Section ..." error to stderr (real config.py:1121-1136).
+    with a "!!! Section ..." error to stderr (Portage config.py:1121-1136).
     Its packages then don't resolve."""
     cfg = tmp_path / "cfg"
     repo = tmp_path / "the-repo"
@@ -11757,13 +11757,13 @@ def test_profile_parent_resolves_an_aliased_repo_name(
 ):
     """A profile `parent` line `<alias>:some/path` where `<alias>` is a
     repo's `aliases =` (not its canonical name) resolves through the
-    alias -- real `LocationsManager._expand_parent_colon` looks the token
+    alias -- Portage `LocationsManager._expand_parent_colon` looks the token
     up via `repositories.get_location_for_name`, which is keyed on
     aliases too. The aliased-in profile level provides `USE=aliasflag`,
     which shows up at `-pv` on a package in the main repo.
 
     (An atom's own `cat/pkg::alias` is deliberately NOT alias-resolved --
-    real `match_from_list` does a straight name comparison; the sibling
+    Portage `match_from_list` does a straight name comparison; the sibling
     fixture `dev-libs/repnamepkg::repnamesection` already covers that
     it is rejected.)"""
     cfg = tmp_path / "cfg"
@@ -11824,7 +11824,7 @@ def test_profile_parent_resolves_an_aliased_repo_name(
 def test_overlay_own_package_use_gates_a_dependency(emerge_binary, fixture_env):
     """package.mask/.unmask already read from every repo (task #40), but
     package.use/.mask/.force/.stable.mask/.stable.force were still main-
-    repo-only -- real UseManager.py's own repos_with_profiles() loop
+    repo-only -- Portage UseManager.py's own repos_with_profiles() loop
     confirms every one of these files is read from every configured
     repo, the same mechanism. dev-libs/overlayuseenablepkg exists only
     in the overlay, whose own profiles/package.use enables
@@ -11872,7 +11872,7 @@ def test_overlay_own_package_use_mask_blocks_a_dependency(emerge_binary, fixture
 
 def test_usepkg_exclude_drops_the_only_binary_candidate(emerge_binary, fixture_env):
     """dev-libs/binaryonlypkg exists only as a binary build -- --usepkg
-    alone makes it eligible ([binary N]), but real depgraph.py's own
+    alone makes it eligible ([binary N]), but Portage depgraph.py's own
     per-candidate check ("in_usepkg_exclude = have_usepkg_exclude and
     usepkg_exclude.findAtomForPackage(pkg, ...)", "if in_usepkg_exclude
     ...: break") drops it from the binary pool entirely once
@@ -11885,7 +11885,7 @@ def test_usepkg_exclude_drops_the_only_binary_candidate(emerge_binary, fixture_e
     )
     assert result.returncode == 1
     assert result.stdout == ""
-    # binaryonlypkg has no ebuild, so real `not cp_exists` -> the
+    # binaryonlypkg has no ebuild, so Portage `not cp_exists` -> the
     # --misspell-suggestions block is appended after the abort line.
     assert result.stderr.splitlines()[0] == (
         'emerge: there are no ebuilds to satisfy "dev-libs/binaryonlypkg".'
@@ -11893,7 +11893,7 @@ def test_usepkg_exclude_drops_the_only_binary_candidate(emerge_binary, fixture_e
 
 
 def test_usepkg_include_gates_binary_eligibility_both_ways(emerge_binary, fixture_env):
-    """--usepkg-include's own real semantics are inverted from
+    """--usepkg-include's own Portage semantics are inverted from
     --usepkg-exclude's: "in_usepkg_include = not have_usepkg_include or
     usepkg_include.findAtomForPackage(pkg, ...)" -- once ANY
     --usepkg-include atom is given, a binary candidate must match one of
@@ -11944,7 +11944,7 @@ def test_newrepo_off_by_default_stays_already_installed(emerge_binary, fixture_e
 def test_newrepo_triggers_a_reinstall_for_a_differing_recorded_repository(
     emerge_binary, fixture_env
 ):
-    """Same fixture as above, but with --newrepo explicitly given: real
+    """Same fixture as above, but with --newrepo explicitly given: Portage
     depgraph.py's own "pkg.repo != inst_pkg.repo" comparison fires since
     the vdb's own recorded "oldrepo" doesn't match "testrepo", the repo
     that actually provides this version now."""
@@ -11977,12 +11977,12 @@ def test_newrepo_does_not_fire_when_the_recorded_repository_matches(
 def test_newrepo_fires_via_the_unknown_repo_sentinel_when_unrecorded(
     emerge_binary, fixture_env
 ):
-    """dev-libs/samepkg has no vdb "repository" file at all (real portage
-    predates this tracking, or a hand-installed/synthetic entry) -- real
+    """dev-libs/samepkg has no vdb "repository" file at all (Portage
+    predates this tracking, or a hand-installed/synthetic entry) -- Portage's
     portage.versions._unknown_repo ("__unknown__") applies, which never
     equals a real repo name, so --newrepo still fires even though
     nothing about this package actually changed. A real, sometimes-
-    surprising consequence of real portage's own comparison having no
+    surprising consequence of Portage's own comparison having no
     tolerant "missing data means unchanged" fallback the way
     --changed-slot/--changed-deps do."""
     result = _run(
@@ -12012,12 +12012,12 @@ def test_newrepo_appears_in_json(emerge_binary, fixture_env):
     assert entry["new_repo"] is True
 
 
-def test_buildpkgonly_reports_the_merge_list_then_the_real_error(
+def test_buildpkgonly_reports_the_merge_list_then_the_portage_error(
     emerge_binary, fixture_env
 ):
-    """Real depgraph.py's own display_problems(): the merge list is
-    printed first (real _show_merge_list()), and only then does the
-    real "--buildpkgonly requires all dependencies to be merged" error
+    """Portage depgraph.py's own display_problems(): the merge list is
+    printed first (Portage _show_merge_list()), and only then does the
+    Portage "--buildpkgonly requires all dependencies to be merged" error
     follow, on stderr -- dev-libs/dualdep (New) RDEPENDs on dev-libs/
     newpkg (also New), so both need building."""
     result = _run(
@@ -12040,7 +12040,7 @@ def test_buildpkgonly_does_not_fire_when_the_dependency_is_already_installed(
     emerge_binary, fixture_env
 ):
     """dev-libs/buildpkgonlysatisfied (New) RDEPENDs on dev-libs/samepkg,
-    which is already installed -- nothing else needs building, so real
+    which is already installed -- nothing else needs building, so Portage
     --buildpkgonly's own depgraph check has nothing to object to."""
     result = _run(
         [str(emerge_binary)],
@@ -12057,9 +12057,9 @@ def test_rebuilt_binaries_off_by_default_stays_already_installed(emerge_binary, 
     recorded BUILD_TIME=1000; the binary index's own copy at the same
     version has BUILD_TIME=2000, and no tree ebuild exists. Without
     --rebuilt-binaries (and without --update -- the identical_binary /
-    _equiv_ebuild_visible reinstall only fires under --update, real's
+    _equiv_ebuild_visible reinstall only fires under --update, Portage's
     `not avoid_update`), a --selective query still stays
-    already-installed: real's `_select_pkg_highest_available` final
+    already-installed: Portage's `_select_pkg_highest_available` final
     `if avoid_update:` step keeps the installed package."""
     result = _run(
         [str(emerge_binary)],
@@ -12074,7 +12074,7 @@ def test_rebuilt_binaries_triggers_a_reinstall_for_a_differing_build_time(
     emerge_binary, fixture_env
 ):
     """Same fixture as above, but with --rebuilt-binaries explicitly
-    given: real depgraph.py's own "don't care if the binary has an older
+    given: Portage depgraph.py's own "don't care if the binary has an older
     BUILD_TIME ... this is for closely tracking a binhost" comment means
     ANY difference (2000 vs 1000, either direction) triggers a reinstall
     once no --rebuilt-binaries-timestamp cutoff is given."""
@@ -12091,7 +12091,7 @@ def test_rebuilt_binaries_triggers_a_reinstall_for_a_differing_build_time(
 
 def test_rebuilt_binaries_timestamp_gates_the_reinstall(emerge_binary, fixture_env):
     """--rebuilt-binaries-timestamp changes the comparison from "any
-    difference" to "strictly newer AND at or above this cutoff" (real
+    difference" to "strictly newer AND at or above this cutoff" (Portage
     depgraph.py: "built_timestamp > installed_timestamp and
     built_timestamp >= minimal_timestamp"). The binary's own BUILD_TIME
     is 2000: a cutoff of 3000 suppresses the reinstall (2000 < 3000),
@@ -12133,7 +12133,7 @@ def test_rebuilt_binaries_timestamp_gates_the_reinstall(emerge_binary, fixture_e
 
 
 def test_rebuilt_binaries_auto_enables_under_usepkgonly_deep_update(emerge_binary, fixture_env):
-    """The real, non-obvious default-resolution asymmetry
+    """Portage's non-obvious default-resolution asymmetry
     (create_depgraph_params.py:185-193): --rebuilt-binaries auto-enables
     even with no explicit flag at all, but only when --usepkgonly, bare
     --deep (no explicit number), and --update are ALL given together.
@@ -12185,9 +12185,9 @@ def test_rebuilt_binaries_auto_enables_under_usepkgonly_deep_update(emerge_binar
 def test_use_dep_equal_parent_matches_when_parent_flag_is_enabled(emerge_binary, fixture_env):
     """PMS 8.3.4's "opt=" conditional use-dep: "the flag must be enabled
     if the flag is enabled for the package with the dependency, or
-    disabled otherwise" -- real Atom.evaluate_conditionals
+    disabled otherwise" -- Portage Atom.evaluate_conditionals
     (lib/portage/dep/__init__.py:1387), confirmed by reading it, applied
-    at real use_reduce's own per-token integration point
+    at Portage use_reduce's own per-token integration point
     (__init__.py:1045-1046). dev-libs/useeqparentonpkg's own
     IUSE="+eqflag" defaults it ON; its RDEPEND
     "dev-libs/useeqchildpkg[eqflag=]" evaluates to "[eqflag]" (must be
@@ -12223,7 +12223,7 @@ def test_use_dep_equal_parent_mismatches_when_parent_flag_is_disabled(emerge_bin
     )
     assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     _assert_abort_preamble(result.stdout)
-    # Backlog #20: child row + the parent-conditional row (real
+    # Backlog #20: child row + the parent-conditional row (Portage
     # depgraph.py:6768-6858), matching the oracle capture
     # (`--pretend --autounmask-use=n dev-libs/useeqparentoffpkg`).
     assert result.stderr.splitlines() == [
@@ -12238,16 +12238,16 @@ def test_use_dep_equal_parent_mismatches_when_parent_flag_is_disabled(emerge_bin
 
 
 def test_tree_indents_a_diamond_dependency_and_shows_it_once(emerge_binary, fixture_env):
-    """--tree/-t: real's `_tree_display` layout (`output_helpers.py:
+    """--tree/-t: Portage's `_tree_display` layout (`output_helpers.py:
     341-495`): the reversed retlist walked with the deepest-child rule,
     each node once (`seen_nodes`). dev-libs/diamond's own two children
-    both RDEPEND on dev-libs/common; real's merge list is
+    both RDEPEND on dev-libs/common; Portage's merge list is
     [common, shared-a, shared-b, diamond], so the reversed scan puts
     shared-b before shared-a and nests the shared common under the
     first chain parent (shared-a).
 
-    Container oracle, real 3.0.82.2, `differential-test-bed/findings/l0.md` "#75 C0"
-    (diamond) / "#75 C1" (exploration). Portuale omits real's
+    Container oracle, Portage 3.0.82.2, `differential-test-bed/findings/l0.md` "#75 C0"
+    (diamond) / "#75 C1" (exploration). Portuale omits Portage's
     `to <root>/` suffix on a non-"/" ROOT -- the same pre-existing
     divergence every row has."""
     result = _run([str(emerge_binary)], ["--pretend", "--tree", "dev-libs/diamond"], fixture_env)
@@ -12261,7 +12261,7 @@ def test_tree_indents_a_diamond_dependency_and_shows_it_once(emerge_binary, fixt
 
 
 def test_tree_unordered_display_preserves_discovery_order(emerge_binary, fixture_env):
-    """--unordered-display (only meaningful together with --tree): real
+    """--unordered-display (only meaningful together with --tree): Portage
     `_unordered_tree_display` (`output_helpers.py:410-431`) DFSes the
     graph from its roots in graph insertion order, so both the root and
     its children follow the merge list's own dependency order rather
@@ -12271,7 +12271,7 @@ def test_tree_unordered_display_preserves_discovery_order(emerge_binary, fixture
     reversed by the mylist walk (atreechild first), unordered keeps the
     RDEPEND order (ztreechild first).
 
-    Container oracle, real 3.0.82.2, `differential-test-bed/findings/l0.md` "#75 C0"
+    Container oracle, Portage 3.0.82.2, `differential-test-bed/findings/l0.md` "#75 C0"
     (the u1 unordered cell) / "#75 C1" (treeorder).
     """
     ordered = _run(
@@ -12298,13 +12298,13 @@ def test_tree_unordered_display_preserves_discovery_order(emerge_binary, fixture
 
 
 def test_tree_onlydeps_shows_the_root_as_a_nomerge_ancestor(emerge_binary, fixture_env):
-    """--tree combined with --onlydeps: real's retlist omits the
+    """--tree combined with --onlydeps: Portage's retlist omits the
     suppressed root, but the graph still holds it, so the ancestor walk
     brings it back as a `[nomerge       ]` occurrence with no attr
     columns (`set_pkg_info`'s ordered=False rule, `output.py:612-614`)
     while its dependencies render normally.
 
-    Container oracle, real 3.0.82.2, `differential-test-bed/findings/l0.md` "#75 C1"
+    Container oracle, Portage 3.0.82.2, `differential-test-bed/findings/l0.md` "#75 C1"
     (onlydeps exploration). Flat `--onlydeps` still hides the root line
     entirely (unchanged, and portuale's flat pins cover it).
     """
@@ -12323,12 +12323,12 @@ def test_tree_onlydeps_shows_the_root_as_a_nomerge_ancestor(emerge_binary, fixtu
 
 
 def test_columns_right_aligns_the_version_into_a_fixed_column(emerge_binary, fixture_env):
-    """--columns: real _set_root_columns's own layout (portuale's own
+    """--columns: Portage _set_root_columns's own layout (portuale's own
     port, see columns_line's docstring) -- category/package with no
     version, padded to columnwidth - 60, then "[version]" padded to
     columnwidth - 30. COLUMNWIDTH is pinned in the test's own env (70,
     picked small enough for a readable exact-string assertion) rather
-    than relying on the real default of 130."""
+    than relying on the Portage default of 130."""
     env = dict(fixture_env)
     env["COLUMNWIDTH"] = "70"
     result = _run(
@@ -12339,7 +12339,7 @@ def test_columns_right_aligns_the_version_into_a_fixed_column(emerge_binary, fix
 
 
 def test_columns_shows_both_new_and_old_version_for_an_upgrade(emerge_binary, fixture_env):
-    """An Upgrade's own "oldbest" column (real pkg_info.oldbest_list) is
+    """An Upgrade's own "oldbest" column (Portage pkg_info.oldbest_list) is
     the installed version in brackets -- the same information the
     non-columns format's own "(upgrade from X)" parenthetical carries,
     just repositioned into a fixed trailing column instead."""
@@ -12355,9 +12355,9 @@ def test_columns_shows_both_new_and_old_version_for_an_upgrade(emerge_binary, fi
 
 
 def test_columns_and_tree_together_is_a_usage_error(emerge_binary, fixture_env):
-    """Real actions.py: "can't specify both of --tree and --columns" --
+    """Portage actions.py: "can't specify both of --tree and --columns" --
     portuale's own CLI-usage-error convention (exit 2, stderr) rather
-    than real portage's own literal exit 1/stdout, matching every other
+    than Portage's own literal exit 1/stdout, matching every other
     CLI-usage error portuale already reports."""
     result = _run(
         [str(emerge_binary)],
@@ -12400,7 +12400,7 @@ def test_columns_columnwidth_falls_back_to_default_on_an_unparsable_value(
     """An unparsable COLUMNWIDTH warns (a fixed, portuale-authored message,
     not either language's own raw parse-error text -- see
     columnwidth_from_env's own docstring for why) and falls back to the
-    real default of 130, rather than treating it as a hard error."""
+    Portage default of 130, rather than treating it as a hard error."""
     env = dict(fixture_env)
     env["COLUMNWIDTH"] = "notanumber"
     result = _run(
@@ -12419,7 +12419,7 @@ def test_solvable_slot_conflict_is_reconciled_by_backtracking(emerge_binary, fix
     and slotconflictoldconsumer (RDEPEND "<dev-libs/slotconflicttarget-2.0",
     which 2.0 itself does NOT satisfy). The first pass hits a slot conflict
     on slotconflicttarget:0, but 1.0 satisfies *both* atoms, so the
-    backtracking retry (real _emerge/resolver/backtracking.py driven by
+    backtracking retry (Portage _emerge/resolver/backtracking.py driven by
     _process_slot_conflicts) re-resolves the whole graph with both
     constraints enforced together: slotconflicttarget settles on 1.0 and
     no [slot conflict] line is printed."""
@@ -12434,11 +12434,11 @@ def test_solvable_slot_conflict_is_reconciled_by_backtracking(emerge_binary, fix
 
 
 def test_backtrack_zero_disables_slot_conflict_reconciliation(emerge_binary, fixture_env):
-    """`--backtrack=0` (real: disable backtracking) turns the retry loop
+    """`--backtrack=0` (Portage: disable backtracking) turns the retry loop
     off. Backlog #90 (S1): the dev-libs/slotconflictparent conflict never
-    forms at any budget -- the walk resolves last-declared-first (real's
+    forms at any budget -- the walk resolves last-declared-first (Portage's
     stack), so the old consumer graphs 1.0 first and the bare dep reuses
-    it (real `--debug` never prints `Slot conflict handler started.`
+    it (Portage `--debug` never prints `Slot conflict handler started.`
     here, S0 matrix oracle) -- so bt0 settles silently on 1.0 with rc 0,
     exactly like the default budget. `--backtrack=1` agrees."""
     reconciled = [
@@ -12475,23 +12475,23 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
     missing-dep probe) and masks its parent, falling back to
     btconsumer-1.0 + bttarget-1.0 with every constraint met and no [slot
     conflict] line -- the same parent downgrade the old puller
-    pre-masking produced, via real's feedback paths instead.
+    pre-masking produced, via Portage's feedback paths instead.
     `--backtrack=0` turns the search off, so the conflict is reported
     instead. Backlog #148: the reported conflict keeps both instances
-    as merge rows (host-real oracle 2026-09-23, real 3.0.82.2 on the
+    as merge rows (host-Portage oracle 2026-09-23, Portage 3.0.82.2 on the
     fixture tree, argv `emerge -p --backtrack=0 dev-libs/btparent`
     under the suite fixture env: `[ebuild N] bttarget-1.0` then `-2.0`,
     rc 1).
 
-    Backlog #129 (S1): the settled trial masks now also print real's
-    two skip notices after the rows (real `_get_missed_updates`,
+    Backlog #129 (S1): the settled trial masks now also print Portage's
+    two skip notices after the rows (Portage `_get_missed_updates`,
     `depgraph.py:1529-1565`): the slot-conflict `WARNING`
     (`bttarget-2.0` vs `<bttarget-2.0`/`btpin-1.0`) plus the abbreviated
     unsatisfied-dependencies tail (`btconsumer:0`, whose
     `>=bttarget-2.0` still matches the backtrack-masked `bttarget-2.0`
-    at settle time -- real's `check_backtrack` probe raises).
+    at settle time -- Portage's `check_backtrack` probe raises).
 
-    Backlog #230: the `WARNING` lines render real's full
+    Backlog #230: the `WARNING` lines render Portage's full
     `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- bttarget/btpin
     are EAPI 8 with no IUSE, so the globals mask out and only the
     implicit `ELIBC="glibc"` group survives."""
@@ -12557,10 +12557,10 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
     slotconflicttarget satisfies both, so the backtracking solvability
     pre-check fails, the runtime_pkg_mask trial is reverted, and the
     slot-collision block is reported -- and since #62 the run exits 1,
-    like real 3.0.82.2 (`action_build`). Backlog #90 (S1): instances file
-    oldpin's 1.0 first -- real's own notice order (staged oracle).
+    like Portage 3.0.82.2 (`action_build`). Backlog #90 (S1): instances file
+    oldpin's 1.0 first -- Portage's own notice order (staged oracle).
     Backlog #148: the surviving conflict keeps both instances as merge
-    rows (host-real oracle 2026-09-23, real 3.0.82.2 on the fixture
+    rows (host-Portage oracle 2026-09-23, Portage 3.0.82.2 on the fixture
     tree, argv `emerge -p dev-libs/slotconflictunsolvable` under the
     suite fixture env: `[ebuild N] slotconflicttarget-1.0` then `-2.0`,
     rc 1) -- the walk's one-row-per-cp cut is gone."""
@@ -12592,11 +12592,11 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
 
 
 def test_slot_conflict_notice_renders_pkg_use_display(emerge_binary, fixture_env):
-    """Real `slot_collision.py`'s `get_conflict()`: each instance header
+    """Portage `slot_collision.py`'s `get_conflict()`: each instance header
     and each shown parent line carries that package's own
     `pkg_use_display(pkg, myopts, modified_use=...)` -- `USE="…"` with
     every IUSE flag, enabled-first, plus the implicit `ELIBC="glibc"`
-    group on this fixture profile (backlog #264; real 3.0.82.2
+    group on this fixture profile (backlog #264; Portage 3.0.82.2
     `--pretend --ignore-default-opts dev-libs/scuseparent` on the
     staged fixture). `dev-libs/scusetarget` has `IUSE="+scuon scuoff"`,
     `dev-libs/scusenewpin` `IUSE="+scupin"`, `dev-libs/scuseoldpin` none.
@@ -12626,9 +12626,9 @@ def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(
 ):
     """dev-libs/slotconfgroup pulls slotconfgroupnew (>=slotconflicttarget-2.0)
     plus slotconfgroupa/b/c (each <slotconflicttarget-2.0). The walk resolves
-    last-declared-first (real's stack, #90 S1), so c/b/a graph 1.0 before
+    last-declared-first (Portage's stack, #90 S1), so c/b/a graph 1.0 before
     new's >=2.0 graphs 2.0. The 1.0 instance has three parents sharing
-    one collision reason ("version", "le"): real
+    one collision reason ("version", "le"): Portage
     _prepare_conflict_msg_and_check_for_specificity keeps one
     representative -- the first-walked, i.e. c -- and appends "(and 2 more
     with the same problem)" (staged oracle), then a single "NOTE: Use the
@@ -12674,10 +12674,10 @@ def test_slot_conflict_color_y_colours_violated_spans_with_aligned_markers(
     emerge_binary, fixture_env
 ):
     """Slot-conflict `--color y` marker alignment (backlog Tier 1,
-    decided): real `highlight_violations` wraps the violated operator /
+    decided): Portage `highlight_violations` wraps the violated operator /
     version / slot / USE-token spans in red and then marks the PRE-color
     indices, so its `^` line drifts once ANSI codes lengthen the line
-    (genuine upstream bug -- and real's own red varies by terminal
+    (genuine upstream bug -- and Portage's own red varies by terminal
     colormap, so byte-parity with the drift is unachievable anyway).
     Portuale wraps the same spans but marks the DISPLAYED string, so
     color and carets agree: `>=` and `2.0` come out red, and the `^`
@@ -12716,7 +12716,7 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     """dev-libs/slotusegroup pulls slotuseplain (>=slotusetarget-2.0, no
     USE-deps) plus slotusex/slotusey, whose `>=slotusetarget-1.0[x]` /
     `[y]` USE-deps 2.0 cannot satisfy (x is default-off and masked there
-    via profiles/package.use.mask, y is gone from 2.0's IUSE). Real
+    via profiles/package.use.mask, y is gone from 2.0's IUSE). Portage
     re-verifies USE-deps on slot reuse: both pull 1.0 as a second
     instance and the notice reports `("use", flag)` parents -- the
     missing-IUSE (unconditional) `[y]` parent before the violated `[x]`
@@ -12724,9 +12724,9 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     A single conflict block (one handler per slot), no autounmask block
     (nothing flippable), no need_rebuild trailer (no installed parent).
     Backlog #90 (S1): the walk resolves last-declared-first, so the
-    1.0 instance files first -- real's own merge-list order (staged
+    1.0 instance files first -- Portage's own merge-list order (staged
     oracle: 1.0 USE="x y" leads). Backlog #148: the surviving conflict
-    keeps BOTH instances as merge rows (real's S0.1 capture in
+    keeps BOTH instances as merge rows (Portage's S0.1 capture in
     02.148-slot-conflict-merge-list.md: 1.0 then 2.0 USE="(-x)",
     rc 1) -- the walk's resolved_slots conflict arm graphs the second
     instance beside the record instead of continuing past it."""
@@ -12785,10 +12785,10 @@ def test_different_slots_of_the_same_package_coexist_without_conflict(emerge_bin
     # flush-left safety net.)
     #
     # Sibling order: portuale's reversed merge list puts 2.0 first; the
-    # real capture has 1.0 first (`differential-test-bed/findings/l0.md` "#75 C1"), a
+    # Portage capture has 1.0 first (`differential-test-bed/findings/l0.md` "#75 C1"), a
     # tree-mode serializer ordering difference C2 owns (the tree retlist
     # differs from the flat one) and stops on, filing the remainder as
-    # backlog #81. The nesting itself (both slots, depth 1) is real's.
+    # backlog #81. The nesting itself (both slots, depth 1) is Portage's.
     tree = _run(
         [str(emerge_binary)], ["--pretend", "--tree", "dev-libs/multislotparent"], fixture_env
     )
@@ -12814,7 +12814,7 @@ def test_different_slots_of_the_same_package_coexist_without_conflict(emerge_bin
 def test_new_slot_install_renders_the_S_bracket_column(emerge_binary, fixture_env):
     """dev-libs/newslotpkg-1.0 (SLOT 0) is installed; -2.0 (SLOT 1) is
     not. Requesting :1 (or the bare atom, non-selective) resolves -2.0
-    into a slot the package isn't installed in -- real
+    into a slot the package isn't installed in -- Portage
     output.py::_get_installed_best's new_slot flag: an "S" right after
     the "N" code letter (rendered with plain -p, not only -v), and NOT
     an "(upgrade from 1.0)" off the unrelated slot-0 install."""
@@ -12833,7 +12833,7 @@ def test_new_slot_install_renders_the_S_bracket_column(emerge_binary, fixture_en
 
 
 def test_interactive_bracket_column(emerge_binary, fixture_env):
-    """Real output.py:833: `if "interactive" in pkg.properties and
+    """Portage output.py:833: `if "interactive" in pkg.properties and
     pkg.operation == "merge": attr_display.interactive = True`, rendered
     as `I` before the N/r code letter (unconditional, like the S column).
     pkg.properties is PROPERTIES after real USE-conditional evaluation."""
@@ -12866,7 +12866,7 @@ def test_interactive_bracket_column(emerge_binary, fixture_env):
 
 
 def test_fetch_restrict_bracket_column(emerge_binary, fixture_env):
-    """Real output.py:633: for a merge-bound ebuild whose evaluated
+    """Portage output.py:633: for a merge-bound ebuild whose evaluated
     RESTRICT contains `fetch`, attr_display.fetch_restrict; then
     fetch_restrict_satisfied if `not getfetchsizes(only_restricted=True)`
     -- every SRC_URI distfile already in DISTDIR at its Manifest size.
@@ -12907,10 +12907,10 @@ def test_fetch_restrict_bracket_column(emerge_binary, fixture_env):
 
 
 def test_pv_totals_summary_line(emerge_binary, fixture_env):
-    """Real output.py::display: `if self.conf.verbosity == 3:
+    """Portage output.py::display: `if self.conf.verbosity == 3:
     self.print_verbose(...)` -> `writemsg_stdout(f"\\n{self.counters}\\n")`
     -- the trailing `Total: N packages (...)` line, only under `-v`,
-    including `, Size of downloads: N KiB` (real `_calc_size` /
+    including `, Size of downloads: N KiB` (Portage `_calc_size` /
     `localized_size`, KiB-only, no locale grouping) and the `Fetch
     Restriction: N package[s][ (M unsatisfied)]` line, and the
     `Conflict:` line's `(N unsatisfied)`/`(all satisfied)` suffix (#68
@@ -12938,9 +12938,9 @@ def test_pv_totals_summary_line(emerge_binary, fixture_env):
     assert installed.stdout.splitlines()[-1] == "Total: 0 packages, Size of downloads: 0 KiB"
 
     # A satisfied blocker (samepkg is installed but nothing walked pulls
-    # it in; real uninstalls it) adds the `1 uninstall` detail (#72 B4,
-    # real `counters.uninst`, not part of `total_installs`) and a
-    # trailing `Conflict: N block (all satisfied)` line -- real 3.0.82.2
+    # it in; Portage uninstalls it) adds the `1 uninstall` detail (#72 B4,
+    # Portage `counters.uninst`, not part of `total_installs`) and a
+    # trailing `Conflict: N block (all satisfied)` line -- Portage 3.0.82.2
     # oracle, 2026-09-16/17 (B0 u2).
     blk = _run([str(emerge_binary)], ["--pretend", "-v", "dev-libs/blockerpkg"], fixture_env)
     assert blk.returncode == 0
@@ -13023,10 +13023,10 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
     and dev-libs/slotconflictoldpin ("<dev-libs/slotconflicttarget-2.0")
     as two top-level atoms: no common satisfying version, so backtracking
     leaves the slot-collision block in place. Backlog #90 (S1): the walk
-    resolves last-declared-first, so oldpin's 1.0 files first -- real's
+    resolves last-declared-first, so oldpin's 1.0 files first -- Portage's
     own notice order (staged oracle). Backlog #148: the surviving
-    conflict keeps both instances as merge rows (host-real oracle
-    2026-09-23, real 3.0.82.2 on the fixture tree, argv `emerge -p
+    conflict keeps both instances as merge rows (host-Portage oracle
+    2026-09-23, Portage 3.0.82.2 on the fixture tree, argv `emerge -p
     dev-libs/slotconflictnewpin dev-libs/slotconflictoldpin` under the
     suite fixture env: `[ebuild N] slotconflicttarget-1.0` then `-2.0`,
     rc 1)."""
@@ -13074,10 +13074,10 @@ def test_multiple_top_level_atoms_dedupe_a_literal_duplicate(emerge_binary, fixt
 def test_multiple_top_level_atoms_all_already_installed(emerge_binary, fixture_env):
     """When every requested top-level atom resolves AlreadyInstalled the
     merge list is empty and `emerge -p` prints nothing at all -- matching
-    real, which likewise omits an already-satisfied package. --noreplace
+    Portage, which likewise omits an already-satisfied package. --noreplace
     keeps a bare top-level atom AlreadyInstalled rather than a plain
     reinstall (see resolve_pretend's own doc comment, portage-repo, on
-    real portage's own "selective" gap)."""
+    Portage's own "selective" gap)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--noreplace", "dev-libs/samepkg", "dev-libs/samepkg"],
@@ -13089,7 +13089,7 @@ def test_multiple_top_level_atoms_all_already_installed(emerge_binary, fixture_e
 
 def test_bad_top_level_atom_aborts_the_whole_run_in_argv_order(emerge_binary, fixture_env):
     """A top-level atom with no visible candidate is fatal to the whole
-    call (matching real portage's own depgraph.py "there are no ebuilds
+    call (matching Portage's own depgraph.py "there are no ebuilds
     to satisfy" behavior), not reported-and-continued the way a
     dependency's own NoVisibleCandidate is -- confirmed with the user
     before implementing. Since top-level atoms are always dequeued in
@@ -13135,7 +13135,7 @@ def test_blocker_top_level_atom_is_rejected_not_silently_dropped(emerge_binary, 
     slot/version were all unset) and then silently dropped by
     resolve_pretend_graph's own `atom.blocker != Blocker::None` BFS skip
     -- exit 0, no output, no error. A blocker isn't a valid emerge target
-    in real portage either, so this must now be rejected explicitly."""
+    in Portage either, so this must now be rejected explicitly."""
     result = _run([str(emerge_binary)], ["--pretend", "!!dev-libs/newpkg"], fixture_env)
     assert result.returncode == 2
     assert result.stdout == ""
@@ -13149,7 +13149,7 @@ def test_verbose_shows_use_flags_gated_by_profile_and_make_conf(emerge_binary, f
     """dev-libs/useflagpkg declares IUSE="foo missingflag"; the fixture
     profile chain resolves "foo" enabled and "missingflag" disabled (see
     portage-profile's own fixture test) -- the USE= line shows both,
-    enabled plain and disabled "-"-prefixed, alphabetically ordered. Real
+    enabled plain and disabled "-"-prefixed, alphabetically ordered. Portage
     `print_use_string = verbosity != 1` and default `emerge -p` verbosity
     is 2, so a New package's full USE list shows at plain -p too; only the
     `::repo` cpv decoration and the counters line are -v-only."""
@@ -13174,7 +13174,7 @@ def test_verbose_shows_use_flags_gated_by_profile_and_make_conf(emerge_binary, f
 def test_use_line_at_p_is_full_for_a_new_pkg_and_changed_only_for_a_reinstall(
     emerge_binary, fixture_env
 ):
-    """Real `print_use_string = verbosity != 1` (not -v-gated); it's
+    """Portage `print_use_string = verbosity != 1` (not -v-gated); it's
     `all_flags = verbosity == 3` that changes *which* flags render. A New
     package's `is_new` branch renders every IUSE flag regardless, so its
     USE list is identical at -p and -pv (the -pv-only additions are the
@@ -13222,7 +13222,7 @@ def test_use_line_at_p_is_full_for_a_new_pkg_and_changed_only_for_a_reinstall(
 def test_reinst_flags_force_show_a_dropped_iuse_trigger_flag_at_plain_p(
     emerge_binary, fixture_env
 ):
-    """Real `_create_use_string`'s `reinst_flag` (`reinst_flags_map`, the
+    """Portage `_create_use_string`'s `reinst_flag` (`reinst_flags_map`, the
     Reinstall's own `_reinstall_for_flags` trigger set): a flag is shown
     even when otherwise-unchanged if it triggered the reinstall. The one
     case this changes at plain -p: `dev-libs/reinstdropiusepkg`'s vdb has
@@ -13238,7 +13238,7 @@ def test_reinst_flags_force_show_a_dropped_iuse_trigger_flag_at_plain_p(
             fixture_env,
         )
         assert p.returncode == 0
-        # Real `_create_use_string` appends one trailing space per group
+        # Portage `_create_use_string` appends one trailing space per group
         # (backlog #272); compare unstripped so the byte is pinned.
         assert p.stdout == (
             f'[ebuild   R    ] dev-libs/reinstdropiusepkg-1.0 to {fixture_env["ROOT"]} USE="(-gone%*)" \n'
@@ -13258,7 +13258,7 @@ def test_reinst_flags_force_show_a_dropped_iuse_trigger_flag_at_plain_p(
 def test_verbose_use_order_is_enabled_first_and_alphabetical_flips_it(
     emerge_binary, fixture_env
 ):
-    """Real output_helpers.py::_create_use_string joins `enabled +
+    """Portage output_helpers.py::_create_use_string joins `enabled +
     disabled` -- enabled flags first, then disabled, each alphabetical --
     unless --alphabetical, which joins one combined bare-name-sorted
     list. dev-libs/iusedefaultpkg resolves enableddefault + plainflag on,
@@ -13268,7 +13268,7 @@ def test_verbose_use_order_is_enabled_first_and_alphabetical_flips_it(
 
     Asserted by content (`any(...)`), not position: useexpandpkg's
     conditional RDEPEND on dev-libs/newpkg -- itself also reachable from
-    @system in this shared fixture profile -- means real's own
+    @system in this shared fixture profile -- means Portage's own
     _merge_order_bias can legitimately place newpkg's own line ahead of
     either top-level package; this test is about USE-flag formatting,
     not merge order, so it doesn't pin a position."""
@@ -13336,7 +13336,7 @@ def test_verbose_use_flags_reflect_package_use_overrides(emerge_binary, fixture_
 
 def test_verbose_on_a_package_with_no_iuse_shows_no_use_line(emerge_binary, fixture_env):
     """dev-libs/newpkg declares no IUSE at all -- -v must not print an
-    empty USE="" line, matching real portage's own "nothing to show"
+    empty USE="" line, matching Portage's own "nothing to show"
     behavior (_create_use_string returns "" when there's nothing to
     join)."""
     result = _run([str(emerge_binary)], ["--pretend", "-v", "dev-libs/newpkg"], fixture_env)
@@ -13349,12 +13349,12 @@ def test_verbose_on_a_package_with_no_iuse_shows_no_use_line(emerge_binary, fixt
 
 
 def test_verbose_consumes_an_explicit_y_or_n_value(emerge_binary, fixture_env):
-    """-v/--verbose is not a plain boolean in real emerge -- it's
+    """-v/--verbose is not a plain boolean in Portage emerge -- it's
     registered with choices=("True", "y", "n"), and insert_optional_args
     inserts "True" only when no explicit value follows. A standalone -v
     (not bundled) must consume an immediately-following "n" as an
     explicit disable, or "y" as an explicit enable -- verified by tracing
-    real insert_optional_args by hand, not guessed."""
+    Portage insert_optional_args by hand, not guessed."""
     disabled = _run(
         [str(emerge_binary)], ["--pretend", "-v", "n", "dev-libs/useflagpkg"], fixture_env
     )
@@ -13411,7 +13411,7 @@ def test_short_flag_bundle_pv_enables_both_pretend_and_verbose(emerge_binary, fi
 def test_short_flag_bundle_reports_the_first_out_of_scope_character(
     emerge_binary, fixture_env
 ):
-    """-pf (pretend + real-but-unimplemented -f/--fetchonly) and -pz
+    """-pf (pretend + Portage-but-unimplemented -f/--fetchonly) and -pz
     (pretend + a genuinely unrecognized "-z") each decompose left to
     right, processing "-p" silently and then reporting on the next
     character exactly as a standalone occurrence of it would -- same
@@ -13437,23 +13437,23 @@ def test_short_flag_bundle_reports_the_first_out_of_scope_character(
 def test_bundled_verbose_never_consumes_the_next_token_as_its_value(
     emerge_binary, fixture_env
 ):
-    """Real emerge's own insert_optional_args never lets a *bundled*
+    """Portage emerge's own insert_optional_args never lets a *bundled*
     short option (one sharing a token with another flag) pick up an
     inline or next-token value -- only a standalone, unbundled -v does
     (see test_verbose_consumes_an_explicit_y_or_n_value). "-pv n" must
     treat "n" as a positional target, not as -v's value -- proven here
     by "n" being category-qualified as a (nonexistent) bare package name
-    (real dep_expand), not by "n" silently disabling verbose."""
+    (Portage dep_expand), not by "n" silently disabling verbose."""
     result = _run([str(emerge_binary)], ["-pv", "n"], fixture_env)
     assert result.returncode == 1
     assert result.stderr.strip() == 'emerge: there are no ebuilds to satisfy "n".'
 
 
-def test_help_prints_a_pilot_specific_summary_not_real_emerges_own(
+def test_help_prints_a_pilot_specific_summary_not_portage_emerges_own(
     emerge_binary, fixture_env
 ):
     """--help/-h is real and implemented, but the text is a grouped tour
-    of what portuale actually does -- not a port of real emerge's own
+    of what portuale actually does -- not a port of Portage emerge's own
     _emerge/help.py (157 lines of colorized usage syntax for its full
     ~130-flag surface). Pinned in full since it's portuale's own
     content, byte-identical to emerge_pretend_reference.py's _HELP_TEXT."""
@@ -13583,7 +13583,7 @@ See README.md and emerge(1) for the full picture.
 def test_help_wins_unconditionally_regardless_of_other_flags_or_position(
     emerge_binary, fixture_env
 ):
-    """Matches real emerge's own behavior: main.py's parse_opts maps
+    """Matches Portage emerge's own behavior: main.py's parse_opts maps
     -h/--help to the "help" action, and main() checks
     "if myaction == 'help'" once, after the whole line has already
     parsed successfully -- so help wins no matter where it appears or
@@ -13603,12 +13603,12 @@ def test_help_wins_unconditionally_regardless_of_other_flags_or_position(
 
 
 def test_world_expands_to_the_fixture_world_files_own_atoms(emerge_binary, fixture_env):
-    """fixtures/var/lib/portage/world (real portage's own
+    """fixtures/var/lib/portage/world (Portage's own
     WORLD_FILE, <ROOT>/var/lib/portage/world) lists dev-libs/newpkg and
     dev-libs/withdeps (which itself recurses into newpkg again -- deduped
     -- and upgradepkg), plus a "@some-nested-set-reference" line that
     must be silently skipped, not mishandled (a "@"-prefixed line in the
-    plain world FILE itself really does fail real portage's own
+    plain world FILE itself really does fail Portage's own
     validation too -- see _read_world_atoms's own docstring; nested sets
     live in the separate world_sets file, exercised below in this same
     test) -- proving @world expansion feeds the exact same multi-atom/
@@ -13618,7 +13618,7 @@ def test_world_expands_to_the_fixture_world_files_own_atoms(emerge_binary, fixtu
     nestedtestset), which itself contributes dev-libs/nestedsetpkg
     directly (installed since the `-pC` set-protection slice, so it is
     omitted from the merge list here -- an already-satisfied package
-    doesn't show under `emerge -p`, matching real) and nests a further
+    doesn't show under `emerge -p`, matching Portage) and nests a further
     "@innernestedset" reference
     (contributing dev-libs/innernestedsetpkg, and -- proving the cycle
     guard -- referencing "@nestedtestset" right back without looping
@@ -13629,23 +13629,23 @@ def test_world_expands_to_the_fixture_world_files_own_atoms(emerge_binary, fixtu
 
     Merge order: newpkg/withdeps/upgradepkg are also reachable from
     @system in this shared fixture profile (profiles/base+default/
-    packages), so real's own _merge_order_bias promotes newpkg ahead of
+    packages), so Portage's own _merge_order_bias promotes newpkg ahead of
     the unrelated, non-system innernestedsetpkg. upgradepkg and
     innernestedsetpkg are both genuine leaves (no dependency of their
-    own) available from round one, so real's own "greedily pop every
+    own) available from round one, so Portage's own "greedily pop every
     available leaf at once" batching (_serialize_tasks'
     ignore_priority-is-None branch) places both of them -- and
     nestedsetpkg/dualslotpkg -- in that same first round, before withdeps
     (which needs newpkg *and* upgradepkg placed first) becomes available
     at all; withdeps therefore lands last, after innernestedsetpkg, even
-    though upgradepkg is withdeps' own RDEPEND target. Same real-grounded
+    though upgradepkg is withdeps' own RDEPEND target. Same Portage-grounded
     bias + batching documented on portage-repo::merge_order (the
     _serialize_tasks port).
 
     An already-installed package (nestedsetpkg, dualslotpkg) is omitted
-    from the merge list entirely, matching real `emerge -p` -- portuale
+    from the merge list entirely, matching Portage `emerge -p` -- portuale
     used to print a per-package "is already installed" notice, dropped
-    because it polluted `emerge -puD @world` and matched nothing in real.
+    because it polluted `emerge -puD @world` and matched nothing in Portage.
     The merge-bound sequence (newpkg, upgradepkg, innernestedsetpkg,
     withdeps) is unaffected."""
     result = _run([str(emerge_binary)], ["--pretend", "--update", "@world"], fixture_env)
@@ -13661,13 +13661,13 @@ def test_world_expands_to_the_fixture_world_files_own_atoms(emerge_binary, fixtu
 def test_world_combines_with_an_explicit_atom(emerge_binary, fixture_env):
     """@world can appear alongside an explicit atom in the same
     invocation, expanding in place at whatever position it's given --
-    real portage's own most common combined usage shape. --update is
+    Portage's own most common combined usage shape. --update is
     added for the same reason as the plain @world test above. Merge
     order: see test_world_expands_to_the_fixture_world_files_own_atoms's
     own doc comment for why withdeps lands last, after innernestedsetpkg.
 
     An already-installed package is omitted from the merge list, matching
-    real `emerge -p`; the merge-bound sequence is unaffected."""
+    Portage `emerge -p`; the merge-bound sequence is unaffected."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--update", "dev-libs/samepkg", "@world"],
@@ -13712,7 +13712,7 @@ def test_custom_set_as_a_top_level_target_expands_to_its_members(
 
 
 def test_selected_set_expands_the_same_as_world(emerge_binary, fixture_env):
-    """Real cnf/sets/portage.conf: @world = @profile @selected @system,
+    """Portage cnf/sets/portage.conf: @world = @profile @selected @system,
     and @selected = WorldSelectedSet (the world file's atoms + world_sets'
     nested sets). On this fixture @world and @selected coincide because
     every @system member is also a world-file member and the fixture
@@ -13729,7 +13729,7 @@ def test_selected_set_expands_the_same_as_world(emerge_binary, fixture_env):
 def test_installed_set_expands_to_a_slot_atom_per_vdb_package(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real @installed (EverythingSet): a `cat/pkg:slot` atom for every
+    """Portage @installed (EverythingSet): a `cat/pkg:slot` atom for every
     package under var/db/pkg -- always slot-qualified, even for a lone
     slot (bug #338959). A test-local ROOT with dev-libs/dualslotpkg-1.0
     (SLOT=1) and dev-libs/nestedsetpkg-1.0 (SLOT=0) installed; the slot
@@ -13755,7 +13755,7 @@ def test_installed_set_expands_to_a_slot_atom_per_vdb_package(
 def test_preserved_rebuild_set_expands_to_the_consumers_of_registered_preserved_libs(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real @preserved-rebuild (PreservedLibraryConsumerSet): the
+    """Portage @preserved-rebuild (PreservedLibraryConsumerSet): the
     installed packages that still link a library kept alive only by
     FEATURES=preserve-libs. A test-local ROOT with dev-libs/nestedsetpkg
     installed and a NEEDED.ELF.2 saying its binary links libpreserved.so.1;
@@ -13812,7 +13812,7 @@ def test_world_missing_file_expands_to_system_not_an_error(
     emerge_binary, fixture_env, tmp_path
 ):
     """A missing WORLD_FILE (a fresh ROOT that's never had anything merged
-    into it) is a real, valid state. Real `@world` is
+    into it) is a real, valid state. Portage `@world` is
     `@selected u @system` (`_sets/base.py::WorldSet`), so with no world
     file it collapses to `@system` -- a non-empty list -- not an empty
     one. `@selected` alone stays just the world file, so *it* still hits
@@ -13840,7 +13840,7 @@ def test_world_missing_file_expands_to_system_not_an_error(
 
 def test_world_sets_unresolvable_set_name_is_a_real_error(emerge_binary, fixture_env, tmp_path):
     """A "@name" listed in world_sets with no matching
-    etc/portage/sets/<name> file is a real, immediate error (real
+    etc/portage/sets/<name> file is a real, immediate error (Portage
     PackageSetNotFound) -- unlike a missing world/world_sets *file*
     itself (a real, valid "nothing selected" state), a name explicitly
     listed but unresolvable is a genuine configuration error. Only ROOT
@@ -13860,7 +13860,7 @@ def test_world_sets_unresolvable_set_name_is_a_real_error(emerge_binary, fixture
 
 def _deselect_root(tmp_path):
     """A minimal, self-contained ROOT with its own world file and vdb --
-    real action_deselect (lib/_emerge/actions.py) only ever touches the
+    Portage action_deselect (lib/_emerge/actions.py) only ever touches the
     world file and vardb, never repos/config at all, so --deselect's own
     tests stay fully isolated from the shared fixtures tree
     (avoiding any ripple effect on its own @world-dependent tests, which
@@ -13876,16 +13876,16 @@ def _deselect_root(tmp_path):
     expansion already does. "=dev-libs/vers-1.0" is an explicit-version
     world entry, never installed either -- since an explicit-category
     target needs no installed check at all (see run_deselect's own doc
-    comment), this exercises real Atom.intersects()'s own deliberately
+    comment), this exercises Portage Atom.intersects()'s own deliberately
     narrow cpv/operator matching directly, without an installed-status
     confound: an exact "=dev-libs/vers-1.0" target matches, but neither
     a different version ("=dev-libs/vers-2.0") nor even the same
     version under a different operator (">=dev-libs/vers-1.0", which
     would actually be *satisfied* by 1.0 under a real range check) does
-    -- real Atom.intersects() requires the operator itself to match
+    -- Portage Atom.intersects() requires the operator itself to match
     exactly, not just range-satisfaction, per its own docstring's "TODO:
-    Detect more forms of intersection". The separate world_sets file (real
-    portage's own WORLD_SETS_FILE, genuinely distinct from the world
+    Detect more forms of intersection". The separate world_sets file (Portage's
+    own WORLD_SETS_FILE, genuinely distinct from the world
     file above) lists "@myselectedset" (matchable by
     "--deselect @myselectedset") and "@anotherselectedset" (present but
     never targeted by any test, so it must never appear in a "Would
@@ -13931,7 +13931,7 @@ def _depclean_root(tmp_path):
     Reachable from @world (dev-libs/dcworld) + @system (dev-libs/
     systempkg): dcworld -> dcdep -> dcsub, dcworld -[bar?]-> dccond
     (USE="bar"), and systempkg itself. dcworld also DEPENDs dcbuilddep
-    and dcdep BDEPENDs dcbdep -- real `emerge --depclean` follows
+    and dcdep BDEPENDs dcbdep -- Portage `emerge --depclean` follows
     build-time deps (bdeps="auto" in remove mode), so both are kept.
     dev-libs/dcorphan (nothing needs it) and dev-libs/dcorphandep (only
     dcorphan's RDEPEND) are the cleanlist."""
@@ -14029,12 +14029,12 @@ def _depclean_pprovided_root(tmp_path):
     shared `fixtures/repo/profiles/default/package.provided` lists
     `dev-libs/providedpkg-1.0` and `dev-libs/providedpkg2-1.0`.
     `providedpkg` is installed AND a @world member; `providedpkg2` is
-    installed and only reachable via `pdwtest`'s RDEPEND. Real
+    installed and only reachable via `pdwtest`'s RDEPEND. Portage
     `_resolve`'s per-arg loop (`depgraph.py:5497-5503`) intercepts a
     `package.provided`-matched world seed before it ever becomes a graph
-    root, and real `dep_check.py:1052` intercepts a `package.provided`-
+    root, and Portage `dep_check.py:1052` intercepts a `package.provided`-
     matched dependency edge the same way -- so both stay unreachable and
-    join the cleanlist, matching the real `-pc` advisory's "will be
+    join the cleanlist, matching the Portage `-pc` advisory's "will be
     removed by depclean, even if they are part of the world set"
     wording."""
     portage_dir = tmp_path / "var" / "lib" / "portage"
@@ -14088,7 +14088,7 @@ def test_depclean_package_provided_pinned_output(
 
 
 def test_depclean_keeps_a_build_only_dependency(emerge_binary, fixture_env, tmp_path):
-    """Real _calc_depclean runs the depgraph in "remove" mode, where
+    """Portage _calc_depclean runs the depgraph in "remove" mode, where
     create_depgraph_params(myopts, "remove") sets bdeps="auto" and
     depgraph.py:4208-4213 keeps DEPEND/BDEPEND in the walk unless
     --with-bdeps=n. dcbuilddep is reachable *only* through dcworld's
@@ -14113,10 +14113,10 @@ def test_depclean_keeps_a_build_only_dependency(emerge_binary, fixture_env, tmp_
 def test_depclean_pretend_with_args_narrows_to_the_named_packages(
     emerge_binary, fixture_env, tmp_path
 ):
-    """`emerge -pc <atom>`: real _calc_depclean drops the world 'selected'
+    """`emerge -pc <atom>`: Portage _calc_depclean drops the world 'selected'
     atoms and protects every non-arg installed package, so the cleanlist
     is just the args-matched packages nothing else needs. No advisory
-    block (real portage only shows it with no args)."""
+    block (Portage only shows it with no args)."""
     env = _depclean_env(fixture_env, tmp_path)
 
     # dcorphan: nothing needs it -> removable (its private dep dcorphandep
@@ -14149,13 +14149,13 @@ def test_depclean_pretend_with_args_narrows_to_the_named_packages(
 
 
 def test_depclean_args_deselect_n_keeps_a_world_member(emerge_binary, fixture_env, tmp_path):
-    """Real action_depclean's `deselect = myopts.get("--deselect") !=
+    """Portage action_depclean's `deselect = myopts.get("--deselect") !=
     "n"` (default True): `-pc <atom>` in args mode empties the world
     "selected" set so a named world member still gets removed
     (actions.py:1037). `-pc <atom> --deselect=n` keeps the world set as a
     protection root, so a world member named as an arg is KEPT. Also
     proves `--depclean --deselect` no longer wrongly routes to the
-    standalone deselect action (real: `myaction` is already `depclean`)."""
+    standalone deselect action (Portage: `myaction` is already `depclean`)."""
     env = _depclean_env(fixture_env, tmp_path)
     # default: dcworld (in @world, nothing needs it) -> removed
     default = _run([str(emerge_binary)], ["--pretend", "-c", "dev-libs/dcworld"], env)
@@ -14328,7 +14328,7 @@ def test_depclean_lib_check_pinned_output(
 
 def _unresolved_root(tmp_path):
     """A ROOT where a *kept* package has a hard runtime dependency no
-    installed package satisfies. Real _calc_depclean's unresolved_deps()
+    installed package satisfies. Portage _calc_depclean's unresolved_deps()
     (actions.py:1137-1248) refuses to remove anything in that state.
 
     uworld (world) -> ukept, whose RDEPEND names dev-libs/umissing (not
@@ -14374,7 +14374,7 @@ def test_depclean_halts_on_an_unresolvable_runtime_dep(
 ):
     """emerge -pc: a kept package's unsatisfiable RDEPEND makes depclean
     print the `* Dependencies could not be completely resolved ...`
-    block and exit 1 without removing anything (real actions.py:1247).
+    block and exit 1 without removing anything (Portage actions.py:1247).
     The SOFT buildtime dep and the satisfied `||` group are not flagged."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "-c"], _unresolved_env(fixture_env, tmp_path)
@@ -14396,7 +14396,7 @@ def test_depclean_halts_on_an_unresolvable_runtime_dep(
 def test_prune_halts_on_an_unresolvable_runtime_dep_with_the_nodeps_hint(
     emerge_binary, fixture_env, tmp_path
 ):
-    """emerge -pP hits the same halt (real _calc_depclean serves
+    """emerge -pP hits the same halt (Portage _calc_depclean serves
     action in ('depclean', 'prune')) and adds the prune-only
     `If you would like to ignore dependencies then use --nodeps.` line."""
     result = _run(
@@ -14466,7 +14466,7 @@ def _depclean_revdep_root(tmp_path):
 
 
 def test_depclean_pretend_verbose_shows_reverse_deps(emerge_binary, fixture_env, tmp_path):
-    """emerge -pc --verbose: real create_cleanlist's `elif "--verbose":
+    """emerge -pc --verbose: Portage create_cleanlist's `elif "--verbose":
     show_parents(pkg)` -- for every KEPT installed package (cpv-sorted):
     '  <cpv> pulled in by:\\n    <parent> requires <atom>'. A world-file
     member's parent is @selected; parent lines are sorted; the blocks
@@ -14502,7 +14502,7 @@ def test_depclean_pretend_verbose_shows_reverse_deps(emerge_binary, fixture_env,
 
 def _depclean_order_root(tmp_path):
     """A ROOT whose orphan cleanlist has dependency edges between its own
-    members, so real _calc_depclean's topological unmerge-order pass
+    members, so Portage _calc_depclean's topological unmerge-order pass
     (actions.py:1591-1731) applies: dev-libs/mmid RDEPENDs dev-libs/zztop
     RDEPENDs dev-libs/aabase, all orphan. The removal order (a package
     before the ones it depends on) is [mmid, zztop, aabase] -- the
@@ -14537,7 +14537,7 @@ def test_depclean_pretend_removal_order_is_topological(emerge_binary, fixture_en
         ln.strip() for ln in result.stdout.splitlines() if ln.startswith(" dev-libs/")
     ]
     assert blocks == ["dev-libs/mmid", "dev-libs/zztop", "dev-libs/aabase"]
-    # "All selected packages" stays sorted (real portage's set-iteration
+    # "All selected packages" stays sorted (Portage's set-iteration
     # order there is not a meaningful spec; both portuale sides sort it).
     line = next(
         ln for ln in result.stdout.splitlines() if ln.startswith("All selected packages:")
@@ -14559,7 +14559,7 @@ def test_depclean_removal_order_pinned_output(
 
 def _depclean_cycle_root(tmp_path):
     """An orphan cleanlist whose members form a genuine dependency cycle,
-    so real _calc_depclean's `ignore_priority_range` fallback
+    so Portage _calc_depclean's `ignore_priority_range` fallback
     (actions.py:1713-1727) kicks in: with no true root, it ignores the
     lowest edge-priority level and pops ONE node (cpv-max) to break the
     cycle. dev-libs/cyclicdepa DEPENDs dev-libs/cyclicdepb (buildtime,
@@ -14641,7 +14641,7 @@ def test_prune_pretend_removes_superseded_versions_in_topological_order(
 ):
     """emerge -p --prune: the non-highest installed versions of
     multi-version cps, kept only if something needs that exact old
-    version. No advisory block, no stats block (real action_depclean
+    version. No advisory block, no stats block (Portage action_depclean
     returns right after the unmerge() preview for action=="prune")."""
     env = dict(fixture_env)
     env["ROOT"] = str(_prune_root(tmp_path))
@@ -14726,7 +14726,7 @@ def test_prune_nodeps_pretend_prunes_every_old_version(emerge_binary, fixture_en
 
 
 def test_prune_nodeps_pretend_nothing_outdated(emerge_binary, fixture_env, tmp_path):
-    """No multi-version cp -> real `global_unmerge and not numselected`
+    """No multi-version cp -> Portage `global_unmerge and not numselected`
     prints ">>> No outdated packages were found on your system." and
     exits 1 (unlike plain --prune's exit 0). With an arg it's the
     ordinary "No packages selected" message instead."""
@@ -14765,9 +14765,9 @@ def test_prune_nodeps_pinned_output(
 
 
 def test_prune_pretend_verbose_shows_reverse_deps(emerge_binary, fixture_env, tmp_path):
-    """emerge -pP --verbose: real create_cleanlist's prune branch
+    """emerge -pP --verbose: Portage create_cleanlist's prune branch
     (actions.py:1339) also calls show_parents(pkg) -- but only for an
-    args_set-matched KEPT version with a real Package parent. In
+    args_set-matched KEPT version with a Portage Package parent. In
     _prune_root, dev-libs/keeper pins =dev-libs/mm-2.0, so mm-2.0 (kept,
     non-highest) is the one block; the highest versions (protected by the
     bare-cp seed, which show_parents filters) get no block. The
@@ -14817,7 +14817,7 @@ def test_prune_pinned_output_on_the_shared_vdb(
 
 
 def test_unmerge_pretend_lists_selected_and_omitted(emerge_binary, fixture_env):
-    """Real _emerge/unmerge.py::_unmerge_display for `unmerge_action ==
+    """Portage _emerge/unmerge.py::_unmerge_display for `unmerge_action ==
     "unmerge"`: every vdb match goes into `selected`, every other
     installed version of the same cp into `omitted`. dev-libs/unmergepkg
     is installed at 1.0 and 2.0. `emerge -pC =dev-libs/unmergepkg-1.0`
@@ -14861,7 +14861,7 @@ def _vdb_path_root(tmp_path):
 
 
 def test_unmerge_pretend_accepts_a_literal_vdb_path(emerge_binary, fixture_env, tmp_path):
-    """Real unmerge.py:137-182: an `-C` argument that starts with `.`/`/`
+    """Portage unmerge.py:137-182: an `-C` argument that starts with `.`/`/`
     or ends `.ebuild` is a path into the vdb -- validated, echoed as the
     derived `=cat/pkg-ver`, and selected. A `.ebuild` suffix is stripped
     first."""
@@ -14913,7 +14913,7 @@ def test_unmerge_pretend_vdb_path_pinned_output(
 
 
 def test_unmerge_pretend_refuses_portage_itself(emerge_binary, fixture_env):
-    """Real _unmerge_display: `sys-apps/portage` (PORTAGE_PACKAGE_ATOM)
+    """Portage _unmerge_display: `sys-apps/portage` (PORTAGE_PACKAGE_ATOM)
     is moved from `selected` to `protected` with a note, and if it was
     the only selection the run reports nothing selected and exits 1."""
     result = _run([str(emerge_binary)], ["--pretend", "-C", "sys-apps/portage"], fixture_env)
@@ -14943,7 +14943,7 @@ def test_unmerge_without_pretend_is_no_longer_gated(emerge_binary, fixture_env):
 
 
 def test_unmerge_pretend_system_profile_warning(emerge_binary, fixture_env):
-    """Real _unmerge_display: `if not (protected or omitted) and cp in
+    """Portage _unmerge_display: `if not (protected or omitted) and cp in
     syslist` -- a cp that would be fully removed and is a @system member
     (dev-libs/systempkg, a *-prefixed atom in profiles/base/packages).
     The two `!!!` lines go to stderr."""
@@ -14960,7 +14960,7 @@ def test_unmerge_pretend_system_profile_warning(emerge_binary, fixture_env):
 
 
 def test_unmerge_pretend_still_listed_in_package_sets_warning(emerge_binary, fixture_env):
-    """Real _unmerge_display: a `selected` package a user-editable set
+    """Portage _unmerge_display: a `selected` package a user-editable set
     reached via world_sets still lists. dev-libs/nestedsetpkg is in
     etc/portage/sets/nestedtestset, which var/lib/portage/world_sets
     directly selects. The warning (stdout) names that set."""
@@ -14978,7 +14978,7 @@ def test_unmerge_pretend_still_listed_in_package_sets_warning(emerge_binary, fix
 
 
 def test_unmerge_pretend_set_warning_higher_slot_refinement(emerge_binary, fixture_env):
-    """Real unmerge.py:421-441's `higher_slot`: the "still listed in the
+    """Portage unmerge.py:421-441's `higher_slot`: the "still listed in the
     following package sets" warning is suppressed for a set when an
     installed *newer* version of the same cp *in a different slot* also
     matches the set atom -- removing this version leaves that set
@@ -15016,8 +15016,8 @@ def test_deselect_matches_a_plain_world_atom(emerge_binary, fixture_env, tmp_pat
 
 
 def test_deselect_matches_via_a_bare_package_name(emerge_binary, fixture_env, tmp_path):
-    """A bare package name (no category at all) is expanded via real
-    portage's own "null category" mechanism: scan the world file's own
+    """A bare package name (no category at all) is expanded via Portage's
+    own "null category" mechanism: scan the world file's own
     atoms for one sharing that package name, substitute in its
     category."""
     result = _run(
@@ -15034,7 +15034,7 @@ def test_deselect_matches_regardless_of_installed_slot_when_target_is_unslotted(
 ):
     """dev-libs/baz is installed at slot 1, and the world file's own
     entry restricts it to slot 2 -- yet an *unslotted* "dev-libs/baz"
-    CLI target still matches: real Atom.intersects() only rejects a
+    CLI target still matches: Portage Atom.intersects() only rejects a
     slot mismatch when BOTH sides carry a slot restriction ("if
     self.slot is None or other.slot is None or self.slot==other.slot:
     return True"), and dep_expand() never adds one to an explicit-
@@ -15056,7 +15056,7 @@ def test_deselect_respects_the_world_atoms_own_slot_restriction_when_target_is_s
 ):
     """Unlike the unslotted case above, a CLI target that itself carries
     an explicit slot restriction ("dev-libs/baz:1") DOES get rejected by
-    real Atom.intersects() against a world entry restricted to a
+    Portage Atom.intersects() against a world entry restricted to a
     different slot ("dev-libs/baz:2") -- both sides now have a slot to
     compare, and they disagree."""
     result = _run(
@@ -15100,7 +15100,7 @@ def test_deselect_matches_an_explicit_category_target_never_installed(
     emerge_binary, fixture_env, tmp_path
 ):
     """dev-libs/qux is listed in the world file but was never actually
-    installed -- yet real dep_expand() returns an explicit-category atom
+    installed -- yet Portage dep_expand() returns an explicit-category atom
     completely unchanged, with no vardb check at all, before
     action_deselect ever seeds expanded_atoms with it unconditionally.
     So installation is NOT required here: the world file's own text is
@@ -15122,7 +15122,7 @@ def test_deselect_matches_a_bare_name_target_never_installed(
     """Same correction as the explicit-category case above, but via the
     bare-name/null-category path: "qux" substitutes in "dev-libs" from
     the world file's own "dev-libs/qux" entry unconditionally, no
-    installed check at all -- real vardb.match() on the still-null-
+    installed check at all -- Portage vardb.match() on the still-null-
     category atom can never match a real vdb entry, so it's dead code
     for this branch and correctly contributes nothing."""
     result = _run(
@@ -15171,7 +15171,7 @@ def test_deselect_rejects_a_range_operator_even_when_satisfied(
 ):
     """">=dev-libs/vers-1.0" would actually be *satisfied* by the world
     file's own "=dev-libs/vers-1.0" entry under a real version-range
-    check, but real Atom.intersects() is deliberately narrower than
+    check, but Portage Atom.intersects() is deliberately narrower than
     that: it requires the operator itself to match exactly (its own
     docstring: "atoms with different cpv, operator or use attributes
     cause this method to return False even though there may actually be
@@ -15205,8 +15205,8 @@ def test_deselect_at_target_matches_a_world_sets_entry_by_exact_name(
     emerge_binary, fixture_env, tmp_path
 ):
     """"--deselect @myselectedset" matches the "@myselectedset" line in
-    the separate world_sets file (real portage's own WORLD_SETS_FILE) --
-    real action_deselect never expands a "@name" target's own set
+    the separate world_sets file (Portage's own WORLD_SETS_FILE) --
+    Portage action_deselect never expands a "@name" target's own set
     members at all, only exact-matches it against a world_set entry
     that's itself a literal "@name" string, so this needs no vdb/atom
     matching whatsoever, unlike every other --deselect target. Reported
@@ -15236,7 +15236,7 @@ def test_deselect_combines_a_world_atom_and_a_world_sets_entry_sorted_together(
     emerge_binary, fixture_env, tmp_path
 ):
     """A plain atom target and a "@name" target discarded in the same
-    run are sorted into ONE combined list (real "sorted(discard_atoms,
+    run are sorted into ONE combined list (Portage "sorted(discard_atoms,
     key=str)"), not printed as two separate "world" then "world_sets"
     blocks -- "@myselectedset" sorts before "dev-libs/foo" (real Python
     "@" < "d" and canonical str.sort() ordering, which portuale's own
@@ -15264,7 +15264,7 @@ def test_deselect_with_no_targets_at_all_reports_no_match(emerge_binary, fixture
 
 def test_deselect_without_pretend_is_no_longer_gated(emerge_binary, fixture_env, tmp_path):
     """`emerge --deselect` WITHOUT `--pretend` really rewrites the world /
-    world_sets files now (run_deselect, real `world_set.replace`). Not a
+    world_sets files now (run_deselect, Portage `world_set.replace`). Not a
     Rust-vs-Python contract case: the reference has no execution machinery
     (it prints `Removing` but doesn't write). The real write is covered in
     test_portuale.py. Here we only assert the old `requires --pretend`
@@ -15290,13 +15290,13 @@ def test_deselect_short_alias_and_bundling(emerge_binary, fixture_env, tmp_path)
 
 
 def test_deselect_n_does_not_trigger_deselect_mode(emerge_binary, fixture_env, tmp_path):
-    """Real "--deselect": y_or_n -- an explicit "n" leaves this
-    invocation as an ordinary --pretend resolution instead (real
+    """Portage "--deselect": y_or_n -- an explicit "n" leaves this
+    invocation as an ordinary --pretend resolution instead (Portage
     main.py's own "if myaction is None and myoptions.deselect is True"
     check), so "dev-libs/foo" here is treated as a normal target atom,
     not a deselect argument -- and resolves the ordinary way: it's
     already installed (in this throwaway ROOT's own vdb) and satisfies
-    the atom, so it's reported as a plain reinstall (real portage's own
+    the atom, so it's reported as a plain reinstall (Portage's own
     "selective" gap for a bare top-level atom -- see resolve_pretend's
     own doc comment, portage-repo) rather than as a deselect-mode "Would
     remove" line."""
@@ -15343,7 +15343,7 @@ def test_system_expands_to_the_fixture_profile_chains_own_packages_files(
     contribute an atom of its own), and fixtures/repo/profiles/
     default/packages (the leaf) contributes dev-libs/withdeps -- proving
     @system stacks across multiple profile levels (not just the leaf,
-    real PackagesSystemSet's own behavior) and that its expanded atoms
+    Portage PackagesSystemSet's own behavior) and that its expanded atoms
     feed the exact same multi-atom/recursion machinery every other
     invocation already uses: withdeps' own RDEPEND recurses into newpkg
     again (deduped against base's own @system entry) and upgradepkg.
@@ -15353,7 +15353,7 @@ def test_system_expands_to_the_fixture_profile_chains_own_packages_files(
     itself is about.
 
     An already-installed package (systempkg) is omitted from the merge
-    list, matching real `emerge -p`; the merge-bound sequence is
+    list, matching Portage `emerge -p`; the merge-bound sequence is
     unaffected."""
     result = _run([str(emerge_binary)], ["--pretend", "--update", "@system"], fixture_env)
     assert result.returncode == 0
@@ -15371,7 +15371,7 @@ def test_system_combines_with_an_explicit_atom(emerge_binary, fixture_env):
     @system test above.
 
     An already-installed package is omitted from the merge list, matching
-    real `emerge -p`; the merge-bound sequence is unaffected."""
+    Portage `emerge -p`; the merge-bound sequence is unaffected."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--update", "dev-libs/samepkg", "@system"],
@@ -15388,8 +15388,8 @@ def test_system_combines_with_an_explicit_atom(emerge_binary, fixture_env):
 def test_unknown_set_name_as_a_top_level_atom_is_a_real_error(emerge_binary, fixture_env):
     """`@world`/`@system` expand to their own atom lists; any other
     `@name` is a user-defined file-based set, resolved via
-    etc/portage/sets/<name> (real StaticFileSet). A `@name` with no
-    matching set file is a real, immediate configuration error (real
+    etc/portage/sets/<name> (Portage StaticFileSet). A `@name` with no
+    matching set file is a real, immediate configuration error (Portage
     PackageSetNotFound), not a silent no-op -- same error the
     world_sets code path already produces for an unresolvable name."""
     result = _run([str(emerge_binary)], ["--pretend", "@some-other-set"], fixture_env)
@@ -15416,7 +15416,7 @@ def test_newuse_reinstalls_a_package_whose_use_changed(emerge_binary, fixture_en
 
 
 def test_newuse_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-N is --newuse's real short alias (see lib/_emerge/main.py's
+    """-N is --newuse's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-pN") it must behave identically to
     the long-flag invocation above."""
     result = _run([str(emerge_binary)], ["-pN", "dev-libs/reinstallpkg"], fixture_env)
@@ -15429,7 +15429,7 @@ def test_newuse_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
 
 def test_newuse_verbose_shows_use_flags_too(emerge_binary, fixture_env):
     """-v combines with -N exactly like it does with New/Upgrade. For a
-    Reinstall (an installed side exists), real output_helpers.py::
+    Reinstall (an installed side exists), Portage output_helpers.py::
     _create_use_string diffs each flag against the installed version's
     recorded USE/IUSE: `foo` was in old IUSE but off, is now on -> `foo*`.
     """
@@ -15455,7 +15455,7 @@ def test_without_newuse_a_use_changed_package_stays_already_installed(
     a NEW dependency recursion into dev-libs/newpkg either. --noreplace
     isolates this from the unrelated "bare top-level atom" reinstall a
     plain invocation would otherwise also trigger (see resolve_pretend's
-    own doc comment, portage-repo, on real portage's own "selective"
+    own doc comment, portage-repo, on Portage's own "selective"
     gap) -- this test is about --newuse specifically, not that."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--noreplace", "dev-libs/reinstallpkg"], fixture_env
@@ -15480,7 +15480,7 @@ def test_newuse_forced_flags_suppresses_a_spurious_reinstall(emerge_binary, fixt
     """dev-libs/usemaskreinstallpkg is installed with an empty vdb IUSE,
     but its own ebuild now declares IUSE="masked_newly_added_flag" -- a
     flag fixtures/repo/profiles/base/use.mask masks off, so it
-    was never enabled either before or after. Real depgraph.py's own
+    was never enabled either before or after. Portage depgraph.py's own
     "flags -= forced_flags" line exists exactly to stop a newly-declared,
     permanently-masked (or forced) IUSE flag from spuriously triggering a
     reinstall just because it now exists -- without it, this would
@@ -15525,7 +15525,7 @@ def test_newuse_vs_changed_use_diverge_on_a_newly_added_iuse_flag(emerge_binary,
 
 
 def test_changed_use_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-U is --changed-use's real short alias (see lib/_emerge/main.py's
+    """-U is --changed-use's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-pU") it must behave identically to
     the long-flag invocation above."""
     result = _run([str(emerge_binary)], ["-pU", "dev-libs/changedusepkg"], fixture_env)
@@ -15556,9 +15556,9 @@ def test_changed_deps_reinstalls_and_recurses_into_the_current_ebuilds_own_depen
 ):
     """dev-libs/changeddepspkg is installed with a vdb-recorded
     RDEPEND="dev-libs/samepkg", but the repo's current ebuild for that
-    exact version now has RDEPEND="dev-libs/newpkg" instead -- real
+    exact version now has RDEPEND="dev-libs/newpkg" instead -- Portage
     depgraph.py's own _changed_deps compares these (flattened against
-    the installed package's own recorded USE, real portage's own
+    the installed package's own recorded USE, Portage's own
     uselist=pkg.use.enabled) and, once --changed-deps is given, this
     portuale reports a reinstall and recurses into the CURRENT ebuild's own
     dependency (newpkg), not the vdb's stale one -- matching how
@@ -15581,7 +15581,7 @@ def test_changed_deps_ignores_a_libc_only_dependency_change(emerge_binary, fixtu
     sys-libs/glibc; its current ebuild names sys-libs/musl instead --
     both are real virtual/libc providers (the fixture vdb's own
     virtual/libc entry RDEPENDs on "|| ( sys-libs/glibc sys-libs/musl
-    )"), so real strip_libc_deps strips both out before comparing,
+    )"), so Portage strip_libc_deps strips both out before comparing,
     leaving only the identical dev-libs/samepkg on each side -- no
     reinstall, even with --changed-deps given."""
     result = _run(
@@ -15602,7 +15602,7 @@ def test_changed_deps_detects_an_atom_moved_between_two_dep_keys(
     its current ebuild has that exact atom in PDEPEND instead, nothing
     else on either side. The net atom set is identical, so the pre-slice
     "merge every dep key into one string, then flatten and compare"
-    approach saw no change -- real _changed_deps (depgraph.py:3168)
+    approach saw no change -- Portage _changed_deps (depgraph.py:3168)
     compares built_deps to unbuilt_deps element-wise, one struct per dep
     key, which portuale now mirrors: the move registers as changed."""
     args = ["--pretend", "--changed-deps", "dev-libs/movedkeydepspkg"]
@@ -15619,7 +15619,7 @@ def test_changed_deps_ignores_a_built_slot_operators_resolved_slot(
     """dev-libs/slotopdepspkg's current ebuild has
     RDEPEND="dev-libs/slotoptarget:="; its vdb recorded the built form
     "dev-libs/slotoptarget:2=" (the concrete slot portage records when a
-    := dep is merged). Real strip_slots (lib/portage/dep/_slot_operator.py)
+    := dep is merged). Portage strip_slots (lib/portage/dep/_slot_operator.py)
     normalizes the built :2= back to := before comparing, so this is NOT
     a changed dependency -- without that normalization every := dep would
     spuriously trigger a --changed-deps reinstall."""
@@ -15632,10 +15632,10 @@ def test_changed_deps_ignores_a_built_slot_operators_resolved_slot(
 def test_changed_deps_structured_comparison(
     emerge_binary, fixture_env
 ):
-    """Real _changed_deps (depgraph.py:3168) compares structured
+    """Portage _changed_deps (depgraph.py:3168) compares structured
     use_reduce(token_class=Atom) output as Python lists -- order-sensitive
     everywhere, redundant brackets collapsed. Portuale's
-    portage_use_reduce::use_reduce_structured ports real use_reduce's own
+    portage_use_reduce::use_reduce_structured ports Portage use_reduce's own
     flat=False bracket-optimization pass to match:
 
       - anyofreorderdepspkg: vdb `|| ( reorderdepa reorderdepb )`, ebuild
@@ -15680,8 +15680,8 @@ def test_changed_deps_json_includes_the_changed_deps_field(emerge_binary, fixtur
 def test_without_changed_deps_a_dependency_change_is_never_detected(emerge_binary, fixture_env):
     """--noreplace isolates this from the unrelated "bare top-level
     atom" reinstall a plain invocation would otherwise also trigger --
-    see resolve_pretend's own doc comment (portage-repo) on real
-    portage's own "selective" gap; this test is about --changed-deps
+    see resolve_pretend's own doc comment (portage-repo) on Portage's
+    own "selective" gap; this test is about --changed-deps
     specifically, not that."""
     result = _run(
         [str(emerge_binary)],
@@ -15697,14 +15697,14 @@ def test_changed_slot_reinstalls_a_package_whose_vdb_slot_differs_from_the_curre
 ):
     """dev-libs/changedslotpkg is installed with a vdb-recorded SLOT="0",
     but the repo's current ebuild for that exact version now has
-    SLOT="0/2" instead (an ABI-bump sub-slot change) -- real
+    SLOT="0/2" instead (an ABI-bump sub-slot change) -- Portage
     depgraph.py's own _changed_slot compares these and, once
     --changed-slot is given, portuale reports a reinstall. Without
     --changed-deps, only the slot reason appears even though this same
     fixture package's own RDEPEND also differs (see the combined-reason
     test below).
 
-    The `[1.0]` bracket is real `output.py::_get_installed_best`
+    The `[1.0]` bracket is Portage `output.py::_get_installed_best`
     721-727: a reinstall of an installed cpv is the
     `vardb.cpv_exists(pkg.cpv)` arm (`replace = True`) and carries
     `myoldbest = [installed_version]` exactly when the installed
@@ -15712,7 +15712,7 @@ def test_changed_slot_reinstalls_a_package_whose_vdb_slot_differs_from_the_curre
     which is this fixture (vdb `SLOT="0"`, ebuild `SLOT="0/2"`).
     `convert_myoldbest` does not suppress a same-version bracket. Only
     reachable since #24 S3 gave walked reinstalls an `oldbest` at all.
-    At `-pv` real's non-`new_slot` branch appends the old sub-slot on
+    At `-pv` Portage's non-`new_slot` branch appends the old sub-slot on
     its extra `old.slot == pkg.slot and old.sub_slot != pkg.sub_slot`
     disjunct, hence `[1.0:0/0::testrepo]`."""
     result = _run(
@@ -15740,7 +15740,7 @@ def test_changed_deps_and_changed_slot_combine_in_one_reinstall_line(
     emerge_binary, fixture_env
 ):
     """dev-libs/changedslotpkg has both a stale vdb RDEPEND and a stale
-    vdb SLOT relative to its current ebuild -- real portage treats
+    vdb SLOT relative to its current ebuild -- Portage treats
     --changed-deps/--changed-slot as independent, freely-combinable
     reinstall triggers, so giving both prints both reasons on the same
     line, deps first."""
@@ -15752,7 +15752,7 @@ def test_changed_deps_and_changed_slot_combine_in_one_reinstall_line(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        # `[1.0]`: real `_get_installed_best` 721-727 -- see the
+        # `[1.0]`: Portage `_get_installed_best` 721-727 -- see the
         # slot-only test just above.
         f'[ebuild   R    ] dev-libs/changedslotpkg-1.0 [1.0] to {fixture_env["ROOT"]}',
     ]
@@ -15777,8 +15777,8 @@ def test_changed_slot_json_includes_the_changed_slot_field(emerge_binary, fixtur
 def test_without_changed_slot_a_slot_change_is_never_detected(emerge_binary, fixture_env):
     """--noreplace isolates this from the unrelated "bare top-level
     atom" reinstall a plain invocation would otherwise also trigger --
-    see resolve_pretend's own doc comment (portage-repo) on real
-    portage's own "selective" gap; this test is about --changed-slot
+    see resolve_pretend's own doc comment (portage-repo) on Portage's
+    own "selective" gap; this test is about --changed-slot
     specifically, not that."""
     result = _run(
         [str(emerge_binary)],
@@ -15808,7 +15808,7 @@ def test_without_with_test_deps_a_test_gated_dependency_is_never_pulled_in(
 def test_with_test_deps_pulls_in_a_top_level_atoms_own_test_gated_dependency(
     emerge_binary, fixture_env
 ):
-    """Same fixture as above, but with --with-test-deps: real
+    """Same fixture as above, but with --with-test-deps: Portage
     accept_keywords_defaults-style extraction (use_reduce_flat_subset,
     subset={"test"}) additionally pulls in dev-libs/testonlydep, on top
     of -- not instead of -- the unconditional dev-libs/newpkg."""
@@ -15840,7 +15840,7 @@ def test_with_test_deps_n_explicitly_disables_it(emerge_binary, fixture_env):
 
 def test_with_test_deps_does_not_apply_beyond_a_top_level_atom(emerge_binary, fixture_env):
     """dev-libs/withtestdepconsumer RDEPENDs on dev-libs/withtestdeppkg,
-    reaching it at depth 1, not depth 0 -- real depgraph.py's own
+    reaching it at depth 1, not depth 0 -- Portage depgraph.py's own
     "pkg.depth == 0" gate (portuale's own equivalent) means
     dev-libs/testonlydep must NOT be pulled in even with --with-test-deps
     given, since withtestdeppkg itself isn't the top-level atom here."""
@@ -15860,7 +15860,7 @@ def test_with_test_deps_does_not_apply_beyond_a_top_level_atom(emerge_binary, fi
 def test_nodeps_disables_recursion_entirely(emerge_binary, fixture_env):
     """dev-libs/withdeps RDEPENDs on dev-libs/newpkg and
     dev-libs/upgradepkg -- see the plain recursion contract test above.
-    With --nodeps, real create_depgraph_params.py pops
+    With --nodeps, Portage create_depgraph_params.py pops
     "recurse" out of myparams, so depgraph.py's own dependency walk
     returns early -- ported here as never even reading withdeps' own
     DEPEND/RDEPEND, so neither dependency appears at all."""
@@ -15872,7 +15872,7 @@ def test_nodeps_disables_recursion_entirely(emerge_binary, fixture_env):
 
 
 def test_nodeps_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-O is --nodeps's real short alias (see lib/_emerge/main.py's
+    """-O is --nodeps's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-pO") it must behave identically to
     the long-flag invocation above."""
     result = _run([str(emerge_binary)], ["-pO", "dev-libs/withdeps"], fixture_env)
@@ -15881,7 +15881,7 @@ def test_nodeps_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
 
 
 def test_nodeps_still_shows_the_top_level_atoms_own_use_display(emerge_binary, fixture_env):
-    """Real portage's own -v USE display is about a package's own
+    """Portage's own -v USE display is about a package's own
     metadata, unrelated to whether its dependencies get walked --
     --nodeps must not blank it out, even though it suppresses the
     foo?-gated dev-libs/newpkg dependency this same package's -v output
@@ -15918,7 +15918,7 @@ def test_onlydeps_suppresses_the_top_level_atom_but_shows_its_dependencies(
 
 
 def test_onlydeps_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-o is --onlydeps's real short alias (see lib/_emerge/main.py's
+    """-o is --onlydeps's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-po") it must behave identically to
     the long-flag invocation above. -u (--update) is bundled in too, for
     the same reason the long-flag invocation above needs --update."""
@@ -15947,30 +15947,30 @@ def test_without_update_a_bare_top_level_atom_still_offers_a_newer_version(
     emerge_binary, fixture_env
 ):
     """dev-libs/upgradepkg is installed at 1.0; a newer 2.0 is visible in
-    the tree too. Real depgraph.py's own `avoid_update` (lines 7814 and
+    the tree too. Portage depgraph.py's own `avoid_update` (lines 7814 and
     8448) means an already-installed version that's still a *matched
     candidate* is kept as-is without searching further -- but for a
     directly-requested (top-level) atom without `selective`
     (--update/--newuse/--changed-use/--changed-deps/--changed-slot/
     --noreplace/--selective), the installed version is never even a
-    matched candidate to begin with (real `want_reinstall =
+    matched candidate to begin with (Portage `want_reinstall =
     found_available_arg and not selective`, see resolve_pretend's own
     doc comment, portage-repo) -- so `avoid_update`'s own shortcut never
     gets a chance to fire, and the ordinary "best visible candidate"
     search proceeds, finding 2.0. Confirmed live against the real,
     installed system `emerge` (not just read from source) during this
     slice's own research. This directly reverses what an earlier version
-    of portuale's own test suite asserted here, before this real
+    of portuale's own test suite asserted here, before this Portage
     behavior was discovered."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/upgradepkg"], fixture_env)
     assert result.returncode == 0
     assert result.stdout == f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}\n'
 
 
-def test_noreplace_restores_the_real_avoid_update_shortcut(emerge_binary, fixture_env):
+def test_noreplace_restores_the_portage_avoid_update_shortcut(emerge_binary, fixture_env):
     """The mirror case: with `selective` restored via --noreplace, the
-    installed version (1.0) IS still a matched candidate (real
-    `want_reinstall` no longer forces it out), so real `avoid_update`'s
+    installed version (1.0) IS still a matched candidate (Portage
+    `want_reinstall` no longer forces it out), so Portage `avoid_update`'s
     own shortcut fires normally and 2.0 is never even considered --
     matching portuale's own pre-existing behavior for every case
     other than a bare top-level atom."""
@@ -15984,7 +15984,7 @@ def test_noreplace_restores_the_real_avoid_update_shortcut(emerge_binary, fixtur
 def test_selective_n_cancels_selective_even_when_update_would_have_set_it(
     emerge_binary, fixture_env
 ):
-    """Real create_depgraph_params.py's own unconditional `if myopts.get(
+    """Portage create_depgraph_params.py's own unconditional `if myopts.get(
     "--selective") == "n": myparams.pop("selective", None)`, checked
     last: an explicit --selective=n wins even over --update, which would
     otherwise set selective on its own. dev-libs/samepkg has no newer
@@ -16013,7 +16013,7 @@ def test_selective_n_cancels_selective_even_when_update_would_have_set_it(
 
 def test_update_upgrades_to_the_newer_visible_version(emerge_binary, fixture_env):
     """Same fixture as above, but with --update: now a real Upgrade,
-    matching real depgraph.py's own `dont_miss_updates` branch."""
+    matching Portage depgraph.py's own `dont_miss_updates` branch."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--update", "dev-libs/upgradepkg"], fixture_env
     )
@@ -16022,7 +16022,7 @@ def test_update_upgrades_to_the_newer_visible_version(emerge_binary, fixture_env
 
 
 def test_update_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-u is --update's real short alias (see lib/_emerge/main.py's
+    """-u is --update's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-pu") it must behave identically to
     the long-flag invocation above."""
     result = _run([str(emerge_binary)], ["-pu", "dev-libs/upgradepkg"], fixture_env)
@@ -16056,13 +16056,13 @@ def test_without_deep_an_already_installed_packages_own_deps_stay_unwalked(
 ):
     """dev-libs/deeppkg is already installed and RDEPENDs on
     dev-libs/deeppkg2 (also already installed), which itself RDEPENDs on
-    dev-libs/newpkg (New) -- without --deep, real portage's own default
+    dev-libs/newpkg (New) -- without --deep, Portage's own default
     (deep=0) never walks an already-installed package's own further
     dependencies, at any depth, so neither deeppkg2 nor newpkg ever
     appears here, and deeppkg itself (AlreadyInstalled) is omitted, so
     `emerge -p` prints nothing.
     --noreplace keeps deeppkg itself AlreadyInstalled (see
-    resolve_pretend's own doc comment, portage-repo, on real portage's
+    resolve_pretend's own doc comment, portage-repo, on Portage's
     own "selective" gap for a bare top-level atom) -- --deep's own
     walk only ever applies to an AlreadyInstalled entry in the first
     place, so this isolates --deep's own gating from that unrelated
@@ -16082,7 +16082,7 @@ def test_deep_walks_the_whole_already_installed_chain(emerge_binary, fixture_env
     a top-level atom, same "don't clutter the list" rule as ever), but
     newpkg's own [ebuild N] line now appears. --noreplace keeps deeppkg
     itself AlreadyInstalled (see resolve_pretend's own doc comment,
-    portage-repo, on real portage's own "selective" gap for a bare
+    portage-repo, on Portage's own "selective" gap for a bare
     top-level atom) -- --deep's own walk only ever applies to an
     AlreadyInstalled entry in the first place, so this isolates --deep's
     own gating from that unrelated default."""
@@ -16096,7 +16096,7 @@ def test_deep_walks_the_whole_already_installed_chain(emerge_binary, fixture_env
 
 
 def test_deep_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-D is --deep's real short alias (see lib/_emerge/main.py's
+    """-D is --deep's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-pD") it must behave identically to
     the long-flag invocation above, never consuming a following token as
     its own value -- same "no ambiguity with another bundled flag
@@ -16118,7 +16118,7 @@ def test_deep_bounded_depth_stops_short_of_the_full_chain(emerge_binary, fixture
     all the way to newpkg, same as unlimited -- proving the bound is
     real and not silently ignored in either direction. --noreplace keeps
     deeppkg itself AlreadyInstalled (see resolve_pretend's own doc
-    comment, portage-repo, on real portage's own "selective" gap for a
+    comment, portage-repo, on Portage's own "selective" gap for a
     bare top-level atom), isolating --deep's own gating from that
     unrelated default."""
     bounded_one = _run(
@@ -16145,10 +16145,10 @@ def test_package_provided_drops_the_dep_and_warns_on_a_direct_target(
 ):
     """profiles/default/package.provided lists dev-libs/providedpkg-1.0
     and dev-libs/providedpkg2-1.0 (both have ebuilds in the fixture repo).
-    Real config.py:970-1027 builds pprovideddict; a dependency atom
+    Portage config.py:970-1027 builds pprovideddict; a dependency atom
     matching one is silently dropped from the dep walk
     (dep_check.py:1052), and a directly-requested one is not resolved and
-    triggers real depgraph.py:11192-11235's `WARNING: … listed in
+    triggers Portage depgraph.py:11192-11235's `WARNING: … listed in
     package.provided:` block (to stderr, exit 0). No SetArg tracking here,
     so the ref is always `'args'`."""
     # dev-libs/needsprovided RDEPENDs providedpkg (dropped) + newpkg (New).
@@ -16197,17 +16197,17 @@ def test_package_provided_drops_the_dep_and_warns_on_a_direct_target(
 def test_emptytree_reinstalls_the_whole_deep_dependency_tree(
     emerge_binary, fixture_env
 ):
-    """--emptytree/-e (real create_depgraph_params.py:176-179 --
+    """--emptytree/-e (Portage create_depgraph_params.py:176-179 --
     myparams["empty"] = True; myparams["deep"] = True;
     myparams.pop("selective")): every atom in the deep dependency tree is
     (re)merged as though nothing is installed. Unlike a plain `emerge -p
     dev-libs/deeppkg` (which shows only deeppkg and never walks its
     installed RDEPEND chain), `-e` forces `deep` on AND turns each
     already-installed dependency into a bare `[ebuild   R   ]` reinstall
-    (no `[oldver]`, no reason -- real portage's `attr_display.replace`
+    (no `[oldver]`, no reason -- Portage's `attr_display.replace`
     from `vardb.cpv_exists`). deeppkg + deeppkg2 are installed ->
     Reinstall; newpkg is not -> New. Useful for byte-for-byte comparison
-    against real portage and for debugging resolution."""
+    against Portage and for debugging resolution."""
     args = ["--pretend", "--emptytree", "dev-libs/deeppkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
@@ -16224,7 +16224,7 @@ def test_emptytree_reinstalls_the_whole_deep_dependency_tree(
     )
 
     # `-e -u` still upgrades a dependency where a newer version exists
-    # (real `emerge -e` reinstalls what you have; `-e -u` upgrades).
+    # (Portage `emerge -e` reinstalls what you have; `-e -u` upgrades).
     eu = _run(
         [str(emerge_binary)],
         ["--pretend", "--emptytree", "--update", "dev-libs/withdeps"],
@@ -16248,7 +16248,7 @@ def test_unreachable_installed_consumer_does_not_block_an_upgrade(
     emerge_binary, fixture_env
 ):
     """#54: an installed consumer's recorded atom only blocks an upgrade
-    when real's `_complete_graph` required-set walk actually reaches it
+    when Portage's `_complete_graph` required-set walk actually reaches it
     (`@world ∪ @selected ∪ @system`, deep over the installed dependency
     graph) -- not merely because it is installed.
 
@@ -16261,7 +16261,7 @@ def test_unreachable_installed_consumer_does_not_block_an_upgrade(
     unblocked. See
     `test_reachable_installed_consumer_version_bound_blocks_an_upgrade`
     for the shape once revdepconsumer *is* reachable (the scenario this
-    test used to assert unconditionally, before #54's gate: real leaves
+    test used to assert unconditionally, before #54's gate: Portage leaves
     media-libs/libdisplay-info at 0.3.0 because of dev-libs/weston's own
     <media-libs/libdisplay-info-0.4.0 bound only because weston is
     @world-reachable on that live tree -- memory
@@ -16278,7 +16278,7 @@ def test_reachable_installed_consumer_holdable_pin_does_not_block_an_upgrade(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):
     """Backlog #79: a *holdable* plain pin from a reachable installed
-    consumer is ignored, not enforced -- real only ever consults such
+    consumer is ignored, not enforced -- Portage only ever consults such
     pins from the slot-operator update probe
     (`_slot_operator_check_reverse_dependencies`,
     `depgraph.py:2472-2538`), never as an upgrade veto.
@@ -16288,7 +16288,7 @@ def test_reachable_installed_consumer_holdable_pin_does_not_block_an_upgrade(
     putting it directly in a copied `@world` -- K2/K3) records
     RDEPEND="<dev-libs/revdeptarget-2.0". Before #79 portuale enforced
     that pin and the upgrade settled as already-installed (empty merge
-    list); real 3.0.82.2 upgrades to 2.0 cleanly -- no block, no
+    list); Portage 3.0.82.2 upgrades to 2.0 cleanly -- no block, no
     residual row, rc 0 (host oracle, hermetic fixture root, 2026-09-18;
     `--update --deep [--newuse]` agree). The pin is jointly satisfiable
     with the bare `--update` pull (1.0 satisfies both), so it is
@@ -16313,19 +16313,19 @@ def test_reachable_installed_consumer_holdable_pin_does_not_block_an_upgrade(
 def test_installed_consumers_built_slot_operator_atom_does_not_block_an_upgrade(
     emerge_binary, fixture_env
 ):
-    """The other half of the same real rule
+    """The other half of the same Portage rule
     (_slot_operator_check_reverse_dependencies, depgraph.py:2494-2502): a
     parent whose recorded atom is a *built* slot-operator atom
     (cat/pkg:S/SS=) "may need to be rebuilt, therefore discard its ...
     built slot operator dependency components which are not necessarily
-    relevant" -- real strips the slot/sub-slot with atom.with_slot("=")
+    relevant" -- Portage strips the slot/sub-slot with atom.with_slot("=")
     before checking. So a sub-slot bump is a *rebuild* trigger, never an
     upgrade blocker.
 
     dev-libs/revdepslottarget goes 1.0 (SLOT="0/1") -> 2.0 (SLOT="0/2"),
     and dev-libs/revdepslotconsumer-1.0 (installed) records
     RDEPEND="dev-libs/revdepslottarget:0/1=". Enforced literally that
-    atom would veto the upgrade; stripped as real strips it, the upgrade
+    atom would veto the upgrade; stripped as Portage strips it, the upgrade
     goes ahead. Same fixture shape as the blocking case above, differing
     only in the recorded atom -- which is the whole distinction."""
     args = ["--pretend", "--update", "dev-libs/revdepslottarget"]
@@ -16337,14 +16337,14 @@ def test_installed_consumers_built_slot_operator_atom_does_not_block_an_upgrade(
 
 
 def _assert_masked_dep_block(stderr, atom, masked_lines, chain_lines):
-    """The masked-dependency disclosure block (real `_show_unsatisfied_dep`
+    """The masked-dependency disclosure block (Portage `_show_unsatisfied_dep`
     for a dependency atom): the two `!!!` header lines, one
     `- <cpv> (masked by: ...)` line per masked candidate, a blank line,
     the `(dependency required by ...)` chain, and the docs footer --
-    exactly the shape real prints (verified live against 3.0.82.2),
-    minus the `for <root>` xinfo suffix real adds when ROOT differs from
+    exactly the shape Portage prints (verified live against 3.0.82.2),
+    minus the `for <root>` xinfo suffix Portage adds when ROOT differs from
     the running root (portuale's top-level masked block omits it too) and
-    minus real's merge-list abandon + exit 1 (needs #19's abort path;
+    minus Portage's merge-list abandon + exit 1 (needs #19's abort path;
     portuale keeps the merge list and exits 0)."""
     lines = stderr.splitlines()
     assert lines[0] == ""
@@ -16370,13 +16370,13 @@ def _assert_masked_dep_block(stderr, atom, masked_lines, chain_lines):
 def test_masked_dependency_is_disclosed_with_its_mask_reasons(
     emerge_binary, fixture_env
 ):
-    """Real `_show_unsatisfied_dep` for a dependency atom matching
+    """Portage `_show_unsatisfied_dep` for a dependency atom matching
     masked-only ebuilds (verified live against 3.0.82.2): the "All
     ebuilds ... have been masked" block plus the `(dependency required
     by ...)` chain, instead of the bare `!!! no visible ebuild for
     dependency` line. dev-libs/maskneedpkg-1.0 RDEPENDs
     dev-libs/maskeddep, which user package.mask masks. The merge list is
-    suppressed entirely (Slice 4 -- real shows no list on the abort path,
+    suppressed entirely (Slice 4 -- Portage shows no list on the abort path,
     only the error block) and the exit code is 1 (Slice 3)."""
     args = ["--pretend", "dev-libs/maskneedpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
@@ -16396,11 +16396,11 @@ def test_masked_dependency_is_disclosed_with_its_mask_reasons(
 def test_keyword_masked_dependency_is_disclosed_with_its_mask_reasons(
     emerge_binary, fixture_env
 ):
-    """Same real rule for a KEYWORDS mask: dev-libs/kwneedpkg-1.0
+    """Same Portage rule for a KEYWORDS mask: dev-libs/kwneedpkg-1.0
     RDEPENDs dev-libs/kwmaskeddep, whose only keyword is `~amd64`. The
     block lists the `~amd64 keyword` reason; the chain is the same
     two-line shape; the merge list is suppressed (Slice 4). (A
-    USE-mismatch-only dep takes real's separate "no ebuilds built with
+    USE-mismatch-only dep takes Portage's separate "no ebuilds built with
     USE flags" path instead -- portuale's autounmask-use machinery -- so
     no fixture covers that here.)"""
     args = ["--pretend", "dev-libs/kwneedpkg"]
@@ -16421,7 +16421,7 @@ def test_keyword_masked_dependency_is_disclosed_with_its_mask_reasons(
 def _assert_residual_slot_conflict_block(
     stdout, root, slot_atom, merge_cpv, merge_parents, inst_cpv, inst_parents
 ):
-    """The residual installed-instance conflict block (real
+    """The residual installed-instance conflict block (Portage
     _complete_graph's end-of-walk unsatisfied-dep loop reporting the
     installed satisfier as a nomerge node): the merge instance keeps the
     ordinary `(cpv, ebuild scheduled for merge)` header while the kept
@@ -16434,8 +16434,8 @@ def _assert_residual_slot_conflict_block(
     merge-scheduled packages -- backlog #264) and a `^` marker
     line, and a bare command-line parent renders `<atom> (Argument)` with
     no marker. An installed header or installed parent keeps the bare
-    `USE=""`: the fixture vdb records empty USE/IUSE, so real
-    `pkg_use_display` has no group to render there either (real 3.0.82.2
+    `USE=""`: the fixture vdb records empty USE/IUSE, so Portage
+    `pkg_use_display` has no group to render there either (Portage 3.0.82.2
     `--pretend --ignore-default-opts dev-libs/needer dev-libs/othermod`
     on the staged fixture). Parents are (parent_cpv_or_None, atom, installed) lists."""
     assert _SLOT_COLLISION_PREAMBLE in stdout
@@ -16475,7 +16475,7 @@ def _world_extra_env(fixture_env, tmp_path, fixtures_root, *atoms):
     appended to `var/lib/portage/world`, leaving the shared fixture
     `world` untouched (many other tests read it).
 
-    Unlike the container fixture-oracle bed -- where real needs absolute
+    Unlike the container fixture-oracle bed -- where Portage needs absolute
     `repos.conf` locations and an absolute `make.profile` symlink target
     -- portuale accepts the fixture tree's relative `location = repo`
     and relative `make.profile` symlink unchanged, so a plain
@@ -16499,14 +16499,14 @@ def test_unreachable_installed_pin_does_not_block_a_plain_update(
 ):
     """#54: dev-libs/keeper-1.0 (installed) records RDEPEND=
     "=dev-libs/paired-1.0", but it is in neither @world/@selected nor
-    @system in the checked-in fixture, so real's `_complete_graph`
+    @system in the checked-in fixture, so Portage's `_complete_graph`
     required-set walk never reaches it and the pin is never applied --
     `--update dev-libs/paired` upgrades to 2.0 exactly like an ordinary
-    update (verified live against real 3.0.82.2,
+    update (verified live against Portage 3.0.82.2,
     `differential-test-bed/findings/l0-fixture-oracle.md` "#54 S0" hermetic row). Before
     the #54 fix portuale applied keeper's pin unconditionally (any
     installed consumer, reachable or not) and stayed silent here,
-    silently holding 1.0 where real upgrades -- see
+    silently holding 1.0 where Portage upgrades -- see
     `test_keeper_reachable_pin_breaks_an_explicit_upgrade_and_reports_it`
     for the shape once keeper *is* reachable."""
     args = ["--pretend", "--update", "dev-libs/paired"]
@@ -16524,7 +16524,7 @@ def test_unreachable_installed_pin_does_not_block_an_explicit_upgrade(
     upgrades cleanly with no residual conflict -- keeper's pin is outside
     every reachable set in the hermetic fixture (verified live, "#54 S0"
     hermetic row). Before the fix portuale applied the unreachable pin
-    anyway and reported a residual slot conflict real never shows here."""
+    anyway and reported a residual slot conflict Portage never shows here."""
     args = ["--pretend", "=dev-libs/paired-2.0"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
@@ -16538,7 +16538,7 @@ def test_unreachable_installed_pin_does_not_block_a_hard_dependency_requirement(
 ):
     """Same #54 rule, the hard requirement coming from a dependency
     instead of an argument: dev-libs/needer-1.0 requires
-    `>=dev-libs/paired-2.0`. Real merges needer + the 2.0 upgrade with no
+    `>=dev-libs/paired-2.0`. Portage merges needer + the 2.0 upgrade with no
     block (verified live, "#54 S0" hermetic row); before the fix
     portuale reported a residual conflict against keeper's unreachable
     pin here too."""
@@ -16558,7 +16558,7 @@ def test_needer_othermod_triangle_reports_the_installed_instance_conflict(
     """#57 S1, the triangle case: needer requires `>=paired-2.0`,
     othermod requires `<paired-2.0` -- directly conflicting hard
     requirements on the same package, with no installed vdb consumer
-    (keeper) reachable to report against. Real 3.0.82.2 merges the 2.0
+    (keeper) reachable to report against. Portage 3.0.82.2 merges the 2.0
     upgrade plus both consumers *and* reports the slot conflict pairing
     the merge instance against installed `paired-1.0` (pulled in by
     othermod alone), in **both** argv orders -- byte-identical blocks,
@@ -16570,12 +16570,12 @@ def test_needer_othermod_triangle_reports_the_installed_instance_conflict(
     `AlreadyInstalled` early branch never consulted `resolved_slots`, so
     an installed instance was invisible to slot tracking from both sides
     (othermod's `<2.0` settling on installed 1.0 after needer graphed
-    2.0, and the mirror order). Exit is 1 per #62 (matching real
+    2.0, and the mirror order). Exit is 1 per #62 (matching Portage
     3.0.82.2's `action_build`: a recorded slot conflict fails the run;
     backlog #62 retired the #57 K1 informational convention).
 
     Instance *order* inside the block is portuale's own (the first
-    instance graphed is listed first): real walks its dep stack LIFO and
+    instance graphed is listed first): Portage walks its dep stack LIFO and
     lists them the other way round. That is a pre-existing FIFO-vs-LIFO
     artifact shared with the merge-vs-merge path (`#57 S0` cell d shows
     the same inversion with neither instance installed) and the L0
@@ -16610,9 +16610,9 @@ def test_solvable_installed_instance_collision_stays_silent(
     """#57 K2's regression guard (`#57 S0` cell e): `dev-libs/plainuser`
     depends on a bare, unversioned `dev-libs/paired`, which the installed
     1.0 satisfies, while `dev-libs/needer` forces `>=paired-2.0`. One
-    graphed instance (2.0) satisfies *every* hard parent atom, so real
+    graphed instance (2.0) satisfies *every* hard parent atom, so Portage
     `_solve_non_slot_operator_slot_conflicts` reconciles it silently --
-    real merges `U paired-2.0` plus both consumers, no block, rc 0, in
+    Portage merges `U paired-2.0` plus both consumers, no block, rc 0, in
     both argv orders (verified in the S0 run dir).
 
     Portuale reaches the same output through the backtracker: the walk
@@ -16639,12 +16639,12 @@ def test_keeper_reachable_pin_breaks_an_explicit_upgrade_and_reports_it(
 ):
     """#54 K3: once keeper is reachable (here, directly in `@world`, on a
     copied configroot -- K2, so the shared fixture `world` stays
-    untouched), real's `_complete_graph` walk *does* reach it and its
+    untouched), Portage's `_complete_graph` walk *does* reach it and its
     `=dev-libs/paired-1.0` pin -- the exact shape 511e659 originally
     pinned as the (then-mistaken) default: `=dev-libs/paired-2.0` still
     upgrades, but the run also reports the residual conflict pairing the
     merge instance (pulled in by the `(Argument)`) against installed 1.0
-    (pulled in by keeper). Verified live against real 3.0.82.2 with
+    (pulled in by keeper). Verified live against Portage 3.0.82.2 with
     keeper world-listed ("#54 S0" keeper-in-world row, byte-identical
     module the volatile timing line)."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/keeper")
@@ -16670,7 +16670,7 @@ def test_keeper_reachable_pin_breaks_a_hard_dependency_requirement_and_reports_i
 ):
     """Same #54 K3 shape, the hard requirement coming from a dependency:
     dev-libs/needer-1.0 requires `>=dev-libs/paired-2.0`, which the
-    now-reachable keeper pin (`=paired-1.0`) cannot satisfy. Real merges
+    now-reachable keeper pin (`=paired-1.0`) cannot satisfy. Portage merges
     needer + the 2.0 upgrade and reports the residual conflict ("#54 S0"
     keeper-in-world row, verified live). The merge instance's parent is
     the needer dep, the installed instance's the keeper pin."""
@@ -16698,11 +16698,11 @@ def test_keeper_reachable_needer_triangle_reports_the_installed_instance_with_bo
 ):
     """Both hard sides at once, keeper reachable: needer requires
     `>=paired-2.0` while othermod requires `<paired-2.0`, and the
-    now-reachable keeper pins `=paired-1.0`. Real merges all three with
+    now-reachable keeper pins `=paired-1.0`. Portage merges all three with
     the 2.0 upgrade and reports one conflict pairing it against installed
     1.0, whose parents are the othermod dep *and* the keeper pin ("#54
     S0" keeper-in-world row, verified live, byte-identical to the
-    hermetic-triangle real output plus the keeper parent line)."""
+    hermetic-triangle Portage output plus the keeper parent line)."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/keeper")
     args = ["--pretend", "dev-libs/needer", "dev-libs/othermod"]
     rust = _run([str(emerge_binary)], args, env)
@@ -16729,10 +16729,10 @@ def test_keeper_reachable_needer_triangle_reports_the_installed_instance_with_bo
 def test_reinstall_atoms_forces_one_deep_dependency_to_reinstall(
     emerge_binary, fixture_env
 ):
-    """--reinstall-atoms ATOMS (real main.py `action: "append"` ->
+    """--reinstall-atoms ATOMS (Portage main.py `action: "append"` ->
     depgraph.py:363 WildcardPackageSet): an already-installed package
     matching one of the atoms is treated as if not installed, forcing a
-    re-merge (real depgraph.py drops it from every inst_pkgs list). It is
+    re-merge (Portage depgraph.py drops it from every inst_pkgs list). It is
     a scoped --emptytree: only the matched atom flips to `[ebuild R]`,
     everything else keeps its ordinary outcome. deeppkg RDEPENDs deeppkg2
     (both installed) RDEPENDs newpkg (New)."""
@@ -16746,8 +16746,8 @@ def test_reinstall_atoms_forces_one_deep_dependency_to_reinstall(
     assert rust.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild   R    ] dev-libs/deeppkg2-1.0 to {fixture_env["ROOT"]}',
-        # deeppkg itself is a directly-named installed atom -> real
-        # portage re-merges it by default (only --noreplace keeps it).
+        # deeppkg itself is a directly-named installed atom -> Portage
+        # re-merges it by default (only --noreplace keeps it).
         f'[ebuild   R    ] dev-libs/deeppkg-1.0 to {fixture_env["ROOT"]}',
     ]
 
@@ -16770,7 +16770,7 @@ def test_rebuild_if_star_rebuilds_an_installed_consumer_of_a_merged_build_dep(
     emerge_binary, fixture_env
 ):
     """--rebuild-if-unbuilt / --rebuild-if-new-rev / --rebuild-if-new-ver
-    (real `_rebuild_config.trigger_rebuilds`): an installed package whose
+    (Portage `_rebuild_config.trigger_rebuilds`): an installed package whose
     vdb DEPEND/BDEPEND is satisfied by a package being merged this run
     gets its own `[ebuild R]` rebuild entry -- it isn't otherwise in the
     graph. `dev-libs/rebuildconsumer` (installed) DEPENDs
@@ -16804,7 +16804,7 @@ def test_rebuild_if_star_rebuilds_an_installed_consumer_of_a_merged_build_dep(
 def test_dynamic_deps_chooses_ebuild_vs_vdb_deps_for_an_installed_deep_dep(
     emerge_binary, fixture_env
 ):
-    """--dynamic-deps (real create_depgraph_params.py, ON by default for a
+    """--dynamic-deps (Portage create_depgraph_params.py, ON by default for a
     source install): an AlreadyInstalled package's --deep dependency walk
     uses its CURRENT ebuild metadata (portuale's own long-standing
     behaviour). --dynamic-deps=n uses the vdb-recorded *DEPEND snapshot.
@@ -16825,7 +16825,7 @@ def test_dynamic_deps_default_appends_the_vdb_built_binding_dropped_by_the_ebuil
     append the vdb's built slot-operator atoms to the live ebuild
     metadata — the default walks the live tree alone, even with
     `PORTUALE_DYNAMIC_DEPS_APPEND=1` in the environment (the variable is
-    ignored; the gate and its append are removed). Real's
+    ignored; the gate and its append are removed). Portage's
     FakeVartree._apply_dynamic_deps would walk BOTH the live
     `dev-libs/newpkg` and the vdb-recorded
     `dev-libs/builtbindtarget:0/1=` here; portuale walks only the live
@@ -16866,7 +16866,7 @@ def test_dynamic_deps_default_appends_the_vdb_built_binding_dropped_by_the_ebuil
 def test_deep_walk_evaluates_flag_deps_against_the_installed_vdb_use(
     emerge_binary, fixture_env
 ):
-    """Real `_pkg_use_enabled(pkg)` returns `pkg._metadata["USE"]` for a
+    """Portage `_pkg_use_enabled(pkg)` returns `pkg._metadata["USE"]` for a
     `built` (installed) package, so a `--deep` walk's `flag? ( dep )`
     conditionals resolve against the *recorded* vdb USE, never a fresh
     profile recompute. dev-libs/deepvdbusepkg is installed with vdb
@@ -16890,24 +16890,24 @@ def test_deep_walk_evaluates_flag_deps_against_the_installed_vdb_use(
 def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     emerge_binary, fixture_env
 ):
-    """Real evaluates every dependency token's conditional use-deps in
+    """Portage evaluates every dependency token's conditional use-deps in
     `use_reduce(..., token_class=Atom)` against
     `_pkg_use_enabled(pkg)`, which for a built package is its vdb
     `USE`. dev-libs/deepusedepparent is installed with vdb USE=""
     (built -flip) and RDEPENDs `~dev-libs/deepusedepchild-1.0[flip=]`,
     which therefore evaluates to `[-flip]`; the installed child is
     +flip and the profile enables flip, so no pool satisfies it and
-    real aborts (#111 S0's live qtbase shape, shrunk). Portuale used to
+    Portage aborts (#111 S0's live qtbase shape, shrunk). Portuale used to
     queue the atom unevaluated, where a conditional form imposes no
     state constraint at all, and resolved rc 0.
 
-    #135 (e) (Phase 5b S2) closes the chain residue: real's bed capture
+    #135 (e) (Phase 5b S2) closes the chain residue: Portage's bed capture
     (`l0-fx-20260922T192350Z`) qualifies the installed owner
     (`# required by dev-libs/deepusedepparent-1.0::testrepo`) and walks
     the whole chain to the argument (three rows). That capture likewise
     shows **no** `BACKTRACK_TERMINATED_EARLY` trailer on this cell (its
     `backtrack: 0/20` means `_autounmask_backtrack_disabled` was never
-    set -- real's `depgraph.py:11735-11752` gate requires backtracking
+    set -- Portage's `depgraph.py:11735-11752` gate requires backtracking
     to have been *active*); backlog #217 ports the gate, so the pin
     below records the trailer-free bytes.
     """
@@ -16933,7 +16933,7 @@ def test_an_evaluated_conditional_use_dep_reaches_candidate_selection(
 ):
     """Arm B: the same parent shape with an unpinned child. The
     evaluated `[-flip]` must reach candidate *selection*, not just the
-    failure display -- real rebuilds dev-libs/deepusedepbchild with flip
+    failure display -- Portage rebuilds dev-libs/deepusedepbchild with flip
     off rather than aborting. A fix that only hardened the unsatisfied
     path would pass arm A and fail here.
     """
@@ -16969,13 +16969,13 @@ def test_an_unfixable_evaluated_dep_of_an_installed_parent_aborts_the_run(
     """Arm D (S5b): dev-libs/deepusedepfparent is installed -flip and the
     profile *forces* flip on the child, so the evaluated `[-flip]` is
     unfixable -- no pool satisfies it and no autounmask flip can change
-    it. Real hard-aborts rc 1 (`emerge: there are no ebuilds to satisfy
+    it. Portage hard-aborts rc 1 (`emerge: there are no ebuilds to satisfy
     "~dev-libs/deepusedepfchild-1.0[flip=]"` + the `_get_dep_chain`
     rows, bed run `l0-fx-20260921T231520Z` / re-grounded
     `l0-fx-20260922T192350Z`, no Change USE rows). Portuale with S5
     alone rendered a bare `no visible ebuild` line and resolved rc 0;
     S5b fixed the rc and #135 (d) (Phase 5b S2) fixed the block --
-    real's sentence with the *unevaluated* atom plus the chain, instead
+    Portage's sentence with the *unevaluated* atom plus the chain, instead
     of the bare `!!! no visible ebuild for dependency "<cp>"` line.
     The staging `for <root>.` suffix stays portuale-absent (the
     `fixture-masked-path-suffix` / `fixture-miss-message-unsuffixed`
@@ -16986,7 +16986,7 @@ def test_an_unfixable_evaluated_dep_of_an_installed_parent_aborts_the_run(
     base = ["--pretend", "-D", "dev-libs/deepusedepfconsumer"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
-    # #135 (c) (O7: un-suppress): real prints the merge-list preamble
+    # #135 (c) (O7: un-suppress): Portage prints the merge-list preamble
     # and the timing line before the abort block. The seconds are wall
     # time (never pinned); the backtrack counters are the signal.
     _assert_abort_preamble(rust.stdout)
@@ -17001,14 +17001,14 @@ def test_an_unfixable_evaluated_dep_of_an_installed_parent_aborts_the_run(
 def test_complete_graph_does_not_merge_a_missing_deep_dep_of_an_installed_pkg(
     emerge_binary, fixture_env
 ):
-    """Real `_complete_graph` toggles `myparams["deep"] = True` **and**
+    """Portage `_complete_graph` toggles `myparams["deep"] = True` **and**
     swaps package selection to `_select_pkg_from_graph`
     (`depgraph.py:8662`) -- graph-or-installed, **never a new merge**. So
     unlike `-D`, complete mode's deep re-walk of the required sets does
     not pull in an installed package's own transitive dependency that
     happens to be missing: `deeppkg` (installed) -> `deeppkg2`
     (installed) -> `newpkg` (not installed). `-D` merges `newpkg`;
-    `--complete-graph` does not (real records it in
+    `--complete-graph` does not (Portage records it in
     `_initially_unsatisfied_deps`, no graph node). Portuale runs phase 1
     non-complete, then the complete pass may only merge what phase 1
     already would."""
@@ -17031,7 +17031,7 @@ def test_complete_graph_does_not_merge_a_missing_deep_dep_of_an_installed_pkg(
 def test_complete_graph_if_new_ver_auto_enables_on_an_upgrade(
     emerge_binary, fixture_env
 ):
-    """Real depgraph.py::_complete_graph 8581-8648: --complete-graph-if-new-ver
+    """Portage depgraph.py::_complete_graph 8581-8648: --complete-graph-if-new-ver
     defaults ON, so complete mode auto-enables when a run would change an
     installed package's version -- even without --complete-graph.
     completegraphpkg 1.0 installed, 2.0 in the tree, RDEPEND
@@ -17052,10 +17052,10 @@ def test_complete_graph_if_new_ver_auto_enables_on_an_upgrade(
 def test_deep_equals_zero_matches_not_passing_deep_at_all(emerge_binary, fixture_env):
     """--deep=0 parses fine (unlike a negative value) but is
     indistinguishable from --deep never being given at all, matching
-    real create_depgraph_params.py's own `!= 0` check that excludes it
+    Portage create_depgraph_params.py's own `!= 0` check that excludes it
     from myparams either way. --noreplace keeps deeppkg itself
     AlreadyInstalled (see resolve_pretend's own doc comment,
-    portage-repo, on real portage's own "selective" gap for a bare
+    portage-repo, on Portage's own "selective" gap for a bare
     top-level atom), isolating --deep's own gating from that unrelated
     default."""
     result = _run(
@@ -17069,10 +17069,10 @@ def test_deep_equals_zero_matches_not_passing_deep_at_all(emerge_binary, fixture
 
 def test_deep_rejects_a_negative_inline_value(emerge_binary, fixture_env):
     """--deep=N is argparse's own native "="-form -- a non-numeric or
-    negative value there is a real, immediate parse error (matching real
+    negative value there is a real, immediate parse error (matching Portage
     parser.error("Invalid --deep parameter: ...")), unlike a negative
     *next token*, which the pre-processor never even consumes as --deep's
-    own value in the first place (real valid_integers rejects it), so it
+    own value in the first place (Portage valid_integers rejects it), so it
     falls through as a separate, likely-invalid token instead."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--deep=-1", "dev-libs/deeppkg"], fixture_env
@@ -17085,13 +17085,13 @@ def test_deep_rejects_a_negative_inline_value(emerge_binary, fixture_env):
 def test_jobs_and_load_average_are_scheduling_only_under_pretend(
     emerge_binary, fixture_env
 ):
-    """--jobs/--load-average (real `main.py`: `valid_integers_or_y_or_n`
+    """--jobs/--load-average (Portage `main.py`: `valid_integers_or_y_or_n`
     + `insert_optional_args` for `--jobs`, `type=float` for
     `--load-average`; consumed by the build `Scheduler` and
     `MetadataRegen`, never by the resolver): every spelling parses and
     leaves the `--pretend` merge list byte-identical --
-    including `--jobs=0` (real: CPU count) -- while bad values fail with
-    byte-identical messages. The `--regen` execution half (real
+    including `--jobs=0` (Portage: CPU count) -- while bad values fail with
+    byte-identical messages. The `--regen` execution half (Portage
     `action_regen(max_jobs, max_load)`) is black-box-tested in
     `test_portuale.py`; the contract suite pins the shared CLI surface."""
     expected = f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}\n'
@@ -17134,7 +17134,7 @@ def test_jobs_and_load_average_are_scheduling_only_under_pretend(
 def test_implicit_system_deps_n_skips_the_system_first_merge_order_bias(
     emerge_binary, fixture_env
 ):
-    """`--implicit-system-deps=n` (real `y_or_n`, default `y`; real
+    """`--implicit-system-deps=n` (Portage `y_or_n`, default `y`; Portage
     `create_depgraph_params.py:120` + `depgraph._merge_order_bias`'s own
     early return): the @system-first / reference-count re-sort is
     skipped and the merge list stays in scheduler-over-discovery order.
@@ -17169,11 +17169,11 @@ def test_implicit_system_deps_n_skips_the_system_first_merge_order_bias(
 def test_deep_is_ignored_when_nodeps_disables_the_dependency_walk_entirely(
     emerge_binary, fixture_env
 ):
-    """--nodeps trumps --deep -- real create_depgraph_params.py pops
+    """--nodeps trumps --deep -- Portage create_depgraph_params.py pops
     "recurse" out of myparams outright, which the dependency walk itself
     checks for before `deep` is ever consulted. --noreplace keeps
     deeppkg itself AlreadyInstalled (see resolve_pretend's own doc
-    comment, portage-repo, on real portage's own "selective" gap for a
+    comment, portage-repo, on Portage's own "selective" gap for a
     bare top-level atom), isolating --deep/--nodeps's own gating from
     that unrelated default."""
     result = _run(
@@ -17191,7 +17191,7 @@ def test_exclude_leaves_an_already_installed_package_alone_even_with_update(
     """dev-libs/upgradepkg is installed at 1.0, a newer 2.0 is visible --
     without --exclude, --update offers the upgrade (see the --update
     contract tests); --exclude matching it overrides --update entirely,
-    same as real _want_update_pkg's/_replace_installed_atom's own
+    same as Portage _want_update_pkg's/_replace_installed_atom's own
     excluded-checked-first precedent."""
     result = _run(
         [str(emerge_binary)],
@@ -17203,7 +17203,7 @@ def test_exclude_leaves_an_already_installed_package_alone_even_with_update(
 
 
 def test_exclude_matches_via_a_wildcard_atom_too(emerge_binary, fixture_env):
-    """Real WildcardPackageSet accepts wildcard atoms, not just plain
+    """Portage WildcardPackageSet accepts wildcard atoms, not just plain
     ones -- ported here as the same two-tier matcher package.mask/
     .unmask already uses."""
     result = _run(
@@ -17216,7 +17216,7 @@ def test_exclude_matches_via_a_wildcard_atom_too(emerge_binary, fixture_env):
 
 
 def test_exclude_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
-    """-X is --exclude's real short alias (see lib/_emerge/main.py's
+    """-X is --exclude's Portage short alias (see lib/_emerge/main.py's
     shortmapping); standalone (never bundled -- see the CLI-surface
     tests below) it must behave identically to the long-flag invocation
     above."""
@@ -17281,7 +17281,7 @@ def test_exclude_threads_through_dependency_recursion_not_just_top_level(
 def test_exclude_repeated_occurrences_and_space_separated_values_both_accumulate(
     emerge_binary, fixture_env
 ):
-    """Real bin/emerge declares --exclude "action": "append" (repeatable)
+    """Portage bin/emerge declares --exclude "action": "append" (repeatable)
     with a help text describing "a space separated list" as one
     occurrence's own value -- both forms must accumulate into the same
     exclude set, not just whichever form happens to be used."""
@@ -17344,10 +17344,10 @@ def test_exclude_is_not_bundle_compatible(emerge_binary, fixture_env):
     )
 
 
-def test_json_is_not_a_real_emerge_option(emerge_binary, fixture_env):
-    """--json is a portuale-specific addition (real portage has no
+def test_json_is_not_a_portage_emerge_option(emerge_binary, fixture_env):
+    """--json is a portuale-specific addition (Portage has no
     structured-output mode for --pretend at all) -- pinned in full since
-    it's portuale's own content, not derived from any real emerge
+    it's portuale's own content, not derived from any Portage emerge
     output, unlike every other flag's own contract test."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--json", "dev-libs/newpkg"], fixture_env
@@ -17483,7 +17483,7 @@ def test_json_source_reflects_ebuild_vs_binary_and_is_omitted_for_no_visible_can
     emerge_binary, fixture_env
 ):
     """"source" mirrors the plain-text loop's own bracket word ("ebuild"/
-    "binary", real RootConfig.py's own pkg_tree_map-driven type_name),
+    "binary", Portage RootConfig.py's own pkg_tree_map-driven type_name),
     not a hardcoded constant -- entry_to_json used to emit a literal
     "ebuild" regardless of entry.source, a real bug left over from
     before binary-package support (--usepkg/--usepkgonly) existed at
@@ -17575,7 +17575,7 @@ def test_virtual_is_resolved_directly(emerge_binary, fixture_env):
     ordinary ebuild whose RDEPEND is a "|| ( ... )" any-of group of real
     providers, no PROVIDE mechanism or special resolution involved. It
     must resolve through the exact same category + any-of-group
-    machinery as any other package -- and real `dep_zapdeps` prefers the
+    machinery as any other package -- and Portage `dep_zapdeps` prefers the
     already-installed provider (dev-libs/samepkg, choice bin 0) over the
     first-listed dev-libs/newpkg (bin 1, needs a merge), so samepkg is
     chosen (silent, AlreadyInstalled) and only virtual/texteditor merges.
@@ -17617,12 +17617,12 @@ def test_virtual_is_resolved_as_a_dependency(emerge_binary, fixture_env):
     ],
     ids=["self-cycle", "ring"],
 )
-def test_virtual_cycle_detected_like_real(atom, expected, emerge_binary, fixture_env):
+def test_virtual_cycle_detected_like_portage(atom, expected, emerge_binary, fixture_env):
     """Backlog #193, upstream `test_virtual_cycle.py` (bug 965570) as
     emitted by pmtest `89d17e0` (fixtures `app-misc/{foo,bar}`,
-    `virtual/{A,B,C,gzip}`, all EAPI 8): real's `ResolverPlayground`
+    `virtual/{A,B,C,gzip}`, all EAPI 8): Portage's `ResolverPlayground`
     fails both cells (`success=False`, `virtual_cycle={gzip-1}` /
-    `{A-1,B-1,C-1}`), and live real fails too -- one
+    `{A-1,B-1,C-1}`), and live Portage fails too -- one
     `podman run --entrypoint /bin/bash localhost/test-portuale:latest`
     probe (portage 3.0.81.3; the `!!! virtual cycle detected:` shape is
     identical in 3.0.82.2 by source read of
@@ -17635,8 +17635,8 @@ def test_virtual_cycle_detected_like_real(atom, expected, emerge_binary, fixture
     no merge rows, stderr exactly `\n\n!!! virtual cycle
     detected:\n\n` + one `  {cpv}::{repo}` line per member (sorted) +
     `\n`. Portuale used to merge both as ordinary rings (rc 0). The
-    pin asserts real's block byte-for-byte on stderr (uncoloured, like
-    real's own `writemsg`), an empty merge list, and rc 1."""
+    pin asserts Portage's block byte-for-byte on stderr (uncoloured, like
+    Portage's own `writemsg`), an empty merge list, and rc 1."""
     result = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert result.returncode == 1
     assert _merge_lines(result.stdout) == []
@@ -17648,8 +17648,8 @@ def test_virtual_cycle_detected_like_real(atom, expected, emerge_binary, fixture
     )
 
 
-def test_real_option_not_implemented_message_names_the_option(emerge_binary, fixture_env):
-    """--accept-properties is a real emerge option (see lib/_emerge/main.py's
+def test_portage_option_not_implemented_message_names_the_option(emerge_binary, fixture_env):
+    """--accept-properties is a Portage emerge option (see lib/_emerge/main.py's
     argument_options) portuale doesn't implement -- the error must
     name it specifically and say "option", distinct from both a
     genuinely unrecognized flag and an unimplemented action."""
@@ -17664,7 +17664,7 @@ def test_real_option_not_implemented_message_names_the_option(emerge_binary, fix
     )
 
 
-def test_real_option_inline_equals_form_is_still_recognized(emerge_binary, fixture_env):
+def test_portage_option_inline_equals_form_is_still_recognized(emerge_binary, fixture_env):
     """--accept-properties=* (the "--opt=value" form argparse also accepts)
     must resolve to the same canonical "--accept-properties" option as
     "--accept-properties *" would, not be treated as one unrecognized token."""
@@ -17682,7 +17682,7 @@ def test_real_option_inline_equals_form_is_still_recognized(emerge_binary, fixtu
 
 def test_sync_points_at_emaint(emerge_binary, fixture_env):
     """`emerge --sync` is a permanent non-goal in portuale -- repo syncing
-    belongs to `emaint sync` (real portage's own long-standing split).
+    belongs to `emaint sync` (Portage's own long-standing split).
     The exact message, with or without --pretend, exit 1, byte-identical
     Rust/Python."""
     for args in (["--sync"], ["--pretend", "--sync"]):
@@ -17692,8 +17692,8 @@ def test_sync_points_at_emaint(emerge_binary, fixture_env):
         assert rust.stderr.strip() == "Functionality has moved to `emaint sync`."
 
 
-def test_real_action_not_implemented_message_says_action_not_option(emerge_binary, fixture_env):
-    """--moo is a real emerge action (see main.py's actions frozenset),
+def test_portage_action_not_implemented_message_says_action_not_option(emerge_binary, fixture_env):
+    """--moo is a Portage emerge action (see main.py's actions frozenset),
     not an option -- the error must say "action". (--search/--depclean/
     --unmerge/--regen used to be the example here; all implemented now.
     --sync has its own dedicated "moved to `emaint sync`" message.)"""
@@ -17708,7 +17708,7 @@ def test_real_action_not_implemented_message_says_action_not_option(emerge_binar
 
 
 def test_list_sets_prints_the_defined_set_names(emerge_binary, fixture_env):
-    """emerge --list-sets (real _emerge/actions.py:3839): every defined
+    """emerge --list-sets (Portage _emerge/actions.py:3839): every defined
     package-set name, sorted, one per line -- the cnf/sets/portage.conf
     built-ins plus the fixture's own user set files."""
     rust = _run([str(emerge_binary)], ["--list-sets"], fixture_env)
@@ -17725,7 +17725,7 @@ def test_list_sets_prints_the_defined_set_names(emerge_binary, fixture_env):
 def test_search_reads_cache_less_fixture_ebuilds(emerge_binary, fixture_env):
     """C2 consequence (owner decision D2, 2026-09-14): 21 fixture ebuilds have no
     `metadata/md5-cache` entry, and with the depend-phase provider
-    registered the Rust search now reads them -- real parses a cache-less
+    registered the Rust search now reads them -- Portage parses a cache-less
     ebuild -- so `--searchdesc fixture` lists `collisionpkg-a` and
     friends, and a fuzzy `-s` no longer renders `configpkg` as
     `[ Masked ]`. Before C2 both implementations skipped those entries
@@ -17772,7 +17772,7 @@ def test_search_reads_cache_less_fixture_ebuilds(emerge_binary, fixture_env):
 def test_search_pinned_output(emerge_binary, fixture_env, args):
     """emerge --search/-s (--searchdesc/-S also matches DESCRIPTION;
     --fuzzy-search / --regex-search-auto / --search-similarity modifiers):
-    real action_search / search.output() shape; stdout, stderr and exit
+    Portage action_search / search.output() shape; stdout, stderr and exit
     code pinned to the harvested output."""
     rust = _run([str(emerge_binary)], args, fixture_env)
     _assert_harvested(rust)
@@ -17798,11 +17798,11 @@ def test_fuzzy_and_regex_search_change_the_result_set(
 def test_misspell_suggestions_for_a_missing_package_name(
     emerge_binary, fixture_env
 ):
-    """--misspell-suggestions (real depgraph.py:7037 + _similar_name_search,
+    """--misspell-suggestions (Portage depgraph.py:7037 + _similar_name_search,
     default on): a top-level `cat/pkg` that doesn't exist gets
     `difflib.get_close_matches` suggestions after the "there are no
     ebuilds to satisfy" line. `--misspell-suggestions=n` drops them; an
-    existing-but-masked cp gets no name suggestions (real `not
+    existing-but-masked cp gets no name suggestions (Portage `not
     cp_exists`)."""
     r = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpgk"], fixture_env)
     assert r.returncode == 1
@@ -17826,12 +17826,12 @@ def test_misspell_suggestions_for_a_missing_package_name(
 def test_bare_command_line_name_is_category_qualified(
     emerge_binary, fixture_env
 ):
-    """Real `dep_expand()` / `cpv_expand()` (`lib/portage/dbapi/`): a
+    """Portage `dep_expand()` / `cpv_expand()` (`lib/portage/dbapi/`): a
     command-line target with no category is qualified against the repo
     tree. `dev-libs/newpkg` is the only `newpkg` anywhere, so
     `emerge newpkg` resolves it. `virtprefpkg` exists as both
     `dev-libs/virtprefpkg` and `virtual/virtprefpkg` -> the non-virtual
-    wins silently (real "assume that the non-virtual is desired"). Rust
+    wins silently (Portage "assume that the non-virtual is desired"). Rust
     == Python throughout."""
     for target, expected in (
         ("newpkg", f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}'),
@@ -17845,7 +17845,7 @@ def test_bare_command_line_name_is_category_qualified(
 def test_bare_command_line_name_with_version_or_slot_is_category_qualified(
     emerge_binary, fixture_env
 ):
-    """Real `dep_expand` (lib/portage/dbapi/dep_expand.py): a no-category
+    """Portage `dep_expand` (lib/portage/dbapi/dep_expand.py): a no-category
     target that carries an operator, a bare version, or a slot is still
     qualified -- `null/` is inserted before the first word char, the
     result is parsed (retrying with a leading `=` for the missing-`=`
@@ -17862,7 +17862,7 @@ def test_bare_command_line_name_with_version_or_slot_is_category_qualified(
         assert r.stdout.splitlines()[0].rstrip() == first_line
 
     # a bare version with no matching ebuild: the message quotes the
-    # dep_expand'd atom (real cpv_expand splices the category, then
+    # dep_expand'd atom (Portage cpv_expand splices the category, then
     # resolution fails)
     r = _run([str(emerge_binary)], ["--pretend", "newpkg-9.9"], fixture_env)
     assert r.returncode == 1
@@ -17882,7 +17882,7 @@ def test_bare_name_ambiguous_across_categories_is_rejected(
     emerge_binary, fixture_env
 ):
     """`ambigpkg` exists as both `app-misc/ambigpkg` and
-    `dev-libs/ambigpkg` (both non-virtual) -> real
+    `dev-libs/ambigpkg` (both non-virtual) -> Portage
     `ambiguous_package_name`'s own non-`--quiet` form (no `--quiet` on
     this command line): a full `search.output()`-shaped listing (`[
     Results for search key : ambigpkg ]` header, one `*  cat/pkg` block
@@ -17903,7 +17903,7 @@ def test_bare_name_ambiguous_across_categories_is_rejected(
 def test_bare_name_ambiguous_quiet_form_is_the_terse_deterministic_list(
     emerge_binary, fixture_env
 ):
-    """The same ambiguity, but with `--quiet`: real `ambiguous_package_
+    """The same ambiguity, but with `--quiet`: Portage `ambiguous_package_
     name`'s own `--quiet` form -- the two `!!!` lines plus the sorted,
     colourized fully-qualified list, no search-style block at all.
    """
@@ -17918,7 +17918,7 @@ def test_bare_name_with_no_match_reports_no_ebuilds(
     emerge_binary, fixture_env
 ):
     """A bare name matching no package anywhere -> `emerge: there are no
-    ebuilds to satisfy "<name>".`, exit 1 (real `cpv_expand` returns
+    ebuilds to satisfy "<name>".`, exit 1 (Portage `cpv_expand` returns
     `null/<name>` and resolution then fails; portuale short-circuits
     with the message)."""
     r = _run([str(emerge_binary)], ["--pretend", "nosuchpkgname"], fixture_env)
@@ -17927,10 +17927,10 @@ def test_bare_name_with_no_match_reports_no_ebuilds(
 
 
 def _check_news_isolated_root(fixture_env, tmp_path, name="root"):
-    """A ROOT for `--check-news` that shares the fixtures' own vdb (real
+    """A ROOT for `--check-news` that shares the fixtures' own vdb (Portage
     `Display-If-Installed` needs it) but isolates `var/lib/gentoo/news/`
     -- since 2026-09-05 `--check-news` really writes `.unread`/`.skip`
-    there (real `NewsManager.updateItems`'s own write-back), and this
+    there (Portage `NewsManager.updateItems`'s own write-back), and this
     must never land in the shared, git-tracked `fixtures/` tree itself
     (every test using plain `fixture_env` shares that ROOT). `var/db` is
     symlinked in (read-only vdb access); `var/lib` is a fresh, real,
@@ -17956,7 +17956,7 @@ def _check_news_isolated_root(fixture_env, tmp_path, name="root"):
 def test_check_news_counts_unread_relevant_items(
     emerge_binary, fixture_env, tmp_path
 ):
-    """emerge --check-news (real actions.py:3844 -> count_unread_news):
+    """emerge --check-news (Portage actions.py:3844 -> count_unread_news):
     the fixture testrepo has thirteen GLEP 42 news items -- one
     unrestricted, one `Display-If-Installed: dev-libs/samepkg` (in the
     vdb at 1.0), one `>=dev-libs/samepkg-1.0` (1.0 satisfies it), one
@@ -17964,7 +17964,7 @@ def test_check_news_counts_unread_relevant_items(
     package, one `dev-libs/infoinstpkg[alpha]` (installed with alpha
     enabled -> its use-dep is satisfied), one `dev-libs/infoinstpkg[beta]`
     (beta declared but disabled -> not satisfied), one whose
-    Display-If-Installed atom is malformed (real NewsItem.isValid rejects
+    Display-If-Installed atom is malformed (Portage NewsItem.isValid rejects
     the whole item), and three News-Item-Format 1.x items -- one with a
     `:slot` atom, one with a `[use]` atom (both invalid under 1.x's EAPI
     0 atom grammar), and one with a plain atom relative to the installed
@@ -17972,10 +17972,10 @@ def test_check_news_counts_unread_relevant_items(
     to what this tree is not: `Display-If-Profile` values that neither
     equal the fixture profile `default` nor are a `/*` prefix of it, and
     `Display-If-Keyword: sparc` against a profile with no sparc `ARCH`
-    (real `news.py` DisplayProfileRestriction / DisplayKeywordRestriction
-    .checkRestriction; the l3-20260928T195717Z container probe had real
+    (Portage `news.py` DisplayProfileRestriction / DisplayKeywordRestriction
+    .checkRestriction; the l3-20260928T195717Z container probe had Portage
     at 15 gentoo items and portuale at 34 before the fix). Five are
-    relevant, so the count is 5. The rewritten state files carry real's
+    relevant, so the count is 5. The rewritten state files carry Portage's
     `apply_secpass_permissions(mode=0o064, mask=0)` group-write bits.
    """
     rust_env = _check_news_isolated_root(fixture_env, tmp_path, "root-rust")
@@ -17985,7 +17985,7 @@ def test_check_news_counts_unread_relevant_items(
     assert "eselect news read" in rust.stdout
     env = rust_env
 
-    # Real NewsManager.updateItems' own write-back: every relevant item
+    # Portage NewsManager.updateItems' own write-back: every relevant item
     # now sits in .unread *and* .skip, sorted, so a re-run doesn't
     # re-evaluate them (and, since they're already accounted for, still
     # reports the same count -- the .skip entry makes the item "sticky").
@@ -17996,7 +17996,7 @@ def test_check_news_counts_unread_relevant_items(
     assert skip == sorted(skip) and len(skip) == 5
     assert set(unread) == set(skip)
     # The [beta] non-match and the malformed item are neither counted nor
-    # added to .skip (a malformed item stays out of .skip so real would
+    # added to .skip (a malformed item stays out of .skip so Portage would
     # re-evaluate it; here it just never becomes valid). The two 1.x
     # items with a :slot / [use] atom are rejected the same way (EAPI 0
     # has no slot/use deps); the 1.x item with a plain atom stays valid
@@ -18030,7 +18030,7 @@ def test_check_news_counts_unread_relevant_items(
 def test_clean_and_rage_clean_pretend_pinned_output(
     emerge_binary, fixture_env, args
 ):
-    """emerge -p --clean / -p --rage-clean (real action_uninstall ->
+    """emerge -p --clean / -p --rage-clean (Portage action_uninstall ->
     unmerge). --clean keeps only the newest version per slot
     (dev-libs/unmergepkg 1.0+2.0 in slot 0 -> remove 1.0;
     dev-libs/dualslotpkg 1.0/slot1 + 2.0/slot2 -> nothing). --rage-clean
@@ -18042,7 +18042,7 @@ def test_clean_and_rage_clean_pretend_pinned_output(
 def test_color_map_overrides_the_ansi_codes(
     emerge_binary, fixture_env, fixtures_root, tmp_path
 ):
-    """Real /etc/portage/color.map (output.py::_parse_color_map): a
+    """Portage /etc/portage/color.map (output.py::_parse_color_map): a
     `KEY = VALUE` line overrides the ANSI code for a `_styles` key or a
     `codes` colour-name (VALUE = a raw code like `31m`, or a
     space-separated list of colour-names). Here `GOOD = darkred` recolours
@@ -18103,7 +18103,7 @@ def test_color_map_overrides_the_ansi_codes(
 def test_quiet_verbosity_level_1_pinned_output(
     emerge_binary, fixture_env, tmp_path, args
 ):
-    """emerge --quiet/-q (real _DisplayConfig verbosity 1): the mask
+    """emerge --quiet/-q (Portage _DisplayConfig verbosity 1): the mask
     column disappears from the [ebuild ...] bracket, the USE="..." line
     is suppressed (unless -v is also given), the ::repo cpv decoration
     and the Total: line never show, and --search drops its verbose
@@ -18118,7 +18118,7 @@ def test_quiet_verbosity_level_1_pinned_output(
         rust_env = fixture_env
     rust = _run([str(emerge_binary)], args, rust_env)
     if "--check-news" in args:
-        # Real `emerge -q --check-news` still prints the count (quiet only
+        # Portage `emerge -q --check-news` still prints the count (quiet only
         # affects the merge list/search display); no harvested entry here --
         # the two implementations wrote to separate roots.
         assert rust.returncode == 0
@@ -18129,7 +18129,7 @@ def test_quiet_verbosity_level_1_pinned_output(
 
 def test_quiet_drops_the_mask_column_and_the_use_line(emerge_binary, fixture_env):
     """The concrete -pq shape: a merge line's fixed-width attr field is
-    6 columns (not the default 7 -- real include_mask_str() is
+    6 columns (not the default 7 -- Portage include_mask_str() is
     verbosity > 1), and no USE="..." suffix. -pvq keeps the USE line
     (print_use_string = verbosity != 1 or --verbose) but still drops the
     mask column and the Total: line."""
@@ -18170,7 +18170,7 @@ def test_quiet_drops_the_mask_column_and_the_use_line(emerge_binary, fixture_env
 def test_profiles_updates_package_moves_pinned_output(
     emerge_binary, fixture_env, args
 ):
-    """Real profiles/updates/ package moves (portage.update /
+    """Portage profiles/updates/ package moves (portage.update /
     _do_global_updates): `move`/`slotmove` directives, applied at read
     time (portuale never syncs), rewrite command-line atoms, `*DEPEND`
     strings and an installed package's identity."""
@@ -18197,7 +18197,7 @@ def test_profiles_updates_move_makes_the_renamed_package_already_installed(
 
 
 def test_package_moves_n_disables_profiles_updates(emerge_binary, fixture_env):
-    """--package-moves (real y_or_n, default y): --package-moves=n turns
+    """--package-moves (Portage y_or_n, default y): --package-moves=n turns
     every profiles/updates/ move/slotmove into a no-op. `move
     dev-libs/oldmovepkg dev-libs/newmovepkg` + vdb dev-libs/oldmovepkg-1.0:
     with the move applied (default) `emerge -p dev-libs/newmovepkg` is a
@@ -18219,7 +18219,7 @@ def test_package_moves_n_disables_profiles_updates(emerge_binary, fixture_env):
 def test_info_prints_the_deterministic_config_block(
     emerge_binary, fixture_env
 ):
-    """emerge --info (real action_info): the host-state header (Portage
+    """emerge --info (Portage action_info): the host-state header (Portage
     version line, `System uname:`, `KiB Mem/Swap:`, repo `Timestamp`/
     `Head commit`, `sh:`/`coreutils:`/`ld:` probes, `info_pkgs` table),
     then `Repositories:`, `Binary Repositories:`, `Installed sets:`, the
@@ -18241,14 +18241,14 @@ def test_info_prints_the_deterministic_config_block(
 def test_info_stacks_make_globals_profile_env_and_info_vars(
     emerge_binary, tmp_path
 ):
-    """emerge --info reads the same config layers real portage does:
+    """emerge --info reads the same config layers Portage does:
     cnf/make.globals (the base db, with its multi-line quoted FEATURES=
     and its `#`-comment-containing-an-apostrophe lines), /etc/profile.env
     (the env.d db -- CONFIG_PROTECT fragments + scalars like LANG), and
     <PORTDIR>/profiles/info_vars (the extra myvars names). The
     const.INCREMENTALS variables (FEATURES / CONFIG_PROTECT /
     CONFIG_PROTECT_MASK / ENV_UNSET) are shown "-*"/"-tok"-resolved then
-    sorted, exactly as real config.regenerate() stores them. Binary
+    sorted, exactly as Portage config.regenerate() stores them. Binary
     Repositories show location + verify-signature."""
     cfg = tmp_path / "cfg"
     repo = tmp_path / "repo"
@@ -18268,7 +18268,7 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
         'USE="profileflag maskedflag"\n'
     )
     # A profile use.mask -> the masked flag is dropped from the global
-    # emerge --info USE display (real regenerate()'s
+    # emerge --info USE display (Portage regenerate()'s
     # myflags.difference_update(self.usemask)).
     (repo / "profiles/pfx/use.mask").write_text("maskedflag\n")
     (repo / "profiles/pfx/parent").write_text("")
@@ -18278,7 +18278,7 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
         "sync-type = git\nsync-uri = https://example.invalid/main.git\n"
     )
-    # Real UseManager.extract_global_USE_changes: a "*/*" entry in the
+    # Portage UseManager.extract_global_USE_changes: a "*/*" entry in the
     # user package.use folds onto the global USE like make.conf USE=,
     # including the USE_EXPAND-prefix shorthand.
     (cfg / "etc/portage/package.use").mkdir(parents=True)
@@ -18371,28 +18371,28 @@ def test_info_shows_the_calling_env_over_make_conf(
     emerge_binary, fixture_env, fixtures_root, tmp_path
 ):
     """Backlog #219: `emerge --info` prints the calling environment over
-    the config files. Real `action_info` reads `settings.get(k)`
+    the config files. Portage `action_info` reads `settings.get(k)`
     (`_emerge/actions.py:2240`), which walks `lookuplist` env-first
-    (real `config.py:3178-3182`; `USE_ORDER "env:pkg:conf:…"` at
+    (Portage `config.py:3178-3182`; `USE_ORDER "env:pkg:conf:…"` at
     `:1031-1035`); portuale's dump read `other_vars` first with the
     process env only as a fallback (`pretend.rs` "Config sources win"),
     so a key `resolve_config` never env-folds itself showed the file
     value. Hermetically: a copied configroot whose `make.conf` sets
-    `PORTAGE_BZIP2_COMMAND` / `PORTAGE_BUNZIP2_COMMAND` (both on real's
+    `PORTAGE_BZIP2_COMMAND` / `PORTAGE_BUNZIP2_COMMAND` (both on Portage's
     hardcoded `myvars` list, neither in `ENV_SCALAR_VARS`, so both reads
     were inverted) to file values, with different calling-env values on
     top -- `--info` must show the env values. `PKGDIR` (same block,
     already env-folded, so unchanged) is guarded too.
-    `BINPKG_COMPRESS[*]` / `BINPKG_FORMAT` are not pinned: real never
+    `BINPKG_COMPRESS[*]` / `BINPKG_FORMAT` are not pinned: Portage never
     prints them (absent from `myvars`, and the fixture profiles ship no
     `info_vars` that could add them).
 
     Fix round 1 (review REQUEST_CHANGES, Important 1): `CONFIG_PROTECT`,
-    `CONFIG_PROTECT_MASK`, `ENV_UNSET` are also on real's hardcoded
+    `CONFIG_PROTECT_MASK`, `ENV_UNSET` are also on Portage's hardcoded
     `myvars` list (`_emerge/actions.py:2202-2205`) but took the dedicated
     `resolved_incremental` arm, which never saw the calling env
     (`apply_env_layer` only noted `TRACKED_INCREMENTALS` members that are
-    also in `ENV_SCALAR_VARS` -- i.e. only `FEATURES`). Real stacks the
+    also in `ENV_SCALAR_VARS` -- i.e. only `FEATURES`). Portage stacks the
     env as the final source of every `const.INCREMENTALS` member's fold
     (`config.regenerate()`: `mydbs = configlist[:-1] + [backupenv]` at
     `config.py:2735-2736`; all four keys are members, `const.py:125-138`),
@@ -18440,7 +18440,7 @@ def test_info_shows_the_calling_env_over_make_conf(
 def test_info_atom_that_does_not_exist_errors_with_misspell_suggestions(
     emerge_binary, fixture_env
 ):
-    """Real action_info's `myfiles` loop: a target whose cat/pkg has no
+    """Portage action_info's `myfiles` loop: a target whose cat/pkg has no
     ebuild anywhere aborts before the config block with `emerge: there
     are no ebuilds to satisfy "<atom>".` + `--misspell-suggestions`,
     exit 1."""
@@ -18455,7 +18455,7 @@ def test_info_atom_prints_package_settings_for_a_pkg_info_package(
     emerge_binary, fixture_env
 ):
     """dev-libs/pkginfopkg's ebuild defines pkg_info() (DEFINED_PHASES=
-    info), so real action_info appends the `Package Settings` section
+    info), so Portage action_info appends the `Package Settings` section
     with a `<cpv>::<repo> would be built with the following:` + USE line,
     then `>>> Attempting to run pkg_info() for '<cpv>'` before running the
     phase (the phase's own output goes to stderr -- einfo). An ordinary
@@ -18486,11 +18486,11 @@ def test_info_atom_prints_package_settings_for_a_pkg_info_package(
 def test_info_atom_wraps_a_forced_flag_and_colours_the_use_line(
     emerge_binary, fixture_env
 ):
-    """Real `pkg_use_display`'s `( )` force/mask wrap and per-flag ANSI
+    """Portage `pkg_use_display`'s `( )` force/mask wrap and per-flag ANSI
     colour (`UseFlagDisplay.__str__`): `dev-libs/infoforcedpkg` is
     installed with IUSE="globalforceflag otherflag", USE="globalforceflag"
     -- `globalforceflag` is globally `use.force`d (fixtures/repo/profiles/
-    base/use.force), so real wraps it `(globalforceflag)` regardless of
+    base/use.force), so Portage wraps it `(globalforceflag)` regardless of
     the vdb-recorded enabled state, while the plain `otherflag` renders
     unwrapped `-otherflag`. Under `--color y`, the forced flag's name
     (not the parens) is red (enabled), the disabled flag is blue. Rust ==
@@ -18509,7 +18509,7 @@ def test_info_atom_wraps_a_forced_flag_and_colours_the_use_line(
 def test_info_atom_prints_the_installed_package_block(
     emerge_binary, fixture_env
 ):
-    """Real action_info checks the vdb first: an installed match
+    """Portage action_info checks the vdb first: an installed match
     short-circuits the ebuild lookup and prints `<cpv>::<repo> was built
     with the following:` + the vdb USE line + the `mydesiredvars`
     (CHOST/CFLAGS/CXXFLAGS/FEATURES/LDFLAGS) whose stored value differs
@@ -18518,10 +18518,10 @@ def test_info_atom_prints_the_installed_package_block(
     IUSE="alpha beta" USE="alpha", CFLAGS/CHOST recorded, the make.conf
     setting neither.
 
-    infoinstpkg's vdb has NO `DEFINED_PHASES` file at all -> real
+    infoinstpkg's vdb has NO `DEFINED_PHASES` file at all -> Portage
     `action_info`'s `if metadata["DEFINED_PHASES"]:` is falsy -> the
     `continue` is skipped -> `>>> Attempting to run pkg_info()` DOES fire
-    (real's falsy-check quirk, `actions.py:2350`). See
+    (Portage's falsy-check quirk, `actions.py:2350`). See
     `test_info_dash_defined_phases_does_not_attempt_pkg_info` for the
     `DEFINED_PHASES="-"` counter-case."""
     rust = _run([str(emerge_binary)], ["--info", "dev-libs/infoinstpkg"], fixture_env)
@@ -18541,14 +18541,14 @@ def test_info_atom_prints_the_installed_package_block(
 def test_info_atom_reads_multiline_vdb_fields_normalised(
     emerge_binary, fixture_env
 ):
-    """#109 S1: `read_vdb_string` normalises every field like real
+    """#109 S1: `read_vdb_string` normalises every field like Portage
     `_aux_get` (`" ".join(myd.split())`, `vartree.py:1044-1046`) on the
     individual-file path too, not only in the consolidated snapshot.
     `dev-libs/multilinevdb` is the committed fixture for that: its
     `IUSE`, `DEFINED_PHASES` and `RDEPEND` files all carry embedded
     newlines (and the RDEPEND leading/trailing whitespace), so `--info`
     reads the fallback path over values a raw read would hand over
-    unnormalised. Expected block verified against real Portage
+    unnormalised. Expected block verified against Portage
     3.0.82.2's own `emerge --info dev-libs/multilinevdb` on this same
     fixture tree (the volatile `KiB Mem:` line aside), byte-identical
     before and after the slice; the normalisation itself is pinned by
@@ -18571,14 +18571,14 @@ def test_info_atom_reads_multiline_vdb_fields_normalised(
 def test_info_atom_ignores_a_stale_vdb_snapshot(emerge_binary, fixture_env):
     """#109 S3: a consolidated `metadata` snapshot is served only when
     `#format=` is the known version **and** `#dir_mtime=` equals the
-    package dir's own `st_mtime_ns` (real `_read_metadata_file`,
+    package dir's own `st_mtime_ns` (Portage `_read_metadata_file`,
     `vartree.py:115-187`). A committed fixture's stamp can never match
     after `git checkout` sets the directory mtime, so
     `dev-libs/stalesnapshot-1.0` is the negative-path pin: its snapshot
     deliberately claims `USE=wrongflag` / `SLOT=99` / `IUSE=wrongflag`,
     and the reader must reject it and serve the individual files
     (`USE="alpha -beta"`). A reader that trusted the stale snapshot would
-    print `wrongflag` here. Expected block verified against real Portage
+    print `wrongflag` here. Expected block verified against Portage
     3.0.82.2 on this same fixture tree (it rejects the stale stamp the
     same way)."""
     rust = _run(
@@ -18599,7 +18599,7 @@ def test_info_atom_ignores_a_stale_vdb_snapshot(emerge_binary, fixture_env):
 def test_info_installed_block_reads_mydesiredvars_from_environment_bz2(
     emerge_binary, fixture_env
 ):
-    """Real `mydesiredvars` sourcing is `_aux_env_search` and *only*
+    """Portage `mydesiredvars` sourcing is `_aux_env_search` and *only*
     that: `dev-libs/infoenvpkg`'s vdb carries a `CFLAGS` individual
     file (a stray `-O2 -bogus`) but its `environment.bz2` has no
     `CFLAGS` -- so `CFLAGS` is `Unset:`, while the env's `CHOST`
@@ -18625,7 +18625,7 @@ def test_info_dash_defined_phases_does_not_attempt_pkg_info(
 ):
     """Counter-case to the empty-`DEFINED_PHASES` quirk: `dev-libs/
     infodashphases` is installed with `DEFINED_PHASES="-"` (the modern
-    "no phases" marker). Real `action_info`'s `if metadata["DEFINED_
+    "no phases" marker). Portage `action_info`'s `if metadata["DEFINED_
     PHASES"]:` is truthy for `"-"`, and `"info" not in ["-"]`, so the
     `continue` fires -> NO `>>> Attempting to run pkg_info()`. Rust ==
     Python."""
@@ -18644,11 +18644,11 @@ def test_info_dash_defined_phases_does_not_attempt_pkg_info(
 def test_info_usepkg_atom_selects_a_non_installed_binary_and_attempts_pkg_info(
     emerge_binary, fixture_env
 ):
-    """Real action_info's `(bindb, "binary")` search half (only under
+    """Portage action_info's `(bindb, "binary")` search half (only under
     --usepkg, only when nothing is installed and no visible ebuild defines
     pkg_info()): dev-libs/binaryinfopkg exists ONLY as a $PKGDIR binary
     (no ebuild anywhere) whose build-info EAPI is 8 and DEFINED_PHASES
-    names `info`. Real prints `<cpv>::<repo> (non-installed binary) was
+    names `info`. Portage prints `<cpv>::<repo> (non-installed binary) was
     built with the following:` + the binary's own baked USE, then
     `>>> Attempting to run pkg_info() for '<cpv>'`. Without --usepkg the
     same atom is a hard `no ebuilds to satisfy` error (the phase output
@@ -18697,7 +18697,7 @@ def test_check_news_reports_none_when_all_items_are_read(
 def test_check_news_skip_file_excludes_items_like_the_read_file(
     emerge_binary, fixture_env, tmp_path
 ):
-    """An id in <eroot>/var/lib/gentoo/news/news-<repo>.skip (real
+    """An id in <eroot>/var/lib/gentoo/news/news-<repo>.skip (Portage
     NewsManager.updateItems' permanent per-item skip list) is not
     counted, exactly like a `.read` id. With ROOT at an empty tmp tree
     only 2026-09-01-portuale-general (unrestricted) is relevant; a `.skip`
@@ -18715,10 +18715,10 @@ def test_check_news_skip_file_excludes_items_like_the_read_file(
 def test_check_news_read_file_lazily_removes_a_previously_unread_item(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real `getUnreadItems`'s count is `len(.unread)`, not a live
+    """Portage `getUnreadItems`'s count is `len(.unread)`, not a live
     recompute (see `run_check_news`'s own doc comment) -- an item stays
     counted until something removes it from `.unread`. The only thing
-    real ever does that is `eselect news read`, a separate tool portuale
+    Portage ever does that is `eselect news read`, a separate tool portuale
     doesn't implement as its own action; `.read` models that tool's
     effect, applied lazily on the next `--check-news` run. Pre-seed
     `.unread`/`.skip` as if a prior run had already found both fixture
@@ -18739,7 +18739,7 @@ def test_check_news_read_file_lazily_removes_a_previously_unread_item(
     assert (news_dir / "news-testrepo.unread").read_text().splitlines() == [
         "2026-09-02-portuale-samepkg"
     ]
-    # .skip stays untouched -- real never removes from it.
+    # .skip stays untouched -- Portage never removes from it.
     assert set((news_dir / "news-testrepo.skip").read_text().splitlines()) == {
         "2026-09-01-portuale-general",
         "2026-09-02-portuale-samepkg",
@@ -18749,7 +18749,7 @@ def test_check_news_read_file_lazily_removes_a_previously_unread_item(
 def test_check_news_matches_a_versioned_display_if_installed_atom(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real `DisplayInstalledRestriction.checkRestriction` is
+    """Portage `DisplayInstalledRestriction.checkRestriction` is
     `vardb.match(self.atom)` -- a full atom match, not a bare `cat/pkg`
     existence check. `dev-libs/samepkg-1.0` is in the fixture vdb:
     `>=dev-libs/samepkg-1.0` (2026-09-04-portuale-versioned-match) is
@@ -18779,8 +18779,8 @@ def test_check_news_matches_a_versioned_display_if_installed_atom(
 
 
 def test_genuinely_unrecognized_option_gets_a_distinct_message(emerge_binary, fixture_env):
-    """A flag that isn't in real emerge's own option surface at all must
-    be reported differently from a real-but-unimplemented one, so users
+    """A flag that isn't in Portage emerge's own option surface at all must
+    be reported differently from a Portage-but-unimplemented one, so users
     can tell a typo apart from a portuale scope gap."""
     result = _run(
         [str(emerge_binary)], ["--totally-fake-option", "dev-libs/newpkg"], fixture_env
@@ -18831,10 +18831,10 @@ def test_oracle_slot_conflict_masks_highest_version_first(
 ):
     """023 oracle, case mgf (upstream
     `test_slot_conflict_mask_update.py::testBacktrackingGoodVersionFirst`):
-    `mgfa` needs `=mgfc-1` + `mgfb`; `mgfb-2` needs `=mgfc-2`. Real masks
+    `mgfa` needs `=mgfc-1` + `mgfb`; `mgfb-2` needs `=mgfc-2`. Portage masks
     the highest conflicting instance (`mgfc-2`) and merges
     `[mgfc-1, mgfb-1, mgfa-1]` -- portuale's slice-3 downgrade bias already
-    does this. Regression guard: MATCHES real."""
+    does this. Regression guard: MATCHES Portage."""
     rust = _b1_run(
         ["--pretend", "dev-libs/mgfa"],
         fixture_env,
@@ -18853,7 +18853,7 @@ def test_oracle_explicit_pin_beats_transitive_pull(
     """023 oracle, case btb (upstream
     `test_backtracking.py::testBacktracking`): `=btba-1` + `btbb`
     (which pulls bare `btba`) merges `[btba-1, btbb-1]` in either argument
-    order. Guard: MATCHES real."""
+    order. Guard: MATCHES Portage."""
     for args in (
         ["--pretend", "=dev-libs/btba-1", "dev-libs/btbb"],
         ["--pretend", "dev-libs/btbb", "=dev-libs/btba-1"],
@@ -18870,8 +18870,8 @@ def test_oracle_one_step_backtrack_budget(
 ):
     """023 oracle, case btn (upstream
     `test_backtracking.py::testBacktrackNotNeeded`, `--backtrack 1`):
-    `btnc` needs `btna` + `btnb`, `btnd` pins both `-1`. Real merges all
-    four (order-insensitive). Guard: MATCHES real."""
+    `btnc` needs `btna` + `btnb`, `btnd` pins both `-1`. Portage merges all
+    four (order-insensitive). Guard: MATCHES Portage."""
     rust = _b1_run(
         ["--pretend", "--backtrack", "1", "dev-libs/btnc", "dev-libs/btnd"],
         fixture_env,
@@ -18891,8 +18891,8 @@ def test_oracle_update_pull_over_installed_old(
     """023 oracle, case btw (upstream
     `test_backtracking.py::testBacktrackWithoutUpdates`): `btwa` needs
     `btwz`, `btwb` needs `>=btwz-2`, `btwz-1` installed, no `--update`.
-    Real merges `[btwz-2, btwb-1, btwa-1]` (order-insensitive). Guard:
-    MATCHES real."""
+    Portage merges `[btwz-2, btwb-1, btwa-1]` (order-insensitive). Guard:
+    MATCHES Portage."""
     root = _b1_root(tmp_path, [], [("dev-libs", "btwz", "1", "0", {})])
     rust = _b1_run(
         ["--pretend", "dev-libs/btwb", "dev-libs/btwa"],
@@ -18911,8 +18911,8 @@ def test_oracle_selective_update_is_a_noop(
 ):
     """023 oracle, case btmu (upstream
     `test_backtracking.py::testBacktrackMissedUpdates`): `btmb` pins
-    `<=btma-1`, both installed, `--update --deep --selective`. Real merges
-    nothing (the update is correctly missed). Guard: MATCHES real."""
+    `<=btma-1`, both installed, `--update --deep --selective`. Portage merges
+    nothing (the update is correctly missed). Guard: MATCHES Portage."""
     root = _b1_root(
         tmp_path,
         [],
@@ -18935,11 +18935,11 @@ def test_oracle_boost_subslot_upgrade(
     """023 oracle, case boost (upstream
     `test_slot_conflict_update.py::testSlotConflictUpdate`): `libcmis`
     needs `boost:=`, installed at subslot 1.52 with `boost-build-1.52.0`.
-    Real merges `[boost-build-1.53.0, boost-1.53.0, libcmis-0.3.1]`.
+    Portage merges `[boost-build-1.53.0, boost-1.53.0, libcmis-0.3.1]`.
     Portuale reaches the same versions via highest-first selection +
     solvable growth, without ever hitting the missed-update mask path
     this test was written for -- and since #24 S1's complete-mode gate
-    it also schedules the `libcmis` subslot rebuild real merges (the
+    it also schedules the `libcmis` subslot rebuild Portage merges (the
     `r`-tagged provider + `rR` consumer + "causing rebuilds" block).
     Full mergelist MATCH (`@system` lines are fixture-profile noise)."""
     root = _b1_root(
@@ -18990,12 +18990,12 @@ def test_oracle_virtual_subslot_upgrade_avoids_missed_update(
 ):
     """023 oracle, case virt (upstream
     `test_slot_conflict_update_virt.py`, bug 692746): `DBD-mysql` needs
-    `virtual/libmysqlclient:=`, installed at subslot 18. Real merges
+    `virtual/libmysqlclient:=`, installed at subslot 18. Portage merges
     `[mysql-connector-c-8.0.17-r3, libmysqlclient-21, DBD-mysql-4.44.0]`.
     Portuale reaches the same versions via highest-first selection --
     the 692746 existing-node mask path never triggers because no slot
     conflict arises -- and since #24 S1's complete-mode gate it also
-    schedules the `DBD-mysql` subslot rebuild real merges. Full
+    schedules the `DBD-mysql` subslot rebuild Portage merges. Full
     mergelist MATCH (`@system` noise as above)."""
     root = _b1_root(
         tmp_path,
@@ -19040,22 +19040,22 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
 ):
     """023 oracle, case btnr (upstream
     `test_backtracking.py::testBacktrackNoWrongRebuilds`, `--backtrack 6`):
-    `btrd` needs `<btra-2`, `btrc-2` needs `>=btra-2`. Real explores
+    `btrd` needs `<btra-2`, `btrc-2` needs `>=btra-2`. Portage explores
     several mask nodes, discards masks whose reason got masked itself
     (bug 375573 `_check_runtime_pkg_mask`), and merges NOTHING
     (`mergelist=[]`, `success=True`).
 
     Backlog #198: portuale now mirrors that search -- the bound conflict
     masks `btra-2`, so `btrc-2`'s `>=btra-2` dies and the
-    missing-dependency backtrack (no top-level exemption, real
+    missing-dependency backtrack (no top-level exemption, Portage
     `depgraph.py:3493-3503`) masks the world-selected `btrc-2` too. The
     run settles with no `btra`/`btrc` upgrade and rc 0, matching the
     upstream oracle's merge list and success. The two notices follow
-    real's deterministic miss mapping from that mask state (slot mask
+    Portage's deterministic miss mapping from that mask state (slot mask
     -> `WARNING` row for `btra-2` with `btrd-1`'s bound; missing-dep
     mask whose `>=btra-2` still names the backtrack-masked `btra-2` ->
     abbreviated tail for `btrc:0`); the notice block is pinned
-    verbatim below. The skipped line carries real's `ELIBC="glibc"`
+    verbatim below. The skipped line carries Portage's `ELIBC="glibc"`
     group (backlog #230's `pkg_use_display`, same as the blk0 cells)
     and the installed consumer its ` in '<root>'` suffix with bare
     `USE=""` (the b1root vdb has no USE file, like the abk0 probe).
@@ -19109,14 +19109,14 @@ def test_oracle_no_aggressive_downgrade(
 ):
     """023 oracle, case bwd (upstream
     `test_aggressive_backtrack_downgrade.py`, bug 693836): upgrading
-    `libvpx` to 1.8.0 must NOT downgrade `firefox` 69.0 -> 60.9.0. Real
+    `libvpx` to 1.8.0 must NOT downgrade `firefox` 69.0 -> 60.9.0. Portage
     merges nothing; portuale also merges nothing (no `firefox`/`libvpx`/
-    `ffmpeg` lines at all). MATCHES real. (The `conflict_downgrade` guards
+    `ffmpeg` lines at all). MATCHES Portage. (The `conflict_downgrade` guards
     that police finer variants of this live in backlog #35, not #23.)
 
     Backlog #205: the skipped `libvpx-1.8.0` names both of installed
     firefox's rejecting atoms -- the built `=1.7*:0=` binding and the
-    `[postproc]` USE pin -- exactly like real's "Record missed updates"
+    `[postproc]` USE pin -- exactly like Portage's "Record missed updates"
     tail (`depgraph.py:2085-2106` records every kept-instance parent
     atom the removed version fails)."""
     root = _b1_root(
@@ -19166,12 +19166,12 @@ def test_oracle_non_slot_operator_update_selects_new_slot(
     """023 oracle, case a522084 -- MATCH, see `docs/history/023-oracle.md`
     (upstream `test_solve_non_slot_operator_slot_conflicts.py`, bug
     522084): `app-misc/A` 1 (`:0/1`) -> 2 (`:0/2`) with installed `B-0`
-    recording `A:0/1=`. Real merges `[A-2, B-0]`. The version choice
+    recording `A:0/1=`. Portage merges `[A-2, B-0]`. The version choice
     (`A-2`, no missed update) is #23's half; the `B-0` subslot rebuild
-    arrives via #24 S1's complete-mode gate (real `_complete_graph` has
+    arrives via #24 S1's complete-mode gate (Portage `_complete_graph` has
     no `--deep` condition, `depgraph.py:8562-8648`, so the auto-enabled
     pass runs under `-uD` too -- portuale re-runs the phase-1 walk with
-    the required-set seeds fed in). Real tags both rows with the red `r`
+    the required-set seeds fed in). Portage tags both rows with the red `r`
     (`PkgAttrDisplay.force_reinstall`) and prints the "causing rebuilds"
     block."""
     root = _b1_root(
@@ -19199,7 +19199,7 @@ def test_oracle_non_slot_operator_update_selects_new_slot(
 
 @pytest.mark.xfail(
     strict=True,
-    reason="bug 439694 needs real's in-walk `_slot_operator_unsatisfied_probe` "
+    reason="bug 439694 needs Portage's in-walk `_slot_operator_unsatisfied_probe` "
     "(`depgraph.py:3447-3454` -> `_slot_operator_unsatisfied_backtrack`): "
     "with no version change anywhere, no merge entry fires the complete-mode "
     "auto-enable, so S1's seeded re-run has nothing to scan -- a post-walk "
@@ -19211,7 +19211,7 @@ def test_oracle_slot_operator_unsatisfied_rebuilds_the_stale_consumer(
     """024 oracle, bug 439694 (upstream
     `test_slot_operator_unsatisfied.py::testSlotOperatorUnsatisfied` case
     1): installed `A-2` (`0/2`) with `B-0` recording `A:0/1=` (its tree
-    ebuild says `A:=`). Real merges `[B-0]` under `-uD @world` -- the
+    ebuild says `A:=`). Portage merges `[B-0]` under `-uD @world` -- the
     broken built slot-operator dep triggers a rebuild with no version
     change at all. Portuale merges nothing yet (DIVERGENT, xfail). Rust
     == Python asserted now, so the flip later only touches the
@@ -19248,7 +19248,7 @@ def test_oracle_slot_operator_unsatisfied_oneshot_selects_without_rebuild(
     2): `emerge --oneshot app-misc/A` on the same shape merges `[A-2]`
     with no `B-0` rebuild -- no version change triggers complete-graph
     mode, and initially-unsatisfied deps are ignored there anyway.
-    MATCHES real: a directly-named atom re-merges even when installed
+    MATCHES Portage: a directly-named atom re-merges even when installed
     (non-selective default, hence `[R]`), and the seed-less run sees no
     reachable consumer."""
     root = _b1_root(
@@ -19277,14 +19277,14 @@ def test_oracle_two_simultaneous_conflicts_defer_second_to_later_pass(
     emerge_binary, fixture_env
 ):
     """023 oracle, case mg2 (C3 first-conflict-only deferral, no direct
-    upstream equivalent -- real `_feedback_slot_conflicts` takes
+    upstream equivalent -- Portage `_feedback_slot_conflicts` takes
     `conflicts_data[0]`): `mg2top` pulls two independent mask-good-first
     subtrees (`mgfa`/`mgfb`/`mgfc` and `mgxa`/`mgxb`/`mgxc`). Both slots
     conflict on the first pass; only the first becomes nodes, the second
     is handled under each sibling in later passes. The search settles
     with every `-1.0` and no conflict block -- the same set a bundled
-    trial would reach, via real's deferral order. Since #129 S1 the
-    settled trial masks also print real's two skip notices after the
+    trial would reach, via Portage's deferral order. Since #129 S1 the
+    settled trial masks also print Portage's two skip notices after the
     rows (the `WARNING` + abbreviated tail, pinned by the `--tree`
     test below); only the merge rows are asserted here."""
     rust = _b1_run(
@@ -19308,15 +19308,15 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
 ):
     """Backlog #155 (P21, display half): `--tree dev-libs/mg2top` nests
     `mgfc-1` under `[nomerge] mgfa-1` (and `mgxc-1` under `[nomerge]
-    mgxa-1`), like real -- not under `[nomerge] mgfb-1`/`[nomerge]
-    mgxb-1`. Real's digraph parent lists follow edge-insertion
+    mgxa-1`), like Portage -- not under `[nomerge] mgfb-1`/`[nomerge]
+    mgxb-1`. Portage's digraph parent lists follow edge-insertion
     (resolution) order and the tree walk picks the first untraversed
     parent; portuale enumerated display edges over merge-sorted array
     position, letting the later-discovered `mgfb-1` precede `mgfa-1`.
     `GraphEntry::discovery` (stamped pre-sort) now orders the
     enumeration.
 
-    Backlog #129 (S1, notice half): the skipped-updates notices real
+    Backlog #129 (S1, notice half): the skipped-updates notices Portage
     reports on this shape (`l0-fx-20260927T080515Z` oracle) now print
     too -- the slot-conflict `WARNING` (`mgxc-2` vs `=mgxc-1`/`mgxa-1`,
     `mgfc-3.0` vs `=mgfc-1`/`mgfa-1`, in first-mask order) fed by the
@@ -19324,12 +19324,12 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
     plus the abbreviated unsatisfied-dependencies tail (`mgxb:0`,
     `mgfb:0`). Full stdout pinned (rc 0). Modulo portuale's
     established display cuts (no `to '<ROOT>'` suffixes; the missed
-    lines show the fixture-tree USE display where the bed's real shows
+    lines show the fixture-tree USE display where the bed's Portage shows
     the container running-root profile's `ABI_X86="(64)"` group -- the
     unmodelled second config, same cut as the #90 skip pin -- while the
-    parent lines match real byte-for-byte at `USE="" ELIBC="glibc"`).
+    parent lines match Portage byte-for-byte at `USE="" ELIBC="glibc"`).
 
-    Backlog #230: the `WARNING` lines render real's full
+    Backlog #230: the `WARNING` lines render Portage's full
     `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- mgxc/mgxa and
     mgfc/mgfa are EAPI 8 with no IUSE, so the globals mask out and only
     the implicit `ELIBC="glibc"` group survives."""
@@ -19373,23 +19373,23 @@ def test_oracle_missed_update_siblings_masked_together(
 ):
     """023 oracle, case mg3 (C4 similar-grouping): `mgfc-3.0` is visible
     but pulled by nothing -- a missed-update sibling of the `mgfc-2.0`
-    vs `=mgfc-1` conflict. Real's `_slot_confict_backtrack` groups
+    vs `=mgfc-1` conflict. Portage's `_slot_confict_backtrack` groups
     similar versions into ONE node, and portuale groups the node the
     same way, but still selects the highest visible `mgfb-2.0` and
     reports the conflict at `--backtrack=1` instead of falling back, so
     the downgrade costs a second mask step through missing-dep feedback.
     At the default budget both converge to all-`1.0` (pinned). The
-    former claim that real settles at `--backtrack=1` was falsified
-    2026-09-14 (real aborts there and at `<=3`; see `docs/history/023-oracle.md`
+    former claim that Portage settles at `--backtrack=1` was falsified
+    2026-09-14 (Portage aborts there and at `<=3`; see `docs/history/023-oracle.md`
     "R2 — genuine upstream oracle"): the upstream-shaped `btgp` pin now
     carries that oracle, and the `--backtrack=1` block below pins
     portuale's low-budget conflict shape only. #36 is closed as
     not-reproducible-as-framed. Since #129 S1 the default-budget settle
-    also prints real's two skip notices after the rows (`mgfc-3.0`
+    also prints Portage's two skip notices after the rows (`mgfc-3.0`
     `WARNING` + `mgfb:0` abbreviated tail); only the merge rows and the
     low-budget block are asserted here. Backlog #148: the low-budget surviving
-    conflict keeps both `mgfc` instances as merge rows (host-real
-    oracle 2026-09-23, real 3.0.82.2 on the fixture tree, argv
+    conflict keeps both `mgfc` instances as merge rows (host-Portage
+    oracle 2026-09-23, Portage 3.0.82.2 on the fixture tree, argv
     `emerge -p --backtrack 1 dev-libs/mgfa` under the suite fixture
     env: `[ebuild N] mgfc-1` then `mgfc-2`, rc 1)."""
     ok = _b1_run(["--pretend", "dev-libs/mgfa"], fixture_env, emerge_binary,
@@ -19399,8 +19399,8 @@ def test_oracle_missed_update_siblings_masked_together(
         f'[ebuild  N     ] dev-libs/mgfb-1 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/mgfa-1 to {fixture_env["ROOT"]}',
     ]
-    # #62: portuale's low-budget conflict shape exits 1 like real
-    # (real aborts at this budget too -- different mechanism, same rc).
+    # #62: portuale's low-budget conflict shape exits 1 like Portage
+    # (Portage aborts at this budget too -- different mechanism, same rc).
     one = _run([str(emerge_binary)],
         ["--pretend", "--backtrack", "1", "dev-libs/mgfa"],
         fixture_env,
@@ -19426,15 +19426,15 @@ def test_backtracking_good_version_first_matches_the_upstream_oracle(
 
     Genuine oracle, re-captured 2026-09-14 through portage's own
     `ResolverPlayground` on the pinned 3.0.82.2 (script + output:
-    `differential-test-bed/logs/r2-blocker-20260914/`): real settles
+    `differential-test-bed/logs/r2-blocker-20260914/`): Portage settles
     `[C-1, B-1, A-1]` at the default budget and at `--backtrack=4` (its
     minimum -- `<=3` aborts), matching upstream's `mergelist`. Since
-    #295 portuale counts restarts like real (depth `max(1, (N+1)//2)`
+    #295 portuale counts restarts like Portage (depth `max(1, (N+1)//2)`
     plus the `backtracked >= N` cap), so the `<=3` budgets are probed
     below."""
     for args, note in (
         (["--pretend", "dev-libs/btgp"], "default budget"),
-        (["--pretend", "--backtrack", "4", "dev-libs/btgp"], "real's minimum (oracle)"),
+        (["--pretend", "--backtrack", "4", "dev-libs/btgp"], "Portage's minimum (oracle)"),
     ):
         r = _run([str(emerge_binary)], args, fixture_env)
         assert r.returncode == 0, (note, r.stdout, r.stderr)
@@ -19450,9 +19450,9 @@ def test_backtracking_good_version_first_aborts_below_the_oracle_minimum(
     emerge_binary, fixture_env
 ):
     """Backlog #295: the same `testBacktrackingGoodVersionFirst` shape at
-    `--backtrack` 1..3 -- real (L0 probe, 3.0.82.2) exits 1 with the
+    `--backtrack` 1..3 -- Portage (L0 probe, 3.0.82.2) exits 1 with the
     conflict standing because it counts restarts and the shape needs
-    four. The third restart real spends is an iteration that fails
+    four. The third restart Portage spends is an iteration that fails
     without feedback (the masked top-level `btgp`, `elif backtracker:
     backtracked += 1`); #297 counts it too."""
     for n in (1, 2, 3):
@@ -19474,7 +19474,7 @@ def test_or_choice_avoids_downgrade_into_the_graphed_update(
     installed against ocaml 4.01.0), `mllabltk` = dev-ml/labltk
     (`>=ocaml-4.02:=`).
 
-    Real `dep_zapdeps`'s `installed_downgrade` guard demotes the
+    Portage `dep_zapdeps`'s `installed_downgrade` guard demotes the
     `<ocaml-4.02` arm once the ocaml update is in the graph (the lower
     version is not a desirable downgrade: `_downgrade_probe` is False), so
     lablgl takes `labltk` and the update survives. Genuine oracle, captured
@@ -19483,7 +19483,7 @@ def test_or_choice_avoids_downgrade_into_the_graphed_update(
     budget `[ocaml-4.02.1, labltk-8.06.0, lablgl-1.05]`, success; with
     `_downgrade_probe` forced True the same run merges nothing (the missed
     update the bug is about) -- which is what portuale did before #35.
-    `--backtrack=0`: real fails with the partial `[ocaml-4.02.1,
+    `--backtrack=0`: Portage fails with the partial `[ocaml-4.02.1,
     labltk-8.06.0]`."""
     lablgl_deps = (
         ">=dev-libs/mlocaml-3.10.2:0/4.01.0= "
@@ -19536,7 +19536,7 @@ def test_or_choice_avoids_downgrade_into_the_graphed_update(
 # Backlog #24 Slice 2 oracle pins: the slot-operator family, one
 # `test_oracle_slotop_*` per upstream shape (method: `docs/history/023-oracle.md`;
 # verdict table: `docs/history/024-oracle.md`). Every pin runs portuale
-# (`_b1_run`); real's mergelist is the expectation, under
+# (`_b1_run`); Portage's mergelist is the expectation, under
 # `xfail(strict=True)` where portuale still diverges. Fixture ebuilds live
 # under `fixtures/repo/` (+ `metadata/md5-cache/`); vdb + world come from
 # `_b1_root`. Renames (`soc*`, `so*`) mark shapes whose upstream names
@@ -19563,7 +19563,7 @@ def test_oracle_slotop_rebuild_order(
 ):
     """Upstream `test_slot_operator_rebuild.py` case 1 (`emerge app-misc/A`,
     `--dynamic-deps=n`): installed `A-1`, `B-0` (`A:0/1=`), `C-0`
-    (`|| ( X A:0/1= )`); world `[B, C]`. Real merges `[A-2, (B-0, C-0)]`
+    (`|| ( X A:0/1= )`); world `[B, C]`. Portage merges `[A-2, (B-0, C-0)]`
     -- the unsatisfiable `X` arm lands in `_initially_unsatisfied_deps`
     and the `A:=` arm still rebuilds `C-0` (`X` exists nowhere).
 
@@ -19603,7 +19603,7 @@ def test_oracle_slotop_rebuild_order(
     merges = _b1_merges(rust.stdout)
     app = [ln for ln in merges if "app-misc/" in ln]
     # S3 (#24): the two consumers are walked graph nodes now, so the
-    # provider they are rebuilt against merges first -- real's
+    # provider they are rebuilt against merges first -- Portage's
     # `[A-2, (B-0, C-0)]`. Upstream leaves the (B-0, C-0) pair itself
     # unordered, so only the provider-first edge is pinned as a sequence.
     assert app[0].startswith("[ebuild  r  U  ] app-misc/A-2 ")
@@ -19624,7 +19624,7 @@ def test_oracle_slotop_complete(
     runtime-mask flavour shares these fixtures, see
     `test_oracle_slotop_runtime_pkg_mask`). Installed `socmeta-1`,
     `socb-1`/`socc-1`/`socd-1` (`socfoo:0/1=`), `socfoo-1` (`0/1`);
-    world `[socmeta]`. Real merges
+    world `[socmeta]`. Portage merges
     `[socfoo-2, (socd-1, socc-1, socb-2), socmeta-2]`.
 
     Was a strict xfail on SELECTION until #57 S1 (K3): the top-level
@@ -19634,7 +19634,7 @@ def test_oracle_slotop_complete(
     -- exactly the gap #57 closes. With the installed-instance slot
     check in place the collision is recorded, the solvable-conflict
     feedback enforces `{dev-libs/socc, =dev-libs/socc-1}`, and the full
-    merge list now matches real. The undo rules were already correct on
+    merge list now matches Portage. The undo rules were already correct on
     this shape (rule 5 keeps socc-1's AtomArg rebuild, rule 8 keeps
     socd-1/socb-2's graph-bound `:=` with `socfoo:0/2=`)."""
     root = _b1_root(
@@ -19707,17 +19707,17 @@ def test_oracle_slotop_slotchange_case1(
     variant (`kde-base/ark --oneshot --usepkg`; no binaries exist in the
     ad-hoc ROOT so `--usepkg` falls back to ebuilds -- the binary half
     is v2 `#24c`): installed `libarchive-3.1.1` (`SLOT 0`, tree `0/13`)
-    + `ark-4.10.0` (`libarchive:0/0=`); world `[ark]`. Real merges
+    + `ark-4.10.0` (`libarchive:0/0=`); world `[ark]`. Portage merges
     `[libarchive-3.1.1, ark-4.10.0]`.
 
-    MATCHES since #24 S5: real's `_slot_change_probe`
+    MATCHES since #24 S5: Portage's `_slot_change_probe`
     (`depgraph.py:2317-2359`) fires on the merge-bound `ark`'s *unbuilt*
     `app-arch/libarchive:=` dep (its child resolved to the installed
     libarchive) because the tree ebuild at the child's own cpv moved
     `SLOT` `0` -> `0/13` without a revbump (bug 456208) -- the
     installed child is scheduled. The provider row carries the `r`
-    marker real's auto-set `force_reinstall` gives it (`slot {0/0 ->
-    0/13}` oldbest bracket), `ark` is a plain `R`; real's
+    marker Portage's auto-set `force_reinstall` gives it (`slot {0/0 ->
+    0/13}` oldbest bracket), `ark` is a plain `R`; Portage's
     `_compute_abi_rebuild_info` yields no `_forced_rebuilds` pair for
     this direction (the scheduled package is the *child*), so there is
     no "causing rebuilds" block."""
@@ -19755,7 +19755,7 @@ def test_oracle_slotop_slotchange_case2_noreplace(
 ):
     """Upstream `test_slot_change_without_revbump.py` case 2
     (`libarchive --noreplace --usepkg`): nothing to do, mergelist `[]`.
-    MATCHES real (same shape as case 1)."""
+    MATCHES Portage (same shape as case 1)."""
     root = _b1_root(
         tmp_path,
         ["kde-base/ark"],
@@ -19789,13 +19789,13 @@ def test_oracle_slotop_slotchange_case4_changedslot(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_change_without_revbump.py` case 4, ebuild
-    variant (`@world --changed-slot --usepkg -uD`): real merges
-    `[libarchive-3.1.1, ark-4.10.0]`. MATCHES real on the merge set:
+    variant (`@world --changed-slot --usepkg -uD`): Portage merges
+    `[libarchive-3.1.1, ark-4.10.0]`. MATCHES Portage on the merge set:
     the standalone `slot_changed` reinstall trigger schedules
     `libarchive`, and the post-walk scan rebinds `ark` (provider-side
-    `r` + `rR` + block, exactly real's `_forced_rebuilds` tagging).
+    `r` + `rR` + block, exactly Portage's `_forced_rebuilds` tagging).
     S5 owns the routing (replace-set probe instead of the standalone
-    trigger); the display is already real-shaped."""
+    trigger); the display is already Portage-shaped."""
     root = _b1_root(
         tmp_path,
         ["kde-base/ark"],
@@ -19820,7 +19820,7 @@ def test_oracle_slotop_slotchange_case4_changedslot(
     )
     assert rust.returncode == 0
     merges = _b1_merges(rust.stdout)
-    # `[3.1.1]`: real `output.py::_get_installed_best` 721-727 -- a
+    # `[3.1.1]`: Portage `output.py::_get_installed_best` 721-727 -- a
     # reinstall of an installed cpv carries `myoldbest = [installed]`
     # exactly when its `(slot, sub_slot)` moved, which is this shape
     # (installed `0/0`, tree `SLOT="0/13"`). #24 S3 gave walked
@@ -19839,7 +19839,7 @@ def test_need_rebuild_trailer_fires_for_an_installed_parent(
     walking alongside the ebuild `:=`), and the append is removed — the
     vdb binding never walks, no conflict forms, no trailer fires, even
     with `PORTUALE_DYNAMIC_DEPS_APPEND=1` in the environment (ignored).
-    Real would print the `cannot be rebuilt` trailer here (its
+    Portage would print the `cannot be rebuilt` trailer here (its
     FakeVartree always applies dynamic deps); portuale's silence is the
     documented #26/#27 cut. Both flag arms (`--exclude`,
     `--useoldpkg-atoms`) stay silent with rc 0."""
@@ -19892,14 +19892,14 @@ def test_oracle_slotop_regslotchange(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_regular_slot_change_without_revbump.py`, ebuild
-    variant (`soslotconsumer --oneshot --usepkg`): real pulls the
+    variant (`soslotconsumer --oneshot --usepkg`): Portage pulls the
     available slot (`soslotlib-1.52.0` at `SLOT 0`) and merges
     `[soslotlib-1.52.0, soslotconsumer-4.0.0.2]`. The tree ebuild at the
     installed cpv moved the *main* slot (`0/1.52` -> `0/0`), which the
-    S3 post-walk scan cannot see (`a_slot == n_slot` fails); real's
+    S3 post-walk scan cannot see (`a_slot == n_slot` fails); Portage's
     `_slot_change_probe` has no such restriction, and since #24 S5
     neither does portuale. `soslotlib` is the scheduled child, so the
-    `r` marker sits on it and real's `_forced_rebuilds` stays empty --
+    `r` marker sits on it and Portage's `_forced_rebuilds` stays empty --
     no "causing rebuilds" block. The binary half (binpkg at `1.52`
     rejected) is v2 `#24c`. Renamed: upstream `dev-libs/boost` is taken
     by the 023 oracle with other SLOTs."""
@@ -19925,8 +19925,8 @@ def test_oracle_slotop_revdeps(
 ):
     """Upstream `test_slot_operator_reverse_deps.py` case 1 (bug 584626,
     `-uD @world`): installed `mesa-11.2.2` (`llvm:0/3.7.1=`),
-    `clang-3.7.1-r100`, `llvm-3.7.1-r2`; world `[mesa]`. Real merges
-    `[llvm-3.8.0-r2, clang-3.8.0-r100, mesa-11.2.2]`. MATCHES real on
+    `clang-3.7.1-r100`, `llvm-3.7.1-r2`; world `[mesa]`. Portage merges
+    `[llvm-3.8.0-r2, clang-3.8.0-r100, mesa-11.2.2]`. MATCHES Portage on
     set and order -- highest-first selection upgrades llvm+clang and
     the S1-gated scan rebuilds mesa, no `check_reverse_dependencies`
     probe needed on this shape (the probe family stays v2 `#24b`)."""
@@ -19977,9 +19977,9 @@ def test_oracle_slotop_revdeps_ignorebuilt(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_operator_reverse_deps.py` case 2
-    (`--ignore-built-slot-operator-deps=y`): real merges
+    (`--ignore-built-slot-operator-deps=y`): Portage merges
     `[llvm-3.8.0-r2, clang-3.8.0-r100]` with no mesa rebuild. MATCHES
-    real (same shape as `test_oracle_slotop_revdeps`)."""
+    Portage (same shape as `test_oracle_slotop_revdeps`)."""
     root = _b1_root(
         tmp_path,
         ["media-libs/mesa"],
@@ -20026,9 +20026,9 @@ def test_oracle_slotop_revdeps_libgit2_stays_empty(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_operator_reverse_deps.py::testSlotOperatorReverseDepsLibGit2`
-    (bug 717140, `-uD @world`): real merges `[]` -- no upgrade to
+    (bug 717140, `-uD @world`): Portage merges `[]` -- no upgrade to
     `libgit2-1.0.0` (it would break glib's `<libgit2-1` bound) and no
-    downgrade to `0.28.4`. MATCHES real: portuale settles with no
+    downgrade to `0.28.4`. MATCHES Portage: portuale settles with no
     `libgit2`/`glib`/`gitg` merge rows. Regression guard through v1
     (mechanism differs -- no update probe -- so S3/S4 must keep it)."""
     root = _b1_root(
@@ -20072,8 +20072,8 @@ def test_oracle_slotop_parentdowngrade_stays_empty(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_operator_update_probe_parent_downgrade.py`
-    (bug 528610, `-uD @world`): real merges `[]` -- the update probe
-    must NOT fire a rebuild for the `<sodb-6.0:=` dep. MATCHES real
+    (bug 528610, `-uD @world`): Portage merges `[]` -- the update probe
+    must NOT fire a rebuild for the `<sodb-6.0:=` dep. MATCHES Portage
     (nothing scheduled on either side). Renamed (`soopenldap`,
     `sys-libs/sodb`) to keep the oracle family grep-able; upstream
     atoms are `net-nds/openldap`, `sys-libs/db`. Regression guard
@@ -20113,8 +20113,8 @@ def test_oracle_slotop_conflict_rebuild(
     """Upstream `test_slot_conflict_rebuild.py::testSlotConflictRebuild`
     (bug 439688, `-uD --backtrack 4 @world`): `C-0`'s `<A-2` cap holds
     `A` at `1`, so no `A`/`B` rebuild; `D` upgrades `1 -> 2` (`0/1 ->
-    0/2`) and `E-0` (`D:0/1=`) rebuilds. Real merges `[D-2, E-0]`.
-    MATCHES real (bug 922038 falls out: nothing schedules `B`, so no
+    0/2`) and `E-0` (`D:0/1=`) rebuilds. Portage merges `[D-2, E-0]`.
+    MATCHES Portage (bug 922038 falls out: nothing schedules `B`, so no
     undo machinery is needed yet)."""
     root = _b1_root(
         tmp_path,
@@ -20163,7 +20163,7 @@ def test_oracle_slotop_conflict_rebuild(
 def test_oracle_slot_conflict_abi_rebuilds_the_built_parent(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Backlog #214 (v2 #24e): real `_slot_conflict_backtrack_abi`
+    """Backlog #214 (v2 #24e): Portage `_slot_conflict_backtrack_abi`
     (`3rdparty/portage/lib/_emerge/depgraph.py:2282`) rebuilds a built
     parent whose soname/`:=` conflict atom the update probe can resolve,
     instead of reporting the slot conflict. Shape: `abiprov-1` (`0/1`)
@@ -20171,11 +20171,11 @@ def test_oracle_slot_conflict_abi_rebuilds_the_built_parent(
     world member `abicons-1`'s recorded `RDEPEND="app-misc/abiprov:0/1="`
     (its live ebuild carries bare `app-misc/abiprov:=`), `-2` through
     `abiforce-1`'s `RDEPEND=">=app-misc/abiprov-2"` -- while no `abiprov`
-    instance is installed. Real merges `[abiprov-2, abicons-1, abiforce-1]`
+    instance is installed. Portage merges `[abiprov-2, abicons-1, abiforce-1]`
     with `abicons-1` as `rR` plus the `causing rebuilds` block
     (`backtrack: 1/4`, rc 0; verified in the one fixture-oracle-container
     probe the #214 S0 slice ran, oracled from now on by
-    `l0-fixture-oracle-g214.txt`). MATCHES real since #214 S1: the
+    `l0-fixture-oracle-g214.txt`). MATCHES Portage since #214 S1: the
     conflict-fired probe schedules the installed `:=` parent for rebuild
     (same `slot_operator_replace_installed` scheduling as #211) and the
     conflict record dissolves on the re-resolve. The `EAPI` file keeps
@@ -20213,22 +20213,22 @@ def test_oracle_slotop_conflict_mass_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_conflict_rebuild.py::testSlotConflictMassRebuild`
-    (bug 486580, `somassa --backtrack 3 -uD`): real merges
+    (bug 486580, `somassa --backtrack 3 -uD`): Portage merges
     `[somassa-1, somassb-2, 5 leaves]`. Renamed (`somass*`; upstream
     `app-misc/A-1` carries different deps than the fixture `A-1`).
-    MATCHES real since #211 C1: the new-child-slot update-probe arm
+    MATCHES Portage since #211 C1: the new-child-slot update-probe arm
     (`depgraph.py:3121-3126`) schedules the installed leaves bound to the
     abandoned slot even with an empty world (walked, not merely
     reachable). Ported through the `slot_operator_rebuild_scan`, so the
     leaves merge as walked `rR` nodes with NO `causing rebuilds` block:
-    the new-slot arm records the consumer alone (#269; real's
+    the new-slot arm records the consumer alone (#269; Portage's
     `_slot_operator_update_backtrack`, `depgraph.py:2442`), verified
-    against live real 3.0.82.2 in the #269 container probe 2026-10-01
+    against live Portage 3.0.82.2 in the #269 container probe 2026-10-01
     (the earlier revision of this docstring claimed the block was
     verified live too -- it was not: the Playground mergelist carries no
     display, and the live display shows no block). The rebuilds need
-    EAPI-bearing vdb -- real's `FakeVartree` overlay refuses EAPI-less
-    records, so without the `EAPI` files below live real merges no
+    EAPI-bearing vdb -- Portage's `FakeVartree` overlay refuses EAPI-less
+    records, so without the `EAPI` files below live Portage merges no
     leaves while the Playground's EAPI-5 records do.
     The `EAPI` files keep this pin's staging faithful to that oracle."""
     installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
@@ -20269,23 +20269,23 @@ def test_oracle_slotop_conflict_mass_rebuild(
 def test_oracle_slotop_update_probe_refusal(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Real `_slot_operator_check_reverse_dependencies`
+    """Portage `_slot_operator_check_reverse_dependencies`
     (`3rdparty/portage/lib/_emerge/depgraph.py:2472`, gates `:2622` and
     `:2738`): the conflict-mass shape (bug 486580, `somassa
     --backtrack 3 -uD`) plus an installed world parent
     (`app-misc/somassveto-1`, recorded `<app-misc/somassb-2`) whose atom
-    the fresh `somassb-2` child violates. Real refuses the whole
+    the fresh `somassb-2` child violates. Portage refuses the whole
     replacement: the probe's candidate-child gate fails, so no leaf
     rebuild is scheduled, while     `somassa-1` + `somassb-2` still merge
-    (verified against real 3.0.82.2 in the one container probe the
+    (verified against Portage 3.0.82.2 in the one container probe the
     #211 R2 slice ran: control merges the 5 leaves at `backtrack: 1/3`,
     the veto run merges only `somassa-1` + `somassb-2` at `0/3`; log in
-    the report). MATCHES real since #211 R2: the rebuild scan checks the
+    the report). MATCHES Portage since #211 R2: the rebuild scan checks the
     fresh candidate against every other in-scope installed parent (built
     `:S/SS=` relaxed to `:=`) and withholds the edge on mismatch. The
     veto parent rides the world file (complete-mode reachability, the
     `FX_WORLD_EXTRA` staging pattern); its live ebuild carries the veto
-    atom itself (real only sees parent pins through the walked depstring
+    atom itself (Portage only sees parent pins through the walked depstring
     + the built-`:=` overlay, never raw vdb), and the `EAPI` files keep
     the probe registration faithful (see the control pin above)."""
     installed = [("app-misc", "somassb", "1", "1", {"EAPI": "8"})]
@@ -20331,22 +20331,22 @@ def test_oracle_slotop_update_probe_mismatched_upgrade_entry(
     """#211 item 2, corrected by #252: the new-child-slot arm does NOT
     probe `Upgrade`/`Downgrade`/`Reinstall` entries with a bound-slot
     mismatch here. Installed `mmprov-1` (`0/1`) + `mmprov-2` (`1/1`) and
-    an installed consumer `mmcons-1` bound `mmprov:0/1=` (real's recorded
+    an installed consumer `mmcons-1` bound `mmprov:0/1=` (Portage's recorded
     form; the live ebuild carries bare `:=`); the run upgrades slot 1
-    to `mmprov-3` (`1/2`). Real merges only `mmprov-3`: the request's
+    to `mmprov-3` (`1/2`). Portage merges only `mmprov-3`: the request's
     own greedy per-slot arg (`_select_files`, `depgraph.py:5380`, via
     `_greedy_slots`, `:5896`) pins the installed slot-0 instance with
     `app-misc/mmprov:0`, and the update probe's reverse-deps gate
     (`_slot_operator_check_reverse_dependencies`, `:2472-2538`) refuses
     every slot-1 candidate against it, so the probe returns None and
-    `slot_operator_replace_installed` stays empty. Probed on real
+    `slot_operator_replace_installed` stays empty. Probed on Portage
     3.0.82.2, host staged-fixture probe 2026-09-29 (PORTAGE_CONFIGROOT
     at the fixture tree, ad-hoc ROOT with EAPI-bearing vdb, neutral
     `make.local` shadow in a mount namespace; argv `--pretend
     --color=n --backtrack=3 --update --deep app-misc/mmprov
     app-misc/mmcons`): rc 0, `backtrack: 0/3`, single row `[ebuild
     U ] app-misc/mmprov-3 [2]`, no `mmcons-1` row and no `causing
-    rebuilds` block (the earlier "MATCHES real (code-grounded)" claim
+    rebuilds` block (the earlier "MATCHES Portage (code-grounded)" claim
     was never probed and was wrong -- cf. the g213 Playground data).
     The `EAPI` files keep the probe registration faithful (see the
     conflict-mass pin)."""
@@ -20388,10 +20388,10 @@ def test_oracle_slotop_pin_gate_explicit_request_atoms_probe(
     pin, so the new-slot probe fires. Same installed/tree shape as the
     #252 pin (`mmprov-1` `0/1` + `mmprov-2` `1/1` + `mmcons-1` bound
     `mmprov:0/1=`, tree `mmprov-3` `1/2`), but the provider request pins
-    a slot or version: real's `_greedy_slots` (`depgraph.py:5896`) then
+    a slot or version: Portage's `_greedy_slots` (`depgraph.py:5896`) then
     spans a single slot and returns no `mmprov:0` arg, so the update
     probe's reverse-deps gate has nothing to refuse against and the
-    consumer rebuilds. Probed on real 3.0.82.2, host staged-fixture probe
+    consumer rebuilds. Probed on Portage 3.0.82.2, host staged-fixture probe
     2026-10-01 (PORTAGE_CONFIGROOT at the fixture tree, ad-hoc ROOT with
     EAPI-bearing vdb, cwd at ROOT for the relative `repos.conf`
     locations; argv `--ignore-default-opts --pretend --color=n
@@ -20486,7 +20486,7 @@ def test_oracle_285_exact_version_update_keeps_pinned_provider(
     instance under `--update`. Same installed/tree shape as the #268 pin
     (`mmprov-1` `0/1` + `mmprov-2` `1/1` + `mmcons-1` bound `mmprov:0/1=`,
     tree `mmprov-3` `1/2`; ad-hoc ROOT via `_b1_root`, EAPI-bearing vdb).
-    Probed on real 3.0.82.2, host staged-fixture probe 2026-10-02 (same
+    Probed on Portage 3.0.82.2, host staged-fixture probe 2026-10-02 (same
     staging as #268; argv `--ignore-default-opts --pretend --color=n
     --backtrack=3 --update --deep <atoms>`, rc 0 throughout; capture
     `r3-s0-captures.md` in the R3 batch): `=app-misc/mmprov-2
@@ -20547,11 +20547,11 @@ def test_oracle_slotop_pin_gate_blocker_discard_probes(
     (`-1` `0/1`, `-2` `1/1`, `-3` `1/2` whose `RDEPEND` soft-blocks the
     old slot `!app-misc/bdprov:0`) + `app-misc/bdcons-1` bound
     `bdprov:0/1=` (installed vdb carries the recorded `0/1=` form; the
-    live ebuild carries bare `:=`). Real revises the `--update` greedy
+    live ebuild carries bare `:=`). Portage revises the `--update` greedy
     args with blocker lookahead (`depgraph.py:5421`, `_greedy_slots(...,
     blocker_lookahead=True)`): the `bdprov:0` pin conflicts with the
     highest package and is discarded, the old slot is uninstalled instead
-    of updated, and the probe rebuilds the consumer. Probed on real
+    of updated, and the probe rebuilds the consumer. Probed on Portage
     3.0.82.2, host staged-fixture probe 2026-10-01 (same staging as the
     cut-(a) pin; argv `--ignore-default-opts --pretend --color=n
     --backtrack=3 --update --deep <atoms>`): `app-misc/bdprov
@@ -20593,7 +20593,7 @@ def test_oracle_289_world_slot_atom_holds_the_old_instance(
 ):
     """#289 pin: with the slot atom `app-misc/bdprov:0` in world, the
     soft blocker `!app-misc/bdprov:0` of the slot-1 update stays
-    unresolved in real 3.0.82.2 -- the `SetArg` parent holds the old
+    unresolved in Portage 3.0.82.2 -- the `SetArg` parent holds the old
     instance, so it is NOT uninstalled: rc 1, rows `[ebuild U]
     app-misc/bdprov-3 [2]` + `[blocks B] app-misc/bdprov:0`. Without the
     world atom (the #284 pin above) the old slot is uninstalled, rc 0.
@@ -20607,7 +20607,7 @@ def test_oracle_289_world_slot_atom_holds_the_old_instance(
     ]
     root = _b1_root(tmp_path, ["app-misc/bdprov:0"], installed)
     env = _b1_env(fixture_env, root)
-    # `_b1_run` asserts rc 0; real exits 1 here (unresolved blocker).
+    # `_b1_run` asserts rc 0; Portage exits 1 here (unresolved blocker).
     rust = _run(
         [str(emerge_binary)],
         ["--pretend", "--update", "app-misc/bdprov"],
@@ -20626,7 +20626,7 @@ def test_oracle_296_installed_holder_in_world_holds_the_old_instance(
 ):
     """#296 pin: an installed `app-misc/bdhold-1` (`RDEPEND` `app-misc/bdprov:0`)
     in world -- a vdb edge of a package the walk never visits -- holds
-    `bdprov-1` in real 3.0.82.2: `--update app-misc/bdprov` merges
+    `bdprov-1` in Portage 3.0.82.2: `--update app-misc/bdprov` merges
     `U bdprov-3 [2]` and leaves the soft blocker unresolved (`[blocks B]`),
     rc 1, never uninstalling the old slot. Portuale used to enforce the
     holder's slot-0 atom as a pin that an upgrade in slot 1 does not break,
@@ -20664,7 +20664,7 @@ def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
     """#292 pin: when one run files both a slot-conflict removal
     (`slotconflicttarget-2.0`, the blk-style old/new consumer pair) and a
     reverse-pin withhold (`whblocker-2.0`, installed world consumer
-    `whtarget-1.0` pinning `~whblocker-1.0`), real 3.0.82.2 renders the
+    `whtarget-1.0` pinning `~whblocker-1.0`), Portage 3.0.82.2 renders the
     conflict block first and the withhold block second whichever way the
     arguments are ordered and at either budget: both are
     `_conflict_missed_update` entries of the one solver, in solving order,
@@ -20702,14 +20702,14 @@ def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
 def test_oracle_298_argument_subtrees_walk_last_argument_first(
     emerge_binary, fixture_env
 ):
-    """#298 pin: real adds every argument's package first and pops its
+    """#298 pin: Portage adds every argument's package first and pops its
     `_dep_stack` LIFO, so the last argument's whole subtree is walked before
     the previous argument's deps are looked at, and the slot-conflict
     notice lists the instances in that insertion order. With
     `slotconflictunsolvable` (pin pair `>=2.0` / `<2.0`) and
     `slotconflictnewconsumer` (bare dep): `<unsolvable> <newconsumer>` ->
     `slotconflicttarget-2.0` then `-1.0`; `<newconsumer> <unsolvable>` ->
-    `-1.0` then `-2.0` (real 3.0.82.2 container probe 2026-10-03, both at
+    `-1.0` then `-2.0` (Portage 3.0.82.2 container probe 2026-10-03, both at
     `--backtrack 0` and the default; `LLM/evidence/2026-10-03-292/`).
     Portuale's FIFO queue used to give `-2.0` first for both."""
     unsolvable = "dev-libs/slotconflictunsolvable"
@@ -20738,13 +20738,13 @@ def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
     `r`, no `causing rebuilds` block. The `mmprov`/`mmcons` shape from
     the #253 recipe with only `mmcons` requested: installed `mmprov-1`
     (`0/1`) + `mmprov-2` (`1/1`) + `mmcons-1` bound `mmprov:0/1=`
-    (real's recorded form; the live ebuild carries bare `:=`), tree
-    `mmprov-3` (`1/2`). Real's update probe (`new_child_slot=True`,
+    (Portage's recorded form; the live ebuild carries bare `:=`), tree
+    `mmprov-3` (`1/2`). Portage's update probe (`new_child_slot=True`,
     `depgraph.py:3121-3126`) finds `mmprov-3` among the *available*
     packages even though no pass scheduled it, and the backtrack
     (`_slot_operator_update_backtrack`, `depgraph.py:2442`) files the
     child reinstall only when `new_child_slot is None` -- so the
-    consumer alone joins the replace set. Probed on real 3.0.82.2, host
+    consumer alone joins the replace set. Probed on Portage 3.0.82.2, host
     container probe 2026-10-01 (staged fixture tree, ad-hoc ROOT with
     EAPI-bearing vdb, `emerge --ignore-default-opts --pretend --color=n
     --backtrack=20 --update --deep app-misc/mmcons
@@ -20810,28 +20810,28 @@ def test_oracle_slotop_newslot_arm_reports_no_provider_or_block(
 def test_oracle_slotop_unsatisfied_probe_heals_through_parent_reinstall(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Backlog #215 (v2 #24f): real `_slot_operator_unsatisfied_probe`
+    """Backlog #215 (v2 #24f): Portage `_slot_operator_unsatisfied_probe`
     (`3rdparty/portage/lib/_emerge/depgraph.py:2817`, fired at
     `:3447-3458`). Installed `app-misc/sousatpar-1` records a built
     `:=` dep on the abandoned provider slot
     (`RDEPEND=">=app-misc/sousatprov-1:0/1="`, EAPI-bearing vdb so
-    real's `FakeVartree` overlay registers it) while the tree holds
+    Portage's `FakeVartree` overlay registers it) while the tree holds
     only `app-misc/sousatprov-2` (`SLOT="2/2"`) and the parent's own
-    live ebuild (`RDEPEND="app-misc/sousatprov:="`, satisfiable). Real
+    live ebuild (`RDEPEND="app-misc/sousatprov:="`, satisfiable). Portage
     heals through the probe's restart
     (`slot_operator_replace_installed` + reinstall the parent against
     the new child): the vendored-3.0.82.2 Playground mergelist is
     `[sousatprov-2, sousatpar-1]`, and its `--debug` fires
     `slot_operator_unsatisfied_probe` + `backtracking due to
     unsatisfied built slot-operator dep` verbatim (see the g215
-    report; the bed cell carries the live display). MATCHES real since
+    report; the bed cell carries the live display). MATCHES Portage since
     #215: the dead-end pass seeds the installed owner and re-resolves
     instead of aborting. Unlike the #211 update probe there is no
     `check_reverse_dependencies` refusal and no `--update` gate --
     the probe fires in-walk, so the plain-argument shape heals on both
     sides without it. The `--backtrack=0` shape is the agreement lock:
     the probe is backtrack-gated (`_allow_backtracking`, `:3447`), so
-    real fails it (`emerge: there are no ebuilds to satisfy
+    Portage fails it (`emerge: there are no ebuilds to satisfy
     ">=app-misc/sousatprov-1:0/1="`, rc 1 -- Playground-established,
     bed-confirmed) and so does this port."""
     root = _b1_root(
@@ -20883,7 +20883,7 @@ def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     on the `mmprov` shape that means the same empty replace set. On the
     `mmprov` shape the pubgrub walk produces the same slot-1 `Upgrade`
     entry, and the bridge schedules no consumer rebuild, like the
-    default path after the #252 probe (real 3.0.82.2 merges only
+    default path after the #252 probe (Portage 3.0.82.2 merges only
     `mmprov-3`; see the entry pin above for the probe citation).
     (`resolvo` does not resolve the direct upgrade arg at all here --
     an engine-side gap below this layer, reported for filing; the
@@ -20932,7 +20932,7 @@ def test_oracle_slotop_synth_oldbest_marks_repo_drifted_rebuild(
     in `testrepo`) agrees on the slot -- the `--solver=pubgrub` bridge
     (which keeps the pre-S3 synthesiser) must still print the `[1.0]`
     old-best bracket on the `R` row, exactly like the default solver
-    already does on this shape since #247. Grounded in real
+    already does on this shape since #247. Grounded in Portage's
     `lib/_emerge/resolver/output.py:721-731` (vendored 3rdparty/portage
     3.0.82.2, byte-identical to host `/usr/sbin/emerge` 3.0.82.2 at
     these lines: the `cpv_exists` arm shows the installed instance as
@@ -20981,11 +20981,11 @@ def test_oracle_prune_rebuilds_restart_adds_passes(
     emerge_binary, fixture_env, tmp_path
 ):
     """#213 (v2 #24d): a slot-operator replace set meeting missed updates
-    restarts with `config["prune_rebuilds"]` (real `_resolve`,
+    restarts with `config["prune_rebuilds"]` (Portage `_resolve`,
     `depgraph.py:5763-5780`). Installed `pprov-1` (`0/1`) + `pcons-1`
-    bound `>=app-misc/pprov-1:0/1=` (real's recorded form; the live
+    bound `>=app-misc/pprov-1:0/1=` (Portage's recorded form; the live
     ebuild carries bare `:=`); the tree holds `pprov-2` (`0/2`, the
-    subslot-bump target). Real's same-slot update probe
+    subslot-bump target). Portage's same-slot update probe
     (`_slot_operator_update_probe`, `depgraph.py:2576`) schedules the
     `pcons-1` rebuild, while the solved `dev-libs/btparent` trio
     (backtracking masks `bttarget-2.0`) leaves missed updates behind
@@ -20993,7 +20993,7 @@ def test_oracle_prune_rebuilds_restart_adds_passes(
     clears the replace set and re-resolves: both rebuilds come back
     (genuine ABI rebuilds -- the re-walk re-schedules them and
     `_eliminate_rebuilds` keeps them), so the merge list is unchanged
-    but the run takes two extra passes. MATCHES real since #213: the
+    but the run takes two extra passes. MATCHES Portage since #213: the
     one allowed S0 probe (single `podman run --entrypoint /bin/bash
     localhost/test-portuale:latest` [the image's portage is 3.0.81.3; a
     vendored 3.0.82.2 ResolverPlayground run agrees on the rows], the staged
@@ -21065,7 +21065,7 @@ def test_oracle_prune_rebuilds_restart_adds_passes(
 def test_oracle_prune_rebuilds_conflict_missed_updates(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#253 half 1: the prune trigger chains real's conflict half of
+    """#253 half 1: the prune trigger chains Portage's conflict half of
     missed updates (`_get_missed_updates`, `depgraph.py:1529-1565`,
     the `:1533-1536` chain of `_runtime_pkg_mask` with
     `_conflict_missed_update`). Installed `pprov-1` (`0/1`) + `pcons-1`
@@ -21077,7 +21077,7 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     `_conflict_missed_update` -- no backtracking mask exists anywhere,
     so portuale's mask-half-only predicate (`backtrack_missed_updates`,
     the trigger at the #213 site) under-fires the prune (safe
-    direction: same rows, fewer passes). Probed on real 3.0.82.2, host
+    direction: same rows, fewer passes). Probed on Portage 3.0.82.2, host
     staged-fixture probe 2026-09-29 (PORTAGE_CONFIGROOT at the fixture
     tree, ad-hoc ROOT with EAPI-bearing vdb for `pprov-1`/`pcons-1`,
     neutral `make.local` shadow in a mount namespace; argv `--pretend
@@ -21093,7 +21093,7 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     conflict-source-only lock), and the same `causing rebuilds` block
     (`pprov-2` rebuilds `pcons-1`). Portuale prints no timing line
     under `--pretend`, so the prune is pinned through `--json`
-    (`backtrack.restarts == 3`, real's 3/20); without the predicate
+    (`backtrack.restarts == 3`, Portage's 3/20); without the predicate
     chain the same run settles after 1 restart. The `--backtrack=0`
     control takes no restart at all (the trigger stays gated there,
     like the probe) while the rows -- including the `WARNING` -- are
@@ -21161,8 +21161,8 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     assert by_cp[("app-misc", "pcons")]["slot_operator_rebuild"] is True
     assert by_cp[("app-misc", "pprov")]["outcome"] == "upgrade"
     # --backtrack=0 control: the trigger stays off (no prune restart,
-    # no consumer rebuild) and, since #270, real's all-or-nothing rule
-    # holds: the provider update is withheld too (real 3.0.82.2, same
+    # no consumer rebuild) and, since #270, Portage's all-or-nothing rule
+    # holds: the provider update is withheld too (Portage 3.0.82.2, same
     # probe with `--backtrack=0`: rc 0, `backtrack: 0/0`, three rows --
     # no pprov/pcons at all) while the direct solve reports the
     # conflict (WARNING persists, no !!! tail). The full row set and the
@@ -21204,18 +21204,18 @@ def test_oracle_270_bt0_provider_update_is_atomic(
     emerge_binary, fixture_env, tmp_path
 ):
     """#270 (flipped from strict xfail by S2): the #253 `pprov`/`pcons` cell
-    at `--backtrack=0`. Real 3.0.82.2 withholds the provider update
+    at `--backtrack=0`. Portage 3.0.82.2 withholds the provider update
     (rc 0, `backtrack: 0/0`): the in-pass
     `_solve_non_slot_operator_slot_conflicts` (`depgraph.py:1774-2115`)
     removes `pprov-2` and keeps installed `pprov-1`, so only
     `[slotconflicttarget-1.0, oldconsumer-1.0, newconsumer-1.0]` merge, and
     the WARNING carries a second block for `app-misc/pprov:0`. Under
-    `--update` real's `_want_installed_pkg` returns True (selective mode,
+    `--update` Portage's `_want_installed_pkg` returns True (selective mode,
     `depgraph.py:7297-7298`), so `is_arg_parent` is false and the
     installed instance stays. Portuale used to exempt the built
     slot-operator atom as a rebuild trigger even at bt0, where the rebuild
-    scan never runs, so it merged `U pprov-2` alone. Grounded on real
-    Portage 3.0.82.2, container probe 2026-10-02 (staged fixture tree,
+    scan never runs, so it merged `U pprov-2` alone. Grounded on Portage
+    3.0.82.2, container probe 2026-10-02 (staged fixture tree,
     ad-hoc ROOT with EAPI-bearing vdb, `--ignore-default-opts --pretend
     --color=n`; captures in portuale
     `LLM/evidence/2026-10-02-270/`)."""
@@ -21250,15 +21250,15 @@ def test_oracle_270_bt0_provider_update_is_atomic(
 
 def test_oracle_270_bt0_warning_block_shape(emerge_binary, fixture_env, tmp_path):
     """#270 S3: the WARNING of the #253 `pprov`/`pcons` cell at `--backtrack=0`
-    has real's shape (container probe 2026-10-02, real 3.0.82.2;
+    has Portage's shape (container probe 2026-10-02, Portage 3.0.82.2;
     `LLM/evidence/2026-10-02-270/real/A-pprov-req-bt0.err`; portuale
-    prints it on stdout, real on stderr -- a standing difference): the
-    `slotconflicttarget:0` block first (real renders its
+    prints it on stdout, Portage on stderr -- a standing difference): the
+    `slotconflicttarget:0` block first (Portage renders its
     `_conflict_missed_update` dict in insertion order,
     `depgraph.py:1529-1565`), then `app-misc/pprov:0`, whose parent
     `pcons-1` is the installed node (`installed in '<root>'`: no merge
     entry replaces it), and whose `^` marker line covers only the
-    mismatching `:0/1=` span -- real's `format_unmatched_atom` marks the
+    mismatching `:0/1=` span -- Portage's `format_unmatched_atom` marks the
     operator and version only when the missed package fails the version
     part (`output.py:925-929`; `pprov-2` satisfies `>=pprov-1`)."""
     installed = [
@@ -21296,7 +21296,7 @@ def test_oracle_270_bt0_provider_not_requested_is_already_atomic(
     the rows stay atomic (no provider/consumer rebuild rows). Same
     installed shape as test 1 (`pprov-1`/`pcons-1` with
     `>=pprov-1:0/1=`), but args request only `pcons` + the two
-    slotconflict consumers (NOT `pprov`). Grounded on real Portage 3.0.82.2
+    slotconflict consumers (NOT `pprov`). Grounded on Portage 3.0.82.2
     container probe 2026-10-02, identical recipe to test 1."""
     installed = [
         ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
@@ -21335,13 +21335,13 @@ def test_oracle_270_mm_cells_agree_at_bt0(
     emerge_binary, fixture_env, tmp_path
 ):
     """#270 neutral guard: `mmprov`/`mmcons` cells (both at bt0) already
-    agree between real and portuale. Cell 1: request mmcons (not mmprov)
+    agree between Portage and portuale. Cell 1: request mmcons (not mmprov)
     with the two slotconflict consumers, expect the same 3 rows. Cell 2:
     request both mmprov and mmcons, expect only the mmprov upgrade row.
     Installed: `mmprov-1` slot `0/1`, `mmprov-2` slot `1/1`, `mmcons-1`
     slot `0` with RDEPEND `app-misc/mmprov:0/1=` (copy from
     test_oracle_slotop_update_probe_mismatched_upgrade_entry). Grounded on
-    real Portage 3.0.82.2 container probe 2026-10-02, identical recipe to
+    Portage 3.0.82.2 container probe 2026-10-02, identical recipe to
     tests 1 and 2."""
     installed = [
         ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
@@ -21397,7 +21397,7 @@ def test_oracle_288_argument_pin_vetoes_the_update_probe(
     emerge_binary, fixture_env, tmp_path
 ):
     """#288 pin: `=app-misc/mmprov-1 app-misc/mmcons` under
-    `--update --deep` merges NOTHING in real 3.0.82.2 (rc 0,
+    `--update --deep` merges NOTHING in Portage 3.0.82.2 (rc 0,
     `backtrack: 0/20`): its update probe refuses every slot-1 provider
     candidate against the ARGUMENT, a recorded parent
     (`_slot_operator_check_reverse_dependencies`: `candidate package does
@@ -21406,7 +21406,7 @@ def test_oracle_288_argument_pin_vetoes_the_update_probe(
     `mmprov:0/1=`, tree `mmprov-3` `1/2`). Portuale used to merge
     `[ebuild U] mmprov-3 [2]` + `[ebuild rR] mmcons-1` here because the
     probe's parent map only held installed parents. Grounded on the
-    container probe `D-arg-pin` (real 3.0.82.2, 2026-10-03; capture
+    container probe `D-arg-pin` (Portage 3.0.82.2, 2026-10-03; capture
     `LLM/evidence/2026-10-03-288/`)."""
     installed = [
         ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
@@ -21443,11 +21443,11 @@ def test_oracle_290_pulled_in_provider_rebuilds_installed_consumer(
 ):
     """#290 pin: the #253 `pprov`/`pcons` cell with the provider NOT
     requested (`pcons` + the two slotconflict consumers), at
-    `--backtrack` 3 and 20. Real 3.0.82.2 pulls `pprov-2` in through the
+    `--backtrack` 3 and 20. Portage 3.0.82.2 pulls `pprov-2` in through the
     `:0/1=` slot-operator edge and rebuilds the installed consumer
     (`r  U pprov-2 [1]`, `rR pcons-1`) next to the slotconflict rows, and
     prints the "causing rebuilds" block (`pprov-2` -> `pcons-1`). Grounded
-    on the container probe `B-pprov-notreq-bt3/bt20` (real 3.0.82.2)."""
+    on the container probe `B-pprov-notreq-bt3/bt20` (Portage 3.0.82.2)."""
     installed = [
         ("app-misc", "pprov", "1", "0/1", {"EAPI": "8"}),
         (
@@ -21496,11 +21496,11 @@ def test_oracle_slotop_required_use(
     """Upstream `test_slot_operator_required_use.py` (bug 523048,
     `emerge app-misc/A`): installed `A-1` + `soreqb-0` (`A:0/1=`,
     `IUSE x y`, `USE=x`); tree `soreqb-0` adds `REQUIRED_USE || ( x y )`
-    (unsatisfied at default USE). Real fails with
+    (unsatisfied at default USE). Portage fails with
     `required_use_unsatisfied=[soreqb:0]`. MATCHES since #24 S3: the
     rebuilt consumer is a walked node, so ordinary selection runs its
     `REQUIRED_USE` check -- the post-pass synthesiser built the entry
-    without ever consulting it, and merged a package real refuses.
+    without ever consulting it, and merged a package Portage refuses.
     Renamed: fixture `app-misc/B` is taken (no IUSE). (`A-2`'s fixture
     `PDEPEND` pulls `B-0 N` along; incidental.)"""
     root = _b1_root(
@@ -21531,8 +21531,8 @@ def test_oracle_slotop_bdeps(
     ad-hoc ROOT so `--usepkg` falls back to ebuilds -- the "reject the
     stale binaries" half is v2 `#24c`): installed `go-1.14.12`
     (`0/1.14.12`) + `buildah`/`libpod` (`BDEPEND go:0/1.14.12=`);
-    world both consumers. Real merges
-    `[go-1.15.5, buildah-1.16.1, libpod-2.1.0]` twice. MATCHES real on
+    world both consumers. Portage merges
+    `[go-1.15.5, buildah-1.16.1, libpod-2.1.0]` twice. MATCHES Portage on
     both commands (the scan reads `BDEPEND` from the vdb)."""
     installed = [
         (
@@ -21570,13 +21570,13 @@ def test_oracle_slotop_bdeps(
 def test_oracle_bdeps_default_of_an_installed_parent_drives_dependency_updates(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Backlog #66 pin (withdrawn: not a bug, fixed by #63) -- real's
+    """Backlog #66 pin (withdrawn: not a bug, fixed by #63) -- Portage's
     `bdeps` parameter, both ways, on a shape where it is observable.
 
     Installed `dev-libs/bdepcascadepkg-1.0` carries
     `BDEPEND=">=dev-libs/bdepcascadedep-2"`, with
     `bdepcascadedep-1.0` installed and `bdepcascadedep-2.0` in the tree.
-    Real `create_depgraph_params.py:97-103` sets `bdeps="auto"` only when
+    Portage `create_depgraph_params.py:97-103` sets `bdeps="auto"` only when
     `--with-bdeps` is unset and `--usepkg` is not in effect
     (`--getbinpkg` implies `--usepkg`, `actions.py:3719-3720`); with
     `bdeps` neither `y` nor `auto`, `_add_pkg_deps`
@@ -21586,12 +21586,12 @@ def test_oracle_bdeps_default_of_an_installed_parent_drives_dependency_updates(
     original #66 report read the pre-#63 option mismatch as "built deps
     are optional", which would have meant the update never happens.
 
-    Oracle: container fixture-oracle capture 2026-09-16 (real 3.0.82.2,
+    Oracle: container fixture-oracle capture 2026-09-16 (Portage 3.0.82.2,
     staged `/tmp/fx66` tree; the re-probe of the same rule on the host is
     in `docs/history/evidence/2026-09-16-post63-probes/`), six cells:
     default `-uDN`, `--with-bdeps=y --usepkg` -> `dep-2.0` merged;
     `--usepkg`, `--getbinpkg`, `--with-bdeps-auto=n`, `--with-bdeps=n`
-    -> no merge list. Every cell MATCHES real, before any code change --
+    -> no merge list. Every cell MATCHES Portage, before any code change --
     the pin exists so the rule cannot silently regress."""
     root = _b1_root(
         tmp_path,
@@ -21641,14 +21641,14 @@ def test_oracle_slotop_rebuild_scan_honours_with_bdeps(
 
     Installed `dev-libs/provpkg-1.0` (`SLOT=0/1`) is upgraded to the
     tree's `2.0` (`0/2`); five installed consumers each bind it through
-    one key with real's versioned built atom
-    (`>=dev-libs/provpkg-1.0:0/1=`, the shape real's vdb records for a
+    one key with Portage's versioned built atom
+    (`>=dev-libs/provpkg-1.0:0/1=`, the shape Portage's vdb records for a
     `:=` dep). Names `cons{rdep,dep,bdep,pdep,idep}`; world holds all
     six, so the `@world` shape walks every consumer while the
     `--oneshot consdep` shape walks only the argument plus the runtime
     world.
 
-    Real 3.0.82.2 source: `create_depgraph_params.py:97-103` sets
+    Portage 3.0.82.2 source: `create_depgraph_params.py:97-103` sets
     `bdeps` from `--with-bdeps`/`--with-bdeps-auto`/`--usepkg`;
     `depgraph.py:4194-4247` empties a built package's
     `DEPEND`/`BDEPEND` first; `:4277/4287` mark them `optional`;
@@ -21742,7 +21742,7 @@ def test_oracle_slotop_rebuild_scan_honours_with_bdeps(
         ], name
     # Argument shape, bdeps off: a DEPEND/BDEPEND argument produces no
     # provider/consumer merge at all (the provider is only reachable
-    # through the build-time dep) -- MATCHES real.
+    # through the build-time dep) -- MATCHES Portage.
     for name in ("consdep", "consbdep"):
         out = run(
             "--update",
@@ -21767,18 +21767,18 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
 
     Same matrix as `test_oracle_slotop_rebuild_scan_honours_with_bdeps`
     above (installed `dev-libs/provpkg-1.0` `0/1`, tree `2.0` `0/2`, five
-    installed consumers bound through one key each with real's versioned
+    installed consumers bound through one key each with Portage's versioned
     built atom `>=dev-libs/provpkg-1.0:0/1=`), except every installed row
     also carries the vdb `EAPI` file the container bed stages
     (`differential-test-bed/layers/l0-fixture-oracle/slotop-bdeps/vdb`;
     the cells run with `FX_SLOTOP_BDEP=1 FX_HOST_ROOTS=1` per
     `differential-test-bed/atomlists/l0-fixture-oracle-slotop.txt`).
-    Without that file real reads the installed EAPI as `"0"`
+    Without that file Portage reads the installed EAPI as `"0"`
     (`vdb`/`vartree.py:1054-1055`, no `slot_operator` support) and the
     dynamic-deps overlay stands down -- which is why the EAPI-less twin
     above cannot see this regression.
 
-    Real 3.0.82.2 upgrades the provider and rebuilds the consumers in
+    Portage 3.0.82.2 upgrades the provider and rebuilds the consumers in
     the `@world` shape (Total 9; 7 with `--usepkg`): the overlay's
     recorded atoms (`FakeVartree._apply_dynamic_deps`,
     `lib/_emerge/FakeVartree.py:146-191`) do not withhold because the
@@ -21874,7 +21874,7 @@ def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
 ):
     """Backlog #67 S3: a profile level's `VIDEO_CARDS="-* intel"` cancels
     both the parent levels' `video_cards_*` flags and the ebuild's own
-    `+video_cards_dummy` IUSE default (real `config.py:2925`'s
+    `+video_cards_dummy` IUSE default (Portage `config.py:2925`'s
     `-<prefix>_*` arm running over the same accumulated set the IUSE
     defaults fed). Fixture `dev-libs/videodrv` declares
     `IUSE="+video_cards_dummy video_cards_intel"`; the installed vdb
@@ -21883,7 +21883,7 @@ def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
 
     The checked-in shared profile is untouched: the test copies the whole
     fixture tree and appends the wildcard line to the copied leaf profile.
-    Container oracle (real 3.0.82.2, 2026-09-16): without the append both
+    Container oracle (Portage 3.0.82.2, 2026-09-16): without the append both
     sides print `[ebuild R] dev-libs/videodrv-1.0 … VIDEO_CARDS="dummy*
     -intel*"`; with it neither merges anything.
     """
@@ -21913,7 +21913,7 @@ def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
     env["DISTDIR"] = str(cfg / "distfiles")
 
     # Inverse cell: the stock profile leaves the `+` IUSE default
-    # standing, exactly as real on the same tree.
+    # standing, exactly as Portage on the same tree.
     inverse = _run(
         [str(emerge_binary)],
         ["--pretend", "--newuse", "--oneshot", "dev-libs/videodrv"],
@@ -21939,16 +21939,16 @@ def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
 def test_oracle_binnew_rejects_a_binary_missing_the_ebuilds_iuse_flag(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Backlog #69 S2: real's binary rejection gate
+    """Backlog #69 S2: Portage's binary rejection gate
     (`reinstall_use or (not installed and respect_use)`,
     `depgraph.py:8259-8294`) with `_reinstall_for_flags`' IUSE-set arm.
     Installed `dev-libs/binnew-1.0` and the `$PKGDIR` binary agree
     (`IUSE=foo`, baked `USE=foo`, BUILD_TIME 1000); the tree ebuild
     gained `newflag`, so only the ebuild's IUSE knows it.
 
-    Real 3.0.82.2 oracle (container, real-built binary pipeline:
+    Portage 3.0.82.2 oracle (container, real-built binary pipeline:
     `emerge --buildpkgonly` + `--usepkgonly`, then the ebuild gains the
-    flag -- the committed crafted `.tbz2`s are portuale-only, real's
+    flag -- the committed crafted `.tbz2`s are portuale-only, Portage's
     local bintree rejects them):
 
     - `--usepkg` / `--getbinpkg`: respect-use auto rejects the binary ->
@@ -22009,10 +22009,10 @@ def test_oracle_blocker_replaced_version_satisfied_and_unsatisfied_twin(
 
     T6 correction (2026-09-17): the satisfied half here is *not* the host
     shape. `dev-libs/bparent` soft-blocks `<dev-libs/blocked-2.0`;
-    installed `blocked` is `1.0`. Real `_validate_blockers`
+    installed `blocked` is `1.0`. Portage `_validate_blockers`
     (`depgraph.py:9095-9255`) drops an installed match replaced in its
     slot by a merge-bound entry, and this run has no edge ordering the
-    replacement behind the owner, so real merges the replacement first
+    replacement behind the owner, so Portage merges the replacement first
     and prints no block row at all (B0b cell p1, `differential-test-bed/findings/l0.md`
     "#68/#72 B0b"). The *host* shape is B0b cell p2c -- the replacement
     version-pins its BDEPEND on the owner, forcing the owner's merge
@@ -22021,9 +22021,9 @@ def test_oracle_blocker_replaced_version_satisfied_and_unsatisfied_twin(
 
     With the replacement suppressed (the twin: an installed `bconsumer`
     pins `=dev-libs/blocked-1.0`) the walked consumer makes the block
-    unresolved. Container oracle, real 3.0.82.2 (2026-09-16):
+    unresolved. Container oracle, Portage 3.0.82.2 (2026-09-16):
     `--dynamic-deps=n` retains the pin, `blocked-1.0` survives (as a
-    `flip` reinstall) and real prints `[blocks B]` + `Conflict: 1 block
+    `flip` reinstall) and Portage prints `[blocks B]` + `Conflict: 1 block
     (1 unsatisfied)` and exits 1.
     """
     # p1 shape: bconsumer tracks the plain `dev-libs/blocked`, so the
@@ -22089,7 +22089,7 @@ def test_oracle_77_nomerge_owner_removal_row(emerge_binary, fixture_env, tmp_pat
     walked still uninstall-orders that owner against its merge-bound
     match.
 
-    Real `_validate_blockers` scans **every** installed package's
+    Portage `_validate_blockers` scans **every** installed package's
     recorded runtime deps (`Package._runtime_keys`, `depgraph.py:
     8919-9078`) and registers their blockers with the vardb `Package` as
     parent; the nomerge arm (`parent.operation == "nomerge"`,
@@ -22099,14 +22099,14 @@ def test_oracle_77_nomerge_owner_removal_row(emerge_binary, fixture_env, tmp_pat
     merge-bound `nomtarget-1.5`, and `nomowner` is not in @world and no
     graph entry depends on it.
 
-    Container oracle, real 3.0.82.2, `differential-test-bed/findings/l0.md` "#77 A0" cells
-    n1 (`-p`), n2 (`-pv`), n3 (`--columns`) and n4 (`-q`): real's bytes
+    Container oracle, Portage 3.0.82.2, `differential-test-bed/findings/l0.md` "#77 A0" cells
+    n1 (`-p`), n2 (`-pv`), n3 (`--columns`) and n4 (`-q`): Portage's bytes
     are the `[uninstall]` row, the inline satisfied `b`, and
     `Total: 1 package (1 upgrade, 1 uninstall)` /
-    `Conflict: 1 block (all satisfied)`. Two real-vs-portuale display
+    `Conflict: 1 block (all satisfied)`. Two Portage-vs-portuale display
     cuts predate this slice and are deliberately not in these pins: the
     `-pv` per-row ` 0 KiB` size suffix (documented in `pretend.rs`'s
-    `verbose_size`) and the trailing space real leaves after a plain `-p`
+    `verbose_size`) and the trailing space Portage leaves after a plain `-p`
     `USE="…"` field. n5 (`--tree`) belongs to Phase C; the n6 control
     (owner set-reachable -> `[blocks B]`, rc 1) is pinned below on a
     test-local root, because the shared fixture world cannot carry
@@ -22141,7 +22141,7 @@ def test_oracle_77_nomerge_owner_removal_row(emerge_binary, fixture_env, tmp_pat
         "Conflict: 1 block (all satisfied)",
     ], result.stdout
 
-    # n3: --columns suppresses the satisfied rows (real `output.py:120`).
+    # n3: --columns suppresses the satisfied rows (Portage `output.py:120`).
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--columns", "=dev-libs/nomtarget-1.5"],
@@ -22212,10 +22212,10 @@ def test_oracle_80_unresolved_scan_collected_row_has_a_trailing_home(
 ):
     """Backlog #80 (A0 controls n1b/n6b): an unresolved row of a
     scan-collected blocker owner -- the owner is a world member (so it
-    is a digraph node with parents and real marks the block unresolved)
+    is a digraph node with parents and Portage marks the block unresolved)
     but never a graph argument, so the row has no entry to hang on.
 
-    Real 3.0.82.2 still reports it: `[blocks B]` in the trailing group,
+    Portage 3.0.82.2 still reports it: `[blocks B]` in the trailing group,
     `Conflict: 1 block (1 unsatisfied)`, rc 1 (host oracle, hermetic
     fixture root with `dev-libs/nomowner` world-listed, 2026-09-18;
     the same shape on a test-local root is byte-identical). Before the
@@ -22276,19 +22276,19 @@ def test_oracle_86_installed_metadata_comes_from_the_recorded_repo(
 ):
     """Backlog #86 S0/S1: the live ebuild metadata of an installed
     package comes from its vdb-recorded `repository`, never from a
-    repo-priority search (real `FakeVartree._aux_get_wrapper`,
+    repo-priority search (Portage `FakeVartree._aux_get_wrapper`,
     `FakeVartree.py:136`, `myrepo=pkg.repo`).
 
     `tworepoowner-1.0` exists in both repos: the overlay copy (priority
     10) carries `RDEPEND="!<dev-libs/tworepotarget-2.0"`, the testrepo
     copy carries no blocker, and the installed instance records
     `repository=testrepo`. Resolving `=dev-libs/tworepotarget-1.5`
-    (which replaces installed `tworepotarget-1.0` in-slot): real
+    (which replaces installed `tworepotarget-1.0` in-slot): Portage
     3.0.82.2 reads the recorded repo's blocker-free view and prints
     just the upgrade, rc 0 (host oracle, hermetic fixture root,
     2026-09-18). Before the fix portuale searched the repos, read the
     overlay copy, and printed a spurious `[uninstall]` +
-    `[blocks b]` pair for a blocker real never sees -- that output is
+    `[blocks b]` pair for a blocker Portage never sees -- that output is
     the regression this pin guards.
     """
     result = _run(
@@ -22310,13 +22310,13 @@ def test_oracle_76_wait_follows_the_selected_disjunctive_branch(emerge_binary, f
     dev-libs/absent )"` has only the owner-merge branch satisfiable, so
     the group collapses to it; `disjowner-1.1`'s own
     `RDEPEND="!<dev-libs/disjtarget-2.0"` soft-blocks the installed
-    `disjtarget-1.0` that the merge replaces in-slot. Real's serializer
+    `disjtarget-1.0` that the merge replaces in-slot. Portage's serializer
     is stuck on the kept edge and appends the solved blocker after
-    `disjtarget-2.0` (container oracle, real 3.0.82.2, host-exact roots
+    `disjtarget-2.0` (container oracle, Portage 3.0.82.2, host-exact roots
     per `differential-test-bed/findings/l0.md` "#76 B0" q1; the sys.settrace dump shows
     the retlist's satisfied `Blocker` and
     `scheduled_uninstalls=[disjtarget-1.0]`). The same shape under the
-    bed's default `ROOT=$FX` splits real's `BDEPEND` across two trees
+    bed's default `ROOT=$FX` splits Portage's `BDEPEND` across two trees
     (the B0b staging artifact), so the permanent bed cell lives in
     `differential-test-bed/atomlists/l0-fixture-oracle-host.txt` and is run with
     `FX_HOST_ROOTS=1`; this pin uses the shared fixture root, where
@@ -22368,14 +22368,14 @@ def test_oracle_81_tree_only_satisfied_row_from_the_stuck_serializer(
     (`merge_order::tree_solved_replacements`), hanging the row under the
     replacement exactly like an Inline row.
 
-    Host oracle, real 3.0.82.2, 2026-09-19 (row bytes, nesting, rc 0,
+    Host oracle, Portage 3.0.82.2, 2026-09-19 (row bytes, nesting, rc 0,
     `-v` counters) and bed `l0-fx-20260924T090502Z` (full walk
-    sequence): real leads with the merge owner, interleaves `newpkg`
+    sequence): Portage leads with the merge owner, interleaves `newpkg`
     second, trails the nested `[nomerge]` owner occurrence with the
     block + replacement nested under it. Portuale walks the tree-mode
     serialization (`merge_order::tree_display_order`, #131 S1) instead
     of the flat order, so the whole list below is byte-identical to
-    real modulo real's ` to <root>/` suffix.
+    Portage modulo Portage's ` to <root>/` suffix.
     """
     args = [
         "--pretend",
@@ -22433,7 +22433,7 @@ def test_oracle_150_tree_shared_child_nests_without_a_nomerge_ancestor(
 
     `-D dev-libs/slotusegroup` pulls two same-slot instances of
     `dev-libs/slotusetarget` (1.0 via `slotusex`/`slotusey`, 2.0 via
-    `slotuseplain`; flat list, rc and notice byte-real since #148). Real
+    `slotuseplain`; flat list, rc and notice byte-identical to Portage since #148). Portage
     nests `slotusetarget-1.0` directly under `slotusex`'s first
     occurrence; portuale used to re-descend the already-displayed
     `slotusex` as a `[nomerge]` ancestor between the 2.0 and 1.0 rows,
@@ -22443,8 +22443,8 @@ def test_oracle_150_tree_shared_child_nests_without_a_nomerge_ancestor(
     child nests there with no ancestor line.
 
     Bed `l0-fx-20260924T090502Z`, cell `--tree -D dev-libs/slotusegroup`
-    (real 3.0.82.2): the list below is byte-identical to real modulo
-    real's ` to <root>/` suffix. Flat output is #148's standing pin and
+    (Portage 3.0.82.2): the list below is byte-identical to Portage modulo
+    Portage's ` to <root>/` suffix. Flat output is #148's standing pin and
     must not move (asserted minimally here via the missing `[nomerge]`).
     """
     result = _run(
@@ -22483,9 +22483,9 @@ def test_oracle_87_rdepend_disjunctive_wait_is_default_bed_covered(
     dev-libs/absent )"` collapses to the owner-merge branch like q1's
     BDEPEND group, and `rdisjowner-1.1`'s own
     `RDEPEND="!<dev-libs/rdisjtarget-2.0"` soft-blocks the installed
-    `rdisjtarget-1.0` -- real appends the solved blocker after the
+    `rdisjtarget-1.0` -- Portage appends the solved blocker after the
     replacement with `Conflict: 1 block (all satisfied)`, rc 0 (host
-    oracle, real 3.0.82.2, 2026-09-18: byte-identical to portuale's
+    oracle, Portage 3.0.82.2, 2026-09-18: byte-identical to portuale's
     output below). Unlike q1's BDEPEND, the RDEPEND group resolves
     against the target root, so the shape survives the default bed's
     `ROOT=$FX` split -- its permanent bed cell lives in the default
@@ -22523,14 +22523,14 @@ def test_oracle_87_rdepend_disjunctive_wait_is_default_bed_covered(
     """Backlog #75 C0/C1/C3: the two deterministic tree-mode blocker
     layouts.
 
-    Real `_tree_display` (`output_helpers.py:341-407`) rewrites the
+    Portage `_tree_display` (`output_helpers.py:341-407`) rewrites the
     blocker edges before laying the tree out: a satisfied row resolved
     by a removal becomes `Package -> Blocker -> Uninstall` (`:377-390`),
     with the display list walked from the reversed retlist. u1 (merging
     owner) and n5 (#77's absent-owner nomerge arm) are the two shapes
-    whose flat merge order already coincides with real's, so their tree
+    whose flat merge order already coincides with Portage's, so their tree
     bytes are deterministic; the container captures are
-    `differential-test-bed/findings/l0.md` "#75 C0" (u1/n5), and portuale omits real's
+    `differential-test-bed/findings/l0.md` "#75 C0" (u1/n5), and portuale omits Portage's
     `to <root>/` suffix on a non-"/" ROOT like every other fixture pin.
 
     Not pinned here, by C2's stop (`#75 C2`, backlog #81): p2b's
@@ -22578,11 +22578,11 @@ def test_oracle_82_tree_edges_follow_the_resolved_dep_target(emerge_binary, fixt
     explicitly while the sibling slot `:1` is reached only through
     `dev-libs/slotorderb`. `required_by` is cp-keyed, so before #82 the
     deps-less-entry fallback gave `slotorderdual-2.0` a second, phantom
-    owner (`slotorderb`) and the tree nested it there. Real's digraph has
+    owner (`slotorderb`) and the tree nested it there. Portage's digraph has
     one edge per atom (`_select_pkg_highest_available`), so it nests
     `2.0` directly under the root.
 
-    Container oracle, real 3.0.82.2, byte-identical apart from real's
+    Container oracle, Portage 3.0.82.2, byte-identical apart from Portage's
     `to <root>/` suffix on a non-"/" ROOT (the standing fixture cut):
     `differential-test-bed/findings/l0.md` "#82".
     """
@@ -22604,23 +22604,23 @@ def test_oracle_82_tree_edges_follow_the_resolved_dep_target(emerge_binary, fixt
 def test_oracle_85_unqualified_atom_collapses_onto_the_slot_qualified_target(
     emerge_binary, fixture_env
 ):
-    """Backlog #85 (S1b, not the #17 wall): real's `_minimize_children`
+    """Backlog #85 (S1b, not the #17 wall): Portage's `_minimize_children`
     (`depgraph.py:4751-4856`).
 
     `dev-libs/treeslotuser` RDEPENDs `treeslotpkg:0` (selects 1.9),
     `treeslotparent` (which pulls `:1`, i.e. 1.10) and the bare
     `dev-libs/treeslotpkg` (which alone would select 1.10, the
-    vercmp-highest). Real eliminates the redundant 1.10 selection -- the
+    vercmp-highest). Portage eliminates the redundant 1.10 selection -- the
     `:0` atom matches only 1.9 while the bare atom matches both -- so
-    the scheduler graph holds no `user → 1.10` edge (real's own
+    the scheduler graph holds no `user → 1.10` edge (Portage's own
     `--debug` digraph dump shows only the 1.9 and parent edges), the
     bias parent-count ties 1-1, and the merge order is
     `1.9, 1.10, treeslotparent, treeslotuser` by discovery order.
     Portuale's per-atom vercmp-highest ranking added the extra edge,
     doubling 1.10's parent count and flipping the pair to `1.10, 1.9`.
 
-    Host oracle, real 3.0.82.2, 2026-09-18: byte-identical apart from
-    real's `to <root>/` suffix and ` 0 KiB` per-row decorations (the
+    Host oracle, Portage 3.0.82.2, 2026-09-18: byte-identical apart from
+    Portage's `to <root>/` suffix and ` 0 KiB` per-row decorations (the
     standing fixture cuts). The same shape in `--tree` nests
     `treeslotparent → 1.10` with 1.9 as `treeslotuser`'s own child,
     because the display list is the reversed merge order.
@@ -22681,7 +22681,7 @@ def _b0b_write_ebuild(repo, cat, pn, ver, body):
     """Write one ad-hoc ebuild plus its `metadata/md5-cache` entry into a
     copied fixture repo.
 
-    Real's md5-cache stores every scalar value **unquoted**
+    Portage's md5-cache stores every scalar value **unquoted**
     (`KEYWORDS=amd64`, `RDEPEND=!<dev-libs/blocked-2.0`), and portuale's
     visibility check reads `KEYWORDS`/`SLOT` straight out of that entry: a
     quoted `KEYWORDS` hides the candidate entirely (a scratch probe hit
@@ -22764,7 +22764,7 @@ def test_oracle_b2c_uninstall_resolved_block_sees_the_complete_mode_sets(
     emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #68/#72 B2c, B0 u4: when a block resolves by an uninstall,
-    real re-runs `_serialize_tasks` in complete mode
+    Portage re-runs `_serialize_tasks` in complete mode
     (`depgraph.py:10365-10383`), which walks `@selected ∪ @profile ∪
     @system`. Installed `bconsumer` (world) depends on installed
     `blocked-1.0`, so the retry makes it a digraph node with parents and
@@ -22773,7 +22773,7 @@ def test_oracle_b2c_uninstall_resolved_block_sees_the_complete_mode_sets(
     #68 S0 cell d control: no retry parent) the block stays satisfied --
     `b`, rc 0.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0"
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0"
     u4 and "#68 S0" cell d).
     """
     root = _b1_root(
@@ -22848,14 +22848,14 @@ def test_oracle_b0b_satisfied_replacement_p1_p1b_no_row(
     emerge_binary, fixture_env, fixtures_root, tmp_path
 ):
     """Backlog #68/#72 B0b cells p1/p1b: with no dependency edge from the
-    replacement to the owner, real's serializer merges the replacement
+    replacement to the owner, Portage's serializer merges the replacement
     first and removes the blocker's uninstall before it is ever scheduled,
     so no `b` row and no `Conflict:` line appear (rc 0). p1 has the owner
     merging New (`bparent-1.1`), p1b installed `bparent-1.0` upgrading to
     it; the dep-less `blocked-2.0` is the committed ebuild.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
-    p1/p1b). Real order p1b: newpkg, upgradepkg, withdeps, bparent-1.1,
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
+    p1/p1b). Portage order p1b: newpkg, upgradepkg, withdeps, bparent-1.1,
     blocked-2.0, rc 0.
     """
     configroot = _b0b_configroot(tmp_path, fixtures_root, "")
@@ -22906,11 +22906,11 @@ def test_oracle_b0b_satisfied_replacement_p2b_installed_dep_no_row(
 ):
     """Backlog #68/#72 B0b cell p2b: the replacement's plain
     `BDEPEND="dev-libs/bparent"` **is** satisfied by the installed
-    `bparent-1.0`, so real's leaf scan can ignore the satisfied edge and
+    `bparent-1.0`, so Portage's leaf scan can ignore the satisfied edge and
     select the replacement first -- no `b` row, no `Conflict:` (rc 0).
     This is the flat p2b capture the B0 stop hinged on.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
     p2b).
     """
     configroot = _b0b_configroot(tmp_path, fixtures_root, 'BDEPEND="dev-libs/bparent"')
@@ -22938,14 +22938,14 @@ def test_oracle_b0b_satisfied_replacement_p2c_inline_row(
 ):
     """Backlog #68/#72 B0b cell p2c (the host shape): the replacement
     version-pins its `BDEPEND="~dev-libs/bparent-1.1"` on the *new* owner,
-    which the installed `bparent-1.0` does not satisfy, so real's
+    which the installed `bparent-1.0` does not satisfy, so Portage's
     serializer is stuck, schedules the blocker's uninstall and appends the
     solved blocker right after the replacement: the satisfied `b` row
     prints inline after `blocked-2.0` and counts (`Conflict: 1 block (all
     satisfied)`), rc 0.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
-    p2c): real order newpkg, upgradepkg, withdeps, bparent-1.1,
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
+    p2c): Portage order newpkg, upgradepkg, withdeps, bparent-1.1,
     blocked-2.0. Portuale's independent-package interleave differs
     (bparent-1.1 before withdeps -- the standing merge-order class); the
     row and counter bytes are the oracle's.
@@ -22979,11 +22979,11 @@ def test_oracle_b0b_satisfied_replacement_p2d_transitive_inline_row(
 ):
     """Backlog #68/#72 B0b cell p2d: the wait is **transitive** -- the
     replacement `BDEPEND`s `bmid-1.0` (New, so unsatisfied), and `bmid`
-    `RDEPEND`s `~dev-libs/bparent-1.1`. Real still reaches the stuck state
+    `RDEPEND`s `~dev-libs/bparent-1.1`. Portage still reaches the stuck state
     and prints the inline `b` row after `blocked-2.0`, rc 0.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
-    p2d): real order newpkg, upgradepkg, withdeps, bparent-1.1, bmid-1.0,
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
+    p2d): Portage order newpkg, upgradepkg, withdeps, bparent-1.1, bmid-1.0,
     blocked-2.0; `Total: 6 packages (3 upgrades, 3 new)`.
     """
     configroot = _b0b_configroot(
@@ -23015,11 +23015,11 @@ def test_oracle_b0b_satisfied_replacement_p2e_runtime_inline_row(
     emerge_binary, fixture_env, fixtures_root, tmp_path
 ):
     """Backlog #68/#72 B0b cell p2e: a plain `RDEPEND` wait behaves like
-    the build-time `BDEPEND` one -- real's leaf scan does not ignore
+    the build-time `BDEPEND` one -- Portage's leaf scan does not ignore
     `runtime` edges (only `optional`/`runtime_post` are relaxed), so the
     inline `b` row prints after `blocked-2.0`, rc 0.
 
-    Container oracle, real 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
+    Container oracle, Portage 3.0.82.2 (`differential-test-bed/findings/l0.md` "#68/#72 B0b",
     p2e).
     """
     configroot = _b0b_configroot(
@@ -23049,16 +23049,16 @@ def test_oracle_b0b_satisfied_replacement_p2e_runtime_inline_row(
 def test_oracle_blocker_nomerge_owner_set_parent(emerge_binary, fixture_env, tmp_path):
     """Backlog #73 cell g: a nomerge blocker owner that is a required-set
     member is a digraph node with parents, even though no walked entry
-    depends on it. Real `_validate_blockers` step 4 refuses to uninstall
+    depends on it. Portage `_validate_blockers` step 4 refuses to uninstall
     a digraph node with `parent_nodes` (`depgraph.py:9216-9224`), and
     `_expand_set_args(..., add_to_digraph=True)` (`:3271`) makes the
     `@world` `SetArg` that parent.
 
-    Container oracle (real 3.0.82.2, `differential-test-bed/findings/l0.md` "#73 S0" cell
+    Container oracle (Portage 3.0.82.2, `differential-test-bed/findings/l0.md` "#73 S0" cell
     g / "#73 S1"): installed `bparent` + installed `blocked-1.0`, world
     {bparent, blocked}, `--update --deep @world =dev-libs/blocked-1.5`
-    -> real prints the `[blocks B]` row and `Conflict: 1 block
-    (1 unsatisfied)` and exits 1 (the row comes from real's trailing
+    -> Portage prints the `[blocks B]` row and `Conflict: 1 block
+    (1 unsatisfied)` and exits 1 (the row comes from Portage's trailing
     `Display.blockers` group; the installed owner itself prints no
     package line). The control pins the target at the installed version
     -- no merge-bound match, #68 cell f -- and stays quiet, rc 0.
@@ -23102,8 +23102,8 @@ def test_oracle_slotop_runtime_pkg_mask(
     (`=socmeta-2`, `--backtrack 14` -- same version topology as the
     complete-graph shape but no named `socc`, so meta's `=socc-1` pin
     holds; `socc` carries the complete flavour's extra `socb` dep,
-    documented in `test_oracle_slotop_complete`). Real merges
-    `[socfoo-2, (socd-1, socc-1, socb-2), socmeta-2]`. MATCHES real
+    documented in `test_oracle_slotop_complete`). Portage merges
+    `[socfoo-2, (socd-1, socc-1, socb-2), socmeta-2]`. MATCHES Portage
     within the ambiguous middle order."""
     root = _b1_root(
         tmp_path,
@@ -23173,14 +23173,14 @@ def test_oracle_slotop_runtime_pkg_mask(
     reason="bug 743115 needs v2 `#24d` `prune_rebuilds` (a "
     "`missed_updates` accumulator clearing the replace set): with no "
     "replace set, portuale upgrades `sosetuptools` to `50.3.0` where "
-    "real holds the `46.4.0` rebuild. Compacted with a plain `soflag` "
+    "Portage holds the `46.4.0` rebuild. Compacted with a plain `soflag` "
     "for upstream's `python_targets_*` USE_EXPAND machinery.",
 )
 def test_oracle_slotop_missed_update(
     emerge_binary, fixture_env, tmp_path
 ):
     """Upstream `test_slot_operator_missed_update.py` (bug 743115,
-    `>=sopypy-7.3.2 @world -uD --backtrack 4`): real merges
+    `>=sopypy-7.3.2 @world -uD --backtrack 4`): Portage merges
     `[sopypy-7.3.2, sosetuptools-46.4.0 (rebuild, NOT the 50.3.0 "
     "upgrade), somercurial-5.5.1]`."""
     root = _b1_root(
@@ -23241,7 +23241,7 @@ def test_oracle_slotop_autounmask_ignorebuilt(
     """Upstream `test_slot_operator_autounmask.py::testSubSlot` case 2
     (`icu --oneshot --ignore-built-slot-operator-deps=y`): installed
     `icu-4.8` (`0/48`) + keyword-masked `libxml2-2.7.8` (`icu:0/48=`);
-    world `[libxml2]`. Real merges `[icu-49]`. MATCHES real (the flag
+    world `[libxml2]`. Portage merges `[icu-49]`. MATCHES Portage (the flag
     skips the scan; the masked consumer stays out). The remaining
     autounmask/keyword/binpkg cases of that file are v2 rows in
     `docs/history/024-oracle.md` (autounmask + keyword-unmask machinery)."""
@@ -23279,7 +23279,7 @@ def test_oracle_slotop_undo_unnecessary(
     """Synthetic `slotundo-unnecessary`: `souprov` upgrades `1.0`
     (`0/1`) -> `2.0` (`0/2`); `sounneed-1.0` records
     `soflag? ( souprov:0/1= )` with the flag OFF, so the dep is gone
-    from both rule-8 sides. Real `_eliminate_rebuilds` rule 8
+    from both rule-8 sides. Portage `_eliminate_rebuilds` rule 8
     (`depgraph.py:3935-3970`) demotes it: the tree
     `soflag? ( souprov:= )` use-reduced with the new node's enabled USE
     (flag off, `pkg.use.enabled`) equals the vdb string use-reduced the
@@ -23321,7 +23321,7 @@ def test_oracle_slotop_undo_unnecessary(
     assert "causing rebuilds" not in rust.stdout
 
     # `--json`: the demoted consumer is not a merge entry and the display
-    # pairs are empty (real `_compute_abi_rebuild_info` drops the edge of
+    # pairs are empty (Portage `_compute_abi_rebuild_info` drops the edge of
     # a demoted parent -- the replacement has no non-installed node to
     # point at).
     rj = _b1_run(
@@ -23343,11 +23343,11 @@ def test_oracle_slotop_undo_changed_slot_guard(
 ):
     """Synthetic `slotundo-changed-slot` (no-flag half): `souneedslot`
     is `sounneed` plus its own same-version SLOT move (tree `0/2`,
-    installed `0/1`). Real keeps the rebuild via rule 6 (installed vs
+    installed `0/1`). Portage keeps the rebuild via rule 6 (installed vs
     new slot differ) -- S4's undo must NOT over-demote a slot-moved
-    consumer. MATCHES real today (kept); guard for S4. (The flag half
+    consumer. MATCHES Portage today (kept); guard for S4. (The flag half
     is `test_oracle_slotop_undo_changed_slot_flag`; since S5 landed
-    real's rule 3, both halves keep this output -- rule 3 is
+    Portage's rule 3, both halves keep this output -- rule 3 is
     behaviour-neutral for ebuilds, see that test's docstring.)"""
     root = _b1_root(
         tmp_path,
@@ -23382,14 +23382,14 @@ def test_oracle_slotop_undo_changed_slot_flag(
 
     S2 expected a `r`-tagged provider, `rR` consumer and edge here (rule
     3 keeping the consumer in the replace set); verified live against
-    the vendored portage that this is *not* real's behaviour: with the
+    the vendored portage that this is *not* Portage's behaviour: with the
     flag the consumer's own slot move makes it a plain reinstall
     (`_changed_slot` selection), the S3 scan never puts it in the
     auto-set, `_eliminate_rebuilds` does not run, and
     `_compute_abi_rebuild_info` yields an empty `_forced_rebuilds` --
     no `r` marker, no "causing rebuilds" block. Portuale's output
     (standalone `slot_changed` trigger + `-u` provider upgrade) already
-    matched; S5 pinned it and landed real's rule 3 (`depgraph.py:
+    matched; S5 pinned it and landed Portage's rule 3 (`depgraph.py:
     3898-3899`) in its position, behaviour-neutral for ebuilds (rule 6
     is the equivalent -- see `docs/history/024-oracle.md`'s S2 correction)."""
     root = _b1_root(
@@ -23460,7 +23460,7 @@ def test_oracle_slotop_undo_cascade(
     """Synthetic `slotundo-cascade`: a522084 plus the consumer's own
     tree `SLOT` bumped (`soccascb` tree `0/5`, installed `0`), so its
     rebuild lands at a new sub-slot and `soccascc` (`soccascb:0/0=`)
-    rebuilds in turn. MATCHES real today (the fixpoint scan chases the
+    rebuilds in turn. MATCHES Portage today (the fixpoint scan chases the
     tree `SLOT`); guards the `casc*` behaviour under the new shape for
     S3 (which must preserve the cascade minus the synthesiser)."""
     root = _b1_root(
@@ -23503,7 +23503,7 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     but with the consumer unreachable (not in @world, not walked),
     so the pin is invisible and the upgrade proceeds.
 
-    Real 3.0.82.2 on the staged hermetic tree (host oracle, same
+    Portage 3.0.82.2 on the staged hermetic tree (host oracle, same
     staging as the S1 probes): `emerge -p --update --deep --newuse
     --oneshot dev-libs/whpuller` merges `whblocker-2.0` + `whpuller-2.0`
     with `[uninstall] whtarget-1.0` + satisfied `[blocks b]`, rc 0.
@@ -23511,7 +23511,7 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     `l0-fixture-oracle-whpin.txt` bed cell -- it needs `FX_WORLD_EXTRA`
     and so lives in the bed, like D1's `rdcpin` cell, not here.
     The uninstall schedules right after its owner `whblocker-2.0`
-    (real's uninstall-scheduling dance, #142 S2 F4b: the owner waits
+    (Portage's uninstall-scheduling dance, #142 S2 F4b: the owner waits
     on its unscheduled removal, then the ready removal pops first);
     the pre-#142 pin had it after `whpuller-2.0`. A fixture-oracle bed
     cell for this no-`FX_WORLD_EXTRA` shape re-verifies the full bytes
@@ -23520,7 +23520,7 @@ def test_oracle_91_unreachable_runtime_pin_merges_with_uninstall(emerge_binary, 
     The consumer's own removal row is what keeps the pin from firing:
     the blocker phase appends the `Uninstall` entry before the
     reverse-dependency scan runs, and the scan skips a removed consumer
-    (real `_in_blocker_conflict`, bug 612772) -- without that skip the
+    (Portage `_in_blocker_conflict`, bug 612772) -- without that skip the
     runtime pin would veto the very upgrade whose blocker removes its
     owner.
     """
@@ -23550,7 +23550,7 @@ def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):
     """Backlog #209: `--backtrack=0` must not skip the reverse-dependency
-    feed loop. Real `_resolve_conflicts` (`_emerge/depgraph.py:9444`)
+    feed loop. Portage `_resolve_conflicts` (`_emerge/depgraph.py:9444`)
     calls `_complete_graph()` (`:8562`) with no `_allow_backtracking`
     gate, so an installed world consumer's satisfiable pin enforces
     in-pass even with backtracking off.
@@ -23559,13 +23559,13 @@ def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
     bed cell in `l0-fixture-oracle-r25.txt`): installed `r25consumer-1.0`
     pins `<dev-libs/r25lib-2.0:=` (recorded `:0/1=` bound form) against
     the `r25lib` 1.0->2.0 update pulled through installed `r25mid`'s
-    `:=` dep. Expected from real (`differential-test-bed/findings/l0.md`
+    `:=` dep. Expected from Portage (`differential-test-bed/findings/l0.md`
     "## #25 S0", default flags there: two merge rows, no warning,
     `backtrack: 0/20` -- the selection path that withholds has no
     backtracking gate anywhere in its chain, so `--backtrack=0` answers
     the same; the coordinator's bed oracles the new bt0 cell directly):
     `r25up-2.0 [U]` + `r25target-1.0 [N]`, rc 0, no skipped-update block,
-    no rebuild block (real's slot-op trigger is backtracking-gated), and
+    no rebuild block (Portage's slot-op trigger is backtracking-gated), and
     `--json` `restarts` 0. Before the fix portuale settled the root pass
     without the pin and merged `r25lib-2.0` here."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
@@ -23601,7 +23601,7 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
     argument the consumer's `<2.0` pin cannot hold alongside, so the scan
     drops the pin and the residual conflict reports it.
 
-    Expected from real (g209 S0 container probe: real 3.0.81.3 staged
+    Expected from Portage (g209 S0 container probe: Portage 3.0.81.3 staged
     like the bed with `FX_WORLD_EXTRA=dev-libs/r25consumer`, argv
     `emerge -p --backtrack=0 --update --deep --newuse --oneshot
     "=dev-libs/r25lib-2.0"`; the reporting chain
@@ -23611,7 +23611,7 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
     on any link, so the pin lands as a slot-collision report): the 2.0
     merge row, then the residual block pairing it (the `(Argument)`
     puller) against installed 1.0 (the consumer pin), rc 1. One display
-    nit vs the probe: real renders the consumer's `:=` bound form
+    nit vs the probe: Portage renders the consumer's `:=` bound form
     first, portuale the normalised `<2.0` form (same two parents, order
     only; the `(and 1 more ...)` tail agrees)."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
@@ -23653,9 +23653,9 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     declaration) forms a genuine slot conflict where the forward order
     silently reuses: the bare dep graphs 2.0 first, `<2.0` graphs 1.0,
     and the direct solve removes 2.0 (`or_tuple` satisfied through the
-    already-forced 1.0) with real's skip-conflict `WARNING`, rc 0.
+    already-forced 1.0) with Portage's skip-conflict `WARNING`, rc 0.
 
-    Real 3.0.82.2 on the staged hermetic tree (host oracle, S0 matrix:
+    Portage 3.0.82.2 on the staged hermetic tree (host oracle, S0 matrix:
     `--backtrack=0` and default agree byte-for-byte modulo the
     `ROOT=$FX` root suffixes and the profile-default `ELIBC="glibc"`
     both omitted by portuale's display cuts): merge rows
@@ -23665,7 +23665,7 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
     (S1 reuse, pinned by the CASES entry above); the unsolvable twin
     keeps its block + rc 1.
 
-    Backlog #230: the `WARNING` lines render real's full
+    Backlog #230: the `WARNING` lines render Portage's full
     `pkg_use_display` (`_emerge/UseFlagDisplay.py:55`) -- target and
     oldconsumer are EAPI 8 with no IUSE, so the globals mask out and
     only the implicit `ELIBC="glibc"` group survives (this revises the
@@ -23714,7 +23714,7 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
     consumers `dev-libs/reinstslotconsumer`
     (`RDEPEND="dev-libs/reinstslottarget:0/1"`) and
     `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`), leaving the
-    shared fixture world untouched (the #54 K2/K3 copy pattern). Real
+    shared fixture world untouched (the #54 K2/K3 copy pattern). Portage
     3.0.82.2 on the staged hermetic tree (coordinator probe
     `differential-test-bed/logs/_g210-probe.txt`, run dir
     `logs/l0-fx-20260927T225534Z`, `FX_WORLD_EXTRA` with both consumers)
@@ -23722,20 +23722,20 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
     for `dev-libs/reinstslottarget:0` listing BOTH consumers' atoms, rc 0.
 
     The pinned bytes are portuale's rendering of that shape, which is
-    real's own explanation modulo the #206 cuts: the missed line shows
+    Portage's own explanation modulo the #206 cuts: the missed line shows
     `USE="" ELIBC="glibc"` on both sides (bed capture
     `differential-test-bed/logs/l0-fx-20260928T100830Z`, coordinator
     run 2026-09-28 on this branch -- both argument cells clean there);
     the installed consumers render `(cpv, installed in '<root>')`
     with bare `USE=""` and slot-span `^` markers on both sides too
-    (real's `Package.__str__` appends ` in '<ROOT>'` iff `ROOT != "/"`,
+    (Portage's `Package.__str__` appends ` in '<ROOT>'` iff `ROOT != "/"`,
     `3rdparty/portage/lib/_emerge/Package.py:568-608`). Portuale's cuts
     stay: the header is bare (no `for <root>`) and the merge line is
     bare (no `to '<root>'`), like the blk0 cells; the parent order is
-    portuale's (consumer `:0/1` before bound `:0/1=`, real lists them
+    portuale's (consumer `:0/1` before bound `:0/1=`, Portage lists them
     reversed -- the comparator sorts explanation lines, so the cells
     still compare clean). The invariant (withhold, rc 0, both atoms
-    named) is real's.
+    named) is Portage's.
     """
     env = _world_extra_env(
         fixture_env,
@@ -23770,16 +23770,16 @@ def test_oracle_210_slot_change_reinstall_ignores_a_noop_argument_consumer(
     emerge_binary, fixture_env
 ):
     """Backlog #210 round 2 (Q2a): a top-level argument that settles
-    `AlreadyInstalled` is a no-op request, not a digraph node in real, so
+    `AlreadyInstalled` is a no-op request, not a digraph node in Portage, so
     its recorded pin never constrains the reinstall.
 
     Same target shape as above but the consumer stays out of `@world`
-    and is passed as an argument instead. Real 3.0.82.2 reinstalls the
+    and is passed as an argument instead. Portage 3.0.82.2 reinstalls the
     target silently here (`[ebuild R]`, rc 0 -- the round-1 probe in
     `g210-report.md` §S0, all three `T C` shapes byte-identical); the
     constraint only fires once the required-set walk reaches the
     consumer (the withhold cell above). Before the #210 fix portuale
-    matched real here only because the reinstall filled no constraint
+    matched Portage here only because the reinstall filled no constraint
     source at all; the pin gates this shape stays silent.
     """
     result = _run(
@@ -23809,7 +23809,7 @@ def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
     and `dev-libs/reinstslotbound` (live `:=`, recorded `:0/1=`) while
     `dev-libs/reinstslottarget` moved `0/1 -> 0/2` without a revbump
     (the #210 fixture; the #54 K2/K3 copy pattern leaves the shared
-    fixture world untouched). Real 3.0.82.2 on the staged hermetic tree
+    fixture world untouched). Portage 3.0.82.2 on the staged hermetic tree
     (S0 probe `probe.log`: `FX_WORLD_EXTRA` with both consumers, argv
     `--changed-slot --update --deep --newuse @world`) merges the four
     unrelated world updates and withholds the reinstall silently, rc 0 --
@@ -23850,17 +23850,17 @@ def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
     assert result.stderr == "", (result.stdout, result.stderr)
 
 
-# Backlog #181: live real `emerge -p` text for the upstream
+# Backlog #181: live Portage `emerge -p` text for the upstream
 # test_circular_dependencies pg0 cases (#50 batch 2). The batch-2 CASES
 # check only the exit code; their labels cite the ResolverPlayground
 # solutions, which live `emerge` does not reproduce. Captures:
 # portuale LLM/evidence/2026-09-27-181-circular-text/ (fixture-oracle run
-# l0-fx-20260927T202111Z, real Portage 3.0.82.2). Each pin is a strict
+# l0-fx-20260927T202111Z, Portage 3.0.82.2). Each pin is a strict
 # xfail until its backlog item lands.
-_CYC0_REAL_BLOCKS = {
-    # #206 only: same cycle and suggestion, real prints package nodes.
-    # Backlog #278: the start is real's single-root (`FX_HOST_ROOTS=1`)
-    # rendering (`dev-libs/cyc0a` first); live real under default
+_CYC0_PORTAGE_BLOCKS = {
+    # #206 only: same cycle and suggestion, Portage prints package nodes.
+    # Backlog #278: the start is Portage's single-root (`FX_HOST_ROOTS=1`)
+    # rendering (`dev-libs/cyc0a` first); live Portage under default
     # staging starts at the other node (`dev-libs/cyc0b` first —
     # recorded in portuale `LLM/evidence/2026-09-30-278/` alongside
     # the O1 triage captures), a cross-root difference owned by
@@ -23875,7 +23875,7 @@ _CYC0_REAL_BLOCKS = {
         "by applying the following change:\n"
         "- dev-libs/cyc0a-1 (Change USE: +bar -foo)\n"
     ),
-    # #207: real backtracks and blames cyc0z-3, not the argument.
+    # #207: Portage backtracks and blames cyc0z-3, not the argument.
     "=dev-libs/cyc0z-1": (
         "(dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
@@ -23885,7 +23885,7 @@ _CYC0_REAL_BLOCKS = {
         "by applying the following change:\n"
         "- dev-libs/cyc0z-3 (Change USE: +bar -foo)\n"
     ),
-    # #208: real starts at cyc0y-1 and finds -foo on the autounmasked USE.
+    # #208: Portage starts at cyc0y-1 and finds -foo on the autounmasked USE.
     "=dev-libs/cyc0w-3": (
         "(dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
@@ -23899,12 +23899,12 @@ _CYC0_REAL_BLOCKS = {
 
 
 @pytest.mark.parametrize("atom", ["=dev-libs/cyc0z-1"])
-def test_circular_dependencies_upstream_pg0_real_text(
+def test_circular_dependencies_upstream_pg0_portage_text(
     emerge_binary, fixture_env, atom
 ):
-    """Backlog #242 (ex-#207): real's `_show_circular_deps` block for the
+    """Backlog #242 (ex-#207): Portage's `_show_circular_deps` block for the
     #50 batch-2 `=dev-libs/cyc0z-1` circular case, verbatim from live
-    `emerge -p --color=n` (real depgraph.py:10425; nodes via
+    `emerge -p --color=n` (Portage depgraph.py:10425; nodes via
     `circular_dependency_handler._prepare_circular_dep_message` ->
     Package.__str__). Exit code 1 already agrees on both sides.
 
@@ -23912,21 +23912,21 @@ def test_circular_dependencies_upstream_pg0_real_text(
     non-`/` ROOT, EAPI >= 7 DEPEND resolves against the running root, so
     the cycle forms there around `cyc0z-3` -- the default-staging bytes in
     portuale `LLM/evidence/2026-09-29-242-inventory/probes/`
-    (`default-cyc0z-1.txt`, real 3.0.82.2). `/` is deterministic here:
+    (`default-cyc0z-1.txt`, Portage 3.0.82.2). `/` is deterministic here:
     the fixture-only `cyc0*` CPs are never in the host vdb (the same basis
     as the existing PORTAGE_RUNNING_ROOT=/ pins)."""
     env = dict(fixture_env)
     env["PORTAGE_RUNNING_ROOT"] = "/"
     rust = _run([str(emerge_binary)], ["--pretend", atom], env)
     assert rust.returncode == 1
-    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+    assert _CYC0_PORTAGE_BLOCKS[atom] in rust.stderr
 
 
-def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
+def test_circular_dependencies_upstream_pg0_portage_text_cyc0b1(
     emerge_binary, fixture_env
 ):
     """Backlog #206: the `=dev-libs/cyc0b-1` third of the block above,
-    now passing — portuale prints real's package-node text
+    now passing — portuale prints Portage's package-node text
     (`Package.__str__`: `(cpv:slot/sub::repo, ebuild scheduled for
     merge)`, no `to '<ROOT>'` suffix under a staged ROOT) for the same
     cycle and suggestion. Grounded on the #181 evidence captures plus
@@ -23936,24 +23936,24 @@ def test_circular_dependencies_upstream_pg0_real_text_cyc0b1(
     atom = "=dev-libs/cyc0b-1"
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
-    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+    assert _CYC0_PORTAGE_BLOCKS[atom] in rust.stderr
 
 
-def test_circular_dependencies_upstream_pg0_real_text_cyc0w3(
+def test_circular_dependencies_upstream_pg0_portage_text_cyc0w3(
     emerge_binary, fixture_env
 ):
     """Backlog #278 (ex-#208(a)): the `=dev-libs/cyc0w-3` third of the
     block above, now passing — portuale starts the printed cycle where
-    real's `shortest_cycle[0]` starts (`dev-libs/cyc0y`, under both
+    Portage's `shortest_cycle[0]` starts (`dev-libs/cyc0y`, under both
     stagings), so the strict-xfail this case used to share with
     `=dev-libs/cyc0z-1` XPASSed and the case is pinned passing here.
-    Grounded on the same live-real block as its siblings (the n206
+    Grounded on the same live-Portage block as its siblings (the n206
     container probe and the O1 `FX_HOST_ROOTS=1` triage capture, which
     agree)."""
     atom = "=dev-libs/cyc0w-3"
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
     assert rust.returncode == 1
-    assert _CYC0_REAL_BLOCKS[atom] in rust.stderr
+    assert _CYC0_PORTAGE_BLOCKS[atom] in rust.stderr
 
 
 def test_or_group_emptied_by_use_conditionals_fails_at_eapi7(
@@ -23963,10 +23963,10 @@ def test_or_group_emptied_by_use_conditionals_fails_at_eapi7(
     `dev-libs/condanyof` carries `IUSE="emptyanyof"` with
     `RDEPEND="|| ( emptyanyof? ( dev-libs/condanyofdep ) )"`, and no
     profile enables `emptyanyof`, so the `||` group reduces to empty.
-    Real `use_reduce` (`lib/portage/dep/__init__.py:864-869`,
+    Portage `use_reduce` (`lib/portage/dep/__init__.py:864-869`,
     `empty_groups_always_true` false at EAPI 7+, `eapi.py:295`)
     substitutes the unsatisfiable atom `__const__/empty-any-of`, and
-    real 3.0.82.2 on the staged fixture tree (S0 probe, `probe.log`:
+    Portage 3.0.82.2 on the staged fixture tree (S0 probe, `probe.log`:
     `emerge -p --color=n dev-libs/condanyof`) exits 1 with
     `emerge: there are no ebuilds to satisfy "__const__/empty-any-of"
     for <ROOT>.` plus the `condanyof-1.0::testrepo` [ebuild] and
@@ -23975,9 +23975,9 @@ def test_or_group_emptied_by_use_conditionals_fails_at_eapi7(
     alternative vacuously satisfiable and merged the package bare
     (rc 0, the 2026-09-28 probe in the entry); now the placeholder
     flows through as an ordinary unsatisfiable dep and aborts like
-    real. The staging `for <root>.` suffix stays portuale-absent (the
+    Portage. The staging `for <root>.` suffix stays portuale-absent (the
     fixture-miss-message-unsuffixed convention); everything else is
-    real's text byte-for-byte."""
+    Portage's text byte-for-byte."""
     args = ["--pretend", "dev-libs/condanyof"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -23999,27 +23999,27 @@ def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
     emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #216: `app-misc/g216top` merges
-    `[g216boot, g216comp, g216mid, g216top]`, rc 0. Real's pass 1 keeps
+    `[g216boot, g216comp, g216mid, g216top]`, rc 0. Portage's pass 1 keeps
     the in-graph `>=dev-lang/g216comp-1.0` branch of `g216comp`'s
     `BDEPEND=|| ( >=dev-lang/g216comp-1.0 dev-lang/g216boot )` live
     (`dep_zapdeps` `preferred_in_graph`, `dep_check.py`), dead-ends on
     the self cycle (`_serialize_tasks`, `depgraph.py:10262`), and
     re-resolves with the `circular_dependency` map to `g216boot`
     (`backtrack: 1/20`, rc 0) -- the S0 container probe
-    (`/tmp/opencode/g216/probe.log`, real 3.0.81.3) shows exactly this
-    merge list. MATCHES real since #216: the `circular_self` bolt-on
+    (`/tmp/opencode/g216/probe.log`, Portage 3.0.81.3) shows exactly this
+    merge list. MATCHES Portage since #216: the `circular_self` bolt-on
     now only fires when the self atom matches nothing in-graph, and the
     serialize dead-end feeds a `circular_dependency` retry.
 
     Track X Slice C (#242): re-pinned to the default-staging dual-root
-    bytes. The fixture BDEPEND resolves against the running root (real
+    bytes. The fixture BDEPEND resolves against the running root (Portage
     `ESYSROOT`, `depgraph.py:4255-4291`), so `g216comp` merges TWICE --
     once per root -- and the running-root `g216boot` leads the list
     (`LLM/evidence/2026-09-29-242-inventory/probes/default-g216top.txt`,
-    real 3.0.82.2: 5 rows, `backtrack: 1/20`, rc 0). The running root
+    Portage 3.0.82.2: 5 rows, `backtrack: 1/20`, rc 0). The running root
     here is a hermetic empty tmp tree (nothing installed, same testrepo),
     so the run is deterministic. Suffix placement (`to <root>` on the
-    running rows vs real's target-row suffix) is Slice D's, not this
+    running rows vs Portage's target-row suffix) is Slice D's, not this
     pin's: this pin fixes the row SET and order."""
     running = tmp_path / "running"
     running.mkdir()
@@ -24046,10 +24046,10 @@ def test_or_pick_in_graph_self_branch_resolves_to_bootstrap(
 def test_or_pick_backtrack0_reports_the_self_cycle(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Backlog #216: `app-misc/g216top --backtrack=0` fails with real's
+    """Backlog #216: `app-misc/g216top --backtrack=0` fails with Portage's
     pass-1 self-cycle block, rc 1, verbatim from the S0 container probe
-    (real 3.0.81.3 `emerge -p --color=n --backtrack=0 app-misc/g216top`;
-    the block text is staging-independent). With no backtracking real
+    (Portage 3.0.81.3 `emerge -p --color=n --backtrack=0 app-misc/g216top`;
+    the block text is staging-independent). With no backtracking Portage
     displays the pass-1 graph -- the `* Error: circular dependencies:`
     self ring -- instead of re-resolving.
 
@@ -24058,7 +24058,7 @@ def test_or_pick_backtrack0_reports_the_self_cycle(
     pass-1 graph strands on the running-root self loop with FOUR merge
     rows behind the block (dual `g216comp`), and the `Total:` counts
     both roots (`LLM/evidence/2026-09-29-242-inventory/probes/
-    default-g216top-b0.txt`, real 3.0.82.2: `Total: 4`, rc 1). The row
+    default-g216top-b0.txt`, Portage 3.0.82.2: `Total: 4`, rc 1). The row
     rendering of the abort partial (backlog #245, closed) is pinned by the
     fixture-oracle g216 list; this pin fixes rc, the verbatim block, and
     the Total."""
@@ -24088,10 +24088,10 @@ def test_or_pick_direct_target_resolves_to_bootstrap(
 ):
     """Backlog #216 (review M3): `dev-lang/g216comp` merges
     `[g216boot, g216comp]`, rc 0 -- the direct-target mirror of the
-    `g216top` default pin above. Same real grounding (pass-1
+    `g216top` default pin above. Same Portage grounding (pass-1
     `preferred_in_graph` self pick, `_serialize_tasks` dead-end,
     `circular_dependency` retry to `g216boot`, `backtrack: 1/20`):
-    the S0 container probe (`/tmp/opencode/g216/probe.log`, real
+    the S0 container probe (`/tmp/opencode/g216/probe.log`, Portage
     3.0.81.3) shows rc 0 with the bootstrap merge, and the L0 oracle
     single-root capture shows exactly these two rows. Single-root
     `fixture_env` (`RUNNING_ROOT == ROOT`) carries no `to <ROOT>`
@@ -24102,7 +24102,7 @@ def test_or_pick_direct_target_resolves_to_bootstrap(
     self pick resolves running-rooted, so even the direct target merges
     `g216comp` TWICE plus the running `g216boot` (3 rows;
     `LLM/evidence/2026-09-29-242-inventory/probes/default-g216comp.txt`,
-    real 3.0.82.2: `backtrack: 1/20`, rc 0). Hermetic dual-root env as
+    Portage 3.0.82.2: `backtrack: 1/20`, rc 0). Hermetic dual-root env as
     in the `g216top` pin above; suffix placement is Slice D's."""
     running = tmp_path / "running"
     running.mkdir()
@@ -24128,7 +24128,7 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
     emerge_binary, fixture_env, tmp_path
 ):
     """Backlog #216 (review M3): `dev-lang/g216comp --backtrack=0`
-    fails with real's pass-1 self-cycle block, rc 1 -- the
+    fails with Portage's pass-1 self-cycle block, rc 1 -- the
     direct-target mirror of the `g216top` b0 pin above. Same verbatim
     block (`_G216_SELF_BLOCK`, staging-independent); the L0 oracle
     single-root capture shows the one-row `[ebuild] g216comp` merge
@@ -24138,7 +24138,7 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
     bytes. Under the hermetic dual-root env the direct target strands
     with BOTH `g216comp` instances behind the block
     (`LLM/evidence/2026-09-29-242-inventory/probes/
-    default-g216comp-b0.txt`, real 3.0.82.2: `Total: 2`, rc 1)."""
+    default-g216comp-b0.txt`, Portage 3.0.82.2: `Total: 2`, rc 1)."""
     running = tmp_path / "running"
     running.mkdir()
     env = dict(fixture_env)
@@ -24162,7 +24162,7 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
 
 # Backlog #244 (batch-2026-09-28_244 Slice C): the aub0 argument-order
 # texts, one literal per distinct output (stdout / stderr).
-# Track X Slice D (#242): the merge rows below carry real's `to <ROOT>`
+# Track X Slice D (#242): the merge rows below carry Portage's `to <ROOT>`
 # suffix. Module-level texts cannot use the `fixture_env` fixture, so the
 # ROOT value is recomputed here -- identical to the fixture's
 # (`conftest.FIXTURES_ROOT`, the committed fixtures tree).
@@ -24203,7 +24203,7 @@ _AUB0_CELLS = [
     _AUB0_CELLS,
     ids=[f"bt-{b}-{o.replace(' ', '')}" for b, o, *_ in _AUB0_CELLS],
 )
-def test_autounmask_use_breakage_argument_order_text_matches_real(
+def test_autounmask_use_breakage_argument_order_text_matches_portage(
     emerge_binary, fixture_env, backtrack, order, rc, stdout, stderr
 ):
     """Backlog #244: upstream `test_autounmask_use_breakage` (`aub0a` needs
@@ -24211,14 +24211,14 @@ def test_autounmask_use_breakage_argument_order_text_matches_real(
     profile enables `foo`), every argument order under both
     `--autounmask-backtrack` values, plus the two-argument pair.
 
-    Real 3.0.82.2, fixture-oracle `l0-fx-20260929T151941Z` /
+    Portage 3.0.82.2, fixture-oracle `l0-fx-20260929T151941Z` /
     `l0-fx-20260929T152543Z` (portuale `LLM/evidence/2026-09-28-244/
     fixture-oracle{,-2}/real/`), pinned here verbatim except for
     portuale's standing conventions: no `for <ROOT>` / `to '<ROOT>'`
     suffixes (`fixture-miss-message-unsuffixed` /
     `fixture-masked-path-suffix`), no wall-clock seconds on the timing
 
-    The shape: real walks the arguments LIFO. Under `=y` every order
+    The shape: Portage walks the arguments LIFO. Under `=y` every order
     fails on A's `aub0d[-foo]` (the autounmask-breakage clean pass), and
     only the two `a`-first orders -- where B and C are walked before A --
     print the slot-conflict prefix, instances in admission order. Under
@@ -24239,14 +24239,14 @@ def test_autounmask_use_breakage_argument_order_text_matches_real(
 def test_236_minimize_children_collapses_an_ebuild_parents_version_range(
     emerge_binary, fixture_env
 ):
-    """#236 Slice B: real `_minimize_children` (`_emerge/depgraph.py:4751-4854`)
+    """#236 Slice B: Portage `_minimize_children` (`_emerge/depgraph.py:4751-4854`)
     on an ebuild parent. The fixture's `libgit2-glib-0.99.0.1` depends on
     `<dev-libs/libgit2-1:0= >=dev-libs/libgit2-0.26.0`; the `<1` atom picks
     `libgit2-0.99.0-r1` (`0/0.99`), the `>=` atom alone would pick the
-    tree's `1.0.0-r1` (`0/1.0`). Real selects both first and then
+    tree's `1.0.0-r1` (`0/1.0`). Portage selects both first and then
     eliminates, ascending: `0.99.0-r1` is the only match of `<1` and stays,
     `1.0.0-r1` is dropped, so both atoms bind `0.99.0-r1` and there is no
-    conflict to report. Expected from real's own ResolverPlayground
+    conflict to report. Expected from Portage's own ResolverPlayground
     (portuale `LLM/evidence/2026-09-29-236/playground/libgit2-glib.log`:
     merge list `libgit2-0.99.0-r1`, `libgit2-glib-0.99.0.1`, no problems
     block). Before Slice B portuale printed the same two rows plus a
@@ -24267,10 +24267,10 @@ def test_236_collapsed_slot_operator_child_is_upgraded_by_the_update_probe(
     and its appended built `>=dev-libs/provpkg-1.0:0/1=` (EAPI 8 vdb, so the
     dynamic-deps append applies) both bind the installed `provpkg-1.0` once
     `_minimize_children` is ported, and the upgrade comes back only through
-    real's slot-operator update probe (`_slot_operator_update_probe` +
+    Portage's slot-operator update probe (`_slot_operator_update_probe` +
     `_slot_operator_update_backtrack`, `_emerge/depgraph.py:2576-2800`,
     `:2400-2452`): the restart merges `U provpkg-2.0` and rebuilds
-    `consrdep`. Expected from real's own ResolverPlayground (portuale
+    `consrdep`. Expected from Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-29-236/playground/slotop-debug.log`: `backtracking
     due to missed slot abi update`, then `provpkg-2.0` + `consrdep-1.0`) and
     from the fixture-oracle `slotop` list's `-uDvN --oneshot
@@ -24308,15 +24308,15 @@ def test_236_r25_default_backtracking_settles_in_one_silent_pass(
     Same hermetic world as the #209 `--backtrack=0` pin above (installed
     world consumer `r25consumer-1.0` pins `<dev-libs/r25lib-2.0:=`,
     installed `r25mid` binds `r25lib` through live `:=` + built
-    `>=r25lib-1.0:0/1=`). Real's `_minimize_children` binds both of
+    `>=r25lib-1.0:0/1=`). Portage's `_minimize_children` binds both of
     r25mid's atoms to the installed `r25lib-1.0`, and the slot-operator
     update probe is refused by `r25consumer`'s `<2.0`
-    (`_slot_operator_check_reverse_dependencies`), so real never tries
-    `r25lib-2.0`: one pass, no skipped-update block. Expected from real:
+    (`_slot_operator_check_reverse_dependencies`), so Portage never tries
+    `r25lib-2.0`: one pass, no skipped-update block. Expected from Portage:
     the fixture-oracle `r25` cell (`differential-test-bed/logs/`
     `l0-fx-20260929T204839Z`, captured under portuale
     `LLM/evidence/2026-09-29-236/fixture-oracle/`): `r25up-2.0 [U]` +
-    `r25target-1.0 [N]`, `backtrack: 0/20`, no warning; and real's own
+    `r25target-1.0 [N]`, `backtrack: 0/20`, no warning; and Portage's own
     ResolverPlayground (`LLM/evidence/2026-09-29-236/playground/`
     `r25-debug.log`). Before #236 portuale selected `r25lib-2.0`,
     restarted once (`--json` `restarts: 1`) and printed the warning."""
@@ -24340,7 +24340,7 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):
     """#266: `_minimize_children` matches a use-dep atom against a
-    not-yet-built package's own candidate effective USE (real
+    not-yet-built package's own candidate effective USE (Portage
     `findAtomForPackage(pkg, modified_use=self._pkg_use_enabled(pkg))`,
     `_emerge/depgraph.py:4797-4807`), not just its own pick.
 
@@ -24352,12 +24352,12 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
 
     Profile B (fixture defaults, no `package.use` override): 2.0 builds
     `-bar`, so the `>=` atom matches only 3.0 and the pair does not
-    collapse -- real merges all three and reports the `bar` enablement
+    collapse -- Portage merges all three and reports the `bar` enablement
     as a USE-changes block (rc 1). Profile A (staged `package.use`
     `dev-libs/r266lib bar`, so 2.0 builds `+bar`): 2.0 now satisfies
-    both atoms and real collapses the pair onto 2.0 (rc 0, two rows).
+    both atoms and Portage collapses the pair onto 2.0 (rc 0, two rows).
 
-    Grounded on real Portage 3.0.82.2, host staged-fixture probes
+    Grounded on Portage 3.0.82.2, host staged-fixture probes
     2026-10-01 (`/usr/sbin/emerge`, PORTAGE_CONFIGROOT at a fixtures
     copy, cwd at ROOT for the relative `repos.conf` locations, argv
     `--ignore-default-opts --pretend dev-libs/r266mid`): profile B ->
@@ -24366,13 +24366,13 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
     `>=dev-libs/r266lib-3.0 bar` USE-changes block; profile A (same
     plus `dev-libs/r266lib bar` in `etc/portage/package.use`) -> rc 0,
     rows `N r266lib-2.0 USE="bar"` + `N r266mid-1.0`, no block. Same
-    split from real's own ResolverPlayground (portuale
+    split from Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-10-01-266/r266_pg.py`: B mergelist
     `[2.0, 3.0, mid]`, A mergelist `[2.0, mid]`). Before the fix
     portuale printed three rows in both profiles (a use-dep atom only
     ever matched its own pick for an ebuild candidate).
 
-    Merge-order note: real lists profile B's rows `3.0, 2.0, mid`
+    Merge-order note: Portage lists profile B's rows `3.0, 2.0, mid`
     while portuale lists `2.0, 3.0, mid` (the standing #17 class), so
     profile B asserts the sorted row set, not the sequence; profile A
     is byte-ordered on both sides."""
@@ -24423,12 +24423,12 @@ def test_107_use_dep_dynamic_deps_pair_settles_in_one_silent_pass(
     Installed `r107mid` binds `r107lib` through live `dev-libs/r107lib:=[abi]`
     and built `dev-libs/r107lib:0/1=[abi]`; installed world consumer
     `r107pin` pins `<dev-libs/r107lib-2.0:=`; `r107up` 1.0->2.0 turns
-    real's complete mode on (the md4c role). Real's `_minimize_children`
+    Portage's complete mode on (the md4c role). Portage's `_minimize_children`
     matches use-deps against the installed instance's own recorded USE
     (`findAtomForPackage(pkg, modified_use=_pkg_use_enabled(pkg))`), so
     both of r107mid's atoms bind the installed `r107lib-1.0` and the
     update probe is refused by `r107pin`: one silent pass. Expected from
-    real's own ResolverPlayground (portuale
+    Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-29-107-reprobe/playground/r107-debug.log`:
     merge list `r107up-2.0`, `r107target-1.0`, `candidate package does not
     match atom '<dev-libs/r107lib-2.0:='`, no backtrack, no warning) and
@@ -24479,14 +24479,14 @@ def test_256_unsatisfied_probe_seeds_every_hitting_parent_in_one_pass(
     """#256: two installed parents (`app-misc/u256pa`, `u256pb`) each carry
     a built `>=app-misc/u256prov-1:0/1=` the tree no longer satisfies (the
     provider moved to slot `2/2`), and each has a same-slot ebuild whose
-    live `u256prov:=` accepts `u256prov-2`. The entry assumed real restarts
-    on the first hitting edge; real's own ResolverPlayground (portuale
+    live `u256prov:=` accepts `u256prov-2`. The entry assumed Portage restarts
+    on the first hitting edge; Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-256-257/u256-a-*.log`) shows otherwise:
     `_add_dep`'s `return 1` (`_emerge/depgraph.py:3453-3455`) ends only that
     edge, the walk goes on, both edges probe in the same pass
     (`backtracking due to unsatisfied built slot-operator dep` twice) and
     one restart heals both -- `u256prov-2` + both reinstalls, in every
-    argument order. Portuale's one-pass seeding is therefore real's shape:
+    argument order. Portuale's one-pass seeding is therefore Portage's shape:
     the same rows and one restart."""
     installed = [
         (
@@ -24537,7 +24537,7 @@ def _276_root(tmp_path):
 def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#276: real masks an installed parent whose live dep cannot be
+    """#276: Portage masks an installed parent whose live dep cannot be
     satisfied (`_add_dep` `:3456-3470` -> `runtime_pkg_mask` "missing
     dependency") and restarts; under `@world` it then drops that parent
     as an argument ("The following update has been skipped due to
@@ -24545,7 +24545,7 @@ def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
     world file") and heals the rest. The stuck parent's ebuild is masked
     on the next pass the same way, the unsatisfied probe seeds the
     healing sibling, and the update probe schedules its forced
-    reinstall. Expected from real 3.0.82.2: the ResolverPlayground
+    reinstall. Expected from Portage 3.0.82.2: the ResolverPlayground
     shape b (portuale `LLM/evidence/2026-09-30-256-257/u256-b-@world.log`:
     mergelist `['app-misc/u256prov-2', 'app-misc/u256pa-1']`, `backtracking
     try 4` records `[ebuild rR] u256pa-1` through the forced reinstall
@@ -24554,7 +24554,7 @@ def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
     --update --deep @world`): rc 0, `backtrack: 5/20`, rows `[ebuild N]
     app-misc/u276prov-2` + `[ebuild rR] app-misc/u276pa-1`, the
     skipped-update block for `app-misc/u276pb:0`, and no
-    `causing rebuilds` block (real's `forced rebuilds` stays empty --
+    `causing rebuilds` block (Portage's `forced rebuilds` stays empty --
     the `rR` rides the forced reinstall atoms, like #256). Before #276
     portuale aborted on the installed parent's built atom
     (`>=app-misc/u276prov-1:0/1=`) instead."""
@@ -24570,12 +24570,12 @@ def test_276_installed_parent_without_replacement_is_masked_and_sibling_heals(
 def test_276_explicit_args_abort_on_the_stuck_parents_live_atom(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#276, second arm: with explicit arguments real has no argument to
+    """#276, second arm: with explicit arguments Portage has no argument to
     drop, so the run fails on the stuck parent's live atom after masking
     the installed and the merge-bound instances (`u256-b-app-misc_u256pa+
     app-misc_u256pb.log`: "backtracking aborted after 2 tries", rc 1).
     Same hermetic shape as the `@world` arm (shared `_276_root` helper):
-    real 3.0.82.2 staged-fixture probe (`--pretend --update --deep
+    Portage 3.0.82.2 staged-fixture probe (`--pretend --update --deep
     app-misc/u276pa app-misc/u276pb`): rc 1, `backtrack: 2/20`, no merge
     rows, `emerge: there are no ebuilds to satisfy
     "<app-misc/u276prov-2:="` with the installed-parent chain. Before
@@ -24595,14 +24595,14 @@ def test_276_explicit_args_abort_on_the_stuck_parents_live_atom(
 def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):
-    """#257: real `_slot_operator_unsatisfied_backtrack`
+    """#257: Portage `_slot_operator_unsatisfied_backtrack`
     (`_emerge/depgraph.py:2881-2915`) masks a *non-installed* built parent
     (`slot_operator_mask_built`, `:2896-2903`) whose built `:S/SS=` dep no
     longer resolves, and restarts; `_add_dep` tries that probe before the
     missing-dependency mask (`:3447-3455`). A local binary
     `app-misc/u257par-1` recorded `RDEPEND=app-misc/u257prov:0/1=`; the
     provider moved to slot `2/2`, and the same-slot ebuild's live
-    `u257prov:=` accepts `u257prov-2`. Real's ResolverPlayground (portuale
+    `u257prov:=` accepts `u257prov-2`. Portage's ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-256-257/u257-usepkg.log`): one unsatisfied
     probe hit, one restart, `[ebuild N] u257prov-2` + `[ebuild N]
     u257par-1`; under `--usepkgonly` there is no ebuild replacement and
@@ -24642,14 +24642,14 @@ def test_254_conflict_abi_probe_evaluates_the_replacements_use_conditionals(
     recorded `RDEPEND=app-misc/abiprov:0/1=`); its tree ebuild carries
     `cflag? ( app-misc/abiprov:= )` with `cflag` off; world member
     `abiforce` needs `>=abiprov-2`, so `abiprov-1`/`abiprov-2` conflict in
-    slot 0. Real's probe evaluates the replacement's conditionals
+    slot 0. Portage's probe evaluates the replacement's conditionals
     (`_select_atoms_probe`, `_emerge/depgraph.py:2667-2713`) and refuses;
-    real then masks `abiprov-1` for the conflict, and the unsatisfied probe
+    Portage then masks `abiprov-1` for the conflict, and the unsatisfied probe
     (whose `validated_atoms` keep every conditional branch,
     `_emerge/Package.py:329-359`) reinstalls the consumer. Expected from
-    real's own ResolverPlayground (portuale
+    Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-254-255/u254-cond.txt`): the same three rows
-    as the unconditional shape but **no** "causing rebuilds" block (real's
+    as the unconditional shape but **no** "causing rebuilds" block (Portage's
     `_compute_abi_rebuild_info` only pairs a provider that is a child of
     the replacement). Before #254 portuale accepted the flat token and
     printed the block."""
@@ -24683,13 +24683,13 @@ def test_254_conflict_abi_probe_evaluates_the_replacements_use_conditionals(
 def test_255_forced_rebuild_marker_is_keyed_by_the_providers_slot(
     emerge_binary, fixture_env, tmp_path
 ):
-    """#255: real's `r` column (`PkgAttrDisplay.force_reinstall`,
+    """#255: Portage's `r` column (`PkgAttrDisplay.force_reinstall`,
     `resolver/output.py:812-816`) is only set on a merge that is not
     `new`, and `new` comes from `_get_installed_best` (`:708-768`), which
     is slot-keyed: a provider installed only in *another* slot is
     `new_slot`, still `new`. The #214 shape (installed `abicons-1` bound
     to `abiprov:0/1=`, `abiforce` pulling `abiprov-2`) plus an installed
-    `abiprov-0.5` in slot `1/1`: real's ResolverPlayground (portuale
+    `abiprov-0.5` in slot `1/1`: Portage's ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-254-255/u255-otherslot.txt`) prints
     `[ebuild  NS    ] app-misc/abiprov-2 [0.5]` -- no `r`. Portuale keyed
     newness off any installed version of the cp and printed `rS`."""
@@ -24715,19 +24715,19 @@ def test_255_forced_rebuild_marker_is_keyed_by_the_providers_slot(
     ]
 
 def test_249_virtual_or_choice_uses_the_pullers_circular_record(emerge_binary, fixture_env):
-    """#249: real's `dep_zapdeps` chains `circular_dependency.get(parent)`
-    and `.get(virt_parent)` (`portage/dep/dep_check.py:673-678`). Real
+    """#249: Portage's `dep_zapdeps` chains `circular_dependency.get(parent)`
+    and `.get(virt_parent)` (`portage/dep/dep_check.py:673-678`). Portage
     expands a new-style virtual's RDEPEND inline, inside the dep_check of
     the package that pulled it, so `parent` there is the puller. Shape
     (the upstream `testCircularJsoncppCmakeBootstrapOrDeps` bug-703440 cycle
     with the `||` moved into a virtual): `dev-util/u249make` BDEPENDs
     `dev-libs/u249json:0=`, which BDEPENDs `virtual/u249make`, whose
     RDEPEND is `|| ( dev-util/u249make-bootstrap dev-util/u249make )`.
-    Pass 1 picks `u249make` and closes the cycle; real records
+    Pass 1 picks `u249make` and closes the cycle; Portage records
     `u249json -> {u249make}`, `virtual/u249make -> {u249json}`,
     `u249make -> {virtual/u249make}` and, on the restart, finds
     `u249make` under the *puller* `u249json`'s key, demotes that branch and
-    merges the bootstrap. Expected from real's own ResolverPlayground
+    merges the bootstrap. Expected from Portage's own ResolverPlayground
     (portuale `LLM/evidence/2026-09-30-249/u249.txt`): `u249make-bootstrap-1`,
     `virtual/u249make-0`, `u249json-1`, `u249make-1`, rc 0; with
     `--backtrack=0` the cycle aborts. Portuale walks the virtual as its own
@@ -24747,7 +24747,7 @@ def test_249_virtual_or_choice_uses_the_pullers_circular_record(emerge_binary, f
     assert "Error: circular dependencies:" in bt0.stdout + bt0.stderr
 
 
-def test_278_printed_cycle_starts_where_reals_shortest_cycle_starts(
+def test_278_printed_cycle_starts_where_portages_shortest_cycle_starts(
     emerge_binary, fixture_env
 ):
     """#278: the circular-dependency block starts at the other node of a
@@ -24757,16 +24757,16 @@ def test_278_printed_cycle_starts_where_reals_shortest_cycle_starts(
     and `virtual/u278make` (`RDEPEND "|| ( …-bootstrap … )"`) mirror
     the #249 shape with the puller also depending on the build tool
     directly, so both build-time edges are hard and `--backtrack=0`
-    aborts with the ring `u278json -> u278make -> u278json`. Real's
+    aborts with the ring `u278json -> u278make -> u278json`. Portage's
     `circular_dependency_handler` prints `shortest_cycle[0]`
     (`resolver/circular_dependency.py:76`), and `_find_cycles`
-    (`:48-56`) keeps the first strictly-shortest cycle of real
+    (`:48-56`) keeps the first strictly-shortest cycle of Portage
     `digraph.get_cycles` order (earliest-inserted node first) — here
     `u278json`, the earliest-inserted node, whose ring closes through
-    its child `u278make`. Grounded on live real 3.0.82.2 on the same
+    its child `u278make`. Grounded on live Portage 3.0.82.2 on the same
     geometry under `u249` names, both stagings (portuale
     `LLM/evidence/2026-09-30-278/`: single-root rendering starts at
-    `u249json`; default staging starts at `u249make` on real's
+    `u249json`; default staging starts at `u249make` on Portage's
     cross-root graph, Track X #242). Portuale renders the single-root
     graph, so the pin records the `u278json` start."""
     r = _run(
@@ -24804,7 +24804,7 @@ def test_251a_demoted_branch_keeps_only_the_settled_blockers(
     installed `u251olda`, `u251tb` blocks installed `u251oldb`. After the
     circular restart demotes `u251ta`, only `u251tb`'s blocker belongs to
     the settled graph -- unless `u251ta` is itself the target. Expected
-    from real's own ResolverPlayground (portuale
+    from Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-251/u251a.txt`): for `u251m`, `u251tb` +
     its `[uninstall]`/`[blocks b]` pair + `u251m`; for `u251ta`, both pairs
     in merge order."""
@@ -24839,12 +24839,12 @@ def test_251b_installed_instance_of_a_recorded_cp_keeps_its_own_choice(
     """#251 corner (b): a `--deep` installed-cp collision. Installed
     `dev-libs/u251p-1` (slot 1, world) carries `|| ( dev-util/u251q
     dev-util/u251r )`; the merging `u251p-2` (slot 2) carries the same `||`
-    as a build dep, and `u251q` closes a cycle back to `u251p:2`. Real keys
+    as a build dep, and `u251q` closes a cycle back to `u251p:2`. Portage keys
     `circular_dependency` by package node (`Package.__hash__`), so only the
     slot-2 node's choice is demoted (to `u251r`); the installed slot-1
     instance keeps `u251q`, which is in the graph anyway. Portuale's
     installed deep walk takes an empty map for the same reason. Expected
-    from real's own ResolverPlayground (portuale
+    from Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-251/u251b.txt`): `u251r-1`, `u251p-2` (new
     slot), `u251q-1` in both argument orders."""
     installed = [
@@ -24870,14 +24870,14 @@ def test_251b_installed_instance_of_a_recorded_cp_keeps_its_own_choice(
         ], args
 
 
-def test_251c_every_branch_demoted_keeps_reals_partial_list(emerge_binary, fixture_env):
+def test_251c_every_branch_demoted_keeps_portages_partial_list(emerge_binary, fixture_env):
     """#251 corner (c): every branch of a `||` demoted. `dev-libs/u251y`
     BDEPENDs `|| ( dev-util/u251c dev-util/u251d ) dev-util/u251d`; both
     alternatives BDEPEND `u251y`. With `u251c` already in the graph, pass 1
-    records both cycles, so `u251y`'s record holds both branches and real's
+    records both cycles, so `u251y`'s record holds both branches and Portage's
     in-bin promotion runs over `other` (`dep_check.py:738-802`); the cycle
     through the direct `u251d` dep persists and both sides abort. Expected
-    from real's own ResolverPlayground (portuale
+    from Portage's own ResolverPlayground (portuale
     `LLM/evidence/2026-09-30-251/u251c.txt`): the forced tree lists
     `u251y` (nomerge), `u251d`, `u251c`, `u251y` for either argument
     order and `u251y`, `u251c`, `u251d`, `u251y` for `u251y` alone; with
@@ -24917,11 +24917,11 @@ def test_250_use_mismatched_installed_instance_does_not_satisfy_a_build_edge(
     """#250 (owner B6: fixture first). Bug 703440's cycle
     (`dev-util/u250make` BDEPENDs `dev-libs/u250json:0=`, which BDEPENDs
     `|| ( dev-util/u250make-bootstrap dev-util/u250make[foo] )`) with the
-    tool already installed but built `-foo`. Real's satisfaction test for
+    tool already installed but built `-foo`. Portage's satisfaction test for
     the build edge is `vardb.match_pkgs(atom)`, which honours use-deps, so
     the installed `-foo` build does not satisfy `u250make[foo]`: the edge
     is unbreakable, the cycle forms, the circular restart demotes the
-    branch and the bootstrap merges. Expected from real's own
+    branch and the bootstrap merges. Expected from Portage's own
     ResolverPlayground (portuale `LLM/evidence/2026-09-30-250/u250.txt`):
     `u250make-bootstrap-1`, `u250json-1`, `u250make-1` for the tool, and
     `u250make-bootstrap-1`, `u250json-1` for the library. Portuale's edge

@@ -1,7 +1,7 @@
 """Black-box contract suite for the use_reduce(flat=True) portuale (see
 LLM/agent-context.md and crates/use-reduce-harness/src/use_reduce.rs).
-Drives the Python harness (a thin wrapper around the real
-portage.dep.use_reduce) and the Rust harness identically via subprocess,
+Drives the Python harness (a thin wrapper around Portage's
+`portage.dep.use_reduce`) and the Rust harness identically via subprocess,
 and asserts their outputs are byte-for-byte the same.
 """
 
@@ -30,7 +30,7 @@ REDUCE_CASES = [
     ("normal", "-", ["(", "(", "dev-libs/a", ")", ")"]),
     ("normal", "-", ["dev-libs/a", "(", "dev-libs/b", "(", "dev-libs/c", ")", ")"]),
     # a leading digit is a *valid* USE flag name start (surprising but
-    # confirmed against the real useflag_re: ^[A-Za-z0-9][A-Za-z0-9+_@-]*$)
+    # confirmed against Portage's `useflag_re`: ^[A-Za-z0-9][A-Za-z0-9+_@-]*$)
     ("normal", "1notaflag", ["1notaflag?", "(", "dev-libs/a", ")"]),
 ]
 

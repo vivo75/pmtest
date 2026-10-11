@@ -13,7 +13,7 @@
 # cp/a installs /etc/env.d/99late (CONFIG_PROTECT="/usr/share/late");
 # cp/b (DEPEND on cp/a) installs one file under the make.conf-protected
 # /usr/share/protectme, the env.d-added /usr/share/late and the
-# unprotected /usr/share/plain, each over a modified copy. Real Portage
+# unprotected /usr/share/plain, each over a modified copy. Portage
 # 3.0.82.2 keeps x and y and writes ._cfg0000_x / ._cfg0000_y; z is
 # overwritten. portuale before #333 overwrote all three.
 set -u

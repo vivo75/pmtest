@@ -2,7 +2,7 @@
 # L32 S1 -- in-container common setup for the life-cycle cells. Sourced by
 # run-cell.sh; do not execute. Mirrors the S0 capture profile
 # (logs/l32-s0-*/scripts/common.sh): the same pin, the same FEATURES
-# overlay, the same C.UTF-8/TZ/ROOT environment, so the real-Portage
+# overlay, the same C.UTF-8/TZ/ROOT environment, so the Portage
 # reference side reproduces the S0 oracle.
 #
 # The fixture overlay is generated on the host (layers/l32/gen-overlay.sh,

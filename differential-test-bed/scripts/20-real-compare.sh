@@ -8,7 +8,7 @@ for pkg in sys-apps/coreutils dev-libs/libevent app-misc/tmux app-shells/bash sy
     echo "### $pkg"
     echo "-- portuale:"
     emerge --pretend --color=n "$pkg" 2>&1 | grep -nE "^\[(ebuild|binary)|there are no ebuilds|no visible|REQUIRED_USE|emerge:" | cat -A | head -12
-    echo "-- real emerge:"
+    echo "-- Portage emerge:"
     /usr/sbin/emerge --pretend --color=n "$pkg" 2>&1 | grep -nE "^\[(ebuild|binary)" | cat -A | head -12
     echo
   } | tee -a "$LOG"

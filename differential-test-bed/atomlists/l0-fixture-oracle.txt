@@ -1,4 +1,4 @@
-# Fixture-oracle cases (backlog #49): real `emerge -p` on the staged
+# Fixture-oracle cases (backlog #49): Portage's `emerge -p` on the staged
 # fixture tree, compared to portuale's own output. One case per line,
 # shell words are emerge arguments. The set spans the resolver shapes
 # the contract suite already covers, so each divergence is a real
@@ -17,10 +17,10 @@ dev-libs/common
 # || any-of group
 dev-libs/anyof
 # #74 S1: an installed || alternative's [use] dep is checked against its
-# recorded vdb USE -- real keeps the installed altprov:1.1[flip] (vdb USE)
+# recorded vdb USE -- Portage keeps the installed altprov:1.1[flip] (vdb USE)
 # over the uninstalled :1.0 slot, so the group contributes no merge
 dev-libs/altconsumer
-# #74 S2a: both installed slots of slotdedup are real nodes, so the deep
+# #74 S2a: both installed slots of slotdedup are Portage nodes, so the deep
 # walk reaches slot 2's own RDEPEND marker
 -D dev-libs/slotdedupconsumer
 # REQUIRED_USE with IUSE defaults
@@ -35,10 +35,10 @@ dev-libs/autounmaskkeywordpkg
 dev-libs/kwneedpkg
 # installed consumer's hard dependency breaks a pin
 dev-libs/needer
-# the same, with the competing othermod constraint present (real prints
+# the same, with the competing othermod constraint present (Portage prints
 # the installed-instance slot conflict in this shape; backlog #54/#57)
 dev-libs/needer dev-libs/othermod
-# ... and with the arguments the other way round: real's block is
+# ... and with the arguments the other way round: Portage's block is
 # byte-identical, so portuale's must be argv-order-independent too (#57)
 dev-libs/othermod dev-libs/needer
 # #57 K2 regression guard: a bare `dev-libs/paired` dep plus needer's
@@ -54,7 +54,7 @@ dev-libs/blockusedeptarget
 dev-libs/requiredusebadpkg
 # #53: go-style || ( self other-bootstrap ) BDEPEND self-branch, with two
 # hard BDEPEND consumers of the md2man-analogue -- portuale misorders the
-# merge list (mogo after its owner); real resolves the || to itself
+# merge list (mogo after its owner); Portage resolves the || to itself
 # (already merge-bound) and aborts with a circular-dependency error
 # (known resolution difference, not a new portuale bug -- see L0 finding D)
 app-misc/mopodman
@@ -62,7 +62,7 @@ app-misc/mopodman
 app-misc/mopodmanok
 # #77 A0: installed nomowner's vdb RDEPEND soft-blocks `<nomtarget-2.0`,
 # nomowner is not walked (not in world, no dependency edge), and the
-# explicit `=nomtarget-1.5` merges -- real uninstall-orders the owner and
+# explicit `=nomtarget-1.5` merges -- Portage uninstall-orders the owner and
 # prints the satisfied row (n1)
 =dev-libs/nomtarget-1.5
 # #75 C3: the same shape in tree mode -- the satisfied row hangs under
@@ -87,7 +87,7 @@ app-misc/mopodmanok
 # #87 S2: the #76 B0 q3 RDEPEND control -- the same satisfied-replacement
 # wait as q1's BDEPEND shape, but through an `RDEPEND="|| ( ... )"`
 # group, which (unlike a BDEPEND) resolves against the target root and
-# so survives the default bed's `ROOT=$FX` split. Real and portuale
+# so survives the default bed's `ROOT=$FX` split. Portage and portuale
 # agree byte-for-byte here (host oracle 2026-09-18); this is the
 # standing default-bed coverage for the `kept_alt_for_display` path
 =dev-libs/rdisjtarget-2.0
@@ -95,35 +95,35 @@ app-misc/mopodmanok
 # installed instance whose owner upgrades too, so flat mode's greedy pop
 # drains past it with no row, but tree mode's one-at-a-time selection
 # stalls and schedules the uninstall (`scheduled_uninstalls`), solving
-# and showing the row. Real and portuale agree on the row bytes, the
+# and showing the row. Portage and portuale agree on the row bytes, the
 # nesting and the -v counters (host oracle 2026-09-19); the surrounding
 # walk sequence stays portuale's own (documented residue).
 --tree --update dev-libs/p2btarget dev-libs/p2bowner dev-libs/newpkg
 # #132 arm A: an installed parent built -flip evaluates its
 # `[flip=]` RDEPEND atom to `[-flip]`; the installed child is +flip and
-# the profile enables flip, so no pool satisfies it -- real's three-pool
+# the profile enables flip, so no pool satisfies it -- Portage's three-pool
 # USE failure (the shrunk #111 live shape)
 -D dev-libs/deepusedepconsumer
-# #132 arm B: same parent shape, child not profile-pinned, so real
+# #132 arm B: same parent shape, child not profile-pinned, so Portage
 # rebuilds the child with flip off instead of aborting
 -D dev-libs/deepusedepbconsumer
 # #132 arm C: parent built +flip evaluates the same atom to `[flip]`,
 # which the installed +flip child satisfies -- nothing moves
 -D dev-libs/deepusedepokconsumer
 # #132 arm D (S5b): installed parent built -flip, child flip
-# profile-*forced* on, so `[-flip]` is unfixable -- real hard-aborts
+# profile-*forced* on, so `[-flip]` is unfixable -- Portage hard-aborts
 # (the live shape: no autounmaskable pool, no Change USE rows)
 -D dev-libs/deepusedepfconsumer
 # #133: installed parent built -flip evaluates its `[flip=]` BDEPEND atom
-# to `[-flip]`; the running root's installed child is +flip, so real
+# to `[-flip]`; the running root's installed child is +flip, so Portage
 # resolves a running-root rebuild of the child with flip off instead of
 # silently dropping the dep as satisfied (the --root-deps half of #132)
 -D --root-deps dev-libs/deeprootdepconsumer
 # #50 S1 batch 1 (upstream test_blocker pg0): A/B/C force X-1, whose
 # RDEPEND `!=Y-1` uninstalls installed Y-1. The clean argv order guards
-# #142's fixed point (real: X-1 + [uninstall]Y-1, no warning)
+# #142's fixed point (Portage: X-1 + [uninstall]Y-1, no warning)
 --backtrack=0 dev-libs/blk0a dev-libs/blk0c dev-libs/blk0b
-# ... and the b-after-a order (real: X-1 + [uninstall]Y-1, one X-2-vs-B
+# ... and the b-after-a order (Portage: X-1 + [uninstall]Y-1, one X-2-vs-B
 # skipped-update block; #142 fixed, unsuppressed)
 --backtrack=0 dev-libs/blk0a dev-libs/blk0b dev-libs/blk0c
 # #142 S2 close-out: the four missing pg0 orders (upstream testBlocker
@@ -136,14 +136,14 @@ app-misc/mopodmanok
 --backtrack=0 dev-libs/blk0c dev-libs/blk0a dev-libs/blk0b
 --backtrack=0 dev-libs/blk0c dev-libs/blk0b dev-libs/blk0a
 # #50 S1 batch 1 (upstream test_blocker pg1, --buildpkgonly blockers):
-# soft BDEPEND `!X` leaves installed X untouched (real merges C-1 bare;
+# soft BDEPEND `!X` leaves installed X untouched (Portage merges C-1 bare;
 # #143 fixed, unsuppressed)
 --buildpkgonly dev-libs/blk1c
-# ... and the hard DEPEND `!!X` abort (real rc 1 with the merge list +
+# ... and the hard DEPEND `!!X` abort (Portage rc 1 with the merge list +
 # two `!!!` lines; #143 fixed, unsuppressed)
 --buildpkgonly dev-libs/blk1a
 # #142 S2 R1/R2: the u6 uninstall-scheduling shape as a two-atom flat
-# cell (merging-arm owners wait on their unadmitted removal; real's own
+# cell (merging-arm owners wait on their unadmitted removal; Portage's own
 # unsolved playground corroborates the u6 prefix). Row bytes are
 # real-grounded by this cell, not inferred.
 dev-libs/blockerpkg dev-libs/graphblockerparent
@@ -156,7 +156,7 @@ dev-libs/blockerpkg dev-libs/graphblockerparent
 # #135 S0 (arms (a)+(b)): installed -flip parent evaluates its
 # `[flip=]` RDEPEND atom to `[-flip]`; no pool satisfies it (leaf
 # installed +flip, ebuild pool flip-on via base package.use), and
-# --autounmask-use=n forces the abort block instead of the fix. Real is
+# --autounmask-use=n forces the abort block instead of the fix. Portage is
 # expected to print the child `Change USE: -flip` row, the parent-flip
 # `Change USE: +flip` row, and the qml?-gated consumer chain row with
 # its [qml] qualifier (live `real-rest-1.log` shapes).
@@ -169,8 +169,8 @@ dev-libs/slcirc
 
 # #238 S0 (upstream test_eapi pg1 C-2, EAPI 8): `|| ( emptyanyof? (
 # dev-libs/condanyofdep ) )` with emptyanyof off reduces the || group to
-# empty, which fails at EAPI 7+ (real `use_reduce`
-# dep/__init__.py:864-869 emits `__const__/empty-any-of`). Real rc 1;
+# empty, which fails at EAPI 7+ (Portage's `use_reduce`
+# dep/__init__.py:864-869 emits `__const__/empty-any-of`). Portage rc 1;
 # the EAPI-6 C-1 shape (empty group dropped, bare merge) is not
 # re-fixtured -- all fixture ebuilds are EAPI 8 since #220.
 dev-libs/condanyof

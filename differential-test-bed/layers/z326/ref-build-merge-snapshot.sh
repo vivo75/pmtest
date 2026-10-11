@@ -1,6 +1,6 @@
 #!/bin/bash
 # ref-build-merge-snapshot.sh -- #326 Z close-out, leg (c) reference side.
-# Real Portage builds <atomlist> from source in the NORMAL image (the l1
+# Portage builds <atomlist> from source in the NORMAL image (the l1
 # build path: layers/l1/build.sh's FEATURES/BINPKG_FORMAT shape), then
 # re-merges --usepkgonly, then rebuilds with BINPKG_FORMAT=xpak and
 # re-merges (the nopy guest's step3 shape), then snapshots the merged
@@ -81,7 +81,7 @@ while IFS= read -r line || [ -n "$line" ]; do
   line=${line%%#*}; line=$(printf '%s' "$line" | tr -d '[:space:]')
   [ -n "$line" ] && atoms+=("$line")
 done < "$ATOMLIST"
-log "reference-building ${#atoms[@]} atoms (+ deps) with real Portage, MAKEOPTS=$MAKEOPTS"
+log "reference-building ${#atoms[@]} atoms (+ deps) with Portage, MAKEOPTS=$MAKEOPTS"
 
 REINSTALL=()
 if [ "${Z326_REINSTALL:-0}" = 1 ]; then

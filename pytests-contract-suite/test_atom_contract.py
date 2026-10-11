@@ -1,7 +1,7 @@
 """Black-box contract suite for the atom-matching portuale (see
 LLM/agent-context.md and crates/portage-dep/src/lib.rs). Drives the
-Python harness (a thin wrapper around the real portage.dep.Atom /
-match_from_list) and the Rust harness identically via subprocess, and
+Python harness (a thin wrapper around Portage's `portage.dep.Atom` /
+`match_from_list`) and the Rust harness identically via subprocess, and
 asserts their outputs are byte-for-byte the same. Neither harness's
 internals are imported directly.
 """
@@ -148,7 +148,7 @@ MATCH_CASES = [
     ("!dev-libs/foo", CANDIDATES),  # blocker: matches same as non-blocker
     (">=dev-libs/nonexistent-1.0", CANDIDATES),  # no matches at all
     # a candidate with no slot info must still pass a slotted atom, per the
-    # real match_from_list's "unknown slot isn't filtered" behavior.
+    # Portage `match_from_list`'s "unknown slot isn't filtered" behavior.
     ("dev-libs/foo:2", ["dev-libs/foo-1.0", "dev-libs/foo-1.0:2"]),
     # slot operators, no explicit slot: match every candidate regardless
     # of its own slot -- matches_slot's early "atom.slot is None" return,
@@ -163,7 +163,7 @@ MATCH_CASES = [
     ("dev-libs/foo:9=", CANDIDATES),  # explicit slot nothing matches
     # USE deps: parsed but never enforced by matching (see portage-dep's
     # module doc comment) -- verified this isn't an invented divergence:
-    # real match_from_list, given these same plain-string candidates
+    # Portage `match_from_list`, given these same plain-string candidates
     # (no .use/.iuse attributes), skips its own USE-dep filtering
     # entirely too, so "[bar]" and "[-bar]" must match the identical set.
     ("dev-libs/foo[bar]", CANDIDATES),
@@ -174,7 +174,7 @@ MATCH_CASES = [
 # "=*" glob version operator (PMS 8.3.1): dedicated candidates exercising
 # the component-boundary rule (bug 560466: "1*" must not match "10", even
 # though "10" literally starts with "1") and the "leading zeros" special
-# case real match_from_list's own "=*" branch applies before comparing
+# case Portage `match_from_list`'s own "=*" branch applies before comparing
 # (see portage-dep's normalize_leading_zeros doc comment) -- neither is
 # covered by the plain CANDIDATES list above.
 GLOB_CANDIDATES = [
@@ -204,10 +204,10 @@ MATCH_CASES += [
     ("=dev-libs/foo-0.5*", ["dev-libs/foo-0.5", "dev-libs/foo-0.50", "dev-libs/foo-00.5"]),
 ]
 
-# "::reponame" repo constraint (PMS 3.1.5): real match_from_list's own
+# "::reponame" repo constraint (PMS 3.1.5): Portage `match_from_list`'s own
 # final post-pass filter -- only ever rejects a candidate that carries a
 # KNOWN, different repo; a repo-less candidate string always passes
-# regardless of what the atom asks for (real dep_getrepo's own
+# regardless of what the atom asks for (Portage `dep_getrepo`'s own
 # "unknown, not absent" semantics for a plain string).
 REPO_CANDIDATES = [
     "dev-libs/foo-1.0",  # no "::repo" at all: must pass every repo-constrained
@@ -239,10 +239,10 @@ def test_match_matches_between_implementations(
     assert rust_result == python_result
 
 
-# extract_affecting_use: real portage's own test corpus
+# extract_affecting_use: Portage's own test corpus
 # (lib/portage/tests/dep/test_extract_affecting_use.py) -- 23 well-formed
 # + 15 malformed, plus the docstring example -- run through both harnesses
-# (Python = real portage's function; Rust = portage_dep's port).
+# (Python = Portage's function; Rust = portage_dep's port).
 AFFECTING_CASES = [
     ("A", "a? ( A ) !b? ( B ) !c? ( C ) d? ( D )"),
     ("B", "a? ( A ) !b? ( B ) !c? ( C ) d? ( D )"),

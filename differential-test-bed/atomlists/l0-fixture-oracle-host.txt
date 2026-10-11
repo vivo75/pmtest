@@ -1,6 +1,6 @@
 # Fixture-oracle cases that need host-exact roots (`FX_HOST_ROOTS=1`,
 # `ROOT=/` with the staged fixture vdb copied in): their shape resolves
-# a `BDEPEND` between the target and running roots, which real's
+# a `BDEPEND` between the target and running roots, which Portage's
 # `create_trees` splits when `ROOT=$FX` (B0b, `differential-test-bed/findings/l0.md`
 # "#68/#72 B0b"; the slot-op matrix `l0-fixture-oracle-slotop.txt` needs
 # the same knob).

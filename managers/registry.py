@@ -361,8 +361,8 @@ def _sh(argv):
         raise RegistryError(
             f"PM {name!r} has no `repo` in managers/managers.yaml: the "
             "differential test bed mounts the PM's own build dir and "
-            "checkout, so it only runs PMs built from source (the real "
-            "portage it compares against is the one inside the container)"
+            "checkout, so it only runs PMs built from source (the Portage "
+            "it compares against is the one inside the container)"
         )
     bins = {kind: declared_applet(kind, name=name) for kind in APPLETS}
     emerge = applet("emerge", name=name) if build else bins["emerge"]

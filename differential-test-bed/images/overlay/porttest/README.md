@@ -16,7 +16,7 @@ seconds (no `SRC_URI`).
 `metadata/md5-cache/` is committed (generated with `egencache --repo
 porttest --update` from the pinned portage) as an **optimisation**, not
 a workaround: both PMs resolve a cache-less repo through their ebuild
-fallback (real: `metadata/md5-cache` pregen miss -> `depcachedir` ->
+fallback (Portage: `metadata/md5-cache` pregen miss -> `depcachedir` ->
 `doebuild(mydo="depend")`; portuale: the same three rungs, #41 C1–C3),
 so `L2_CACHELESS=1 differential-test-bed/run/l2-portuale-builder.sh
 differential-test-bed/atomlists/l1-porttest.txt` exercises that path. Keeping the cache

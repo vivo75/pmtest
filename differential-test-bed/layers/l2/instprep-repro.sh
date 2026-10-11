@@ -1,7 +1,7 @@
 #!/bin/bash
 # #38 S4 -- in-container repro for the merge-time `instprep` phase.
 #
-# Real runs `__dyn_instprep` from `dblink.treewalk()` on every merge
+# Portage runs `__dyn_instprep` from `dblink.treewalk()` on every merge
 # (`vartree.py:4440-4450`); it strips/compresses the image iff the
 # `binpkg-dostrip`/`binpkg-docompress` token is ABSENT. With both tokens
 # removed, `install_qa_check` skips the transforms, so the only place they
@@ -45,7 +45,7 @@ cat > /etc/portage/repos.conf/porttest.conf <<-EOF
 	auto-sync = no
 	EOF
 
-# same base on both sides (real's behaviour is the pin's)
+# same base on both sides (Portage's behaviour is the pin's)
 if [ "${L2_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
   PIN=${L2_PORTAGE_PIN:-3.0.82.2}
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
@@ -72,7 +72,7 @@ snapshot() {  # <cell>
     # All three setuid binaries are byte-identical and share one
     # build-id, so which name `estrip`'s `___parallel` traversal links
     # the shared `.build-id/e0/2277…` lines to is nondeterministic in
-    # real too (the #38 S0/S2 race): match every `pt-*` target and drop
+    # Portage too (the #38 S0/S2 race): match every `pt-*` target and drop
     # the target text (`awk` keeps `$1 $2`), so the link *paths* still
     # compare.
     for p in docs setuid; do
@@ -89,7 +89,7 @@ log "cell src: emerge -1 ${ATOMS[*]}"
 snapshot src
 
 log "cell bin: emerge -B, unmerge, emerge -1K"
-# No builddir wipe: real `_emerge/EbuildBuild._start_pre_clean` runs the
+# No builddir wipe: Portage `_emerge/EbuildBuild._start_pre_clean` runs the
 # `clean` phase before every build, and portuale does the same since
 # backlog #42 (and post-cleans after a successful merge), so the -B build
 # starts from the state the pre-clean leaves in either PM. Before #42

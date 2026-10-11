@@ -17,7 +17,7 @@
 #                 already installed (the porttest fixtures);
 #     deep     -- `-b --deep --usepkg=n`, which also builds+merges any
 #                 missing dependency into the throwaway builder first.
-#                 Needed for the real L1 set: real `-B` refuses when a
+#                 Needed for the real L1 set: Portage `-B` refuses when a
 #                 dep is not merged ("--buildpkgonly requires all
 #                 dependencies to be merged"). G0.1 revisited at S5.
 set -u
@@ -32,7 +32,7 @@ export LC_ALL=C.UTF-8 TZ=UTC
 export PKGDIR DISTDIR
 export MAKEOPTS="-j${JOBS}"
 export EMERGE_DEFAULT_OPTS=""
-# binpkg-multi-instance is explicit on both builders: real portage gets it
+# binpkg-multi-instance is explicit on both builders: Portage gets it
 # from make.globals anyway, but portuale's default is deliberately off
 # (PackageOptions::binpkg_multi_instance), so pinning it in the process
 # env keeps the two archive layouts identical.

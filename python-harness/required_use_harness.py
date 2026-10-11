@@ -2,14 +2,14 @@
 """Neutral CLI test-harness binary (Python side) for the REQUIRED_USE
 portuale -- see LLM/agent-context.md and
 crates/portage-required-use/src/lib.rs for what is and isn't
-ported. Wraps the real portage.dep.check_required_use rather than
+ported. Wraps Portage's portage.dep.check_required_use rather than
 reimplementing it, always called with eapi="8" -- pinned so both sides
 agree on the same EAPI-gated attributes the Rust side hardcodes
 unconditionally (see that crate's own doc comment): "??" (at-most-one-of)
-groups always recognized (real eapi >= 5), and an empty group NEVER
-treated as vacuously satisfied (real eapi <= 6's own special case,
+groups always recognized (Portage eapi >= 5), and an empty group NEVER
+treated as vacuously satisfied (Portage eapi <= 6's own special case,
 deliberately not replicated -- ordinary per-operator evaluation on an
-empty list is used instead, real EAPI 7+ behavior).
+empty list is used instead, Portage EAPI 7+ behavior).
 
 Usage:
     required_use_harness.py check <enabled> <iuse> <token...>
@@ -19,7 +19,7 @@ Usage:
       -> "true" | "false" | "ERROR"
     required_use_harness.py reduce <enabled> <iuse> <token...>
       -> "-" when satisfied, else the human-readable minimal unsatisfied
-         sub-expression (real check_required_use(...).tounicode() run
+         sub-expression (Portage's check_required_use(...).tounicode() run
          through human_readable_required_use), or "ERROR"
     required_use_harness.py batch
       -> reads "<op> <enabled> <iuse> <token...>" lines from stdin, one

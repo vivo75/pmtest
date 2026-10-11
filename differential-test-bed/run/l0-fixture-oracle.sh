@@ -1,8 +1,8 @@
 #!/bin/bash
-# L0 fixture oracle -- real `emerge` on the checked-in fixture tree
+# L0 fixture oracle -- Portage's `emerge` on the checked-in fixture tree
 # (backlog #49 / docs/second_python_copy_removal.md §6).
 #
-# Stages a copy of `fixtures/` inside the test container, runs real
+# Stages a copy of `fixtures/` inside the test container, runs Portage
 # `emerge -p` and portuale `-p` on the same cases, and lets the L0
 # comparator produce typed findings. Real-execution-only (AGENTS.md
 # step 4's carve-out: no contract CASES entry, no Python mirror).

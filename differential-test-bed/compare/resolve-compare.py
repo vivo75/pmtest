@@ -5,9 +5,9 @@ Usage: resolve-compare.py [--fs NAME] [--backend NAME] <dir> [allowlist]
 
 Reads a directory produced by ``differential-test-bed/layers/l0/in-container.sh``::
 
-    <dir>/real/<slug>.txt        raw `emerge -pv` output, real portage
+    <dir>/real/<slug>.txt        raw `emerge -pv` output, Portage
     <dir>/portuale/<slug>.txt    raw `emerge -pv` output, portuale
-    <dir>/meta.tsv               slug \\t kind \\t real_rc \\t ptl_rc
+    <dir>/meta.tsv               slug \\t kind \\t portage_rc \\t ptl_rc
     <dir>/fingerprint.tsv        environment fingerprint
 
 For every probe it normalises both merge lists and reports typed
@@ -63,7 +63,7 @@ class Pkg:
 class Probe:
     slug: str
     kind: str
-    real_rc: int
+    portage_rc: int
     ptl_rc: int
     findings: list[dict] = field(default_factory=list)
 
@@ -111,7 +111,7 @@ MASKED = re.compile(r'have been masked|is required to complete your request')
 REQUSE = re.compile(r'REQUIRED_USE (?:flag constraints are unsatisfied|not satisfied)')
 
 
-# Backlog #227: real `_show_missed_update_slot_conflicts`
+# Backlog #227: Portage's `_show_missed_update_slot_conflicts`
 # (`3rdparty/portage/lib/_emerge/depgraph.py:1652`, 3.0.82.2) prints one
 # `WARNING: One or more updates/rebuilds have been skipped due to a
 # dependency conflict:` block after the merge list (rc 0) -- one
@@ -121,7 +121,7 @@ REQUSE = re.compile(r'REQUIRED_USE (?:flag constraints are unsatisfied|not satis
 # "Backlog #90 (S2) + #92"). The block used to be silently dropped by
 # this comparator (none of its lines match MERGE/TOTAL/ERRLINE), so the
 # r25 cell reported 0 unexplained while portuale printed the warning
-# and real did not.
+# and Portage did not.
 SKIPPED_HEADER = (
     "WARNING: One or more updates/rebuilds have been skipped "
     "due to a dependency conflict:"
@@ -131,7 +131,7 @@ SKIPPED_HEADER = (
 def _norm_skipped_detail(s: str) -> str:
     """Normalise volatile bits out of a skipped-block detail line.
 
-    Real appends the target root to scheduled-for-merge consumers
+    Portage appends the target root to scheduled-for-merge consumers
     (`merge to '<ROOT>'`) and to group headers (`for <ROOT>`); the
     staged path varies per run dir, so only its presence is signal --
     the path itself becomes a placeholder (same treatment as
@@ -139,11 +139,11 @@ def _norm_skipped_detail(s: str) -> str:
 
     Backlog #230 fix round 1: portuale's bare merge-parent rendering
     is a deliberate cut (the #206 tmp-ROOT rule, same as the
-    slot-collision notice) -- real appends `to '<ROOT>'` for merge
+    slot-collision notice) -- Portage appends `to '<ROOT>'` for merge
     parents whenever `ROOT != "/"` (`Package.__str__`,
     `3rdparty/portage/lib/_emerge/Package.py:599-602`), so the suffix
     is stripped on both sides (portuale never emits it) and a
-    suffixed real parent equals a bare portuale one. This covers any
+    suffixed Portage parent equals a bare portuale one. This covers any
     target-rooted detail line, including a `to`-suffixed missed line;
     installed `in '<root>'` lines are NOT stripped (portuale renders
     those with the real path). USE content is deliberately NOT
@@ -158,7 +158,7 @@ def _norm_skipped_detail(s: str) -> str:
 def _skipped_row_key(s: str) -> str:
     """Package-identity key of a skipped-block detail line.
 
-    Strips the `KEY="..."` USE/USE_EXPAND displays (real's
+    Strips the `KEY="..."` USE/USE_EXPAND displays (Portage's
     `pkg_use_display` renders USE plus ABI_X86/ELIBC/... expansions,
     portuale's `render_pkg_use_display` only USE) and the normalised
     root suffixes -- those belong to the explanation text, compared
@@ -167,21 +167,21 @@ def _skipped_row_key(s: str) -> str:
     """
     s = KV.sub("", s)
     s = re.sub(r"\s+to\s+'<root>'", "", s)
-    # real's installed parents carry ` in '<root>'` (`Package.__str__`)
+    # Portage's installed parents carry ` in '<root>'` (`Package.__str__`)
     s = re.sub(r"\s+in\s+'<root>'", "", s)
     return re.sub(r"\s+", " ", s).strip()
 
 
 def _is_skipped_group_header(s: str) -> bool:
-    """A group header is a `cat/pkg:slot` token (real's
+    """A group header is a `cat/pkg:slot` token (Portage's
     `str(pkg.slot_atom)`, portuale's `{category}/{package}:{slot}`),
-    optionally followed by real's ` for <root>`.
+    optionally followed by Portage's ` for <root>`.
 
     Any other non-indented line (the `!!!` abbreviated tail, autounmask
     advice, `emerge:` errors, ...) ends the block instead.
     """
     toks = s.strip().split()
-    # Real appends ` for <root>` when ROOT != "/" (`depgraph.py:1662-1664`);
+    # Portage appends ` for <root>` when ROOT != "/" (`depgraph.py:1662-1664`);
     # the staged fixture oracle always runs with such a root.
     if not (len(toks) == 1 or (len(toks) == 3 and toks[1] == "for")):
         return False
@@ -196,7 +196,7 @@ def _parse_skipped_block(lines: list[str], i: int) -> tuple[dict, int]:
     groups maps header slot-atom -> {"with": sorted deduped missed-
     version keys, "rows": sorted conflict-atom identity keys,
     "expl": sorted normalised detail lines} (duplicate headers, as
-    portuale emits one block per rejecting parent while real groups
+    portuale emits one block per rejecting parent while Portage groups
     parents under one header, merge back together -- the per-group
     `conflicts with` line is a per-header attribute, not a per-row
     one, so it compares as a set), and next_i is the first unconsumed
@@ -238,7 +238,7 @@ def _parse_skipped_block(lines: list[str], i: int) -> tuple[dict, int]:
             g["expl"].append(_norm_skipped_detail(atom_line))
             g["rows"].append(_skipped_row_key(_norm_skipped_detail(atom_line)))
             i += 1
-            # The `^` marker line mirrors real's operator/version spans
+            # The `^` marker line mirrors Portage's operator/version spans
             # (`format_unmatched_atom`, `resolver/output.py:892`); an
             # empty/all-space marker rstrips to a blank line, which the
             # skip above already tolerates -- but a present marker is
@@ -263,11 +263,11 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool,
 
     The *advice set* is the actionable "you must change something"
     diagnostics -- needed USE-flag changes, masked-package requirements,
-    unsatisfied REQUIRED_USE -- normalised so real and portuale can be
+    unsatisfied REQUIRED_USE -- normalised so Portage and portuale can be
     compared even when one truncates its merge list and the other does
     not (the autounmask exit-code divergence).
 
-    *backtracking-terminated-early* is real's own marker that it stopped
+    *backtracking-terminated-early* is Portage's own marker that it stopped
     after the first autounmask batch (`--autounmask-backtrack=n`); when
     it fires and the two Total counts are far apart, the merge lists are
     a truncated-vs-complete pair and set/order comparison is meaningless.
@@ -325,7 +325,7 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool,
             # `_parse_skipped_block` takes raw lines + the index of
             # the line after the header (`i` already advanced past
             # it) and returns the resume index.
-            # (real and portuale each print at most one; a second
+            # (Portage and portuale each print at most one; a second
             # block merges into the first rather than replacing it)
             new_groups, i = _parse_skipped_block(raw_lines, i)
             for h, g in new_groups.items():
@@ -347,7 +347,7 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool,
                     in_use_block = False
                 continue
             if ADVICE_ATOM.match(stripped):
-                # Real `_display_autounmask` joins a package's flipped
+                # Portage `_display_autounmask` joins a package's flipped
                 # flags in Python `set` iteration order, which is
                 # PYTHONHASHSEED-randomised -- three `emerge -pv` runs of
                 # the same resolve give `cairo lcms` / `cairo lcms` /
@@ -376,7 +376,7 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool,
 
 
 def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Probe:
-    pr = Probe(slug=slug, kind=kind, real_rc=rrc, ptl_rc=prc)
+    pr = Probe(slug=slug, kind=kind, portage_rc=rrc, ptl_rc=prc)
     rpk, rerr, rtot, radv, r_trunc, rskip = parse(rp)
     ppk, perr, ptot, padv, p_trunc, pskip = parse(pp)
 
@@ -391,7 +391,7 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
         add("advice", f"portuale-only: {a}")
 
     # -- skipped-update warning block (backlog #227) ---------------------
-    # Real `_show_missed_update_slot_conflicts` and portuale's
+    # Portage `_show_missed_update_slot_conflicts` and portuale's
     # `GraphResult::skipped_updates` rendering print this after the
     # merge list with rc 0. Like advice it is compared on every path
     # (even when exit codes differ): presence on one side only, and a
@@ -401,11 +401,11 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
     add_skipped_findings(pr, rskip, pskip)
 
     # -- autounmask merge-list truncation --------------------------------
-    # Real, with `--autounmask-backtrack=n` (the default), can stop the
+    # Portage, with `--autounmask-backtrack=n` (the default), can stop the
     # resolve at the first autounmask-blocked node and emit only a
     # partial merge list (`* backtracking has terminated early`). When it
     # does AND the two Total counts are far apart, portuale's fuller list
-    # is not "extra packages" -- it is what real *would* have shown had it
+    # is not "extra packages" -- it is what Portage *would* have shown had it
     # kept going. Comparing set/order/totals then is truncated-vs-complete
     # noise (the same reason the `rrc != prc` branch above bails). Compare
     # advice + errors and report the shape. `known-divergences.yaml` can
@@ -489,7 +489,7 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
                 add("use", f"{r.cp} {uk}: real {rv} vs portuale {pv}")
 
     # -- merge order (over the common set) --------------------------------
-    # `[blocks ...]` lines are not merge tasks -- real prints them in
+    # `[blocks ...]` lines are not merge tasks -- Portage prints them in
     # `_blocker_parents` (a digraph) iteration order, which is
     # PYTHONHASHSEED-randomised (a two-blocker package flips between runs)
     # -- so they're excluded from the ordered comparison (still compared
@@ -528,7 +528,7 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
 # skipped-update block comparison (backlog #227)
 # --------------------------------------------------------------------------
 def _only_in(a: list[str], b: list[str]) -> list[str]:
-    """Multiset difference, sorted (duplicate detail lines are real:
+    """Multiset difference, sorted (duplicate detail lines are Portage's:
     portuale emits one block per rejecting parent)."""
     diff = Counter(a) - Counter(b)
     return sorted(diff.elements())

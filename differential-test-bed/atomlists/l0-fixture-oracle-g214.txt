@@ -1,6 +1,6 @@
-# #214 — `_slot_conflict_backtrack_abi` (v2 #24e, real
+# #214 — `_slot_conflict_backtrack_abi` (v2 #24e, Portage's
 # `_slot_conflict_backtrack_abi`, depgraph.py:2282): a merge-merge slot
-# conflict whose built, rebuildable parent real rebuilds instead of
+# conflict whose built, rebuildable parent Portage rebuilds instead of
 # reporting.
 #
 # Run with
@@ -13,7 +13,7 @@
 #   FX_WORLD_EXTRA="app-misc/abicons app-misc/abiforce" \
 #     differential-test-bed/run/l0-fixture-oracle.sh differential-test-bed/atomlists/l0-fixture-oracle-g214.txt
 #
-# Shape (S0 probe, this branch -- the single real-Portage probe common
+# Shape (S0 probe, this branch -- the single Portage probe common
 # rule 13 allows, `podman run ... localhost/test-portuale:latest
 # /probe.sh`, pasted verbatim): `app-misc/abiprov-1` (`SLOT="0/1"`) and
 # `app-misc/abiprov-2` (`SLOT="0/2"`) both merge-bound -- `-1` through
@@ -21,7 +21,7 @@
 # `RDEPEND="app-misc/abiprov:0/1="` (its live ebuild carries bare
 # `app-misc/abiprov:=`), `-2` through `app-misc/abiforce-1`'s
 # `RDEPEND=">=app-misc/abiprov-2"` -- while no `abiprov` instance is
-# installed (the committed fixture vdb carries `abicons-1` only). Real's
+# installed (the committed fixture vdb carries `abicons-1` only). Portage's
 # slot-conflict pass finds the built parent's `:=` conflict atom
 # resolvable by the update probe
 # (`_slot_operator_update_probe_slot_conflict`) and rebuilds it

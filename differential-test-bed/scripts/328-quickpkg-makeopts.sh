@@ -1,6 +1,6 @@
 #!/bin/bash
 # 328-quickpkg-makeopts.sh -- portuale #328 oracle: the gpkg compressor of
-# an unmerge-backup quickpkg takes {JOBS} from make.conf MAKEOPTS (real
+# an unmerge-backup quickpkg takes {JOBS} from make.conf MAKEOPTS (Portage
 # gpkg._get_binary_cmd: makeopts_to_job_count(settings["MAKEOPTS"])).
 # Runs inside the bed image as root with either PM:
 #

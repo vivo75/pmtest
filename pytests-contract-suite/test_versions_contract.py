@@ -1,6 +1,6 @@
 """Black-box contract suite for the versions-comparison portuale (see
-LLM/agent-context.md). Drives the Python harness (a thin wrapper around the
-real `portage.versions`) and the Rust harness identically via subprocess,
+LLM/agent-context.md). Drives the Python harness (a thin wrapper around
+Portage's `portage.versions`) and the Rust harness identically via subprocess,
 and asserts their outputs are byte-for-byte the same. Neither harness's
 internals are imported directly -- this is deliberately implementation-
 agnostic, per the "black-box via CLI/API" decision in LLM/agent-context.md.

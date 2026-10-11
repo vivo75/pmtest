@@ -1,9 +1,9 @@
 """Every committed fixture `metadata/md5-cache` entry must be valid for
 its ebuild (backlog #46 S1).
 
-Real `portdbapi._pull_valid_cache` validates a pregen entry's `_md5_`
+Portage's `portdbapi._pull_valid_cache` validates a pregen entry's `_md5_`
 against the ebuild's content before trusting it; a stale entry makes
-real run the `depend` phase (C0's P8 oracle), and after #46 S3 portuale
+Portage run the `depend` phase (C0's P8 oracle), and after #46 S3 portuale
 does the same. This guard keeps the checked-in tree valid so the
 contract suite keeps testing a cached repo rather than a regenerated
 one, and so a new fixture that forgets `_md5_` (or edits the ebuild
@@ -84,6 +84,6 @@ def test_committed_fixture_md5_cache_entries_match_their_ebuilds(root: Path):
             problems.append(f"{category}/{pf}: _md5_={want} but the ebuild is {got}")
     assert checked, f"{root}: no cache entries found"
     assert not problems, (
-        f"{root}: {len(problems)} stale md5-cache entr(y/ies) -- refresh with real "
+        f"{root}: {len(problems)} stale md5-cache entr(y/ies) -- refresh with Portage's "
         f"`egencache --update` (backlog #46 S1):\n" + "\n".join(problems)
     )
