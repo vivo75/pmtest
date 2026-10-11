@@ -9006,8 +9006,11 @@ def test_emerge_unmerge_backup_multi_instance_uses_the_subdir_layout(
     `<pkgdir>/<cat>/<pn>/<pf>-<build_id>.gpkg.tar` (Portage `bin/quickpkg` ->
     `bintree.inject` -> `getname(..., allocate_new=True)` -- `.xpak`
     pre-#173, when the xpak shape was still the default; backlog #173),
-    not the bare single-instance path -- and the `Packages` entry
-    carries `BUILD_ID`."""
+    not the bare single-instance path. The `Packages` entry carries no
+    `BUILD_ID`: `bin/quickpkg` never exports one into the archive, and
+    `_pkgindex_entry` (`bintree.py:2289-2313`) copies the archive's keys
+    (#342; Portage's own index in pmtest
+    `differential-test-bed/scripts/335-unmerge-features.sh`)."""
     root = tmp_path / "root"
     (root / "var/lib/portage").mkdir(parents=True)
     pkgdir = tmp_path / "pkgdir"
@@ -9043,7 +9046,7 @@ def test_emerge_unmerge_backup_multi_instance_uses_the_subdir_layout(
 
     packages = (pkgdir / "Packages").read_text()
     assert "CPV: dev-libs/emergeconfigpkg-1.0" in packages
-    assert "BUILD_ID: 1" in packages
+    assert "BUILD_ID" not in packages
     assert "PATH: dev-libs/emergeconfigpkg/emergeconfigpkg-1.0-1.gpkg.tar" in packages
 
 
