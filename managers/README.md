@@ -39,6 +39,15 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
     atom_harness: /path        #   <rust_dir>/target/<profile>/<package-harness>)
 ```
 
+- Un applet o un `<kind>_harness` scritto come `~` (null esplicito)
+  significa "questo PM non lo fornisce": il registry alza `NotProvided`
+  e i test che ne hanno bisogno fanno skip, invece di fallire su una
+  build cargo di un package che non esiste. Una chiave assente resta il
+  fallback alla build del PM (`<rust_dir>/target/<profile>/<package>`).
+  Esempio: la voce `portage-cli` (`em`, lu-zero/portage-cli) non ha
+  `mrg` né harness neutrali, e il suo `ebuild` è lo shim
+  `managers/shims/portage-cli/ebuild` (`em ebuild "$@"`), perché `em`
+  non fa dispatch su `argv[0]`.
 - `type: reference` — il PM oracolo (oggi il portage reale). Il suo
   output è il comportamento atteso; non si modifica mai il test per
   farlo passare, si fissa il PM sotto test.

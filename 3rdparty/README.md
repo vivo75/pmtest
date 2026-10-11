@@ -20,7 +20,7 @@ changes.
 |---|---|---|
 | `portage/` | the `.py` ebuild helpers that `import portage` (`doins.py`, `xpak-helper.py`, …), their `lib/portage` import path, `cnf/sets/portage.conf`, and the real `portage.versions` / `portage.dep` modules the primitive harnesses (`python/*_harness.py`) wrap | `repos.toml` `[portage]` |
 | `brush/` | reference/hacking checkout of the bash interpreter `portuale` embeds; `crates/portuale/Cargo.toml` fetches it via git independently | `repos.toml` `[brush]` |
-| `portage-cli/` | reference checkout of upstream Rust Portage CLI (`portage-solver` / `portage-atom-pubgrub` / `portage-atom-resolvo`); analysis in `docs/solver-backends-analysis.md`. No Cargo dependency yet | `repos.toml` `[portage-cli]` |
+| `portage-cli/` | upstream Rust Portage CLI (`portage-solver` / `portage-atom-pubgrub` / `portage-atom-resolvo`; analysis in `docs/solver-backends-analysis.md`), and the source of the `portage-cli` PM under test (`PMTEST_PM=portage-cli`, its `em` built from here). No Cargo dependency yet | `repos.toml` `[portage-cli]` |
 
 The **bash phase runtime** (`ebuild.sh` and friends) is *not* here — it's
 vendored into the tree at `bin/` so `emerge` runs with no Portage

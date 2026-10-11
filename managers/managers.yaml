@@ -17,6 +17,18 @@ pms:
     ebuild: ../portuale/target/release/portuale
     mrg: ../portuale/target/release/portuale
     version: git
+  portage-cli:
+    type: portage-compatible
+    repo: 3rdparty/portage-cli  # lu-zero/portage-cli, see 3rdparty/repos.toml
+    package: portage-cli        # cargo package of the `em` binary
+    emerge: 3rdparty/portage-cli/target/release/em  # bare `em` is emerge
+    ebuild: managers/shims/portage-cli/ebuild       # `em ebuild`, no argv[0] dispatch
+    mrg: ~                      # `~` = not shipped: the tests that need it skip
+    versions_harness: ~
+    atom_harness: ~
+    use_reduce_harness: ~
+    required_use_harness: ~
+    version: git
   portage:
     type: reference
     emerge: /usr/sbin/emerge

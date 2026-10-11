@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+# `ebuild` applet for the portage-cli registry entry (managers.yaml).
+#
+# portage-cli's `em` has no argv[0] dispatch: a bare `em` is already
+# `emerge`, so that applet is a plain symlink to the binary, but
+# `ebuild <file> <phase>...` is the `em ebuild` subcommand. The tests
+# reach this script through their own `ebuild` symlink, so the binary
+# is located from this file's real path, in the active cargo profile.
+set -euo pipefail
+here="$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")"
+exec "${here}/../../../3rdparty/portage-cli/target/${PMTEST_PROFILE:-release}/em" ebuild "$@"

@@ -296,11 +296,28 @@ def _provide(name, pm, package, binary, build=True):
     return binary
 
 
+def _refuse_declined(name, pm, key, what):
+    """`NotProvided` when the entry sets `key` to an explicit null.
+
+    A key that is absent falls back to the entry's own build (portuale's
+    multicall and harness packages); a key written as `~` is the entry
+    saying it does not ship that binary at all (portage-cli has no `mrg`
+    and no neutral harnesses), so the tests that need it skip instead of
+    failing on a cargo package that was never there.
+    """
+    if key in pm and pm[key] is None:
+        raise NotProvided(
+            f"PM {name!r} does not ship {what} (`{key}: ~` in "
+            "managers/managers.yaml) -- not applicable"
+        )
+
+
 def declared_applet(kind, name=None):
     """Where an applet *would* live -- no build, no existence check."""
     if kind not in APPLETS:
         raise RegistryError(f"unknown applet {kind!r} (expected one of {APPLETS})")
     name, pm = active_pm(name)
+    _refuse_declined(name, pm, kind, kind)
     if pm.get(kind):
         return resolve_path(pm[kind])
     rd = rust_dir(pm)
@@ -330,6 +347,7 @@ def harness(kind, name=None, build=True):
         )
     name, pm = active_pm(name)
     package = HARNESS_PACKAGES[kind]
+    _refuse_declined(name, pm, f"{kind}_harness", package)
     if pm.get(f"{kind}_harness"):
         binary = resolve_path(pm[f"{kind}_harness"])
     else:

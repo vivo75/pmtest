@@ -161,3 +161,26 @@ def test_similar_segments_are_not_rewritten(monkeypatch):
     monkeypatch.setenv("PMTEST_PROFILE", "debug")
     for raw in ("/opt/mytarget/release/foo", "/opt/target/release-notes/foo"):
         assert str(registry.resolve_path(raw)) == raw
+
+
+# --- explicit null: the entry does not ship it ----------------------------
+
+
+def test_null_applet_is_not_provided(monkeypatch):
+    """`mrg: ~` skips (NotProvided), never falls back to a cargo package."""
+    monkeypatch.setattr(registry, "_registry_cache", {"x": {"repo": ".", "mrg": None}})
+    with pytest.raises(registry.NotProvided):
+        registry.declared_applet("mrg", name="x")
+
+
+def test_null_harness_is_not_provided_without_building(monkeypatch):
+    monkeypatch.setattr(registry, "_registry_cache", {"x": {"repo": ".", "atom_harness": None}})
+    calls = _record_cargo_build(monkeypatch)
+    with pytest.raises(registry.NotProvided):
+        registry.harness("atom", name="x")
+    assert calls == []
+
+
+def test_absent_applet_still_falls_back_to_the_build(monkeypatch):
+    monkeypatch.setattr(registry, "_registry_cache", {"x": {"repo": ".", "package": "p"}})
+    assert str(registry.declared_applet("mrg", name="x")).endswith("/target/release/p")
