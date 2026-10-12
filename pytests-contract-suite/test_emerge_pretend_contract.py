@@ -566,6 +566,13 @@ CASES = [
     # validation behaviour itself is pinned hermetically per cell by the
     # `test_s8_*` functions (each docstring cites its S0 capture).
     ("#341 S8: unknown set earns Portage's rc 1", ["--pretend", "@s341"], 1),
+    # #341 S9: build-id matching against binary candidates. The shared
+    # root holds no t341 repo and no such binpkg, so this argv is the
+    # plain miss (rc 1) on both sides, like the S5/S6 entries above; the
+    # instance selection itself is pinned hermetically per cell by the
+    # `test_s9_*` functions (each docstring cites its H-bid-mask oracle
+    # cell: host Portage 3.0.82.2, two-instance PKGDIR).
+    ("#341 S9: build-id match cell earns Portage's rc 1", ["--pretend", "--usepkgonly", "dev-libs/t341-dep"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -6376,6 +6383,173 @@ def test_s4_binary_rewritten_rdepend_masks_invalid(
         "app-misc/t341-good",
         "app-misc/t341-good-1::t341",
         "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 1",
+    )
+
+
+# A hermetic `$PKGDIR` holding two binpkg-multi-instance builds of
+# `dev-libs/t341-dep-1` (backlog #341 S9): same CPV, `BUILD_ID` 1
+# (`BUILD_TIME` 1000) and `BUILD_ID` 2 (`BUILD_TIME` 2000). Field values
+# (EAPI 8, SLOT 0/1, KEYWORDS amd64, IUSE x) mirror the `repo-341` ebuild;
+# like the S4 binary pin above only the index entry is read on this path,
+# never an archive.
+_T341_BID_PACKAGES = (
+    "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 2\n\n"
+    "CPV: dev-libs/t341-dep-1\n"
+    "DEFINED_PHASES: -\n"
+    "DESCRIPTION: backlog #341 S9 oracle instance build 1\n"
+    "EAPI: 8\n"
+    "IUSE: x\n"
+    "KEYWORDS: amd64\n"
+    "SLOT: 0/1\n"
+    "USE:\n"
+    "REPO: t341\n"
+    "PATH: dev-libs/t341-dep-1-1.tbz2\n"
+    "BUILD_ID: 1\n"
+    "BUILD_TIME: 1000\n"
+    "\n"
+    "CPV: dev-libs/t341-dep-1\n"
+    "DEFINED_PHASES: -\n"
+    "DESCRIPTION: backlog #341 S9 oracle instance build 2\n"
+    "EAPI: 8\n"
+    "IUSE: x\n"
+    "KEYWORDS: amd64\n"
+    "SLOT: 0/1\n"
+    "USE:\n"
+    "REPO: t341\n"
+    "PATH: dev-libs/t341-dep-1-2.tbz2\n"
+    "BUILD_ID: 2\n"
+    "BUILD_TIME: 2000\n"
+)
+
+
+def _t341_bid_configroot(tmp_path, fixtures_root, mask_line):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #341 S9
+    cells: the S4 root (fixture repos plus the `repo-341` overlay) with a
+    two-instance `$PKGDIR` (`_T341_BID_PACKAGES`) and a user
+    `package.mask` holding `mask_line` ("" for an empty mask)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    pkgdir = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir"
+    pkgdir.mkdir(parents=True, exist_ok=True)
+    (pkgdir / "Packages").write_text(_T341_BID_PACKAGES)
+    (Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/package.mask").write_text(
+        mask_line + "\n"
+    )
+    return env
+
+
+def test_s9_build_id_mask_masks_only_the_equal_instance(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S9: a user `package.mask` line `=dev-libs/t341-dep-1-2`
+    masks only the binary instance with that build-id; the older build 1
+    stays mergeable.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --ignore-default-opts --getbinpkg=n --usepkgonly=y dev-libs/t341-dep`
+    with the two-instance `$PKGDIR` and that mask line (S0 cell
+    `H-bid-mask-masked`, rc 0, stdout `[binary  N     ]
+    dev-libs/t341-dep-1-1:0/1::t341 to <ROOT> USE="-x" 0 KiB`). The pin
+    below uses `--pretend` short lines (no `:slot::repo`/`0 KiB` suffix,
+    the `binaryonlypkg` convention); the signal is the `-1` instance
+    suffix. No S0 cell existed for the positive side: this oracle was
+    built for S9 (per-test configroot, synthetic `Packages`, host
+    Portage)."""
+    env = _t341_bid_configroot(tmp_path, fixtures_root, "=dev-libs/t341-dep-1-2")
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N     ] dev-libs/t341-dep-1-1 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s9_build_id_atom_selects_the_equal_instance(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S9: an `=` atom with a build-id resolves the binary
+    instance carrying it (Portage checks the id only in the `=` branch,
+    dep:2994-3008).
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --ignore-default-opts --getbinpkg=n --usepkgonly=y
+    '=dev-libs/t341-dep-1-2'` with the two-instance `$PKGDIR` and an
+    empty mask (S0 cell `H-bid-mask-atom`, rc 0, stdout `[binary  N     ]
+    dev-libs/t341-dep-1-2:0/1::t341 …`). Same `--pretend` short-line
+    convention as the sibling pin; the signal is the `-2` suffix. The
+    `probe_match.py` rows (`=dev-libs/foo-1.0-2` → only `#2`) pin the
+    same rule at the `portage-dep` unit level."""
+    env = _t341_bid_configroot(tmp_path, fixtures_root, "")
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "=dev-libs/t341-dep-1-2"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N     ] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s9_range_atom_ignores_the_build_id(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S9: `>=`/`~`/`<`/`<=` atoms carrying a build-id ignore
+    it in matching (dep:2994-3008: the id is consulted only in the `=`
+    branch), so the newest instance wins.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --ignore-default-opts --getbinpkg=n --usepkgonly=y
+    '>=dev-libs/t341-dep-1-2'` with the two-instance `$PKGDIR` (host
+    re-run of the `probe_match.py` row `>=dev-libs/foo-1.0-2` → all foo,
+    2026-10-12): rc 0, build 2 merged. Same `--pretend` short-line
+    convention as the sibling pins."""
+    env = _t341_bid_configroot(tmp_path, fixtures_root, "")
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", ">=dev-libs/t341-dep-1-2"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N     ] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s9_build_id_atom_masked_reports_the_masked_instance(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S9: with the equal instance masked, an `=`+build-id
+    top-level atom reports the masked block naming that instance (the
+    older build does not satisfy the atom).
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --ignore-default-opts --getbinpkg=n --usepkgonly=y
+    '=dev-libs/t341-dep-1-2'` with the two-instance `$PKGDIR` and the
+    mask line `=dev-libs/t341-dep-1-2` (S0 cell
+    `H-bid-mask-atom-masked`, rc 1, stderr `!!! All ebuilds that could
+    satisfy "=dev-libs/t341-dep-1-2" … - dev-libs/t341-dep-1::t341
+    (masked by: package.mask)`; Portage appends a `for <root>.` suffix
+    to the header line, which portuale omits by the
+    fixture-miss-message-unsuffixed convention). Stdout empty, stderr
+    pinned via `_all_masked`."""
+    env = _t341_bid_configroot(tmp_path, fixtures_root, "=dev-libs/t341-dep-1-2")
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "=dev-libs/t341-dep-1-2"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "=dev-libs/t341-dep-1-2",
+        "dev-libs/t341-dep-1::t341",
+        "package.mask",
     )
 
 
