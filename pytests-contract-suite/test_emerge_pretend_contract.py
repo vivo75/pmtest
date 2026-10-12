@@ -539,6 +539,11 @@ CASES = [
     # configroot differs, so one shared-root CASES entry (the plain miss,
     # rc 1, like Portage) plus the hermetic `test_s5_*` pins below.
     ("#341 S5: profile EAPI/formats validation earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep"], 1),
+    # #341 S6: user config (`/etc/portage` + `/etc/portage/profile` atom
+    # validation). Same argv and same shared-root miss (rc 1, like
+    # Portage: the shared root sees no t341 repo); the hermetic
+    # `test_s6_*` pin above replays the S0 user-config cell (rc 0).
+    ("#341 S6: user-config atom validation earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -6641,6 +6646,150 @@ def test_s5_unsupported_node_eapi_aborts_the_profile(
         "!!! Allowed actions are limited to --help, --info, --search, --sync, and",
         "!!! --version.",
     ]
+
+
+def _t341_user_configroot(tmp_path, fixtures_root):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #341 S6
+    user-config cell: the shared fixture repos plus the `repo-341`
+    overlay (in place, read-only), `make.profile` at the fixture
+    default profile, and S0 run6's eight lines (t341-adapted) in every
+    user file, with the per-file suffixes of `s0-sectionC.sh` (` x` for
+    `package.use`/`accept_keywords`, ` MIT` for `package.license`,
+    ` t341.conf` for `package.env` minus the `[x]` line). Returns the
+    env dict plus the configroot path (for ROOT normalisation)."""
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage/profile").mkdir(parents=True)
+    (cfg / "etc/portage/env").mkdir(parents=True)
+    (cfg / "etc/portage/sets").mkdir(parents=True)
+    (cfg / "var/lib/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t341]\nlocation = {fixtures_root / 'repo-341'}\npriority = 50\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    (cfg / "etc/portage/env/t341.conf").write_text("X=1\n")
+    u8 = [
+        "*/t341-dep",
+        "dev-libs/t341-*",
+        "dev-libs/t341-dep::t341",
+        "=dev-libs/t341-dep-1-2",
+        "=dev-libs/t341-dep-1-02",
+        "dev-libs/t341-dep-1",
+        "!dev-libs/t341-dep",
+        "dev-libs/t341-dep[x]",
+    ]
+    (cfg / "etc/portage/package.mask").write_text("\n".join(u8) + "\n")
+    (cfg / "etc/portage/package.unmask").write_text("\n".join(u8) + "\n")
+    (cfg / "etc/portage/package.use").write_text(
+        "\n".join(f"{line} x" for line in u8) + "\n"
+    )
+    (cfg / "etc/portage/package.accept_keywords").write_text(
+        "\n".join(f"{line} x" for line in u8) + "\n"
+    )
+    (cfg / "etc/portage/package.license").write_text(
+        "\n".join(f"{line} MIT" for line in u8) + "\n"
+    )
+    (cfg / "etc/portage/package.env").write_text(
+        "\n".join(f"{line} t341.conf" for line in u8 if "[" not in line) + "\n"
+    )
+    (cfg / "etc/portage/package.properties").write_text("\n".join(u8) + "\n")
+    (cfg / "etc/portage/profile/package.mask").write_text("\n".join(u8) + "\n")
+    (cfg / "etc/portage/profile/package.use").write_text(
+        "\n".join(f"{line} x" for line in u8) + "\n"
+    )
+    (cfg / "etc/portage/profile/package.use.force").write_text(
+        "\n".join(f"{line} x" for line in u8) + "\n"
+    )
+    (cfg / "etc/portage/profile/packages").write_text("\n".join(u8) + "\n")
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}, cfg
+
+
+def test_s6_user_config_validates_each_file_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S6: user-config (`/etc/portage/package.*`) and
+    user-profile (`/etc/portage/profile/*`) lines validate with
+    `eapi=None`, `allow_repo=True` and per-file wildcard/build-id flags
+    (oracle Q2e): `package.mask`/`unmask`/`properties`/`env` keep
+    wildcards, `::repo`, build-ids and use-dep lines; `package.use`/
+    `accept_keywords` drop use-dep lines with the not-allowed message;
+    `package.license` additionally drops build-ids; the user profile's
+    `package.mask`/`packages` drop wildcards while its `package.use*`
+    keeps them. Dropped lines warn `--- Invalid atom in <file>:
+    <message>` on stderr, each once (Portage prints every warning twice
+    on a fresh configroot — mtimedb miss — and the user-profile
+    `packages` warnings a third time mid-resolve, matrix §1.2/§1.3;
+    portuale prints each once per owner Q3). End state merges with rc 0
+    like Portage (the kept `dev-libs/t341-dep x` use lines and the
+    user-profile `package.use.force` entry enable `x`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    dev-libs/t341-dep` (S0 cell `C-userconfig`, rc 0; its 66 stderr lines
+    are the 31 below printed twice, plus a third copy of the four
+    `profile/packages` lines from the mid-resolve re-read). The hermetic
+    root below replays the same shape; `<ROOT>` is the scratch
+    configroot. Merge-row deltas vs Portage are the standing cosmetics:
+    no `:0/1::t341` slot/repo suffix without `-v`, no trailing `0 KiB`
+    (matrix §1.6), `USE="x"` for Portage's `USE="(x)"` (portuale never
+    renders the forced-flag parens), and the `#` mask-column marker is
+    Portage's own (the kept mask and unmask lines both match). No pin
+    covers the `package.env` use-dep crash cell (`C-userenv-crash`):
+    Portage's reader accepts that line and dies later with
+    `AssertionError: setcpv recursion detected` (a Portage bug, plan §S6);
+    portuale keeps the line."""
+    env, cfg = _t341_user_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N    #] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
+    ]
+    R = "<ROOT>"
+    expected = [
+        f"--- Invalid atom in {R}/etc/portage/profile/packages: /t341-dep",
+        f"--- Invalid atom in {R}/etc/portage/profile/packages: dev-libs/t341-*",
+        f"--- Invalid atom in {R}/etc/portage/profile/packages: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/profile/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.use: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.use: dev-libs/t341-dep-1",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/etc/portage/profile/package.use: dev-libs/t341-dep[x]",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.use.force: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.use.force: dev-libs/t341-dep-1",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/etc/portage/profile/package.use.force: dev-libs/t341-dep[x]",
+        f"--- Invalid atom in {R}/etc/portage/package.use: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.use: dev-libs/t341-dep-1",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/etc/portage/package.use: dev-libs/t341-dep[x]",
+        f"--- Invalid atom in {R}/etc/portage/package.license: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/etc/portage/package.license: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.license: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/etc/portage/package.properties: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.properties: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/etc/portage/package.env: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.env: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/etc/portage/package.accept_keywords: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/etc/portage/package.accept_keywords: dev-libs/t341-dep[x]",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.mask: dev-libs/t341-*",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.mask: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/profile/package.mask: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/etc/portage/package.mask: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.mask: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/etc/portage/package.unmask: =dev-libs/t341-dep-1-02",
+        f"--- Invalid atom in {R}/etc/portage/package.unmask: dev-libs/t341-dep-1",
+    ]
+    lines = result.stderr.replace(str(cfg), R).splitlines()
+    assert lines == expected
 
 
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
