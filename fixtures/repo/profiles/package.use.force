@@ -1,8 +1,9 @@
 # repo-level package.use.force: force-enables "forceflag" for
-# dev-libs/pkgusemaskforcepkg via a bare wildcard entry (deliberately
-# less specific than any real atom, to help exercise atom-specificity
-# ordering alongside the package.use.mask fixture files).
-*/pkgusemaskforcepkg forceflag
+# dev-libs/pkgusemaskforcepkg via a bare cat/pkg atom (Portage drops
+# wildcard atoms such as `*/pkgusemaskforcepkg` in repo profiles --
+# UseManager._parse_file_to_dict allows them only for user config --
+# so the entry must be a plain atom; backlog #341 S5).
+dev-libs/pkgusemaskforcepkg forceflag
 
 # dev-libs/deepusedepfchild is installed +flip; this entry force-enables
 # flip in its *effective* USE too, so the `[-flip]` its installed parent

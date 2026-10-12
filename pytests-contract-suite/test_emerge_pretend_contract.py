@@ -534,6 +534,11 @@ CASES = [
     ("#341 S4: t341-condfirst earns Portage's rc 1", ["--pretend", "app-misc/t341-condfirst"], 1),
     ("#341 S4: t341-eapi7 earns Portage's rc 1", ["--pretend", "app-misc/t341-eapi7"], 1),
     ("#341 S4: binary t341-good under --usepkgonly earns Portage's rc 1", ["--pretend", "--usepkgonly", "app-misc/t341-good"], 1),
+    # #341 S5: profile files (per-node EAPI, formats). All four S0
+    # profile cells run the same argv (`dev-libs/t341-dep`); only the
+    # configroot differs, so one shared-root CASES entry (the plain miss,
+    # rc 1, like Portage) plus the hermetic `test_s5_*` pins below.
+    ("#341 S5: profile EAPI/formats validation earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -6345,6 +6350,297 @@ def test_s4_binary_rewritten_rdepend_masks_invalid(
         "app-misc/t341-good-1::t341",
         "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 1",
     )
+
+
+def _t341_profile_configroot(tmp_path, fixtures_root, repo="repo-341", layout=None, noeapi_eapi=None):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #341 S5
+    profile cells: the shared fixture repos plus a *copy* of the `repo-341`
+    overlay (the copy lives under `tmp_path` so the test can rewrite its
+    profile tree), `make.profile` at the copy's `t341/noeapi` leaf.
+
+    The committed fixture's `profiles/t341/parent` points at the S0
+    container's gentoo tree (`/var/db/repos/gentoo/...`), which hermetic
+    tests cannot see; the copy's parent is repointed at the fixture
+    default profile instead. `layout` (when given) replaces the copy's
+    `metadata/layout.conf` (the `nokey` cell); `noeapi_eapi` (when given)
+    replaces the leaf's `eapi` file (the `eapi10` cell). Returns the env
+    dict plus the copy's path (for ROOT normalisation)."""
+    cfg = tmp_path / "cfg"
+    dst = tmp_path / "t341-repo"
+    shutil.copytree(fixtures_root / repo, dst)
+    (dst / "profiles/t341/parent").write_text(
+        f"{fixtures_root / 'repo/profiles/default'}\n"
+    )
+    if layout is not None:
+        (dst / "metadata/layout.conf").write_text(layout)
+    if noeapi_eapi is not None:
+        (dst / "profiles/t341/noeapi/eapi").write_text(noeapi_eapi)
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t341]\nlocation = {dst}\npriority = 50\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(dst / "profiles/t341/noeapi")
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}, cfg, dst
+
+
+def _t341_normalize(text, cfg, dst, fixtures_root):
+    """Normalise the scratch paths out of a pinned stderr: the repo copy,
+    the configroot, and the fixtures tree (the pre-existing
+    `package.use.force` wildcard warning cites the latter)."""
+    return (
+        text.replace(str(dst), "<REPO>")
+        .replace(str(cfg), "<ROOT>")
+        .replace(str(fixtures_root), "<FIXTURES>")
+    )
+
+
+def test_s5_eapi5_node_keeps_modern_atoms_noeapi_drops_them(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S5: profile files validate per node EAPI. The `t341`
+    node (`eapi` = 5) keeps `:=`, `:0` and `[x(+)]`; the `noeapi` child
+    (no `eapi` file, no `profile_eapi_when_unspecified` anywhere: EAPI 0)
+    drops them with the EAPI-0 messages. `::t341`, build-ids, wildcards
+    and bare versions drop in both (no `profile-repo-deps`/`build-id`
+    formats); use-carrying lines in `package.use`/`package.accept_keywords`
+    get the not-allowed message. End state stays `masked by: package.mask`
+    (the surviving plain atom), Portage rc 1.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    dev-libs/t341-dep` (S0 cell `B-prof-eapi5-noeapi`, rc 1; its 92 stderr
+    lines are the 46 below printed twice — fresh-configroot mtimedb-miss
+    doubling, matrix §1.2. Portage prints ×2 on a fresh configroot, ×1
+    warm; portuale prints each warning once per owner Q3, so the pin sees
+    one copy, in Portage's per-file order `packages`, `package.use`,
+    `package.accept_keywords`, `package.mask`, parent before child,
+    matrix §1.4. The hermetic root below replays the same shape; stdout
+    empty. `<REPO>` is the scratch repo copy."""
+    env, cfg, dst = _t341_profile_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    R = "<REPO>"
+    expected = [
+        f"--- Invalid atom in {R}/profiles/t341/packages: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/packages: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/packages: /t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: /t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/package.use: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: dev-libs/t341-dep::t341",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: dev-libs/t341-dep-1",
+    ]
+    lines = _t341_normalize(result.stderr, cfg, dst, fixtures_root).splitlines()
+    assert lines == expected + [""] + _all_masked(
+        "dev-libs/t341-dep", "dev-libs/t341-dep-1::t341", "package.mask"
+    ).splitlines() + [""]
+
+
+def test_s5_formats_repo_deps_and_build_id_accepted(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S5: with `profile-formats = portage-2
+    profile-repo-deps build-id profile-default-eapi` plus
+    `profile_eapi_when_unspecified = 5` (underscore spelling is normative:
+    repository/config.py:529, matrix §3), `::t341` and `=…-1-2` are kept
+    everywhere except `package.accept_keywords` (build-ids never pass
+    there), and the `noeapi` node reads as EAPI 5 (no EAPI-0 messages).
+    Only wildcards, bare versions and use-in-usefiles still warn. The
+    formats repo carries no ebuilds, so the end state is `there are no
+    ebuilds to satisfy`, Portage rc 1 (its `Maybe you meant…` suggestions
+    name the container gentoo tree and are not pinned hermetically).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    dev-libs/t341-dep` (S0 cell `B-prof-formats`, rc 1; miss-state doubling
+    as in the eapi5 cell: portuale prints each warning once per owner Q3).
+    Stdout empty."""
+    env, cfg, dst = _t341_profile_configroot(
+        tmp_path, fixtures_root, repo="repo-341-formats"
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    R = "<REPO>"
+    expected = [
+        f"--- Invalid atom in {R}/profiles/t341/packages: /t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: /t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/package.use: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: dev-libs/t341-dep-1",
+    ]
+    lines = _t341_normalize(result.stderr, cfg, dst, fixtures_root).splitlines()
+    assert lines[: len(expected)] == expected
+    assert 'emerge: there are no ebuilds to satisfy "dev-libs/t341-dep".' in "\n".join(
+        lines[len(expected) :]
+    )
+
+
+def test_s5_nokey_layout_key_ignored_without_default_eapi_format(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S5: `profile_eapi_when_unspecified` counts only with
+    `profile-default-eapi` in `profile-formats`; without it the key is
+    dropped (with a `SyntaxWarning`) and the `noeapi` node stays EAPI 0
+    while the `t341` node (`eapi` file = 5) still takes `::repo` and
+    build-ids from the other formats. End state `there are no ebuilds`
+    (scratch repo without ebuilds, like S0), Portage rc 1.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    dev-libs/t341-dep` (S0 cell `B-prof-nokey`, rc 1; miss-state doubling:
+    portuale ×1 per owner Q3). Portage's warning is a two-line Python
+    frame (`…/config.py:1694: SyntaxWarning: …` + `  warnings.warn(`);
+    the frame path is the container's Portage install and is not
+    reproducible hermetically, so portuale reproduces the message text
+    (with its `SyntaxWarning: ` category) and the pin covers that text
+    only. Stdout empty."""
+    env, cfg, dst = _t341_profile_configroot(
+        tmp_path,
+        fixtures_root,
+        repo="repo-341-formats",
+        layout="masters =\nthin-manifests = true\n"
+        "profile-formats = portage-2 profile-repo-deps build-id\n"
+        "profile_eapi_when_unspecified = 5\n",
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    R = "<REPO>"
+    expected = [
+        "SyntaxWarning: Repository named 't341' has profile_eapi_when_unspecified setting in "
+        f"'{R}/metadata/layout.conf', but 'profile-default-eapi' is not listed in the "
+        "profile-formats field. Please report this issue to the repository maintainer.",
+        f"--- Invalid atom in {R}/profiles/t341/packages: /t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: /t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/packages: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/package.use: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/package.use: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.use: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: */t341-dep",
+        f"--- Atom is not allowed to have USE flag(s) in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep[x(+)]",
+        f"--- Invalid atom in {R}/profiles/t341/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: =dev-libs/t341-dep-1-2",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.accept_keywords: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/package.mask: dev-libs/t341-dep-1",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: */t341-dep",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: dev-libs/t341-dep:=",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: Slot deps are not allowed in EAPI 0: 'dev-libs/t341-dep:0'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: Use deps are not allowed in EAPI 0: 'dev-libs/t341-dep[x(+)]'",
+        f"--- Invalid atom in {R}/profiles/t341/noeapi/package.mask: dev-libs/t341-dep-1",
+    ]
+    lines = _t341_normalize(result.stderr, cfg, dst, fixtures_root).splitlines()
+    assert lines[: len(expected)] == expected
+    assert 'emerge: there are no ebuilds to satisfy "dev-libs/t341-dep".' in "\n".join(
+        lines[len(expected) :]
+    )
+
+
+def test_s5_unsupported_node_eapi_aborts_the_profile(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S5: a node `eapi` file with an unsupported EAPI
+    (`10`) raises Portage's `ParseError`, which empties the whole profile
+    list and aborts the run (`Your current profile is invalid…`), Portage
+    rc 1. Portuale prints each line once (the S0 ×2 is miss-state
+    doubling, matrix §1.2, owner Q3); the `Unable to parse profile` and
+    not-a-symlink framing lines depend on the container layout and are
+    not reproduced.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    dev-libs/t341-dep` (S0 cell `B-prof-eapi10`, rc 1). Stdout empty."""
+    env, cfg, dst = _t341_profile_configroot(
+        tmp_path, fixtures_root, noeapi_eapi="10\n"
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert _t341_normalize(result.stderr, cfg, dst, fixtures_root).strip().splitlines() == [
+        "!!! ParseError: Profile contains unsupported EAPI '10': '<REPO>/profiles/t341/noeapi/eapi'",
+        "!!! Your current profile is invalid. If you have just changed your profile",
+        "!!! configuration, you should revert back to the previous configuration.",
+        "!!! Allowed actions are limited to --help, --info, --search, --sync, and",
+        "!!! --version.",
+    ]
 
 
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
