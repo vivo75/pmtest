@@ -31,6 +31,7 @@ FIXTURE_ROOTS = [
         "independentoverlay",
         "layoutmasteroverlay",
         "repnamerepo",
+        "repo-341",
     )
 ] + [REPO_ROOT / "differential-test-bed" / "images" / "overlay" / "porttest"]
 

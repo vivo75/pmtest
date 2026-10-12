@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/t341-dep:= !!app-misc/t341-badslot
+SLOT=0
+_md5_=da57fed9b98da954d9e4d67f48c4300b

@@ -1,0 +1,8 @@
+dev-libs/t341-dep::t341
+=dev-libs/t341-dep-1-2
+*/t341-dep
+dev-libs/t341-dep:=
+dev-libs/t341-dep:0
+dev-libs/t341-dep[x(+)]
+dev-libs/t341-dep-1
+dev-libs/t341-dep

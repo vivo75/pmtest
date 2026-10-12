@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+EAPI=8
+IUSE=x
+KEYWORDS=amd64
+RDEPEND=x? ( dev-libs/t341-dep ) dev-libs/t341-dep::gentoo
+SLOT=0
+_md5_=cdc5c5b78b506db54f2a8d0b7ff81bc5

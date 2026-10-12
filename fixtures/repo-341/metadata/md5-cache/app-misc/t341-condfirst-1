@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=y? ( dev-libs/t341-dep::a )
+SLOT=0
+_md5_=d9e71e2c84bda5926a56e0dc35a189ae
