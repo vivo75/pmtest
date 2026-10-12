@@ -280,7 +280,7 @@ CASES = [
         [
             "--pretend", "--deep",
             "--reinstall-atoms", "dev-libs/deeppkg2 dev-libs/nothingmatches",
-            "--reinstall-atoms", "=dev-libs/newpkg-1.0",
+            "--reinstall-atoms", "dev-libs/newpkg",
             "dev-libs/deeppkg",
         ],
         0,
@@ -445,7 +445,7 @@ CASES = [
     ("--exclude: leaves an installed package alone despite --update", ["--pretend", "--update", "--exclude", "dev-libs/upgradepkg", "dev-libs/upgradepkg"], 0),
     ("-X short alias for --exclude", ["--pretend", "--update", "-X", "dev-libs/upgradepkg", "dev-libs/upgradepkg"], 0),
     ("--exclude=ATOM inline form", ["--pretend", "--update", "--exclude=dev-libs/upgradepkg", "dev-libs/upgradepkg"], 0),
-    ("--exclude prevents a not-yet-installed package from being offered", ["--pretend", "--exclude", "dev-libs/newpkg", "dev-libs/newpkg"], 1),
+    ("--exclude prevents a not-yet-installed package from being offered", ["--pretend", "--exclude", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("--exclude with no argument is a real, immediate usage error", ["--pretend", "--exclude"], 2),
     ("-X bundled with other short flags is not supported", ["-pX", "dev-libs/upgradepkg"], 2),
     ("--json: new install", ["--pretend", "--json", "dev-libs/newpkg"], 0),
@@ -484,8 +484,8 @@ CASES = [
     ("versioned top-level atom: no version satisfies it", ["--pretend", ">=dev-libs/newpkg-9.0"], 1),
     ("slotted top-level atom: no such slot", ["--pretend", "dev-libs/newpkg:5"], 1),
     ("exact-version top-level atom: already installed", ["--pretend", "=dev-libs/samepkg-1.0"], 0),
-    ("blocker top-level atom: not a valid target", ["--pretend", "!!dev-libs/newpkg"], 2),
-    ("weak-blocker top-level atom: not a valid target", ["--pretend", "!dev-libs/newpkg"], 2),
+    ("blocker top-level atom: not a valid target", ["--pretend", "!!dev-libs/newpkg"], 1),
+    ("weak-blocker top-level atom: not a valid target", ["--pretend", "!dev-libs/newpkg"], 1),
     (
         "USE-dep top-level atom: now in v1 grammar, resolves New",
         ["--pretend", "dev-libs/foo[bar(+)]"],
@@ -544,6 +544,21 @@ CASES = [
     # Portage: the shared root sees no t341 repo); the hermetic
     # `test_s6_*` pin above replays the S0 user-config cell (rc 0).
     ("#341 S6: user-config atom validation earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep"], 1),
+    # #341 S7: command line + `--exclude`-style options. Bad package
+    # atoms and bad option atoms fail before resolution, so the shared
+    # root (which sees no t341 repo) still earns Portage's exit code;
+    # the hermetic `test_s7_*` pins below replay the S0 D cells
+    # (output text) and the live-probed strict families.
+    ("#341 S7: wildcard package arg earns Portage's rc 1", ["--pretend", "*/t341-dep"], 1),
+    ("#341 S7: blocker package arg earns Portage's rc 1", ["--pretend", "!dev-libs/t341-dep"], 1),
+    ("#341 S7: bare-version package arg earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep-1"], 1),
+    ("#341 S7: bad build-id package arg earns Portage's rc 1", ["--pretend", "=dev-libs/t341-dep-1-02"], 1),
+    ("#341 S7: build-id package arg with no build earns Portage's rc 1", ["--pretend", "=dev-libs/t341-dep-1-2"], 1),
+    ("#341 S7: bad --exclude atom earns Portage's rc 2", ["--pretend", "--exclude", ">=dev-libs/t341-dep-1", "dev-libs/t341-dep"], 2),
+    ("#341 S7: two bad --exclude atoms earn Portage's rc 2", ["--pretend", "--exclude", "dev-libs/t341-dep::t341", "--exclude", ">=dev-libs/t341-dep-1", "dev-libs/t341-dep"], 2),
+    ("#341 S7: bad --buildpkg-exclude atom earns Portage's rc 2", ["--pretend", "--buildpkg-exclude", "!dev-libs/t341-dep", "dev-libs/t341-dep"], 2),
+    ("#341 S7: bad --usepkg-exclude atom earns Portage's rc 2", ["--pretend", "--usepkg-exclude", "dev-libs/t341-dep::t341", "dev-libs/t341-dep"], 2),
+    ("#341 S7: bad --reinstall-atoms atom earns Portage's rc 2", ["--pretend", "--reinstall-atoms", "=dev-libs/t341-dep-1-2", "dev-libs/t341-dep"], 2),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -2041,7 +2056,7 @@ CASES = [
     ("bare name: a unique package name is category-qualified", ["--pretend", "newpkg"], 0),
     ("bare name: ambiguous across two categories is rejected", ["--pretend", "ambigpkg"], 1),
     ("bare name: no match reports 'no ebuilds to satisfy'", ["--pretend", "nosuchpkgname"], 1),
-    ("bare name + version: dep_expand splices the category (=cat/pkg-ver)", ["--pretend", "newpkg-1.0"], 0),
+    ("bare name + version: rejected like Portage (a version needs an operator)", ["--pretend", "newpkg-1.0"], 1),
     ("bare name + operator + version: dep_expand splices the category", ["--pretend", ">=newpkg-1.0"], 0),
     ("bare name + slot: dep_expand splices the category", ["--pretend", "newpkg:0"], 0),
     ("bare name + nonexistent version: 'no ebuilds' on the expanded atom", ["--pretend", "newpkg-9.9"], 1),
@@ -6790,6 +6805,447 @@ def test_s6_user_config_validates_each_file_like_portage(
     ]
     lines = result.stderr.replace(str(cfg), R).splitlines()
     assert lines == expected
+
+
+def _t341_cmd_invalid(emerge_binary, env, atom):
+    """Run `emerge --pretend <atom>` in the S4 hermetic root and pin
+    Portage's two-line `run_action` rejection (rc 1, empty stdout)."""
+    result = _run([str(emerge_binary)], ["--pretend", atom], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        f"!!! '{atom}' is not a valid package atom.\n"
+        "!!! Please check ebuild(5) for full details.\n"
+    )
+    return result
+
+
+def test_s7_cmd_wild_rejected_like_portage(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S7: `*/t341-dep` is not a valid package argument
+    (wildcards need `allow_wildcard`, which `is_valid_package_atom`
+    never passes).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n */t341-dep`
+    (S0 cell `D-cmd-wild`, rc 1, stderr `!!! '*/t341-dep' is not a valid
+    package atom.` + `!!! Please check ebuild(5) for full details.`,
+    stdout empty). The hermetic root below replays the same shape."""
+    _t341_cmd_invalid(
+        emerge_binary, _t341_configroot(tmp_path, fixtures_root), "*/t341-dep"
+    )
+
+
+def test_s7_cmd_blocker_rejected_like_portage(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S7: `!dev-libs/t341-dep` is not a valid package
+    argument (`is_valid_package_atom` passes `allow_blockers=False`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    !dev-libs/t341-dep` (S0 cell `D-cmd-blocker`, rc 1, the same two
+    `!!!` lines as every other bad package atom, stdout empty)."""
+    _t341_cmd_invalid(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "!dev-libs/t341-dep",
+    )
+
+
+def test_s7_cmd_bare_version_rejected_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: `dev-libs/t341-dep-1` is not a valid package
+    argument (a version without an operator is no atom).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    dev-libs/t341-dep-1` (S0 cell `D-cmd-ver`, rc 1, the same two `!!!`
+    lines, stdout empty)."""
+    _t341_cmd_invalid(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "dev-libs/t341-dep-1",
+    )
+
+
+def test_s7_cmd_bad_build_id_rejected_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: `=dev-libs/t341-dep-1-02` is not a valid package
+    argument (build-ids reject a leading zero, dep:2015).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    =dev-libs/t341-dep-1-02` (S0 cell `D-cmd-badbid0`, rc 1, the same two
+    `!!!` lines, stdout empty)."""
+    _t341_cmd_invalid(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "=dev-libs/t341-dep-1-02",
+    )
+
+
+def test_s7_cmd_build_id_atom_with_no_build_resolves_to_no_ebuilds(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: `=dev-libs/t341-dep-1-2` IS a valid package
+    argument (a build-id atom, `eapi=None`), but no ebuild carries a
+    build-id, so resolution reports the plain miss (rc 1).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    =dev-libs/t341-dep-1-2` (S0 cell `D-cmd-bid`, rc 1, stderr
+    `emerge: there are no ebuilds to satisfy "=dev-libs/t341-dep-1-2"
+    for <root>/`, stdout empty). Portuale omits Portage's `for <root>.`
+    suffix by the fixture-miss-message-unsuffixed convention; stdout
+    empty on both sides."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "=dev-libs/t341-dep-1-2"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert (
+        result.stderr
+        == 'emerge: there are no ebuilds to satisfy "=dev-libs/t341-dep-1-2".\n'
+    )
+
+
+def test_s7_cmd_short_repo_name_merges_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: `t341-dep::t341` IS a valid package argument
+    (`is_valid_package_atom` splices `cat/` into the short name, then
+    parses with `allow_repo=True`) and merges like its qualified form.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    t341-dep::t341` (S0 cell `D-cmd-shortrepo`, rc 0, merges
+    `dev-libs/t341-dep-1` with `USE="-x"`). Merge-row deltas vs Portage
+    are the standing cosmetics (no `:0/1::t341` slot/repo suffix without
+    `-v`, no trailing `0 KiB`, matrix §1.6); stderr empty on both sides."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "t341-dep::t341"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def _t341_exclude_error(emerge_binary, env, flag, atoms):
+    """Run `emerge --pretend --<flag> <atoms…> dev-libs/t341-dep` in the
+    S4 hermetic root and pin Portage's `parser.error` line (rc 2, empty
+    stdout). Portage prints its ~4.7 KB argparse `usage:` block above
+    the error line (S0 matrix §1.5); portuale reproduces the error line
+    only, which is what is pinned here."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", *[f"--{flag}={a}" for a in atoms], "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    return result
+
+
+@pytest.mark.parametrize(
+    "atom",
+    [
+        ">=dev-libs/t341-dep-1",
+        "dev-libs/t341-dep::t341",
+        "=dev-libs/t341-dep-1-2",
+        "dev-libs/t341-dep[x]",
+        "!dev-libs/t341-dep",
+    ],
+    ids=[
+        "D-excl-op",
+        "D-excl-repo",
+        "D-excl-bid",
+        "D-excl-use",
+        "D-excl-blocker",
+    ],
+)
+def test_s7_exclude_rejects_non_plain_atoms_like_portage(
+    emerge_binary, tmp_path, fixtures_root, atom
+):
+    """Backlog #341 S7: `--exclude` takes only plain package names and
+    slot atoms (wildcards allowed) — operators, repos, build-ids, use
+    deps and blockers abort through `parser.error`
+    (`_find_bad_atoms`, `repository/config.py:91-116`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full
+    argv `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    --exclude <atom> dev-libs/t341-dep` (S0 cells `D-excl-op`,
+    `D-excl-repo`, `D-excl-bid`, `D-excl-use`, `D-excl-blocker`, each rc 2,
+    stderr `emerge: error: Invalid Atom(s) in --exclude parameter:
+    '<atom>' (only package names and slot atoms (with wildcards)
+    allowed)` under the argparse `usage:` block, stdout empty). The
+    hermetic root below replays the same shape; only the error line is
+    pinned (see `_t341_exclude_error`)."""
+    result = _t341_exclude_error(
+        emerge_binary, _t341_configroot(tmp_path, fixtures_root), "exclude", [atom]
+    )
+    assert result.stderr == (
+        f"emerge: error: Invalid Atom(s) in --exclude parameter: '{atom}' "
+        "(only package names and slot atoms (with wildcards) allowed)\n"
+    )
+
+
+def test_s7_exclude_two_bad_atoms_joined_with_comma(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: two bad `--exclude` values (across two
+    occurrences) join with `,` in one error line.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n --exclude
+    dev-libs/t341-dep::t341 --exclude >=dev-libs/t341-dep-1
+    dev-libs/t341-dep` (S0 cell `D-excl-two`, rc 2, stderr `emerge:
+    error: Invalid Atom(s) in --exclude parameter:
+    'dev-libs/t341-dep::t341,>=dev-libs/t341-dep-1' (only …)` under the
+    `usage:` block, stdout empty). Only the error line is pinned."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--exclude",
+            "dev-libs/t341-dep::t341",
+            "--exclude",
+            ">=dev-libs/t341-dep-1",
+            "dev-libs/t341-dep",
+        ],
+        env,
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr == (
+        "emerge: error: Invalid Atom(s) in --exclude parameter: "
+        "'dev-libs/t341-dep::t341,>=dev-libs/t341-dep-1' "
+        "(only package names and slot atoms (with wildcards) allowed)\n"
+    )
+
+
+def test_s7_usepkg_exclude_rejects_repo_atom_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: `--usepkg-exclude` validates with the same strict
+    rule as `--exclude` (only the flag name in the message changes,
+    `_emerge/main.py:885-906`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    --usepkg-exclude dev-libs/t341-dep::t341 dev-libs/t341-dep` (S0 cell
+    `D-usexpkg-excl-repo`, rc 2, stderr `emerge: error: Invalid Atom(s)
+    in --usepkg-exclude parameter: 'dev-libs/t341-dep::t341' (only …)`
+    under the `usage:` block, stdout empty). Only the error line is
+    pinned."""
+    result = _t341_exclude_error(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "usepkg-exclude",
+        ["dev-libs/t341-dep::t341"],
+    )
+    assert result.stderr == (
+        "emerge: error: Invalid Atom(s) in --usepkg-exclude parameter: "
+        "'dev-libs/t341-dep::t341' "
+        "(only package names and slot atoms (with wildcards) allowed)\n"
+    )
+
+
+def test_s7_buildpkg_exclude_rejects_blocker_without_the_suffix(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: `--buildpkg-exclude` validates first and with the
+    `less_strict` rule (operators, repos and build-ids pass;
+    `_find_bad_atoms` passes no `allow_build_id`, so `eapi=None` turns it
+    on), and its message carries no "(only …)" suffix
+    (`_emerge/main.py:839-845`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    --buildpkg-exclude !dev-libs/t341-dep dev-libs/t341-dep` (S0 cell
+    `D-bpkgexcl-blocker`, rc 2, stderr `emerge: error: Invalid Atom(s) in
+    --buildpkg-exclude parameter: '!dev-libs/t341-dep'` under the
+    `usage:` block, stdout empty). Only the error line is pinned."""
+    result = _t341_exclude_error(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "buildpkg-exclude",
+        ["!dev-libs/t341-dep"],
+    )
+    assert result.stderr == (
+        "emerge: error: Invalid Atom(s) in --buildpkg-exclude parameter: "
+        "'!dev-libs/t341-dep'\n"
+    )
+
+
+def test_s7_buildpkg_exclude_is_checked_before_the_strict_families(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S7: with two bad option values, `--buildpkg-exclude`
+    reports first no matter the argv order (`_emerge/main.py:839-845`
+    runs before the nine-family loop at :885-906).
+
+    Portage 3.0.82.2, this host (2026-10-12), hermetic t341 configroot
+    (same shape as `_t341_configroot`), full argv `emerge -p
+    --ignore-default-opts --getbinpkg=n --usepkg=n --buildpkg-exclude
+    '!dev-libs/foo' --exclude '!dev-libs/bar' dev-libs/foo`: rc 2,
+    stderr `emerge: error: Invalid Atom(s) in --buildpkg-exclude
+    parameter: '!dev-libs/foo'` under the `usage:` block. The hermetic
+    root below replays the same shape with t341 atoms; only the error
+    line is pinned."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--buildpkg-exclude",
+            "!dev-libs/t341-dep",
+            "--exclude",
+            "!dev-libs/other",
+            "dev-libs/t341-dep",
+        ],
+        env,
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr == (
+        "emerge: error: Invalid Atom(s) in --buildpkg-exclude parameter: "
+        "'!dev-libs/t341-dep'\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "flag,atom",
+    [
+        ("reinstall-atoms", "=dev-libs/t341-dep-1-2"),
+        ("useoldpkg-atoms", "dev-libs/t341-dep::t341"),
+        ("rebuild-exclude", ">=dev-libs/t341-dep-1"),
+        ("rebuild-ignore", "dev-libs/t341-dep[x]"),
+        ("usepkg-include", "!dev-libs/t341-dep"),
+        ("getbinpkg-exclude", "dev-libs/t341-dep::t341"),
+        ("getbinpkg-include", "!dev-libs/t341-dep"),
+    ],
+    ids=[
+        "reinstall-atoms",
+        "useoldpkg-atoms",
+        "rebuild-exclude",
+        "rebuild-ignore",
+        "usepkg-include",
+        "getbinpkg-exclude",
+        "getbinpkg-include",
+    ],
+)
+def test_s7_strict_families_share_the_exclude_message(
+    emerge_binary, tmp_path, fixtures_root, flag, atom
+):
+    """Backlog #341 S7: every strict family validates like `--exclude` —
+    only the flag name in the message changes (one shared f-string,
+    `_emerge/main.py:885-906`). No S0 cell covers these flags, so each
+    row is grounded in a live host probe instead.
+
+    Portage 3.0.82.2, this host (2026-10-12), hermetic t341 configroot
+    (same shape as `_t341_configroot`), full argv `emerge -p
+    --ignore-default-opts --getbinpkg=n --usepkg=n --<flag> <atom>
+    dev-libs/t341-dep` (with `dev-libs/foo` for the t341-dep atom):
+    each exits 2 with stderr `emerge: error: Invalid Atom(s) in
+    --<flag> parameter: '<atom>' (only package names and slot atoms
+    (with wildcards) allowed)` under the `usage:` block, stdout empty.
+    Only the error line is pinned."""
+    result = _t341_exclude_error(
+        emerge_binary, _t341_configroot(tmp_path, fixtures_root), flag, [atom]
+    )
+    assert result.stderr == (
+        f"emerge: error: Invalid Atom(s) in --{flag} parameter: '{atom}' "
+        "(only package names and slot atoms (with wildcards) allowed)\n"
+    )
+
+
+@pytest.mark.parametrize(
+    "exclude",
+    [
+        "dev-libs/t341-*",
+        "t341-dep",
+        "dev-libs/t341-dep:0/1",
+        "*/*:0",
+    ],
+    ids=[
+        "D-excl-wild-ok",
+        "D-excl-short-ok",
+        "D-excl-slot-ok",
+        "D-excl-allslot-ok",
+    ],
+)
+def test_s7_excluded_top_level_target_resolves_to_total_zero(
+    emerge_binary, tmp_path, fixtures_root, exclude
+):
+    """Backlog #341 S7: an excluded top-level target resolves to nothing
+    silently (`Total: 0`, rc 0) — never to "there are no ebuilds". Short
+    names match every category (`WildcardPackageSet._implicitWildcarding`,
+    `lib/portage/_sets/base.py`: `t341-dep` behaves as `*/t341-dep`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full
+    argv `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    --exclude <atom> dev-libs/t341-dep` (S0 cells `D-excl-wild-ok`,
+    `D-excl-short-ok`, `D-excl-slot-ok`, `D-excl-allslot-ok`, each rc 0,
+    stdout the merge header + `Calculating dependencies ... done!` + the
+    timing line + `Total: 0 packages, Size of downloads: 0 KiB`, stderr
+    empty). Portuale's `-pv` list shape is its own (rows + `Total:`,
+    matrix §1.6): an empty list prints the blank line + `Total: 0
+    packages, Size of downloads: 0 KiB`, stderr empty. The hermetic root
+    below replays the same shape."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--exclude", exclude, "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout == "\nTotal: 0 packages, Size of downloads: 0 KiB\n"
+    assert result.stderr == ""
+
+
+@pytest.mark.parametrize(
+    "exclude",
+    [
+        "=dev-libs/t341-dep-1-2",
+        "dev-libs/t341-dep::t341",
+        ">=dev-libs/t341-dep-1",
+    ],
+    ids=[
+        "D-bpkgexcl-bid-ok",
+        "D-bpkgexcl-repo-ok",
+        "D-bpkgexcl-op-ok",
+    ],
+)
+def test_s7_buildpkg_exclude_accepts_operators_repos_and_build_ids(
+    emerge_binary, tmp_path, fixtures_root, exclude
+):
+    """Backlog #341 S7: `--buildpkg-exclude` accepts operators, repos and
+    build-ids (the `less_strict` rule); the exclusion itself only steers
+    binpkg builds, so the ebuild still merges (`Total: 1`, rc 0).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full
+    argv `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    --buildpkg-exclude <atom> dev-libs/t341-dep` (S0 cells
+    `D-bpkgexcl-bid-ok`, `D-bpkgexcl-repo-ok`, `D-bpkgexcl-op-ok`, each rc
+    0, merging `dev-libs/t341-dep-1` with `USE="-x"`). The acceptance
+    rule itself is pinned by portuale's Rust unit tests on
+    `find_bad_atoms` (acceptance alone cannot tell it apart); the
+    hermetic root below replays the merge shape. Merge-row deltas vs
+    Portage are the standing cosmetics (matrix §1.6); stderr empty."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--buildpkg-exclude", exclude, "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/t341-dep-1:0/1::t341 to {env["ROOT"]} USE="-x" ',
+        "",
+        "Total: 1 package (1 new), Size of downloads: 0 KiB",
+    ]
+    assert result.stderr == ""
 
 
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
@@ -14041,18 +14497,18 @@ def test_versioned_and_slotted_top_level_atoms_resolve_like_bare_ones(
 
 
 def test_blocker_top_level_atom_is_rejected_not_silently_dropped(emerge_binary, fixture_env):
-    """Prior to this slice, the CLI's bare-atom check never tested for a
-    blocker at all: `emerge --pretend '!!foo'` was accepted (operator/
-    slot/version were all unset) and then silently dropped by
-    resolve_pretend_graph's own `atom.blocker != Blocker::None` BFS skip
-    -- exit 0, no output, no error. A blocker isn't a valid emerge target
-    in Portage either, so this must now be rejected explicitly."""
+    """A blocker is not a valid emerge target: Portage's `run_action`
+    gate (`_emerge/actions.py:4244-4262`, `is_valid_package_atom` with
+    `allow_blockers=False`) rejects `!!dev-libs/newpkg` with two `!!!`
+    lines and exit 1 — the same text as any other bad package atom
+    (backlog #341 S7). Prior to S7 portuale reported these with its own
+    `emerge: … is a blocker, not a valid emerge target` line and exit 2."""
     result = _run([str(emerge_binary)], ["--pretend", "!!dev-libs/newpkg"], fixture_env)
-    assert result.returncode == 2
+    assert result.returncode == 1
     assert result.stdout == ""
-    assert (
-        result.stderr.strip()
-        == 'emerge: "!!dev-libs/newpkg" is a blocker, not a valid emerge target'
+    assert result.stderr == (
+        "!!! '!!dev-libs/newpkg' is not a valid package atom.\n"
+        "!!! Please check ebuild(5) for full details.\n"
     )
 
 
@@ -14448,6 +14904,7 @@ Binary packages:
       --buildpkg-exclude ATOMS  skip the binary package for matching packages
   -k, --usepkg / -K, --usepkgonly  use a usable binary package when one exists (-K: only, never build)
   -g, --getbinpkg / -G, --getbinpkgonly  also fetch binary packages from a remote binhost (-G: only)
+      --getbinpkg-exclude ATOMS, --getbinpkg-include ATOMS  validated like --exclude; fetch filtering is not modelled
       --usepkg-exclude ATOMS, --usepkg-include ATOMS  narrow which packages may come from a binary
       --binpkg-respect-use[=y|n]  reject a binary package built with the wrong USE
       --binpkg-changed-deps[=y|n]  reject a binary whose recorded deps differ from the ebuild (auto unless -K)
@@ -18156,17 +18613,26 @@ def test_exclude_prevents_a_not_yet_installed_package_from_being_offered(
     emerge_binary, fixture_env
 ):
     """dev-libs/newpkg has no installed version at all -- excluding it as
-    a top-level atom means there's no eligible candidate left, the same
-    fatal "no ebuilds to satisfy" outcome any other unsatisfiable
-    top-level atom already gets."""
+    a top-level atom resolves to nothing silently (`Total: 0`, rc 0),
+    never to "no ebuilds to satisfy" (backlog #341 S7; Portage's
+    `if excluded: continue` in the depgraph argument loop).
+
+    Portage 3.0.82.2, hermetic t341 configroot on this host (2026-10-12),
+    full argv `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    --exclude dev-libs/t341-dep dev-libs/t341-dep`: rc 0, the merge
+    header + `Calculating dependencies ... done!` + timing + `Total: 0
+    packages, Size of downloads: 0 KiB` on stdout (S0 cells
+    `D-excl-wild-ok`/`-short-ok`/`-slot-ok`/`-allslot-ok` show the same
+    for the wildcard/short/slotted spellings). Without `-v` both sides
+    print nothing at all."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--exclude", "dev-libs/newpkg", "dev-libs/newpkg"],
         fixture_env,
     )
-    assert result.returncode == 1
+    assert result.returncode == 0
     assert result.stdout == ""
-    assert result.stderr.strip() == 'emerge: there are no ebuilds to satisfy "dev-libs/newpkg".'
+    assert result.stderr == ""
 
 
 def test_exclude_threads_through_dependency_recursion_not_just_top_level(
@@ -18757,14 +19223,19 @@ def test_bare_command_line_name_with_version_or_slot_is_category_qualified(
     emerge_binary, fixture_env
 ):
     """Portage `dep_expand` (lib/portage/dbapi/dep_expand.py): a no-category
-    target that carries an operator, a bare version, or a slot is still
-    qualified -- `null/` is inserted before the first word char, the
-    result is parsed (retrying with a leading `=` for the missing-`=`
-    backward-compat shape), the package name is pulled back out and
-    `cpv_expand`ed, and the category is spliced into the original string.
-    `dev-libs/newpkg` is the only `newpkg` anywhere."""
+    target that carries an operator or a slot is still qualified --
+    `null/` is inserted before the first word char, the result is parsed
+    (retrying with a leading `=` for the missing-`=` backward-compat
+    shape), the package name is pulled back out and `cpv_expand`ed, and
+    the category is spliced into the original string.
+    `dev-libs/newpkg` is the only `newpkg` anywhere. A no-category
+    target carrying a *bare* version (`newpkg-1.0`) never reaches
+    `dep_expand`: Portage's `run_action` gate (`_emerge/actions.py`,
+    `is_valid_package_atom`) rejects it first with two `!!!` lines and
+    exit 1 (backlog #341 S7; live host probe 2026-10-12:
+    `emerge -p t341-dep-1` in a hermetic t341 configroot exits 1 with
+    `!!! 't341-dep-1' is not a valid package atom.`)."""
     for target, first_line, exit_code in (
-        ("newpkg-1.0", f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}', 0),
         (">=newpkg-1.0", f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}', 0),
         ("newpkg:0", f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}', 0),
     ):
@@ -18772,21 +19243,29 @@ def test_bare_command_line_name_with_version_or_slot_is_category_qualified(
         assert r.returncode == exit_code, r.stderr
         assert r.stdout.splitlines()[0].rstrip() == first_line
 
-    # a bare version with no matching ebuild: the message quotes the
-    # dep_expand'd atom (Portage cpv_expand splices the category, then
-    # resolution fails)
-    r = _run([str(emerge_binary)], ["--pretend", "newpkg-9.9"], fixture_env)
-    assert r.returncode == 1
-    assert r.stderr.strip() == 'emerge: there are no ebuilds to satisfy "=dev-libs/newpkg-9.9".'
+    # a bare version with no operator is not a valid package atom at all:
+    # the message quotes the raw argument (no dep_expand'd `=` form),
+    # whatever versions the tree holds.
+    for target in ("newpkg-1.0", "newpkg-9.9"):
+        r = _run([str(emerge_binary)], ["--pretend", target], fixture_env)
+        assert r.returncode == 1
+        assert r.stdout == ""
+        assert r.stderr == (
+            f"!!! '{target}' is not a valid package atom.\n"
+            "!!! Please check ebuild(5) for full details.\n"
+        )
 
-    # ambiguous survives version stripping (non-`--quiet`: the full
-    # search-style block -- see
-    # test_bare_name_ambiguous_across_categories_is_rejected)
+    # ambiguous with a bare version: the `run_action` gate fires before
+    # `dep_expand` ever strips the version, so there is no ambiguity
+    # report (see test_bare_name_ambiguous_across_categories_is_rejected
+    # for the plain-name form, which still reaches `dep_expand`).
     r = _run([str(emerge_binary)], ["--pretend", "ambigpkg-1.0"], fixture_env)
     assert r.returncode == 1
-    assert '!!! The short ebuild name "ambigpkg-1.0" is ambiguous.' in r.stderr
-    assert "*  app-misc/ambigpkg" in r.stdout
-    assert "*  dev-libs/ambigpkg" in r.stdout
+    assert r.stdout == ""
+    assert r.stderr == (
+        "!!! 'ambigpkg-1.0' is not a valid package atom.\n"
+        "!!! Please check ebuild(5) for full details.\n"
+    )
 
 
 def test_bare_name_ambiguous_across_categories_is_rejected(
