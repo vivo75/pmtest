@@ -559,6 +559,13 @@ CASES = [
     ("#341 S7: bad --buildpkg-exclude atom earns Portage's rc 2", ["--pretend", "--buildpkg-exclude", "!dev-libs/t341-dep", "dev-libs/t341-dep"], 2),
     ("#341 S7: bad --usepkg-exclude atom earns Portage's rc 2", ["--pretend", "--usepkg-exclude", "dev-libs/t341-dep::t341", "dev-libs/t341-dep"], 2),
     ("#341 S7: bad --reinstall-atoms atom earns Portage's rc 2", ["--pretend", "--reinstall-atoms", "=dev-libs/t341-dep-1-2", "dev-libs/t341-dep"], 2),
+    # #341 S8: `@sets` files and the world file. The shared root holds no
+    # `sets/s341` file, so both sides take the missing-set error here (rc
+    # 1: host Portage 3.0.82.2 `emerge --pretend @no-such-set-xyz-341`
+    # exits 1 with `emerge: There are no sets to satisfy …`); the
+    # validation behaviour itself is pinned hermetically per cell by the
+    # `test_s8_*` functions (each docstring cites its S0 capture).
+    ("#341 S8: unknown set earns Portage's rc 1", ["--pretend", "@s341"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -7246,6 +7253,114 @@ def test_s7_buildpkg_exclude_accepts_operators_repos_and_build_ids(
         "Total: 1 package (1 new), Size of downloads: 0 KiB",
     ]
     assert result.stderr == ""
+
+
+def _t341_sets_configroot(tmp_path, fixtures_root):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #341 S8
+    sets/world cells: the S4 root (`_t341_configroot`) plus S0 run5's
+    eight lines in `etc/portage/sets/s341` and in `var/lib/portage/world`
+    (mirrors S0's cfgE2, where `PORTAGE_CONFIGROOT` and `ROOT` are the
+    same directory). Returns the env dict plus the configroot path (for
+    ROOT normalisation)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    cfg = Path(env["PORTAGE_CONFIGROOT"])
+    lines = [
+        "*/t341-dep",
+        "dev-libs/t341-*",
+        "dev-libs/t341-dep::t341",
+        "=dev-libs/t341-dep-1-2",
+        "=dev-libs/t341-dep-1-02",
+        "dev-libs/t341-dep-1",
+        "!dev-libs/t341-dep",
+        "dev-libs/t341-dep[x]",
+    ]
+    (cfg / "etc/portage/sets").mkdir(parents=True, exist_ok=True)
+    (cfg / "etc/portage/sets/s341").write_text("\n".join(lines) + "\n")
+    (cfg / "var/lib/portage").mkdir(parents=True, exist_ok=True)
+    (cfg / "var/lib/portage/world").write_text("\n".join(lines) + "\n")
+    return env, cfg
+
+
+def _s8_use_stderr():
+    """The S8 stderr head: Portage's USE-change prompt for the two valid
+    lines' `dev-libs/t341-dep` (USE `x` still off), shared by both cells."""
+    return [
+        "",
+        "The following USE changes are necessary to proceed:",
+        ' (see "package.use" in the portage(5) man page for more details)',
+        "# required by dev-libs/t341-dep::t341 (argument)",
+        ">=dev-libs/t341-dep-1 x",
+    ]
+
+
+def test_s8_named_set_prints_validation_failed_after_merge_list(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S8: a named set validates every line with
+    `isvalidatom(atom, allow_repo=True)` (no wildcard, no blocker, no
+    build-id; repo and use deps allowed; `eapi=None` — oracle Q2g) and
+    prints `<path>: Validation failed at line: N, data X` on stderr
+    *after* the merge list and its USE-change prompt
+    (depgraph.py:11142-11145).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n @s341`
+    (S0 cell `E-sets-s341`, rc 1; stdout the merge list `[ebuild N]
+    dev-libs/t341-dep-1:0/1::t341 … USE="x" 0 KiB` + `Total:`; stderr the
+    USE-change prompt `# required by @s341 (argument)` /
+    `>=dev-libs/t341-dep-1 x`, then six `…/sets/s341: Validation failed
+    at line: N, data X` for lines 1, 2, 4, 5, 6, 7 — line 3
+    (`dev-libs/t341-dep::t341`) and line 8 (`dev-libs/t341-dep[x]`) are
+    accepted). The hermetic root below replays the same shape; `<ROOT>`
+    is the scratch configroot. Two standing deltas vs Portage: the merge
+    row has no `:0/1::t341` slot/repo suffix at plain `-p` and no
+    trailing `0 KiB` (matrix §1.6), and the prompt names the expanded
+    member atom (`# required by dev-libs/t341-dep::t341 (argument)`)
+    where Portage names the set (`# required by @s341 (argument)`) —
+    portuale resolves set members as plain atoms and keeps no set-arg
+    label for the `dep_chain` (known residue, not re-pinned here)."""
+    env, cfg = _t341_sets_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "@s341"], env)
+    assert result.returncode == 1
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
+    ]
+    R = "<ROOT>"
+    setpath = f"{R}/etc/portage/sets/s341"
+    assert result.stderr.replace(str(cfg), R).splitlines() == _s8_use_stderr() + [
+        f"{setpath}: Validation failed at line: 1, data */t341-dep",
+        f"{setpath}: Validation failed at line: 2, data dev-libs/t341-*",
+        f"{setpath}: Validation failed at line: 4, data =dev-libs/t341-dep-1-2",
+        f"{setpath}: Validation failed at line: 5, data =dev-libs/t341-dep-1-02",
+        f"{setpath}: Validation failed at line: 6, data dev-libs/t341-dep-1",
+        f"{setpath}: Validation failed at line: 7, data !dev-libs/t341-dep",
+    ]
+
+
+def test_s8_selected_drops_bad_world_lines_silently(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S8: `@selected` (the world file) validates with the
+    same `ValidAtomValidator` but drops bad lines silently — the errors
+    stay on Portage's inner `_pkgset` and are never printed (oracle Q2g,
+    `_sets/files.py`).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n @selected`
+    with the world file holding the same eight lines (S0 cell
+    `E-sets-selected`, rc 1; stdout the same merge list as `@s341`;
+    stderr the same USE-change prompt and *zero* `Validation failed`
+    lines). The hermetic root below replays the same shape; `<ROOT>` is
+    the scratch configroot. Same two standing deltas as the `@s341` pin
+    (matrix §1.6 merge row; `# required by` names the member atom)."""
+    env, cfg = _t341_sets_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "@selected"], env)
+    assert result.returncode == 1
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
+    ]
+    R = "<ROOT>"
+    assert result.stderr.replace(str(cfg), R).splitlines() == _s8_use_stderr()
 
 
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
