@@ -7,14 +7,31 @@ it, always called with flat=True and no masklist/excludeall/is_src_uri/
 opconvert/subset/token_class -- see the Rust side's doc comment for why
 those are out of v1 scope.
 
+The `validate` op wraps the S4 shape instead (`matchall=True, flat=True,
+token_class=Atom, is_valid_flag=…`, Portage `Package._validate_deps`) and
+selects the message the way `_metadata_exception` does: a categorized
+inner error prints bare, anything else the outer `InvalidDependString`
+text. NOTE (review M-5): `_pinned_portage.py` imports the vendored
+checkout, which has no compiled `_parser`, so the pure-Python `Atom` path
+runs here -- equal to the C path for `Atom` (0 differences over the 120k
+fuzz cases, oracle report section 1.4), so this differential is sound for
+atom-level validation (it must NOT be reused for S10's native-scanner
+quirk, where C and PY diverge).
+
 Usage:
     use_reduce_harness.py reduce <mode> <uselist> <token...>
         mode: "normal" | "matchall" | "matchnone"
         uselist: comma-separated enabled flags, or "-" for none
         token...: the dep string's whitespace-separated tokens
       -> comma-joined flattened tokens (possibly empty), or "ERROR"
+    use_reduce_harness.py validate <eapi> <validflags> <token...>
+        eapi: EAPI text, or "None" for eapi=None
+        validflags: comma-separated valid IUSE flags, or "-" for none
+        token...: the dep string's whitespace-separated tokens
+      -> "OK", or "ERR:<category>:<message>" with the
+         `_metadata_exception` selection above
     use_reduce_harness.py batch
-      -> reads "reduce <mode> <uselist> <token...>" lines from stdin, one
+      -> reads "reduce ..." / "validate ..." lines from stdin, one
          result per line
 """
 
@@ -26,7 +43,7 @@ from _pinned_portage import use_pinned_portage
 
 use_pinned_portage()
 
-from portage.dep import use_reduce
+from portage.dep import Atom, use_reduce
 from portage.exception import InvalidDependString
 
 
@@ -48,11 +65,38 @@ def _format_reduce(mode, uselist_arg, tokens):
     return ",".join(result)
 
 
+def _format_validate(eapi_arg, validflags_arg, tokens):
+    eapi = None if eapi_arg == "None" else eapi_arg
+    valid = (
+        frozenset() if validflags_arg == "-" else frozenset(validflags_arg.split(","))
+    )
+    depstr = " ".join(tokens)
+    try:
+        use_reduce(
+            depstr,
+            eapi=eapi,
+            matchall=True,
+            is_valid_flag=valid.__contains__,
+            token_class=Atom,
+            flat=True,
+        )
+    except InvalidDependString as e:
+        for err in e.errors or ():
+            if getattr(err, "category", None) is not None:
+                return f"ERR:{err.category}:{err}"
+        return f"ERR:dependency.syntax:{e}"
+    return "OK"
+
+
 def _dispatch(op, args):
     if op == "reduce":
         if len(args) < 2:
             raise ValueError("reduce expects at least 2 args (mode, uselist)")
         return _format_reduce(args[0], args[1], args[2:])
+    if op == "validate":
+        if len(args) < 2:
+            raise ValueError("validate expects at least 2 args (eapi, validflags)")
+        return _format_validate(args[0], args[1], args[2:])
     raise ValueError(f"unknown op {op!r}")
 
 

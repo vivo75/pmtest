@@ -509,6 +509,31 @@ CASES = [
     ("bare trailing colon top-level atom: still invalid", ["--pretend", "dev-libs/foo:"], 1),
     ("explicit slot + \"*\" top-level atom: still invalid", ["--pretend", "dev-libs/foo:0*"], 1),
     ("syntactically invalid atom", ["--pretend", "not an atom!"], 1),
+    # Backlog #341 S4: ebuild/binary `*DEPEND` validation (mask
+    # `invalid:`). These atoms live in the standalone `repo-341` overlay,
+    # which is NOT registered in the shared `fixtures/etc` repos.conf (S0:
+    # registering it would move every `--info`/repo-listing output), so the
+    # shared-root run below reports the plain miss (rc 1) rather than the
+    # `invalid:` mask -- the exit code still equals Portage's, and the
+    # mask text itself is pinned hermetically per cell by the `test_s4_*`
+    # functions (each docstring cites its S0 capture). `t341-good` is
+    # deliberately absent: Portage exits 0 there, the shared root 1.
+    ("#341 S4: t341-badrepo earns Portage's rc 1", ["--pretend", "app-misc/t341-badrepo"], 1),
+    ("#341 S4: t341-badbid earns Portage's rc 1", ["--pretend", "app-misc/t341-badbid"], 1),
+    ("#341 S4: t341-badcond earns Portage's rc 1", ["--pretend", "app-misc/t341-badcond"], 1),
+    ("#341 S4: t341-badslot earns Portage's rc 1", ["--pretend", "app-misc/t341-badslot"], 1),
+    ("#341 S4: t341-built earns Portage's rc 1", ["--pretend", "app-misc/t341-built"], 1),
+    ("#341 S4: t341-token earns Portage's rc 1", ["--pretend", "app-misc/t341-token"], 1),
+    ("#341 S4: t341-twokeys earns Portage's rc 1", ["--pretend", "app-misc/t341-twokeys"], 1),
+    ("#341 S4: t341-mixcat earns Portage's rc 1", ["--pretend", "app-misc/t341-mixcat"], 1),
+    ("#341 S4: t341-twobuilt earns Portage's rc 1", ["--pretend", "app-misc/t341-twobuilt"], 1),
+    ("#341 S4: t341-emptygrp earns Portage's rc 1", ["--pretend", "app-misc/t341-emptygrp"], 1),
+    ("#341 S4: t341-glued earns Portage's rc 1", ["--pretend", "app-misc/t341-glued"], 1),
+    ("#341 S4: t341-xor earns Portage's rc 1", ["--pretend", "app-misc/t341-xor"], 1),
+    ("#341 S4: t341-qq earns Portage's rc 1", ["--pretend", "app-misc/t341-qq"], 1),
+    ("#341 S4: t341-condfirst earns Portage's rc 1", ["--pretend", "app-misc/t341-condfirst"], 1),
+    ("#341 S4: t341-eapi7 earns Portage's rc 1", ["--pretend", "app-misc/t341-eapi7"], 1),
+    ("#341 S4: binary t341-good under --usepkgonly earns Portage's rc 1", ["--pretend", "--usepkgonly", "app-misc/t341-good"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -5929,6 +5954,396 @@ def test_user_package_mask_extended_wildcards_mask_the_package(
     assert result.stdout == ""
     assert result.stderr.strip() == _all_masked(
         "dev-libs/foo", "dev-libs/foo-1.0::testrepo", "package.mask"
+    )
+
+
+def _t341_configroot(tmp_path, fixtures_root):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #341 S4
+    cells: the shared fixture repos plus the standalone `repo-341` overlay
+    (never `fixtures/etc` itself), `make.profile` at the fixture default
+    profile. Mirrors S0's cfgA (repos.conf holding the fixture repos +
+    t341) minus the host gentoo tree, which hermetic tests cannot see."""
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t341]\nlocation = {fixtures_root / 'repo-341'}\npriority = 50\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+
+
+def _t341_masked(emerge_binary, env, cell, reason):
+    """Run `emerge --pretend app-misc/<cell>` in the S4 hermetic root and
+    pin the `invalid:` masked block (Portage's exit code 1, empty stdout)."""
+    result = _run([str(emerge_binary)], ["--pretend", f"app-misc/{cell}"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        f"app-misc/{cell}", f"app-misc/{cell}-1::t341", reason
+    )
+    return result
+
+
+def test_s4_badrepo_masks_repo_dep_atom(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `RDEPEND="dev-libs/t341-dep::gentoo"` (EAPI 8, where
+    `repo_deps` is False) masks the package `invalid:`.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-badrepo` (S0 cell `A-ebuild-t341-badrepo`, rc 1, stderr
+    `invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 1`).
+    The hermetic root below replays the same shape; stdout empty, stderr
+    pinned via `_all_masked`."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-badrepo",
+        "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 1",
+    )
+
+
+def test_s4_badbid_masks_build_id_atom(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `RDEPEND="=dev-libs/t341-dep-1-2"` (EAPI 8, where
+    `allow_build_id` is off) masks the package `invalid:`.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-badbid` (S0 cell `A-ebuild-t341-badbid`, rc 1, stderr
+    `invalid: RDEPEND: Invalid atom (=dev-libs/t341-dep-1-2), token 1`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-badbid",
+        "invalid: RDEPEND: Invalid atom (=dev-libs/t341-dep-1-2), token 1",
+    )
+
+
+def test_s4_badcond_masks_iuse_missing_use_dep(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `RDEPEND="dev-libs/t341-dep[x?]"` with `IUSE=""`
+    masks the package with the categorized (wrapper-less) `IUSE.missing`
+    text.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-badcond` (S0 cell `A-ebuild-t341-badcond`, rc 1, stderr
+    `invalid: RDEPEND: USE flag 'x' referenced in conditional 'x?' in atom
+    'dev-libs/t341-dep[x?]' is not in IUSE`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-badcond",
+        "invalid: RDEPEND: USE flag 'x' referenced in conditional 'x?' "
+        "in atom 'dev-libs/t341-dep[x?]' is not in IUSE",
+    )
+
+
+def test_s4_badslot_masks_star_slot_operator(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `RDEPEND="dev-libs/t341-dep:0*"` masks the package
+    `invalid:` (`:*` is not a slot operator in any EAPI).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-badslot` (S0 cell `A-ebuild-t341-badslot`, rc 1, stderr
+    `invalid: RDEPEND: Invalid atom (dev-libs/t341-dep:0*), token 1`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-badslot",
+        "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep:0*), token 1",
+    )
+
+
+def test_s4_built_masks_built_slot_operator_on_unbuilt(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S4 (reopens #15): `RDEPEND="dev-libs/t341-dep:0/1="` on
+    an unbuilt ebuild masks the package with Portage's `Improper context`
+    text (`Package.py:347-356`; only for keys that parsed cleanly, one
+    reason per built atom).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-built` (S0 cell `A-ebuild-t341-built`, rc 1, stderr
+    `invalid: RDEPEND: Improper context for slot-operator "built" atom
+    syntax: dev-libs/t341-dep:0/1=`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-built",
+        "invalid: RDEPEND: Improper context for slot-operator "
+        '"built" atom syntax: dev-libs/t341-dep:0/1=',
+    )
+
+
+def test_s4_token_counts_parens_and_conditionals(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: in `RDEPEND="x? ( dev-libs/t341-dep )
+    dev-libs/t341-dep::gentoo"` (`IUSE="x"`) the bad atom is token 5 --
+    the count includes `(`, `)` and `flag?`.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-token` (S0 cell `A-ebuild-t341-token`, rc 1, stderr
+    `invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 5`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-token",
+        "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 5",
+    )
+
+
+def test_s4_twokeys_reports_every_key(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `DEPEND="dev-libs/t341-dep::a"` plus
+    `RDEPEND="dev-libs/t341-dep:0*"` masks with both keys' first errors
+    (same category, so `_dep_keys` order).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-twokeys` (S0 cell `A-ebuild-t341-twokeys`, rc 1, stderr
+    `invalid: DEPEND: Invalid atom (dev-libs/t341-dep::a), token 1,
+    invalid: RDEPEND: Invalid atom (dev-libs/t341-dep:0*), token 1`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-twokeys",
+        "invalid: DEPEND: Invalid atom (dev-libs/t341-dep::a), token 1, "
+        "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep:0*), token 1",
+    )
+
+
+def test_s4_mixcat_groups_reasons_by_category(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: with `IUSE=""`, `BDEPEND="y? ( dev-libs/t341-dep )"`
+    + `DEPEND="dev-libs/t341-dep::a"` + `RDEPEND="z? ( dev-libs/t341-dep )"`
+    prints BDEPEND, RDEPEND, DEPEND -- reasons file under their category
+    (`dependency.syntax`, `IUSE.missing`) in first-insertion order
+    (Package.py:534-557, depgraph.py:12560-12563), not in `_dep_keys`
+    order.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-mixcat` (S0 cell `A-ebuild-t341-mixcat`, rc 1)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-mixcat",
+        "invalid: BDEPEND: USE flag 'y' referenced in conditional 'y?' is not in IUSE, "
+        "invalid: RDEPEND: USE flag 'z' referenced in conditional 'z?' is not in IUSE, "
+        "invalid: DEPEND: Invalid atom (dev-libs/t341-dep::a), token 1",
+    )
+
+
+def test_s4_twobuilt_reports_each_built_atom(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `PDEPEND="dev-libs/t341-dep:0/1=
+    dev-libs/t341-dep:0/2="` masks with two `Improper context` lines, one
+    per built atom.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-twobuilt` (S0 cell `A-ebuild-t341-twobuilt`, rc 1)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-twobuilt",
+        "invalid: PDEPEND: Improper context for slot-operator "
+        '"built" atom syntax: dev-libs/t341-dep:0/1=, '
+        "invalid: PDEPEND: Improper context for slot-operator "
+        '"built" atom syntax: dev-libs/t341-dep:0/2=',
+    )
+
+
+def test_s4_emptygrp_reports_the_open_paren_token(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S4: `RDEPEND="x? ( )"` (`IUSE="x"`) reports the empty
+    group at the `(` token.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-emptygrp` (S0 cell `A-ebuild-t341-emptygrp`, rc 1, stderr
+    `invalid: RDEPEND: expected: dependency string, got: ')', token 2`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-emptygrp",
+        "invalid: RDEPEND: expected: dependency string, got: ')', token 2",
+    )
+
+
+def test_s4_glued_reports_missing_whitespace(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4: `RDEPEND="dev-libs/t341-dep("` reports the glue,
+    not the atom (Portage checks `missing_white_space_check` after the
+    atom fails, dep:788-796).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-glued` (S0 cell `A-ebuild-t341-glued`, rc 1, stderr
+    `invalid: RDEPEND: missing whitespace around '(' at
+    'dev-libs/t341-dep(', token 1`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-glued",
+        "invalid: RDEPEND: missing whitespace around '(' "
+        "at 'dev-libs/t341-dep(', token 1",
+    )
+
+
+def test_s4_xor_treats_caret_caret_as_a_plain_token(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S4: `^^` is an operator only in REQUIRED_USE; in
+    `*DEPEND` it is a plain (invalid) atom token.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-xor` (S0 cell `A-ebuild-t341-xor`, rc 1, stderr
+    `invalid: RDEPEND: Invalid atom (^^), token 1`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-xor",
+        "invalid: RDEPEND: Invalid atom (^^), token 1",
+    )
+
+
+def test_s4_qq_treats_question_question_as_a_conditional(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S4: `??` in `*DEPEND` is a conditional on flag `?`,
+    which is not in IUSE.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-qq` (S0 cell `A-ebuild-t341-qq`, rc 1, stderr
+    `invalid: RDEPEND: USE flag '?' referenced in conditional '??' is not
+    in IUSE`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-qq",
+        "invalid: RDEPEND: USE flag '?' referenced in conditional '??' is not in IUSE",
+    )
+
+
+def test_s4_condfirst_reports_the_atom_before_the_conditional(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S4: in `RDEPEND="y? ( dev-libs/t341-dep::a )"` with
+    `IUSE=""` the invalid atom inside the invalid group is reported first
+    (the atom token is scanned before its group's `)` closes).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-condfirst` (S0 cell `A-ebuild-t341-condfirst`, rc 1,
+    stderr `invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::a),
+    token 3`)."""
+    _t341_masked(
+        emerge_binary,
+        _t341_configroot(tmp_path, fixtures_root),
+        "t341-condfirst",
+        "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::a), token 3",
+    )
+
+
+def test_s4_good_merges(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4 control: `RDEPEND="dev-libs/t341-dep:=
+    !!app-misc/t341-badslot"` stays valid (`:=` needs EAPI 5+,
+    `!!` needs EAPI 2+) and merges with its dependency.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-good` (S0 cell `A-ebuild-t341-good`, rc 0, merge list
+    `[ebuild N] dev-libs/t341-dep-1 … USE="-x"` + `[ebuild N]
+    app-misc/t341-good-1`). Merge lines name `<ROOT>` (no `::repo`/slot
+    suffix without `-v`, and no trailing `0 KiB` size, per the S0 matrix
+    §1.6 cosmetic deltas)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "app-misc/t341-good"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="-x" ',
+        f'[ebuild  N     ] app-misc/t341-good-1 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s4_eapi7_allows_use_dep_defaults(emerge_binary, tmp_path, fixtures_root):
+    """Backlog #341 S4 control: `RDEPEND="dev-libs/t341-dep[x(+)]"` (EAPI 7,
+    where `use_dep_defaults` holds) is valid; the resolve still stops at
+    Portage's USE-change prompt (rc 1 with a merge list).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n
+    app-misc/t341-eapi7` (S0 cell `A-ebuild-t341-eapi7`, rc 1, merge list +
+    stderr `The following USE changes are necessary to proceed:` …)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], ["--pretend", "app-misc/t341-eapi7"], env)
+    assert result.returncode == 1
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
+        f'[ebuild  N     ] app-misc/t341-eapi7-1 to {env["ROOT"]}',
+    ]
+    assert result.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by app-misc/t341-eapi7-1::t341\n"
+        "# required by app-misc/t341-eapi7 (argument)\n"
+        ">=dev-libs/t341-dep-1 x\n"
+    )
+
+
+def test_s4_binary_rewritten_rdepend_masks_invalid(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #341 S4: a binary whose `Packages` `RDEPEND` was rewritten
+    to `dev-libs/t341-dep::gentoo` is validated with its `EAPI` exactly
+    like an ebuild, and masks `invalid:` under `--usepkgonly`.
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`
+    (`F-binary-rewritten`, rc 1, stderr `masked by: invalid: RDEPEND:
+    Invalid atom (dev-libs/t341-dep::gentoo), token 1`): S0 built a real
+    gpkg of `t341-good` and rewrote its `RDEPEND` (oracle-run3 procedure).
+    No such binpkg exists in the fixtures, so this pin replays the same
+    shape with a synthetic `Packages` entry carrying the rewritten
+    `RDEPEND` (the mask is computed from the index entry alone; the
+    archive itself is never read on this path)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    pkgdir = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir"
+    pkgdir.mkdir(parents=True, exist_ok=True)
+    (pkgdir / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 1\n\n"
+        "CPV: app-misc/t341-good-1\n"
+        "EAPI: 8\n"
+        "IUSE:\n"
+        "KEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/t341-dep::gentoo\n"
+        "SLOT: 0\n"
+        "USE:\n"
+        "REPO: t341\n"
+        "PATH: app-misc/t341-good-1.tbz2\n"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "app-misc/t341-good"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "app-misc/t341-good",
+        "app-misc/t341-good-1::t341",
+        "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 1",
     )
 
 
