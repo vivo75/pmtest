@@ -7,6 +7,7 @@ internals are imported directly.
 """
 
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -96,6 +97,86 @@ def _run(cmd: list[str], *args: str) -> str:
         [*cmd, *args], capture_output=True, text=True, check=True
     )
     return result.stdout.strip()
+
+
+# S2 parse modes: flag argv shared by both harnesses (the atom is always the
+# last arg). Portage is the oracle for every expected value; the S2 battery
+# TSV below carries the message-level pins, these rows carry parity.
+PARSE_MODES: list[list[str]] = [
+    [],
+    ["--eapi", "5"],
+    ["--eapi", "7"],
+    ["--eapi", "8"],
+    ["--eapi", "9"],
+    ["--eapi", "10"],
+    ["--eapi", "8", "--allow-build-id", "1"],
+    ["--allow-repo", "0", "--allow-build-id", "0"],
+    ["--allow-wildcard", "--allow-repo", "1"],
+]
+
+
+@pytest.mark.parametrize("mode", PARSE_MODES)
+@pytest.mark.parametrize("atom", PARSE_VALID_ATOMS + PARSE_INVALID_ATOMS)
+def test_parse_modes_match_between_implementations(
+    atom, mode, atom_harness_python, atom_harness_rust
+):
+    """PARSE_MODES x the existing atom lists: byte parity only (validity
+    differs per mode -- e.g. `dev-libs/foo::gentoo` is INVALID with
+    `--eapi 8` -- so only equality is asserted)."""
+    python_result = _run(atom_harness_python, "parse", *mode, atom)
+    rust_result = _run([str(atom_harness_rust)], "parse", *mode, atom)
+    assert rust_result == python_result
+
+
+# The S2 oracle battery: the 83 probe strings of
+# LLM/evidence/2026-10-11-341-oracle/probe_atoms.py, re-probed live into
+# crates/portage-dep/src/testdata/atoms-3.0.82.2.tsv by
+# LLM/tools/atom_oracle_table.py. Rows tagged S3* need the wildcard branch
+# (S3) and stay skipped here until then. Match parity for build-id atoms is
+# intentionally out of scope (S2 review C-1; pinned by the Rust unit test
+# `eq_build_id_atom_matches_no_plain_candidate`), so this is parse-only.
+_TSV_MODES = {
+    "None": [],
+    "e5": ["--eapi", "5"],
+    "e7": ["--eapi", "7"],
+    "e8": ["--eapi", "8"],
+    "e9": ["--eapi", "9"],
+    "eX": ["--eapi", "10"],
+    "e8+bid": ["--eapi", "8", "--allow-build-id", "1"],
+    "None-repo": ["--allow-repo", "0", "--allow-build-id", "0"],
+    "wild": ["--allow-wildcard", "--allow-repo", "1"],
+}
+
+
+def _battery_rows():
+    tsv = (
+        Path(__file__).resolve().parents[2]
+        / "portuale"
+        / "crates"
+        / "portage-dep"
+        / "src"
+        / "testdata"
+        / "atoms-3.0.82.2.tsv"
+    )
+    rows = []
+    for line in tsv.read_text().splitlines()[1:]:
+        if not line:
+            continue
+        atom, mode, verdict, _detail = line.split("\t")
+        if verdict.startswith("S3"):
+            continue
+        rows.append((atom, mode))
+    return rows
+
+
+@pytest.mark.parametrize("atom,mode", _battery_rows())
+def test_oracle_battery_matches_between_implementations(
+    atom, mode, atom_harness_python, atom_harness_rust
+):
+    flags = _TSV_MODES[mode]
+    python_result = _run(atom_harness_python, "parse", *flags, atom)
+    rust_result = _run([str(atom_harness_rust)], "parse", *flags, atom)
+    assert rust_result == python_result
 
 
 @pytest.mark.parametrize("atom", PARSE_VALID_ATOMS)
