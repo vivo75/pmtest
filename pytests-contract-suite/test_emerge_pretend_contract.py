@@ -5881,6 +5881,57 @@ def test_invalid_defaulted_use_dep_conditional_masks_the_package(emerge_binary, 
     )
 
 
+def _wildcard_mask_configroot(tmp_path, fixtures_root, mask_line):
+    """A hermetic per-test PORTAGE_CONFIGROOT over the committed fixture
+    repos (never `fixtures/etc` itself): the shared repo set with absolute
+    locations, `make.profile` at the fixture default profile, and a user
+    `package.mask` holding the single line under test."""
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    (cfg / "etc/portage/package.mask").write_text(mask_line + "\n")
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+
+
+@pytest.mark.parametrize("mask_line", ["dev-libs/fo*", "*-libs/f*o", "*/*:0"])
+def test_user_package_mask_extended_wildcards_mask_the_package(
+    emerge_binary, tmp_path, fixtures_root, mask_line
+):
+    """Backlog #341 S3: extended (wildcard) atoms in a user `package.mask`
+    mask the package, like Portage (`match_from_list` re-parses with
+    `allow_wildcard=True, allow_repo=True`, dep:2901-2906).
+
+    Portage 3.0.82.2, container `localhost/test-portuale:latest`, full argv
+    `emerge -pv --ignore-default-opts --getbinpkg=n --usepkg=n dev-libs/foo`,
+    run three times against this same fixture tree with `package.mask`
+    holding one line: `dev-libs/fo*`, `*-libs/f*o`, `*/*:0`. Every run
+    exits 1 with `- dev-libs/foo-1.0::testrepo (masked by: package.mask)`
+    on stderr (Portage adds a `for <root>.` suffix to the header line,
+    which portuale omits by the fixture-miss-message-unsuffixed
+    convention). The hermetic per-test PORTAGE_CONFIGROOT below replays
+    the same shape; stdout empty, full stderr pinned via `_all_masked`."""
+    env = _wildcard_mask_configroot(tmp_path, fixtures_root, mask_line)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/foo"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/foo", "dev-libs/foo-1.0::testrepo", "package.mask"
+    )
+
+
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
     """Backlog #153 (P19), the group half: `dev-vcs/somercurial-5.5.1` has
     no `IUSE` but its `RDEPEND` gates `dev-python/sopypy` behind

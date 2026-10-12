@@ -131,10 +131,11 @@ def test_parse_modes_match_between_implementations(
 # The S2 oracle battery: the 83 probe strings of
 # LLM/evidence/2026-10-11-341-oracle/probe_atoms.py, re-probed live into
 # crates/portage-dep/src/testdata/atoms-3.0.82.2.tsv by
-# LLM/tools/atom_oracle_table.py. Rows tagged S3* need the wildcard branch
-# (S3) and stay skipped here until then. Match parity for build-id atoms is
-# intentionally out of scope (S2 review C-1; pinned by the Rust unit test
-# `eq_build_id_atom_matches_no_plain_candidate`), so this is parse-only.
+# LLM/tools/atom_oracle_table.py. The 6 rows tagged S3OK need the wildcard
+# branch (S3, now implemented); other S3* verdicts stay skipped. Match
+# parity for build-id atoms is intentionally out of scope (S2 review C-1;
+# pinned by the Rust unit test `eq_build_id_atom_matches_no_plain_candidate`),
+# so this is parse-only.
 _TSV_MODES = {
     "None": [],
     "e5": ["--eapi", "5"],
@@ -163,7 +164,7 @@ def _battery_rows():
         if not line:
             continue
         atom, mode, verdict, _detail = line.split("\t")
-        if verdict.startswith("S3"):
+        if verdict.startswith("S3") and verdict != "S3OK":
             continue
         rows.append((atom, mode))
     return rows
@@ -308,6 +309,32 @@ MATCH_CASES += [
                                          # every candidate regardless of its own repo
     ("dev-libs/foo:0::gentoo", REPO_CANDIDATES),  # repo constraint combined
                                                     # with an explicit slot
+]
+
+# Extended (wildcard) atoms (#341 S3): Portage `match_from_list` re-parses
+# with `allow_wildcard=True, allow_repo=True`, so these match here while the
+# default `parse` mode still reports them INVALID. Expected sets are Portage's
+# own (`probe_match.py` shape, re-run live 2026-10-12 with these strings):
+# `*/foo*`, `dev-libs/fo*` and `*/*:0` match all four; `=*/foo-*1*` and
+# `*-libs/f*o` match the three `foo` ones; `=dev-libs/foo*-*12*` and
+# `*/*::x` match only the `foobar` one (the `foo` candidates carry
+# `::gentoo`, as in the oracle -- a repo-less candidate would pass any
+# `::repo` filter, review C-2).
+EXTENDED_MATCH_CANDIDATES = [
+    "dev-libs/foo-1.0::gentoo",
+    "dev-libs/foo-1.0-r1::gentoo",
+    "dev-libs/foo-10::gentoo",
+    "dev-libs/foobar-1.12::x",
+]
+
+MATCH_CASES += [
+    ("*/foo*", EXTENDED_MATCH_CANDIDATES),
+    ("dev-libs/fo*", EXTENDED_MATCH_CANDIDATES),
+    ("*/*:0", EXTENDED_MATCH_CANDIDATES),
+    ("=*/foo-*1*", EXTENDED_MATCH_CANDIDATES),
+    ("*-libs/f*o", EXTENDED_MATCH_CANDIDATES),
+    ("=dev-libs/foo*-*12*", EXTENDED_MATCH_CANDIDATES),
+    ("*/*::x", EXTENDED_MATCH_CANDIDATES),
 ]
 
 

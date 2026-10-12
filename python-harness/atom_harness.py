@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Neutral CLI test-harness binary (Python side) for the atom-matching
 portuale -- see LLM/agent-context.md and crates/portage-dep/src/lib.rs
-for the S2 grammar this exercises (EAPI-aware strict atoms incl. build-ids;
-extended/wildcard syntax arrives in S3). Wraps Portage's
+for the S3 grammar this exercises (EAPI-aware strict atoms incl. build-ids,
+plus extended/wildcard syntax). Wraps Portage's
 portage.dep.Atom / portage.dep.match_from_list rather than reimplementing
-them, and rejects any atom that uses extended/wildcard syntax (S3 ports that
-branch on the Rust side) so both harnesses
-agree on the same input language rather than Python silently accepting a
-wider one. Build-ids ARE accepted since S2 (see portage-dep's own doc
-comment on the `=`-with-build-id match rule). Slot operators (":=", ":*",
+them. Build-ids ARE accepted since S2 (see portage-dep's own doc
+comment on the `=`-with-build-id match rule); extended/wildcard atoms ARE
+accepted since S3 (parsed with `allow_wildcard=True`, matched through
+Portage's `match_from_list`, which re-parses with `allow_wildcard=True,
+allow_repo=True` itself). Slot operators (":=", ":*",
 ":slot=") and USE deps ("foo[bar]", all 7 PMS 8.3.4 forms plus 4-style
 defaults) ARE accepted -- see portage-dep's own doc comment on
 why: Portage's own matching logic (_match_slot, and
@@ -71,9 +71,8 @@ _SUPPORTED_OPERATORS = {None, "=", "=*", ">", ">=", "<", "<=", "~"}
 
 def _parse_v1_atom(s, eapi=None, allow_repo=None, allow_build_id=None,
                    allow_wildcard=False):
-    """Returns a real Atom if `s` parses under the S2 grammar subset, else
-    None (either it's not a valid atom at all, or it uses extended/wildcard
-    syntax, which arrives in S3). Flags pass straight to `portage.dep.Atom`."""
+    """Returns a real Atom if `s` parses under the S3 grammar subset, else
+    None. Flags pass straight to `portage.dep.Atom`."""
     kwargs = {}
     if eapi is not None:
         kwargs["eapi"] = eapi
@@ -91,7 +90,7 @@ def _parse_v1_atom(s, eapi=None, allow_repo=None, allow_build_id=None,
         # A supported-but-unparseable `eapi` (e.g. "3_pre1", padded " 8"):
         # Portage raises ValueError out of `Eapi.__init__`.
         return None
-    if a.extended_syntax or a.operator not in _SUPPORTED_OPERATORS:
+    if a.operator not in _SUPPORTED_OPERATORS:
         return None
     return a
 
@@ -108,6 +107,10 @@ def _format_parse(s, **kwargs):
     if a.version is None:
         version = ""
         revision = ""
+    elif a.extended_syntax:
+        # An extended `=*` keeps its stars (`*1*`); catpkgsplit cannot split
+        # a wildcard cpv, and there is never a revision.
+        version, revision = a.version, ""
     else:
         _, _, version, rev = catpkgsplit(a.cpv)
         # catpkgsplit reports an absent revision as "r0" too; only an
