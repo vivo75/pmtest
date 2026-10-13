@@ -1,0 +1,9 @@
+DEFINED_PHASES=-
+EAPI=8
+INHERIT=t348-d
+KEYWORDS=amd64
+PROPERTIES=t348eb-prop t348ec-prop
+RESTRICT=t348eb-restrict t348ec-restrict
+SLOT=0
+_eclasses_=t348-d	08308972fc54826f755ec41a1406ba8b
+_md5_=1d8552ff4019e3f7923dc99ca6e1a798

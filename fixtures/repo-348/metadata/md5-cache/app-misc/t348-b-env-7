@@ -1,0 +1,8 @@
+DEFINED_PHASES=compile configure install postinst postrm preinst prepare prerm pretend setup test unpack
+DESCRIPTION=S0.4 probe: dump the per-phase environment (EAPI 7)
+EAPI=7
+HOMEPAGE=https://example.invalid/t348-b-env
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=653f859db1a14bddb08111f09d028bdd

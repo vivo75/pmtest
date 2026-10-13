@@ -1,0 +1,17 @@
+#!/bin/sh
+# Minimal fake configure for the S0.5 probe (package t348-b-phasert):
+# records the argv econf passed, then writes a Makefile with
+# all/check/test/install targets for the default_src_* fallbacks.
+echo "configure argv: $@" > config.args
+cat > Makefile <<'MAKEEOF'
+all:
+	@echo built > built.txt
+check:
+	@echo checked > checked.txt
+test: check
+install:
+	mkdir -p "$(DESTDIR)/usr/share/t348-b-phasert"
+	cp built.txt "$(DESTDIR)/usr/share/t348-b-phasert/built.txt"
+	cp config.args "$(DESTDIR)/usr/share/t348-b-phasert/config.args"
+MAKEEOF
+echo "t348-b-phasert configured ok"

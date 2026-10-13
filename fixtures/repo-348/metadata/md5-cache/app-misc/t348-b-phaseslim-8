@@ -1,0 +1,8 @@
+DEFINED_PHASES=compile install setup unpack
+DESCRIPTION=S0.5 probe: minimal hooks, skips observable (EAPI 8)
+EAPI=8
+HOMEPAGE=https://example.invalid/t348-b-phaseslim
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=6d8a457a35a1e5319584747f9e8c010d

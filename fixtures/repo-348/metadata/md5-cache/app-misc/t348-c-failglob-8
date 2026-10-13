@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-failglob probe (EAPI 8)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=ec3ef325889355186018f7fc196aae20

@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-keepdir-install probe (EAPI 8)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=5f05590f8bfccf29c930a2126735add5

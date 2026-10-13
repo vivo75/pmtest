@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-verq-install probe (EAPI 8)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=95c8bb525d3687a1c8deb209be5e2d04

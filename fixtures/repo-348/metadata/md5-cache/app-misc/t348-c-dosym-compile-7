@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-dosym-compile probe (EAPI 7)
+EAPI=7
+KEYWORDS=amd64
+SLOT=0
+_md5_=f1f7c609d2f75d1e708337eddb85daad

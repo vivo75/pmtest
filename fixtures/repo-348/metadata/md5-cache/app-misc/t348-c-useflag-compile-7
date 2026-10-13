@@ -1,0 +1,7 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-useflag-compile probe (EAPI 7)
+EAPI=7
+IUSE=+foo bar
+KEYWORDS=amd64
+SLOT=0
+_md5_=4296cff94b658811c8477d978b31d52d

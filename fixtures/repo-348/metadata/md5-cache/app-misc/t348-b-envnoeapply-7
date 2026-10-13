@@ -1,0 +1,8 @@
+DEFINED_PHASES=compile configure install postinst postrm preinst prepare prerm pretend setup test unpack
+DESCRIPTION=S0.4 probe: die without eapply_user (EAPI 7)
+EAPI=7
+HOMEPAGE=https://example.invalid/t348-b-env
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=c6308df23394ec2560a68fe4a207eca2

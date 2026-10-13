@@ -1,0 +1,8 @@
+DEFINED_PHASES=compile configure install postinst postrm preinst prepare prerm pretend setup test unpack
+DESCRIPTION=S0.5 probe: full phase hooks with default fallbacks (EAPI 7)
+EAPI=7
+HOMEPAGE=https://example.invalid/t348-b-phases
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=e7831d58355669535075dc0530e14902

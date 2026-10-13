@@ -1,0 +1,5 @@
+DEFINED_PHASES=prepare
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=75bea5712f1dd56c1eee72b0013ae38f

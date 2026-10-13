@@ -1,0 +1,7 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-hasq-install probe (EAPI 7)
+EAPI=7
+IUSE=foo
+KEYWORDS=amd64
+SLOT=0
+_md5_=fa96ce50c292d2a20b205df291d440e7

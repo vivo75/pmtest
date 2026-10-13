@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+EAPI=7
+IDEPEND=app-misc/t348-d-good
+KEYWORDS=amd64
+SLOT=0
+_md5_=8fbf854d722e414ff8f1d3bd6134e85f

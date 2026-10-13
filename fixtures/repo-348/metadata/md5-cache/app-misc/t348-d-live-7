@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+EAPI=7
+KEYWORDS=amd64
+PROPERTIES=live
+SLOT=0
+_md5_=fff99e64de7bddb2a6e67fab736a7bac

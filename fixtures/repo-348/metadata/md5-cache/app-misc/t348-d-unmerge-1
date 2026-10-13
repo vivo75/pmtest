@@ -1,0 +1,5 @@
+DEFINED_PHASES=install postrm prerm
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=75bb7804862ffcca7c041764dc95d495

@@ -1,0 +1,4 @@
+EAPI=7
+SLOT="0"
+KEYWORDS="amd64"
+PROPERTIES="live"

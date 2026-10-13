@@ -1,0 +1,3 @@
+EAPI=7_alpha
+SLOT="0"
+KEYWORDS="amd64"

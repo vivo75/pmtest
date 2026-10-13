@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile configure install prepare test unpack
+DESCRIPTION=t348 S0.6 t348-c-eapply-compile probe (EAPI 7)
+EAPI=7
+KEYWORDS=amd64
+SLOT=0
+_md5_=9d3568b533f14898ebc18f235d676574

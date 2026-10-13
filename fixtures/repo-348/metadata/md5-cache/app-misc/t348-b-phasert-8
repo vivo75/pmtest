@@ -1,0 +1,9 @@
+DEFINED_PHASES=compile configure install postinst postrm preinst prepare prerm pretend setup test unpack
+DESCRIPTION=S0.5 probe: full hooks, RESTRICT=test (EAPI 8)
+EAPI=8
+HOMEPAGE=https://example.invalid/t348-b-phasert
+KEYWORDS=amd64
+LICENSE=MIT
+RESTRICT=test
+SLOT=0
+_md5_=435d414b98b44cc020a90668b3299684

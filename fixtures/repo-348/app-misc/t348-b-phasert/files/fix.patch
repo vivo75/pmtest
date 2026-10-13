@@ -1,0 +1,5 @@
+--- a/hello.in
++++ b/hello.in
+@@ -1 +1 @@
+-hello v1
++hello v2 patched

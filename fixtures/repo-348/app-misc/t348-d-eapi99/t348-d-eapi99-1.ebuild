@@ -1,0 +1,3 @@
+EAPI=99
+SLOT="0"
+KEYWORDS="amd64"
