@@ -27255,3 +27255,187 @@ def test_t348_s2_e6_iuse_effective_and_in_portage_iuse(
             assert "in_iuse foo: rc=0" in text, (eapi, text)
             assert "usex bogusflag => []" in text, (eapi, text)
             assert "use_enable bogusflag => []" in text, (eapi, text)
+
+
+def test_t348_s3_p1_ebuild_test_forces_the_test_phase(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S3 P1: `ebuild <file> test` (and any multi-command
+    list containing `test`) forces the test phase even without
+    `FEATURES=test` (`EBUILD_FORCE_TEST`, `Forcing test.` on stderr);
+    with `RESTRICT=test` the forced run still skips via `__dyn_test`.
+
+    Oracolo: Portage 3.0.82.2 host, celle b-env-7/8-portage-ebuild-test
+    (`ebuild …/t348-b-env-7.ebuild test`, rc 0, `Forcing test.` su
+    stderr, hook `src_test` eseguito con `>>> Test phase:`) e
+    b-phases-t348-b-phasert-7-portage-ebuild-seq (RESTRICT=test:
+    `Forcing test.` stampato comunque, `src_test` saltato,
+    `>>> Test phase [disabled because of RESTRICT=test]`); pre-fix
+    portuale saltava `src_test` in silenzio (rc 0, zero hook)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    repo348 = fixtures_root / "repo-348"
+    for eapi in ("7", "8"):
+        pf = f"t348-b-env-{eapi}"
+        result = subprocess.run(
+            [
+                str(ebuild_binary),
+                str(repo348 / f"app-misc/t348-b-env/{pf}.ebuild"),
+                "test",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert result.returncode == 0, (eapi, result.stdout, result.stderr)
+        assert "Forcing test." in result.stderr, (eapi, result.stderr)
+        log = stage / "env-src_test.log"
+        assert log.is_file(), (eapi, result.stdout, result.stderr)
+        assert "TAG=src_test" in log.read_text(), (eapi, log.read_text()[:500])
+    # Multi-command containing `test` forces too (`bin/ebuild` keys off
+    # the whole argv, `ebuild:296-302`).
+    pf = "t348-b-env-7"
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(repo348 / f"app-misc/t348-b-env/{pf}.ebuild"),
+            "setup",
+            "test",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert "Forcing test." in result.stderr, result.stderr
+    # RESTRICT=test: forced but skipped by the vendored `__dyn_test`,
+    # exactly like the oracle (no new hook line for `src_test`).
+    (stage / "phases-t348-b-phasert.log").unlink(missing_ok=True)
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(repo348 / "app-misc/t348-b-phasert/t348-b-phasert-7.ebuild"),
+            "test",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert "Forcing test." in result.stderr, result.stderr
+    log = stage / "phases-t348-b-phasert.log"
+    assert log.is_file(), (result.stdout, result.stderr)
+    lines = log.read_text().splitlines()
+    assert "pkg_setup" in lines, lines
+    assert "src_test" not in lines, lines
+
+
+def test_t348_s3_p2_preinst_postinst_run_standalone(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S3 P2: `ebuild <file> preinst|postinst` runs the
+    `pkg_preinst`/`pkg_postinst` hook standalone (no dep chain, rc 0),
+    like Portage's direct `_spawn_phase` for those commands.
+
+    Oracolo: Portage 3.0.82.2 host, celle
+    b-env-7/8-portage-ebuild-preinst/postinst (rc 0, stdout vuoto,
+    `stage-env-pkg_preinst.log` scritto dall'hook); pre-fix portuale
+    era uno stub dry-run rc 0 silenzioso (nessun hook eseguito)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    repo348 = fixtures_root / "repo-348"
+    for eapi in ("7", "8"):
+        pf = f"t348-b-env-{eapi}"
+        for command, func in (("preinst", "pkg_preinst"), ("postinst", "pkg_postinst")):
+            log = stage / f"env-{func}.log"
+            log.unlink(missing_ok=True)
+            result = subprocess.run(
+                [
+                    str(ebuild_binary),
+                    str(repo348 / f"app-misc/t348-b-env/{pf}.ebuild"),
+                    command,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                env=env,
+            )
+            assert result.returncode == 0, (eapi, command, result.stdout, result.stderr)
+            assert result.stdout == "", (eapi, command, result.stdout)
+            assert log.is_file(), (eapi, command, result.stdout, result.stderr)
+            assert f"TAG={func}" in log.read_text(), (eapi, command)
+
+
+def _t348_s3_requse_message() -> str:
+    """Portage's `_validate_deps` REQUIRED_USE refusal
+    (`doebuild.py:1955-1975`): the reduced subset line plus the trailing
+    blank line, byte for byte as the oracle prints it."""
+    return (
+        "\n  The following REQUIRED_USE flag constraints are unsatisfied:\n"
+        "    t348dfoo? ( t348dbar )\n"
+        "\n"
+    )
+
+
+def test_t348_s3_p3_setup_refuses_violated_required_use(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S3 P3: `ebuild <file> setup` with violated
+    `REQUIRED_USE` fails rc 1 with Portage's constraints text (the gate
+    in `_validate_deps`, `eapi_has_required_use` = `attrs.required_use`
+    di S1); satisfied USE still runs clean.
+
+    Oracolo: Portage 3.0.82.2 host, celle d-requse7/8-setup
+    (`ebuild …/t348-d-requse-8.ebuild setup` con
+    `package.use: app-misc/t348-d-requse t348dfoo`, rc 1, stdout vuoto,
+    il blocco `unsatisfied:` + riga del vincolo su stderr); pre-fix
+    portuale era rc 0 muto. Il percorso emerge copre già lo stesso
+    vincolo (d-requse*-pret `same`); qui è riusata la stessa
+    valutazione (`portage-required-use` + IUSE implicito del config)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    package_use = Path(base["PORTAGE_CONFIGROOT"]) / "etc/portage/package.use"
+    package_use.mkdir(parents=True, exist_ok=True)
+    (package_use / "t348-s3").write_text("app-misc/t348-d-requse t348dfoo\n")
+    env = _t348_s2_real_env(base, tmp_path)
+    repo348 = fixtures_root / "repo-348"
+    for eapi in ("7", "8"):
+        result = subprocess.run(
+            [
+                str(ebuild_binary),
+                str(repo348 / f"app-misc/t348-d-requse/t348-d-requse-{eapi}.ebuild"),
+                "setup",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert result.returncode == 1, (eapi, result.stdout, result.stderr)
+        assert result.stdout == "", (eapi, result.stdout)
+        assert result.stderr.endswith(_t348_s3_requse_message()), (
+            eapi,
+            result.stderr,
+        )
+    # Controllo soddisfatto: senza `package.use` la stessa `setup` gira
+    # (rc 0), come sull'oracolo.
+    sat_base = _t348_configroot(tmp_path / "sat", fixtures_root)
+    sat_env = _t348_s2_real_env(sat_base, tmp_path / "sat")
+    result = subprocess.run(
+        [
+            str(ebuild_binary),
+            str(repo348 / "app-misc/t348-d-requse/t348-d-requse-8.ebuild"),
+            "setup",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=sat_env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
