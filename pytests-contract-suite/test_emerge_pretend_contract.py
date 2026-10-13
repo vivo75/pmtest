@@ -27439,3 +27439,96 @@ def test_t348_s3_p3_setup_refuses_violated_required_use(
         env=sat_env,
     )
     assert result.returncode == 0, (result.stdout, result.stderr)
+
+
+def _t348_s6_reinstall_sequence() -> list[str]:
+    """Portage's hook order for a same-version reinstall: the 9 build
+    hooks, then `pkg_preinst` of the new instance, the old instance's
+    `pkg_prerm`/`pkg_postrm` teardown, and `pkg_postinst` of the new
+    instance (vartree.py, dblink.treewalk: the replaced same-cpv dblink
+    is unmerged like any other same-slot instance)."""
+    return [
+        "pkg_pretend",
+        "pkg_setup",
+        "src_unpack",
+        "src_prepare",
+        "src_configure",
+        "src_compile",
+        "src_install",
+        "pkg_preinst",
+        "pkg_prerm",
+        "pkg_postrm",
+        "pkg_postinst",
+    ]
+
+
+def test_t348_s6_same_version_reinstall_runs_old_teardown_hooks(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S6 M1: reinstalling the already-installed version/slot
+    with `emerge --oneshot` runs the old instance's `pkg_prerm` and
+    `pkg_postrm` between the new `pkg_preinst` and `pkg_postinst`
+    (pre-fix portuale skipped both: 9 hooks instead of 11), with
+    `REPLACING_VERSIONS`/`REPLACED_BY_VERSION` set to the version, and
+    leaves the ROOT file set and the single VDB entry exactly as Portage
+    does (the just-merged files are never deleted).
+
+    Oracolo: Portage 3.0.82.2 host, cella
+    b-phases-t348-b-phasert-8-portage-emerge-featurestest (31 righe
+    cumulative = 9 + 11 + 11: il reinstall corre prerm/postrm
+    dell'istanza vecchia; caso versione diversa già `same` in P3) e
+    riverifica S6 su root ermetica (`t348-b-phases-8`: fresh 9 hook,
+    reinstall 11 hook `pkg_preinst, pkg_prerm, pkg_postrm, pkg_postinst`;
+    `pkg_preinst/postinst` con `REPLACING_VERSIONS="8"`,
+    `pkg_prerm/postrm` con `REPLACED_BY_VERSION="8"`; ROOT con
+    `usr/share/t348-b-phases/{built.txt,config.args}` e
+    `usr/share/doc/t348-b-phases-8/README.md`, un'unica entry VDB)."""
+    for eapi in ("7", "8"):
+        sub = tmp_path / f"s6-{eapi}"
+        base = _t348_configroot(sub, fixtures_root)
+        stage = sub / "stage"
+        _t348_s2_with_logdir(base, stage)
+        env = _t348_s2_real_env(base, sub)
+        atom = f"=app-misc/t348-b-phases-{eapi}"
+        log = stage / "phases-t348-b-phases.log"
+        fresh = _run([str(emerge_binary)], ["--oneshot", atom], env)
+        assert fresh.returncode == 0, (eapi, fresh.stdout, fresh.stderr)
+        assert log.is_file(), (eapi, fresh.stdout, fresh.stderr)
+        fresh_sequence = _t348_s6_reinstall_sequence()
+        # Fresh install: the 9 build hooks, no teardown (`pkg_prerm` /
+        # `pkg_postrm` run only over a replaced instance).
+        assert log.read_text().splitlines() == fresh_sequence[:8] + fresh_sequence[10:], (
+            eapi,
+            log.read_text(),
+        )
+        log.unlink()
+        reinstall = _run([str(emerge_binary)], ["--oneshot", atom], env)
+        assert reinstall.returncode == 0, (eapi, reinstall.stdout, reinstall.stderr)
+        assert log.is_file(), (eapi, reinstall.stdout, reinstall.stderr)
+        assert log.read_text().splitlines() == _t348_s6_reinstall_sequence(), (
+            eapi,
+            log.read_text(),
+        )
+        root = Path(env["ROOT"])
+        for payload in (
+            "usr/share/t348-b-phases/built.txt",
+            "usr/share/t348-b-phases/config.args",
+            f"usr/share/doc/t348-b-phases-{eapi}/README.md",
+        ):
+            assert (root / payload).is_file(), (eapi, payload)
+            assert (root / payload).stat().st_size > 0, (eapi, payload)
+        entries = sorted(
+            p.name
+            for p in (root / "var/db/pkg/app-misc").iterdir()
+            if not p.name.startswith("-MERGING-")
+        )
+        assert entries == [f"t348-b-phases-{eapi}"], (eapi, entries)
+        contents = (
+            root / f"var/db/pkg/app-misc/t348-b-phases-{eapi}/CONTENTS"
+        ).read_text()
+        for payload in (
+            "/usr/share/t348-b-phases/built.txt",
+            "/usr/share/t348-b-phases/config.args",
+            f"/usr/share/doc/t348-b-phases-{eapi}/README.md",
+        ):
+            assert payload in contents, (eapi, contents)
