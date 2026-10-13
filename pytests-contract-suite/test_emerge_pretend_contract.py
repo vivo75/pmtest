@@ -27009,3 +27009,249 @@ def test_t348_s5_spaced_eapi_builds_like_portage(
     )
     assert result.returncode == 0, (result.stdout, result.stderr)
     assert "eapply_user: command not found" not in result.stderr
+
+
+def _t348_s2_real_env(base, tmp_path):
+    """Full host env plus the hermetic #348 roots for tests that run real
+    phases (`ebuild`/`emerge` spawn `bash`, which needs the host PATH).
+    `ROOT` points at a scratch root so vdb lookups (`REPLACING_VERSIONS`)
+    stay hermetic; `PORTAGE_TMPDIR`/`DISTDIR` isolate the builddirs."""
+    env = dict(os.environ)
+    env.update(base)
+    env["ROOT"] = str(tmp_path / "root")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["DISTDIR"] = str(tmp_path / "distdir")
+    (tmp_path / "distdir").mkdir(exist_ok=True)
+    return env
+
+
+def _t348_s2_with_logdir(base, stage):
+    """Export `T348_LOGDIR` through `make.conf` (like the S0 capture root)
+    so the `t348-b-env` probes dump their per-phase `declare -p` logs into
+    `stage/`. `T348_LOGDIR` is a config var, so phases see it; passing it
+    only in the calling env would not survive the whitelist."""
+    make_conf = Path(base["PORTAGE_CONFIGROOT"]) / "etc/portage/make.conf"
+    with make_conf.open("a") as fh:
+        fh.write(f'\nT348_LOGDIR="{stage}"\n')
+    stage.mkdir(parents=True, exist_ok=True)
+
+
+def _t348_s2_direct_setup(ebuild_binary, eapi, env):
+    """Run `ebuild …/t348-b-env-<eapi>.ebuild setup` (dep chain:
+    pretend+setup) and return the `env-pkg_setup.log` text the probe wrote
+    to `T348_LOGDIR`."""
+    pf = f"t348-b-env-{eapi}"
+    ebuild = str(
+        Path(env["T348_EBUILD_DIR"]) / f"app-misc/t348-b-env/{pf}.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild, "setup"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    log = Path(env["T348_STAGE"]) / "env-pkg_setup.log"
+    assert log.is_file(), (result.stdout, result.stderr)
+    return log.read_text()
+
+
+def test_t348_s2_e1_ebuild_phase_func_exported(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S2 E1: `EBUILD_PHASE_FUNC` is exported readonly per
+    phase (`pkg_setup` for `setup`), as Portage's `config.environ()` does
+    when `exports_EBUILD_PHASE_FUNC` (EAPI >= 5; floor EAPI 7/8 always).
+
+    Oracolo: Portage 3.0.82.2 host, celle b-env-7/8-portage-ebuild-setup
+    (`declare -rx EBUILD_PHASE_FUNC="pkg_setup"` in
+    `stage-env-pkg_setup.log`; pre-fix portuale: unset/empty)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    env["T348_STAGE"] = str(stage)
+    env["T348_EBUILD_DIR"] = str(fixtures_root / "repo-348")
+    for eapi in ("7", "8"):
+        text = _t348_s2_direct_setup(ebuild_binary, eapi, env)
+        assert 'declare -rx EBUILD_PHASE_FUNC="pkg_setup"' in text, (
+            f"EAPI {eapi}",
+            text[:2000],
+        )
+
+
+def test_t348_s2_e2_a_set_in_direct_path(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S2 E2: `A` is exported (empty here, no `SRC_URI`) in
+    the direct `ebuild <file> <phase>` path too, not just in the emerge
+    path (Portage `doebuild_environment` always sets it).
+
+    Oracolo: Portage 3.0.82.2 host, celle b-env-7/8-portage-ebuild-setup
+    (`declare -x A=""`; pre-fix portuale: `declare: A: not found`)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    env["T348_STAGE"] = str(stage)
+    env["T348_EBUILD_DIR"] = str(fixtures_root / "repo-348")
+    for eapi in ("7", "8"):
+        text = _t348_s2_direct_setup(ebuild_binary, eapi, env)
+        assert 'declare -x A=""' in text, (f"EAPI {eapi}", text[:2000])
+        assert "declare: A: not found" not in text, (f"EAPI {eapi}", text[:2000])
+
+
+def test_t348_s2_e3_merge_vars_source_and_upgrade(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S2 E3: source merges export `MERGE_TYPE="source"` and
+    `REPLACING_VERSIONS` (empty on a fresh install, the replaced version
+    on upgrade) in pretend/setup/preinst/postinst; the replaced version's
+    `pkg_prerm`/`pkg_postrm` see `REPLACED_BY_VERSION` while
+    `MERGE_TYPE`/`REPLACING_VERSIONS` stay readonly-unexported-empty
+    (`exports_merge_type`/`exports_replace_vars`, EAPI >= 4).
+
+    Oracolo: Portage 3.0.82.2 host, celle
+    b-env-portage-emerge-install7 (fresh: `MERGE_TYPE="source"`,
+    `REPLACING_VERSIONS=""`) e b-env-portage-emerge-upgrade78
+    (`REPLACING_VERSIONS="7"`, `REPLACED_BY_VERSION="8"`,
+    `declare -r MERGE_TYPE` / `declare -r REPLACING_VERSIONS`)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    fresh = _run(
+        [str(emerge_binary)],
+        ["--oneshot", "=app-misc/t348-b-env-7"],
+        env,
+    )
+    assert fresh.returncode == 0, (fresh.stdout, fresh.stderr)
+    text = (stage / "env-pkg_setup.log").read_text()
+    assert 'declare -rx MERGE_TYPE="source"' in text, text[:2000]
+    assert 'declare -rx REPLACING_VERSIONS=""' in text, text[:2000]
+    assert 'declare -rx EBUILD_PHASE_FUNC="pkg_setup"' in text, text[:2000]
+    upgrade = _run(
+        [str(emerge_binary)],
+        ["--oneshot", "=app-misc/t348-b-env-8"],
+        env,
+    )
+    assert upgrade.returncode == 0, (upgrade.stdout, upgrade.stderr)
+    setup = (stage / "env-pkg_setup.log").read_text()
+    assert 'declare -rx MERGE_TYPE="source"' in setup, setup[:2000]
+    assert 'declare -rx REPLACING_VERSIONS="7"' in setup, setup[:2000]
+    preinst = (stage / "env-pkg_preinst.log").read_text()
+    assert 'declare -rx MERGE_TYPE="source"' in preinst, preinst[:2000]
+    assert 'declare -rx REPLACING_VERSIONS="7"' in preinst, preinst[:2000]
+    prerm = (stage / "env-pkg_prerm.log").read_text()
+    assert 'declare -rx REPLACED_BY_VERSION="8"' in prerm, prerm[:2000]
+    assert "declare -r MERGE_TYPE" in prerm, prerm[:2000]
+    assert "declare -rx MERGE_TYPE" not in prerm, prerm[:2000]
+    assert "declare -r REPLACING_VERSIONS" in prerm, prerm[:2000]
+    assert "declare -rx REPLACING_VERSIONS" not in prerm, prerm[:2000]
+    assert 'declare -rx EBUILD_PHASE_FUNC="pkg_prerm"' in prerm, prerm[:2000]
+
+
+def test_t348_s2_e4_sysroot_esysroot_broot_exported(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S2 E4: non-cross builds export `SYSROOT`/`ESYSROOT`
+    (`""`) and readonly `BROOT` (`""`) (`sysroot`/`broot`, EAPI >= 7).
+
+    Oracolo: Portage 3.0.82.2 host, celle b-env-7/8-portage-ebuild-setup
+    (`declare -x SYSROOT=""`, `declare -x ESYSROOT=""`,
+    `declare -rx BROOT=""`; pre-fix portuale: `SYSROOT`/`ESYSROOT`
+    unset, `BROOT` unexported)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    env["T348_STAGE"] = str(stage)
+    env["T348_EBUILD_DIR"] = str(fixtures_root / "repo-348")
+    for eapi in ("7", "8"):
+        text = _t348_s2_direct_setup(ebuild_binary, eapi, env)
+        assert 'declare -x SYSROOT=""' in text, (f"EAPI {eapi}", text[:2000])
+        assert 'declare -x ESYSROOT=""' in text, (f"EAPI {eapi}", text[:2000])
+        assert 'declare -rx BROOT=""' in text, (f"EAPI {eapi}", text[:2000])
+
+
+def _t348_s2_probe_log(ebuild_binary, pkg, eapi, phase, env):
+    """Run one `ebuild <probe> <phase>` cell and return the probe's
+    `${T}/t348.log` text (the `t348-c-*` probes always log there)."""
+    ebuild = str(
+        Path(env["T348_FIXTURES_ROOT"])
+        / f"repo-348/app-misc/{pkg}/{pkg}-{eapi}.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild, phase],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    log = (
+        Path(env["PORTAGE_TMPDIR"])
+        / f"portage/app-misc/{pkg}-{eapi}/temp/t348.log"
+    )
+    assert log.is_file(), (result.stdout, result.stderr)
+    return log.read_text()
+
+
+def test_t348_s2_e5_slot_exported_standalone_keepdir(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S2 E5: standalone phases export `SLOT` (from the
+    md5-cache), so `keepdir` names its marker `.keep_<cat>_<pn>-0`
+    instead of `...-` (Portage `config.py:185` exports it).
+
+    Oracolo: Portage 3.0.82.2 host, celle
+    c-t348-c-keepdir-compile/install-7/8-portage
+    (`.keep_app-misc_t348-c-keepdir-compile-0`; pre-fix portuale:
+    trailing `-` with empty `SLOT`)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    env = _t348_s2_real_env(base, tmp_path)
+    env["T348_FIXTURES_ROOT"] = str(fixtures_root)
+    for eapi in ("7", "8"):
+        for pkg, phase in (
+            ("t348-c-keepdir-compile", "compile"),
+            ("t348-c-keepdir-install", "install"),
+        ):
+            text = _t348_s2_probe_log(ebuild_binary, pkg, eapi, phase, env)
+            assert f".keep_app-misc_{pkg}-0" in text, (eapi, text)
+            assert f".keep_app-misc_{pkg}-\n" not in text, (eapi, text)
+
+
+def test_t348_s2_e6_iuse_effective_and_in_portage_iuse(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S2 E6: standalone phases carry the package's
+    `IUSE_EFFECTIVE` (declared `IUSE` plus the profile implicit set) and
+    the `___in_portage_iuse` gate (`config.py:2181-2185`), so `in_iuse`
+    sees declared flags and `use`/`usex`/`use_enable` die on unknown
+    ones instead of silently taking the default (`iuse_effective`,
+    EAPI >= 5).
+
+    Oracolo: Portage 3.0.82.2 host, celle
+    c-t348-c-useflag-compile/install-7/8-portage (`in_iuse foo: rc=0`,
+    `usex bogusflag => []`, `use_enable bogusflag => []`; pre-fix
+    portuale: rc 1 / `[no]` / `[--disable-bogusflag]`)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    stage = tmp_path / "stage"
+    _t348_s2_with_logdir(base, stage)
+    env = _t348_s2_real_env(base, tmp_path)
+    env["T348_FIXTURES_ROOT"] = str(fixtures_root)
+    env["T348_STAGE"] = str(stage)
+    env["T348_EBUILD_DIR"] = str(fixtures_root / "repo-348")
+    text = _t348_s2_direct_setup(ebuild_binary, "8", env)
+    assert "declare -x IUSE_EFFECTIVE=" in text, text[:2000]
+    assert 'declare -x IUSE_EFFECTIVE=""' not in text, text[:2000]
+    for eapi in ("7", "8"):
+        for pkg, phase in (
+            ("t348-c-useflag-compile", "compile"),
+            ("t348-c-useflag-install", "install"),
+        ):
+            text = _t348_s2_probe_log(ebuild_binary, pkg, eapi, phase, env)
+            assert "in_iuse foo: rc=0" in text, (eapi, text)
+            assert "usex bogusflag => []" in text, (eapi, text)
+            assert "use_enable bogusflag => []" in text, (eapi, text)
