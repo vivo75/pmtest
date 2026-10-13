@@ -26629,3 +26629,383 @@ def test_250_use_mismatched_installed_instance_does_not_satisfy_a_build_edge(
         f'[ebuild  N     ] dev-libs/u250json-1 to {root}',
     ]
 
+def _t348_configroot(tmp_path, fixtures_root):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #348 S5
+    cells: the shared fixture repos plus the standalone `repo-348` overlay
+    (never `fixtures/etc` itself), `make.profile` at the fixture default
+    profile. Mirrors `_t341_configroot` with the `t348` repo in place of
+    `t341`; `FEATURES` disables the sandboxes like the S0 capture root, so
+    real phase runs work unprivileged."""
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t348]\nlocation = {fixtures_root / 'repo-348'}\npriority = 50\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\n'
+        'FEATURES="-sandbox -usersandbox -network-sandbox"\n'
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+
+
+def _all_masked_eapi(atom: str, cpv: str, reason: str) -> str:
+    """`_all_masked` plus Portage's EAPI-masked upgrade paragraph: after the
+    masked rows, `The current version of portage supports EAPI '9'. ...`
+    (Portage wraps `portage.const.EAPI` at 75 columns; the two lines below
+    are that wrap, byte for byte), then the shared `MASKED PACKAGES`
+    footer. Compared `.strip()`ed like `_all_masked`."""
+    return (
+        f'!!! All ebuilds that could satisfy "{atom}" have been masked.\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        f"- {cpv} (masked by: {reason})\n"
+        "\nThe current version of portage supports EAPI '9'. You must upgrade to a\n"
+        "newer version of portage before EAPI masked packages can be installed.\n"
+        "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook."
+    )
+
+
+def _unsupported_eapi_message(cpv: str, eapi: str) -> str:
+    """Portage's `UnsupportedAPIException` text (exception.py:228-230) as
+    `bin/ebuild` prints it: `!!! ` plus a word-wrap at 70 columns."""
+    return (
+        f"!!! Unable to do any operations on '{cpv}', since its\n"
+        "!!! EAPI is higher than this portage version's. Please upgrade to a\n"
+        f"!!! portage version that supports EAPI '{eapi}'."
+    )
+
+
+def test_t348_s5_unsupported_eapi_pretend_masks_by_eapi(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U1: `emerge -p` on an ebuild with an unsupported EAPI
+    reports the candidate masked by EAPI, not missing.
+
+    Oracolo: Portage 3.0.82.2 host, cella d-eapi99-pret (full argv
+    `emerge -p --ignore-default-opts =app-misc/t348-d-eapi99-1`, rc 1,
+    `- app-misc/t348-d-eapi99-1::t348 (masked by: EAPI 99)` plus the
+    `supports EAPI '9'` upgrade paragraph). Portage appends `for <root>`
+    to the header line, which portuale omits by the
+    fixture-miss-message-unsuffixed convention (as in the #341 S4 pins);
+    stdout stays empty on both sides of that convention."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "=app-misc/t348-d-eapi99-1"], env
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked_eapi(
+        "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-eapi99-1::t348", "EAPI 99"
+    )
+
+
+def test_t348_s5_unsupported_eapi_alpha_pretend_masks_by_eapi(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U1: same mask for the PMS-valid suffixed spelling
+    `EAPI=7_alpha`.
+
+    Oracolo: Portage 3.0.82.2 host, cella d-eapi7a-pret (argv
+    `emerge -p --ignore-default-opts =t348-d-eapi7a-1`, rc 1,
+    `- app-misc/t348-d-eapi7a-1::t348 (masked by: EAPI 7_alpha)` plus the
+    upgrade paragraph; the pin uses the qualified atom)."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "=app-misc/t348-d-eapi7a-1"], env
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked_eapi(
+        "=app-misc/t348-d-eapi7a-1", "app-misc/t348-d-eapi7a-1::t348", "EAPI 7_alpha"
+    )
+
+
+def test_t348_s5_unsupported_eapi_pretend_names_masked_target_only(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U1: with a valid target beside the masked one, the
+    report still names the masked package (nothing merges, rc 1).
+
+    Oracolo: Portage 3.0.82.2 host, cella d-eapi99-pret2 (full argv
+    `emerge -p --ignore-default-opts =app-misc/t348-d-eapi99-1
+    app-misc/t348-d-good`, rc 1, same masked block for the bad atom)."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-good"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked_eapi(
+        "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-eapi99-1::t348", "EAPI 99"
+    )
+
+
+def test_t348_s5_unsupported_eapi_oneshot_and_buildpkgonly_mask(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U1: `--oneshot` and `--buildpkgonly` mask by EAPI
+    exactly like `--pretend` (no merge, no binpkg, rc 1).
+
+    Oracolo: Portage 3.0.82.2 host, celle d-eapi99-oneshot
+    (`emerge --oneshot --ignore-default-opts =app-misc/t348-d-eapi99-1`)
+    e d-eapi7a-buildpkg
+    (`emerge --buildpkgonly --ignore-default-opts =app-misc/t348-d-eapi7a-1`),
+    entrambe rc 1 con il blocco masked + upgrade paragraph."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)], ["--oneshot", "=app-misc/t348-d-eapi99-1"], env
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked_eapi(
+        "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-eapi99-1::t348", "EAPI 99"
+    )
+    result = _run(
+        [str(emerge_binary)], ["--buildpkgonly", "=app-misc/t348-d-eapi7a-1"], env
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked_eapi(
+        "=app-misc/t348-d-eapi7a-1", "app-misc/t348-d-eapi7a-1::t348", "EAPI 7_alpha"
+    )
+
+
+def test_t348_s5_ebuild_cli_refuses_unsupported_eapi(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U2: `ebuild <file> <phase>` on an unsupported EAPI
+    refuses with Portage's `UnsupportedAPIException` text instead of
+    running the phases (a safety gate: pre-fix `install` executed the full
+    chain with rc 0).
+
+    Oracolo: Portage 3.0.82.2 host, celle d-eapi99-clean
+    (`ebuild …/t348-d-eapi99-1.ebuild clean`), d-eapi99-pretend e
+    d-eapi99-install (tutte rc 1, stdout vuoto,
+    `!!! Unable to do any operations on 'app-misc/t348-d-eapi99-1', since
+    its EAPI is higher … supports EAPI '99'.`), più d-eapi7a-clean per il
+    suffisso `7_alpha`."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    eapi99 = str(
+        fixtures_root / "repo-348/app-misc/t348-d-eapi99/t348-d-eapi99-1.ebuild"
+    )
+    for command in ("clean", "pretend", "setup", "install"):
+        result = subprocess.run(
+            [str(ebuild_binary), eapi99, command],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert result.returncode == 1, (command, result.stdout, result.stderr)
+        assert result.stdout == "", (command, result.stdout)
+        assert result.stderr.strip() == _unsupported_eapi_message(
+            "app-misc/t348-d-eapi99-1", "99"
+        ), (command, result.stderr)
+    eapi7a = str(
+        fixtures_root / "repo-348/app-misc/t348-d-eapi7a/t348-d-eapi7a-1.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), eapi7a, "install"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _unsupported_eapi_message(
+        "app-misc/t348-d-eapi7a-1", "7_alpha"
+    )
+
+
+def test_t348_s5_ebuild_cli_merge_and_package_refuse_unsupported_eapi(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U2: the refusal covers `merge`, `qmerge` and
+    `package` from the same CLI (the gate fires before the privilege
+    check, so the EAPI text — not a privilege error — is what an
+    unprivileged caller sees).
+
+    Oracolo: Portage 3.0.82.2 host, `doebuild_environment` alza
+    `UnsupportedAPIException` (doebuild.py:565-572) prima di qualunque
+    dispatch di fase, per ogni comando (nessuna cella S0 diretta per
+    merge/qmerge/package: il testo atteso è quello di
+    exception.py:228-230, identico alle celle U2)."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    eapi99 = str(
+        fixtures_root / "repo-348/app-misc/t348-d-eapi99/t348-d-eapi99-1.ebuild"
+    )
+    for command in ("merge", "qmerge", "package"):
+        result = subprocess.run(
+            [str(ebuild_binary), eapi99, command],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert result.returncode == 1, (command, result.stdout, result.stderr)
+        assert result.stdout == "", (command, result.stdout)
+        assert result.stderr.strip() == _unsupported_eapi_message(
+            "app-misc/t348-d-eapi99-1", "99"
+        ), (command, result.stderr)
+
+
+def test_t348_s5_binpkg_with_unsupported_eapi_is_masked(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U3: merging a binpkg whose index `EAPI` is unknown
+    is refused as an EAPI mask (pre-fix portuale merged it and wrote
+    `EAPI=99` into the VDB).
+
+    Oracolo: Portage 3.0.82.2 host, cella d-binpkg-eapi99 (full argv
+    `emerge -K --usepkgonly --ignore-default-opts =app-misc/t348-d-good-1`
+    contro un binpkg ricraftato con `EAPI: 99`, rc 1,
+    `- app-misc/t348-d-good-1 (masked by: EAPI 99)` — senza suffisso
+    `::repo` per i binari — più l'upgrade paragraph). Il `Packages`
+    scritto qui sotto riusa solo l'indice (nessun archivio su disco, via
+    stale-index re-injection): il percorso di mask è lo stesso, con la
+    nuova fixture `app-misc/t348-s5-bineapi-1` come gemella sorgente."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    pkgdir = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir"
+    pkgdir.mkdir(parents=True, exist_ok=True)
+    (pkgdir / "Packages").write_text(
+        "TIMESTAMP: 0\n"
+        "VERSION: 0\n"
+        "PACKAGES: 1\n"
+        "\n"
+        "BUILD_ID: 1\n"
+        "BUILD_TIME: 1791849112\n"
+        "CPV: app-misc/t348-s5-bineapi-1\n"
+        "DEFINED_PHASES: -\n"
+        "EAPI: 99\n"
+        "KEYWORDS: amd64\n"
+        "PATH: app-misc/t348-s5-bineapi-1.gpkg.tar\n"
+        "REPO: t348\n"
+        "SIZE: 10240\n"
+        "SLOT: 0\n"
+        "USE: elibc_glibc\n"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["-K", "--usepkgonly", "=app-misc/t348-s5-bineapi-1"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked_eapi(
+        "=app-misc/t348-s5-bineapi-1", "app-misc/t348-s5-bineapi-1", "EAPI 99"
+    )
+    assert not (Path(env["ROOT"]) / "var/db/pkg/app-misc").exists()
+
+
+def test_t348_s5_unmerge_of_unknown_eapi_install_keeps_working(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U3 (guardia di non-regressione): `emerge -C` di un
+    pacchetto installato la cui EAPI è sconosciuta continua a funzionare
+    (Portage inizializza PATH/BUILDDIR anche con EAPI corrotta proprio per
+    l'uninstall, doebuild.py:568-572).
+
+    Oracolo: Portage 3.0.82.2 host, celle d-unmerge-99/d-unmerge-99b (già
+    `same`: rc 0, pacchetto rimosso, bystander intatto). Il test mergia
+    davvero `app-misc/t348-d-unmerge-1` in una ROOT di scratch, ne
+    corrompe `EAPI` nel VDB a `99` e lo rimuove."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    root = tmp_path / "rootU"
+    root.mkdir()
+    (root / "tmp").mkdir()
+    # Real phases spawn `bash`: keep the host PATH (the stripped hermetic
+    # env cannot exec it), overriding only the hermetic roots.
+    env = dict(os.environ)
+    env.update(base)
+    env["ROOT"] = str(root)
+    env["BROOT"] = str(root)
+    env["CLEAN_DELAY"] = "0"
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["DISTDIR"] = str(tmp_path / "distdir")
+    (tmp_path / "distdir").mkdir()
+    merged = _run(
+        [str(emerge_binary)],
+        ["--oneshot", "=app-misc/t348-d-unmerge-1"],
+        env,
+    )
+    assert merged.returncode == 0, (merged.stdout, merged.stderr)
+    vdb_eapi = root / "var/db/pkg/app-misc/t348-d-unmerge-1/EAPI"
+    assert vdb_eapi.is_file()
+    vdb_eapi.write_text("99\n")
+    removed = _run(
+        [str(emerge_binary)], ["-C", "=app-misc/t348-d-unmerge-1"], env
+    )
+    assert removed.returncode == 0, (removed.stdout, removed.stderr)
+    assert not (root / "var/db/pkg/app-misc/t348-d-unmerge-1").exists()
+
+
+def test_t348_s5_skewed_cache_idepend_is_followed(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U4: con cache/file in skew (file EAPI 8, cache EAPI 7
+    con stringa `IDEPEND`), la risoluzione segue la stringa in cache come
+    Portage (che non applica il gate EAPI a risoluzione:
+    `edepend[k] = metadata[k]`).
+
+    Oracolo: Portage 3.0.82.2 host, cella d-eapimm-pret (full argv
+    `emerge -p --ignore-default-opts =app-misc/t348-d-eapimm-1`, rc 0,
+    tira `app-misc/t348-d-good-1` prima del target)."""
+    env = _t348_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "=app-misc/t348-d-eapimm-1"], env
+    )
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    good = [ln for ln in lines if "app-misc/t348-d-good-1" in ln]
+    target = [ln for ln in lines if "app-misc/t348-d-eapimm-1" in ln]
+    assert len(good) == 1, result.stdout
+    assert len(target) == 1, result.stdout
+    assert lines.index(good[0]) < lines.index(target[0]), result.stdout
+
+
+def test_t348_s5_spaced_eapi_builds_like_portage(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #348 S5 U5: `EAPI=" 8"` (spazi dentro le virgolette) compila
+    come Portage (pre-fix portuale moriva con
+    `eapply_user: command not found` perché esportava l'EAPI dell'head
+    parse, `"0"`, mentre Portage usa la `EAPI` normalizzata della cache,
+    `8` — lo scrittore dei metadati word-splitta ogni valore).
+
+    Oracolo: Portage 3.0.82.2 host, cella d-eapisp-install
+    (`ebuild …/t348-d-eapisp-1.ebuild install`, rc 0, albero installato
+    1 KiB)."""
+    base = _t348_configroot(tmp_path, fixtures_root)
+    # Real phases spawn `bash`: keep the host PATH (the stripped hermetic
+    # env cannot exec it), overriding only the hermetic roots.
+    env = dict(os.environ)
+    env.update(base)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["DISTDIR"] = str(tmp_path / "distdir")
+    (tmp_path / "distdir").mkdir()
+    eapisp = str(
+        fixtures_root / "repo-348/app-misc/t348-d-eapisp/t348-d-eapisp-1.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), eapisp, "install"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert "eapply_user: command not found" not in result.stderr
