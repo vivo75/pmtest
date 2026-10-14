@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S1 greedy-slot bare target, SLOT 2 half (overall best, not installed); regressed = best slot 2 missing from the plan
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=d65ddfcb5a345c532bc8431e744710b0

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S1 sibling-slot bare target, SLOT 2 half (best visible, nothing installed); regressed = non-best slot 1 planned alongside it
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=c176e9e5e597dcd5a76005177d9895b3

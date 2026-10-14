@@ -436,6 +436,10 @@ CASES = [
     ("-pv: :slot/sub_slot decoration on a sub-slotted dep", ["--pretend", "-v", "dev-libs/subslotconsumer"], 0),
     ("-pv: [old-ver] decorated for an Upgrade", ["--pretend", "-v", "--update", "dev-libs/upgradepkg"], 0),
     ("-pv: new-slot other-version list, decorated", ["--pretend", "-v", "dev-libs/newslotpkg:1"], 0),
+    ("-pv: bare target selects the best slot only (pg34-sib, #34 S1)", ["--pretend", "-v", "dev-libs/pg34-sib"], 0),
+    ("-pv: greedy slots show only the new slot without --update (pg34-gs, #34 S1)", ["--pretend", "-v", "dev-libs/pg34-gs"], 0),
+    ("-pvu: greedy slots add the installed-slot upgrade (pg34-gs, #34 S1)", ["--pretend", "-v", "--update", "dev-libs/pg34-gs"], 0),
+    ("-pv: installed slot stays out without --update (pg34-multi, #34 S1)", ["--pretend", "-v", "dev-libs/pg34-multi"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -27578,3 +27582,119 @@ def test_t348_s6_same_version_reinstall_runs_old_teardown_hooks(
             f"/usr/share/doc/t348-b-phases-{eapi}/README.md",
         ):
             assert payload in contents, (eapi, contents)
+
+
+def _pg34_plan(stdout):
+    """`(action letters, cat/pkg-ver:slot)` per `[ebuild]` row, in order.
+
+    #34 S1 pins the planned set and action letters only (the plan's Goal);
+    the verbose old-version/repo bracket columns stay out of scope.
+    """
+    plan = []
+    for line in stdout.splitlines():
+        if not line.startswith("[ebuild"):
+            continue
+        bracket, rest = line[1:].split("]", 1)
+        plan.append((bracket.replace("ebuild", "").strip(), rest.split()[0].split("::")[0]))
+    return plan
+
+
+def _pg34_run(emerge_binary, fixture_env, args):
+    rust = _run([str(emerge_binary)], args, fixture_env)
+    assert rust.returncode == 0, (args, rust.stdout, rust.stderr)
+    return _pg34_plan(rust.stdout)
+
+
+def test_pg34_sib_pubgrub_selects_best_slot_only(emerge_binary, fixture_env):
+    """#34 S1: a bare multi-slot target plans only the best visible slot.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-14-34-s1/cap-pg34-sib-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. `--solver=pubgrub` still plans slot 1 too."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-sib"],
+    ) == [("N", "dev-libs/pg34-sib-2:2")]
+
+
+def test_pg34_gs_pubgrub_pv_selects_new_slot_only(emerge_binary, fixture_env):
+    """#34 S1: without `--update` the greedy slots add no installed slot.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-14-34-s1/cap-pg34-gs-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. `--solver=pubgrub` still upgrades slot 1 too."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gs"],
+    ) == [("NS", "dev-libs/pg34-gs-2:2")]
+
+
+def test_pg34_gs_pubgrub_pvu_upgrades_installed_slot(emerge_binary, fixture_env):
+    """#34 S1: with `--update` the installed slot upgrades in place.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-14-34-s1/cap-pg34-gs-pvu-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gs"],
+    ) == [("NS", "dev-libs/pg34-gs-2:2"), ("U", "dev-libs/pg34-gs-1.1:1")]
+
+
+def test_pg34_multi_pubgrub_pv_keeps_installed_slot_out(emerge_binary, fixture_env):
+    """#34 S1: the installed slot stays out without `--update`.
+
+    The Portage 3.0.82.2 container plan is a single `NS` row for slot 2
+    (same shape as `cap-pg34-sib-pv-portage.txt`; argv in `cmd.txt`
+    under `LLM/evidence/2026-10-14-34-s1/`); only the `[ebuild]` rows
+    are pinned, not the license-mask footer."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-multi"],
+    ) == [("NS", "dev-libs/pg34-multi-2:2")]
+
+
+def test_pg34_sib_default_selects_best_slot_only(emerge_binary, fixture_env):
+    """#34 S1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-14-34-s1/cap-pg34-sib-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-sib"]) == [
+        ("N", "dev-libs/pg34-sib-2:2")
+    ]
+
+
+def test_pg34_gs_default_pv_selects_new_slot_only(emerge_binary, fixture_env):
+    """#34 S1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-14-34-s1/cap-pg34-gs-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-gs"]) == [
+        ("NS", "dev-libs/pg34-gs-2:2")
+    ]
+
+
+@pytest.mark.xfail(strict=True, reason="backlog #359: default solver lacks the slot-1 U row")
+def test_pg34_gs_default_pvu_upgrades_installed_slot(emerge_binary, fixture_env):
+    """#34 S1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-14-34-s1/cap-pg34-gs-pvu-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-gs"]) == [
+        ("NS", "dev-libs/pg34-gs-2:2"),
+        ("U", "dev-libs/pg34-gs-1.1:1"),
+    ]
+
+
+def test_pg34_multi_default_pv_keeps_installed_slot_out(emerge_binary, fixture_env):
+    """#34 S1 default-solver lock: a single `NS` row for slot 2, the
+    Portage 3.0.82.2 container plan (same shape as
+    `cap-pg34-sib-pv-portage.txt`; argv in `cmd.txt` under
+    `LLM/evidence/2026-10-14-34-s1/`); only the `[ebuild]` rows pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-multi"]) == [
+        ("NS", "dev-libs/pg34-multi-2:2")
+    ]

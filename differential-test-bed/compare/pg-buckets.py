@@ -119,6 +119,7 @@ def parse_trace(path: Path) -> dict:
     installed_cp: set[str] = set()
     adj: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
     closure: dict[str, str] = {}
+    plan: set[str] = set()
     n_edge = 0
     for line in path.read_text(errors="replace").splitlines():
         m = RE_TARGET.match(line)
@@ -142,6 +143,14 @@ def parse_trace(path: Path) -> dict:
         if m:
             closure[m.group(1)] = m.group(2)
             continue
+        if line.startswith("pg-plan "):
+            plan.add(line[8:].strip())
+    # pg-edge covers every candidate version the engine loaded; keep only
+    # edges of planned or installed parents (older traces have no pg-plan).
+    if plan:
+        keep = plan | installed
+        adj = defaultdict(list, {cp: [e for e in es if e[2] in keep]
+                                 for cp, es in adj.items()})
     return {"targets": targets, "installed": installed,
             "installed_cp": installed_cp, "adj": adj, "closure": closure,
             "n_edge": n_edge}

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S1 multi-slot bare target, SLOT 1 half (installed); regressed = slot 1 planned alongside best slot 2
+EAPI=8
+KEYWORDS=amd64
+SLOT=1
+_md5_=f22333168957048b4d349efc3bbf219f

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S1 greedy-slot bare target, SLOT 1 old half (1.0 installed); regressed = -pv plans slot 1 or -pvu misses the U to 1.1
+EAPI=8
+KEYWORDS=amd64
+SLOT=1
+_md5_=38c84267df1489a6cdc5e956c8c8edbd
