@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """L0 -- resolver parity comparison (host half).
 
-Usage: resolve-compare.py [--fs NAME] [--backend NAME] <dir> [allowlist]
+Usage: resolve-compare.py [--fs NAME] [--backend NAME]
+       [--count-categories missing,extra,version,action,exit] <dir> [allowlist]
 
 Reads a directory produced by ``differential-test-bed/layers/l0/in-container.sh``::
 
@@ -15,6 +16,14 @@ findings (missing / extra / version / flags / use / order / error /
 exit / totals / skipped-updates). A finding is *explained* when it
 matches an entry in the allowlist (``known-divergences.yaml``); the run
 is GREEN iff every finding is explained.
+
+With ``--count-categories`` (backlog #34, the pubgrub parity mode) the
+bracket comparison splits ``flags`` into ``action`` (only the
+N/S/U/D/R letters) and ``columns`` (every other bracket column, e.g.
+``~``/``#``/``*`` -- reported but never counted), and the report gains
+a counts section: one ``CAT\\tcount`` line per requested category
+(unexplained findings only) plus one ``slug\\tCAT\\tcount`` line per
+probe with a nonzero count. Without the option the output is unchanged.
 
 Outputs ``<dir>/l0-report.txt`` (human) and ``<dir>/l0-report.json``
 (machine). Exit status: 0 green, 1 unexplained findings, 2 usage/IO.
@@ -45,6 +54,42 @@ KV = re.compile(r'([A-Z0-9_]+)="([^"]*)"')
 CPV = re.compile(r"^(?P<cp>.+?)-(?P<ver>\d[^-]*(?:-r\d+)?)(?:::(?P<repo>\S+))?$")
 
 MERGE_TYPES = {"ebuild", "binary", "nomerge", "blocks", "uninstall"}
+
+# Backlog #34 (S0): the bracket action letters parity counts. Every
+# other bracket column (fetch/mask/USE-change markers like `~`, `#`,
+# `*`, ...) is reported as `columns` and never counted (§0.3).
+ACTION_LETTERS = frozenset("NSUDR")
+
+
+def split_flags(flags: str) -> tuple[str, str]:
+    """Split a merge-list bracket body into (action, columns).
+
+    >>> split_flags("N")
+    ('N', '')
+    >>> split_flags("R ~")
+    ('R', '~')
+    >>> split_flags("NS")
+    ('NS', '')
+    >>> split_flags("")
+    ('', '')
+    """
+    compact = flags.replace(" ", "")
+    action = "".join(c for c in compact if c in ACTION_LETTERS)
+    columns = "".join(c for c in compact if c not in ACTION_LETTERS)
+    return action, columns
+
+
+def count_findings(findings: list[dict], categories: list[str]) -> dict[str, int]:
+    """Count findings per requested category (``{cat: n}``, zeros kept).
+
+    Only the requested categories are counted; anything else (order,
+    use, columns, ...) is ignored, not reported.
+    """
+    counts = {c: 0 for c in categories}
+    for f in findings:
+        if f["category"] in counts:
+            counts[f["category"]] += 1
+    return counts
 
 
 @dataclass
@@ -375,7 +420,8 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool,
     return pkgs, errs, total, advice, terminated_early, skipped
 
 
-def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Probe:
+def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path,
+            split_action: bool = False) -> Probe:
     pr = Probe(slug=slug, kind=kind, portage_rc=rrc, ptl_rc=prc)
     rpk, rerr, rtot, radv, r_trunc, rskip = parse(rp)
     ppk, perr, ptot, padv, p_trunc, pskip = parse(pp)
@@ -482,7 +528,18 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path) -> Pro
         ):
             add("version", f"{r.cp}{s}: real {r.ver} vs portuale {p.ver}")
         if r.flags != p.flags:
-            add("flags", f"{r.cp}: real flags [{r.flags}] vs portuale [{p.flags}]")
+            if split_action:
+                # Backlog #34 (S0): `--count-categories` mode compares
+                # only the N/S/U/D/R letters as `action`; the rest of
+                # the bracket is reported as `columns` (not counted).
+                ra, rc = split_flags(r.flags)
+                pa, pc = split_flags(p.flags)
+                if ra != pa:
+                    add("action", f"{r.cp}{s}: real action [{ra}] vs portuale [{pa}]")
+                if rc != pc:
+                    add("columns", f"{r.cp}{s}: real columns [{rc}] vs portuale [{pc}]")
+            else:
+                add("flags", f"{r.cp}: real flags [{r.flags}] vs portuale [{p.flags}]")
         for uk in r.use.keys() | p.use.keys():
             rv, pv = r.use.get(uk, []), p.use.get(uk, [])
             if rv != pv:
@@ -616,7 +673,7 @@ def explained(finding: dict, slug: str, kind: str, allow: list[dict],
               run_fs: str | None = None,
               run_backend: str | None = None) -> dict | None:
     for e in allow:
-        if e.get("layer", "l0") != "l0":
+        if e.get("layer", "l0") not in ("l0", "l0-pubgrub"):
             continue
         fs = e.get("fs")
         if fs is not None:
@@ -649,6 +706,7 @@ def explained(finding: dict, slug: str, kind: str, allow: list[dict],
 def main(argv: list[str]) -> int:
     run_fs: str | None = None
     run_backend: str | None = None
+    count_cats: list[str] | None = None
     pos: list[str] = []
     i = 0
     while i < len(argv):
@@ -664,6 +722,15 @@ def main(argv: list[str]) -> int:
                 print(__doc__)
                 return 2
             run_backend = argv[i]
+        elif argv[i] == "--count-categories":
+            i += 1
+            if i >= len(argv):
+                print(__doc__)
+                return 2
+            count_cats = [c.strip() for c in argv[i].split(",") if c.strip()]
+            if not count_cats:
+                print(__doc__)
+                return 2
         else:
             pos.append(argv[i])
         i += 1
@@ -684,7 +751,8 @@ def main(argv: list[str]) -> int:
             continue
         slug, kind, rrc, prc = row.split("\t")
         probes.append(
-            compare(slug, kind, int(rrc), int(prc), d / "real" / f"{slug}.txt", d / "portuale" / f"{slug}.txt")
+            compare(slug, kind, int(rrc), int(prc), d / "real" / f"{slug}.txt", d / "portuale" / f"{slug}.txt",
+                    split_action=count_cats is not None)
         )
 
     # classify
@@ -702,6 +770,19 @@ def main(argv: list[str]) -> int:
     by_cat: dict[str, int] = {}
     for _, f in unexplained:
         by_cat[f["category"]] = by_cat.get(f["category"], 0) + 1
+
+    # Backlog #34 (S0): `--count-categories` tallies the requested
+    # categories over unexplained findings only (the parity progress
+    # meter); everything else is ignored, not reported.
+    counts: dict[str, int] = {}
+    counts_by_probe: dict[str, dict[str, int]] = {}
+    if count_cats is not None:
+        counts = {c: 0 for c in count_cats}
+        for slug, f in unexplained:
+            if f["category"] in counts:
+                counts[f["category"]] += 1
+                per = counts_by_probe.setdefault(slug, {c: 0 for c in count_cats})
+                per[f["category"]] += 1
 
     n_probes = len(probes)
     n_clean = sum(1 for p in probes if not p.findings)
@@ -746,7 +827,7 @@ def main(argv: list[str]) -> int:
     unused = [
         e.get("id", "<unnamed>")
         for e in allow
-        if e.get("layer", "l0") == "l0"
+        if e.get("layer", "l0") in ("l0", "l0-pubgrub")
         # An fs-qualified entry for another fs is out of scope here,
         # not a removal candidate.
         and (e.get("fs") is None or run_fs in (
@@ -760,20 +841,36 @@ def main(argv: list[str]) -> int:
         lines += ["## allowlist entries that matched nothing (candidates for removal)",
                   *(f"  {u}" for u in unused), ""]
 
+    if count_cats is not None:
+        lines += ["## counts (--count-categories " + ",".join(count_cats) + ", unexplained only)",
+                  *(f"{c}\t{counts[c]}" for c in count_cats), ""]
+        if counts_by_probe:
+            lines.append("## counts by probe")
+            for slug in sorted(counts_by_probe):
+                per = counts_by_probe[slug]
+                for c in count_cats:
+                    if per[c]:
+                        lines.append(f"{slug}\t{c}\t{per[c]}")
+            lines.append("")
+
     (d / "l0-report.txt").write_text("\n".join(lines))
+    summary = {
+        "probes": n_probes,
+        "clean": n_clean,
+        "parity_rate": parity,
+        "explained": len(explained_hits),
+        "unexplained": len(unexplained),
+        "by_category": by_cat,
+        "fs": run_fs,
+        "backend": run_backend,
+    }
+    if count_cats is not None:
+        summary["counts"] = counts
+        summary["counts_by_probe"] = counts_by_probe
     (d / "l0-report.json").write_text(
         json.dumps(
             {
-                "summary": {
-                    "probes": n_probes,
-                    "clean": n_clean,
-                    "parity_rate": parity,
-                    "explained": len(explained_hits),
-                    "unexplained": len(unexplained),
-                    "by_category": by_cat,
-                    "fs": run_fs,
-                    "backend": run_backend,
-                },
+                "summary": summary,
                 "probes": [asdict(p) for p in probes],
             },
             indent=2,

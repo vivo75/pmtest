@@ -8,7 +8,7 @@
 #   differential-test-bed/run/l0-resolver.sh [atomlist]
 #
 # Env: PORTTEST_IMAGE, PORTTEST_PODMAN, L0_SKIP_PORTAGE_UPGRADE,
-#      L0_EMERGE_OPTS  (see differential-test-bed/layers/l0/in-container.sh).
+#      L0_EMERGE_OPTS, L0_PORTUALE_OPTS  (see differential-test-bed/layers/l0/in-container.sh).
 #
 # Exit: 0 green, 1 unexplained divergences, 2 setup error.
 
@@ -37,6 +37,7 @@ podman_run_pm "porttest-l0-$$" \
   -e "L0_SKIP_MULTI=${L0_SKIP_MULTI:-0}" \
   -e "L0_SKIP_INVARIANTS=${L0_SKIP_INVARIANTS:-0}" \
   -e "L0_EMERGE_OPTS=${L0_EMERGE_OPTS:--pv}" \
+  -e "L0_PORTUALE_OPTS=${L0_PORTUALE_OPTS:-}" \
   -e "L0_PORTAGE_PIN=${L0_PORTAGE_PIN:-3.0.82.2}" \
   --entrypoint /bin/bash "$IMAGE" \
   /TEST/layers/l0/in-container.sh "$REL_ATOMLIST" "/TEST/logs/$RUN"

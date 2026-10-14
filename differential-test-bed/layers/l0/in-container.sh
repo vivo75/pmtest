@@ -14,6 +14,11 @@
 #   L0_SKIP_PORTAGE_UPGRADE=1   skip the `=sys-apps/portage-<PIN>` step
 #   L0_PORTAGE_PIN=3.0.82.2     the portage version portuale mirrors
 #   L0_EMERGE_OPTS="-pv"        emerge flags for every probe
+#   L0_PORTUALE_OPTS=""         extra flags for portuale's argv only
+#                               (e.g. `--solver=pubgrub` for the #34 pubgrub
+#                               parity mode); Portage's argv is unchanged.
+#                               Empty (the default) leaves portuale's argv
+#                               byte-identical to the default run.
 #   L0_SKIP_INVARIANTS=1        skip the extra portuale --json/--tree/--quiet
 #                               runs read by differential-test-bed/compare/check-invariants.py
 
@@ -22,6 +27,7 @@ ATOMLIST=${1:?atom list path}
 OUTDIR=${2:?output dir}
 PIN=${L0_PORTAGE_PIN:-3.0.82.2}
 EOPTS=${L0_EMERGE_OPTS:--pv}
+POPTS=${L0_PORTUALE_OPTS:-}
 
 PORTAGE_EMERGE=/usr/sbin/emerge
 PTL=/usr/local/bin/emerge
@@ -113,7 +119,7 @@ probe() {
   # shellcheck disable=SC2086
   timeout 600 "$PORTAGE_EMERGE" $EOPTS --color=n "$atom" > "$OUTDIR/real/$s.txt" 2>&1 ; rrc=$?
   # shellcheck disable=SC2086
-  timeout 600 "$PTL"  $EOPTS --color=n "$atom" > "$OUTDIR/portuale/$s.txt" 2>&1 ; prc=$?
+  timeout 600 "$PTL" $EOPTS $POPTS --color=n "$atom" > "$OUTDIR/portuale/$s.txt" 2>&1 ; prc=$?
   if [ "${L0_SKIP_INVARIANTS:-0}" != 1 ]; then
     # Output-invariant input (docs/second_python_copy_removal.md §1/§2):
     # the same probe in the other display modes; stdout only.
@@ -214,7 +220,8 @@ probe_multi() {  # label + emerge args
   local label=$1; shift
   local s="MULTI_$(slug "$label")" rrc prc
   timeout 1200 "$PORTAGE_EMERGE" "$@" --color=n > "$OUTDIR/real/$s.txt" 2>&1 ; rrc=$?
-  timeout 1200 "$PTL"  "$@" --color=n > "$OUTDIR/portuale/$s.txt" 2>&1 ; prc=$?
+  # shellcheck disable=SC2086
+  timeout 1200 "$PTL" $POPTS "$@" --color=n > "$OUTDIR/portuale/$s.txt" 2>&1 ; prc=$?
   printf '%s\t%s\t%s\t%s\n' "$s" "multi" "$rrc" "$prc" >> "$OUTDIR/meta.tsv"
   log "  [multi] $label  (Portage rc=$rrc  ptl rc=$prc)"
 }

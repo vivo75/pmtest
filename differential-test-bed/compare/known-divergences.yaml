@@ -13,8 +13,10 @@
 # *something* -- an entry that constrains nothing matches nothing):
 #
 #   id:         short kebab-case handle (shown in reports)
-#   layer:      l0 | l1 | l2 | l3 | l4 | l5   (default l0)
-#   categories: [missing, extra, version, flags, use, order, error,
+#   layer:      l0 | l0-pubgrub | l1 | l2 | l3 | l4 | l5   (default l0)
+#               (`l0-pubgrub` = backlog #34 pubgrub parity mode entries,
+#               graded with resolve-compare.py --count-categories)
+#   categories: [missing, extra, version, flags, action, columns, use, order, error,
 #                exit, totals, advice]  -- or `category:` for a single one
 #                (`advice` = a needed USE change / mask / REQUIRED_USE
 #                 diagnostic that only one side emits)
