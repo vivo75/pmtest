@@ -7455,14 +7455,16 @@ def _t341_sets_configroot(tmp_path, fixtures_root):
     return env, cfg
 
 
-def _s8_use_stderr():
+def _s8_use_stderr(set_name):
     """The S8 stderr head: Portage's USE-change prompt for the two valid
-    lines' `dev-libs/t341-dep` (USE `x` still off), shared by both cells."""
+    lines' `dev-libs/t341-dep` (USE `x` still off), shared by both cells;
+    the requirer is the set argument (`@s341`, `@selected`), as in Portage
+    (backlog #345)."""
     return [
         "",
         "The following USE changes are necessary to proceed:",
         ' (see "package.use" in the portage(5) man page for more details)',
-        "# required by dev-libs/t341-dep::t341 (argument)",
+        f"# required by {set_name} (argument)",
         ">=dev-libs/t341-dep-1 x",
     ]
 
@@ -7486,13 +7488,10 @@ def test_s8_named_set_prints_validation_failed_after_merge_list(
     at line: N, data X` for lines 1, 2, 4, 5, 6, 7 — line 3
     (`dev-libs/t341-dep::t341`) and line 8 (`dev-libs/t341-dep[x]`) are
     accepted). The hermetic root below replays the same shape; `<ROOT>`
-    is the scratch configroot. Two standing deltas vs Portage: the merge
+    is the scratch configroot. One standing delta vs Portage: the merge
     row has no `:0/1::t341` slot/repo suffix at plain `-p` and no
-    trailing `0 KiB` (matrix §1.6), and the prompt names the expanded
-    member atom (`# required by dev-libs/t341-dep::t341 (argument)`)
-    where Portage names the set (`# required by @s341 (argument)`) —
-    portuale resolves set members as plain atoms and keeps no set-arg
-    label for the `dep_chain` (known residue, not re-pinned here)."""
+    trailing `0 KiB` (matrix §1.6). The prompt names the set
+    (`# required by @s341 (argument)`) like Portage (backlog #345)."""
     env, cfg = _t341_sets_configroot(tmp_path, fixtures_root)
     result = _run([str(emerge_binary)], ["--pretend", "@s341"], env)
     assert result.returncode == 1
@@ -7501,7 +7500,7 @@ def test_s8_named_set_prints_validation_failed_after_merge_list(
     ]
     R = "<ROOT>"
     setpath = f"{R}/etc/portage/sets/s341"
-    assert result.stderr.replace(str(cfg), R).splitlines() == _s8_use_stderr() + [
+    assert result.stderr.replace(str(cfg), R).splitlines() == _s8_use_stderr("@s341") + [
         f"{setpath}: Validation failed at line: 1, data */t341-dep",
         f"{setpath}: Validation failed at line: 2, data dev-libs/t341-*",
         f"{setpath}: Validation failed at line: 4, data =dev-libs/t341-dep-1-2",
@@ -7525,8 +7524,9 @@ def test_s8_selected_drops_bad_world_lines_silently(
     `E-sets-selected`, rc 1; stdout the same merge list as `@s341`;
     stderr the same USE-change prompt and *zero* `Validation failed`
     lines). The hermetic root below replays the same shape; `<ROOT>` is
-    the scratch configroot. Same two standing deltas as the `@s341` pin
-    (matrix §1.6 merge row; `# required by` names the member atom)."""
+    the scratch configroot. Same standing delta as the `@s341` pin
+    (matrix §1.6 merge row); `# required by @selected (argument)` matches
+    Portage (backlog #345)."""
     env, cfg = _t341_sets_configroot(tmp_path, fixtures_root)
     result = _run([str(emerge_binary)], ["--pretend", "@selected"], env)
     assert result.returncode == 1
@@ -7534,7 +7534,9 @@ def test_s8_selected_drops_bad_world_lines_silently(
         f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
     ]
     R = "<ROOT>"
-    assert result.stderr.replace(str(cfg), R).splitlines() == _s8_use_stderr()
+    assert result.stderr.replace(str(cfg), R).splitlines() == _s8_use_stderr(
+        "@selected"
+    )
 
 
 def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_env):
@@ -9584,7 +9586,7 @@ def test_pkgdir_directory_scan_resolves_a_binpkg_with_no_packages_index(
         # The binary candidate resolved (its dep was walked far enough to
         # name it); the abort suppresses every merge line.
         _assert_abort_preamble(rust.stdout)
-        assert f'there are no ebuilds to satisfy "{dep}' in rust.stderr, pkg
+        assert f'there are no binary packages to satisfy "{dep}' in rust.stderr, pkg
 
     # -v: same abort, still exit 1.
     v = _run(
@@ -9662,7 +9664,7 @@ def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
         )
         assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
         _assert_abort_preamble(rust.stdout)
-        assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr, label
+        assert 'there are no binary packages to satisfy "dev-libs/samepkg' in rust.stderr, label
 
     # The file no stanza covers resolves in both modes too.
     for label, run_env in [("trusted", env), ("untrusted", untrusted)]:
@@ -9671,7 +9673,7 @@ def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
         )
         assert rust.returncode == 1, (label, rust.stdout, rust.stderr)
         _assert_abort_preamble(rust.stdout)
-        assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in rust.stderr, label
+        assert 'there are no binary packages to satisfy "dev-libs/newpkg' in rust.stderr, label
 
     # The removed file: trusted re-injects the orphan stanza (the
     # binary resolves and its dep is walked), untrusted drops it (the
@@ -9681,7 +9683,7 @@ def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
     )
     assert rust.returncode == 1, rust.stdout + rust.stderr
     _assert_abort_preamble(rust.stdout)
-    assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
+    assert 'there are no binary packages to satisfy "dev-libs/samepkg' in rust.stderr
 
     rust = _run(
         [str(emerge_binary)], ["--pretend", "--usepkgonly", "dev-libs/gonepkg"], untrusted
@@ -9692,7 +9694,7 @@ def test_pkgdir_scan_with_untrusted_index_drops_stale_stanzas(
     # merge-bound parent exists -- like the no-`--quickpkg-direct`
     # leg of `test_quickpkg_direct_injects_source_root_packages`.
     assert rust.stdout == "", rust.stdout
-    assert 'there are no ebuilds to satisfy "dev-libs/gonepkg"' in rust.stderr
+    assert 'there are no binary packages to satisfy "dev-libs/gonepkg"' in rust.stderr
 
 
 def test_binrepos_conf_is_read_as_a_directory_of_fragments(
@@ -9776,7 +9778,7 @@ def test_pkgdir_scan_finds_both_indexed_and_loose_binpkgs(
     )
     assert loose.returncode == 1
     _assert_abort_preamble(loose.stdout)
-    assert 'there are no ebuilds to satisfy "dev-libs/newpkg' in loose.stderr
+    assert 'there are no binary packages to satisfy "dev-libs/newpkg' in loose.stderr
 
 
 def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
@@ -9823,7 +9825,7 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     # no merge list since Slice 4 -- the `-3` build-id rendering is
     # pinned on the legacy gate instead, where the list still shows).
     _assert_abort_preamble(rust.stdout)
-    assert 'there are no ebuilds to satisfy "dev-libs/samepkg' in rust.stderr
+    assert 'there are no binary packages to satisfy "dev-libs/samepkg' in rust.stderr
     off_env = dict(env, PORTUALE_ABORT_PATH="0")
     legacy = _run([str(emerge_binary)], args, off_env)
     # Portage `output.py::_append_build_id`: the `-3` from the filename.
@@ -10296,7 +10298,7 @@ def test_binpkg_changed_deps_explicit_override(
     y_args = ["--pretend", "--getbinpkgonly", "--binpkg-changed-deps=y", "dev-libs/bcdeppkg"]
     ry = _run([str(emerge_binary)], y_args, fixture_env)
     assert ry.returncode == 1
-    assert 'no ebuilds to satisfy "dev-libs/bcdeppkg"' in ry.stderr
+    assert 'no binary packages to satisfy "dev-libs/bcdeppkg"' in ry.stderr
     # ...whereas plain --getbinpkgonly keeps it (check off by default) --
     # but its own dep is unresolvable, so the resolve aborts (exit 1, no
     # merge list since Slice 4) with the dep note on stderr.
@@ -10305,7 +10307,7 @@ def test_binpkg_changed_deps_explicit_override(
     )
     assert base.returncode == 1
     _assert_abort_preamble(base.stdout)
-    assert 'there are no ebuilds to satisfy "dev-libs/bcdepold' in base.stderr
+    assert 'there are no binary packages to satisfy "dev-libs/bcdepold' in base.stderr
 
 
 def test_use_ebuild_visibility_enforces_the_check_under_usepkgonly(
@@ -10326,7 +10328,7 @@ def test_use_ebuild_visibility_enforces_the_check_under_usepkgonly(
     args = ["--pretend", "--getbinpkgonly", "--use-ebuild-visibility", "dev-libs/eqebvispkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert 'no ebuilds to satisfy "dev-libs/eqebvispkg"' in rust.stderr
+    assert 'no binary packages to satisfy "dev-libs/eqebvispkg"' in rust.stderr
 
 
 def test_getbinpkg_multi_instance_newest_build_time_wins(
@@ -26310,6 +26312,50 @@ def test_257_unsatisfied_probe_masks_a_stale_binary_parent(
     only = _run([str(emerge_binary)], ["--pretend", "--usepkgonly", "app-misc/u257par"], env)
     assert only.returncode == 1
     assert 'satisfy "app-misc/u257prov:0/1="' in only.stderr
+
+
+def test_353_usepkgonly_missing_dependency_says_binary_packages_even_when_merging(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#353: with `--usepkgonly` (or `-K`) a binary whose dependency has no
+    binary package fails with Portage's `_show_unsatisfied_dep` text
+    `there are no binary packages to satisfy "<atom>"` (`depgraph.py:7024-7032`,
+    chosen by `--usepkgonly` in the options) followed by the
+    `(dependency required by ...)` chain, on stderr and with rc 1 -- also
+    without `--pretend`, where portuale used to exit 1 saying nothing.
+
+    Portage 3.0.82.2: S0 cell `d-binpkg-merge` of #348
+    (`LLM/evidence/2026-10-12-348-s0/d/`: `emerge -K --usepkgonly
+    =app-misc/t348-d-idep-8`, rc 1, stderr `emerge: there are no binary
+    packages to satisfy "app-misc/t348-d-good".` + two `(dependency
+    required by ...)` rows) and ResolverPlayground
+    (`LLM/evidence/2026-09-30-256-257/u257-usepkgonly.log`, same shape for
+    `app-misc/u257par`). The hermetic root below replays the u257 shape."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root)
+    pkgdir = tmp_path / "fixtures" / "pkgdir"
+    packages = (pkgdir / "Packages").read_text()
+    count = int(re.search(r"^PACKAGES: (\d+)", packages, re.M).group(1))
+    packages = re.sub(r"^PACKAGES: \d+", f"PACKAGES: {count + 1}", packages, count=1, flags=re.M)
+    packages = packages.rstrip("\n") + (
+        "\n\nCPV: app-misc/u257par-1\nBUILD_TIME: 1000\nDEFINED_PHASES: -\n"
+        "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nPATH: app-misc/u257par-1.tbz2\n"
+        "RDEPEND: app-misc/u257prov:0/1=\nREPO: testrepo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
+    )
+    (pkgdir / "Packages").write_text(packages)
+    expected = [
+        "",
+        'emerge: there are no binary packages to satisfy "app-misc/u257prov:0/1=".',
+        '(dependency required by "app-misc/u257par-1::testrepo" [binary])',
+        '(dependency required by "app-misc/u257par" [argument])',
+    ]
+    for args in (["--pretend", "--usepkgonly"], ["--usepkgonly"], ["-K"], ["-q", "-K"]):
+        r = _run([str(emerge_binary)], [*args, "app-misc/u257par"], env)
+        assert r.returncode == 1, (args, r.stdout, r.stderr)
+        assert r.stderr.splitlines() == expected, (args, r.stderr)
+    # Without `--usepkgonly` the wording stays "ebuilds".
+    plain = _run([str(emerge_binary)], ["--pretend", "app-misc/u257nosuchpkg"], env)
+    assert plain.returncode == 1
+    assert "no binary packages" not in plain.stderr
 
 
 def test_254_conflict_abi_probe_evaluates_the_replacements_use_conditionals(
