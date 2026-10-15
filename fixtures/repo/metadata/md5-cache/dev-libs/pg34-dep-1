@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G1 downgrade subtree dep (stable, not installed; the re-selected pg34-downer-1 pulls it, so -pve shows UD plus this N row)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=e5d76cc4d0bb3a6ea957b0015da1c805

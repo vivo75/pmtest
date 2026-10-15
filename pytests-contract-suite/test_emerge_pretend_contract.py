@@ -459,6 +459,11 @@ CASES = [
     ("-pve: emptytree rebuilds the installed dep (pg34-app, #34 S4)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-app"], 0),
     ("-pve: new slot only (pg34-gs, #34 S4)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-gs"], 0),
     ("-pvN: newuse reinstalls the named installed target (pg34-ulib, #34 S4)", ["--pretend", "-v", "--newuse", "dev-libs/pg34-ulib"], 0),
+    ("-pv: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-downer"], 0),
+    ("-pvu: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--update", "dev-libs/pg34-downer"], 0),
+    ("-pvuD: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-downer"], 0),
+    ("-pvuDN: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--update", "--deep", "--newuse", "dev-libs/pg34-downer"], 0),
+    ("-pve: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-downer"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -28236,4 +28241,135 @@ def test_pg34_ulib_default_pvN_rebuilds_named_target(emerge_binary, fixture_env)
     assert _pg34_run(emerge_binary, fixture_env, ["-pvN", "dev-libs/pg34-ulib"]) == [
         ("N", "dev-libs/pg34-uextra-1"),
         ("R", "dev-libs/pg34-ulib-1"),
+    ]
+
+
+def test_pg34_downer_pubgrub_pv_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1: `-pv` on pg34-downer plans `N dep + UD downer-1`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. `pg34-downer-2` is installed but `~amd64`-masked
+    under the fixture `ACCEPT_KEYWORDS=amd64`, so no visible version is `>=`
+    it and Portage re-selects stable `-1` (`UD`); `--solver=pubgrub` used to
+    plan nothing (`Total: 0`)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-downer"],
+    ) == [("N", "dev-libs/pg34-dep-1"), ("UD", "dev-libs/pg34-downer-1")]
+
+
+def test_pg34_downer_pubgrub_pvu_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1: `-pvu` on pg34-downer plans `N dep + UD downer-1`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pvu-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned. Same shape as
+    `-pv` (the named target is always update-wanted); `--solver=pubgrub`
+    used to plan nothing."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-downer"],
+    ) == [("N", "dev-libs/pg34-dep-1"), ("UD", "dev-libs/pg34-downer-1")]
+
+
+def test_pg34_downer_pubgrub_pvuD_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1: `-pvuD` on pg34-downer plans `N dep + UD downer-1`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pvuD-portage.txt` (argv
+    in `cmd.txt` there); only the `[ebuild]` rows are pinned. Under `--deep`
+    the walk reaches the installed `-2` with `want_update` true, so the
+    downgrade probe fires; `--solver=pubgrub` used to plan only `N dep`
+    (the installed `-2` stayed hidden)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-downer"],
+    ) == [("N", "dev-libs/pg34-dep-1"), ("UD", "dev-libs/pg34-downer-1")]
+
+
+def test_pg34_downer_pubgrub_pvuDN_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1: `-pvuDN` on pg34-downer plans `N dep + UD downer-1`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pvuDN-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. Same
+    shape as `-pvuD`; `--solver=pubgrub` used to plan only `N dep`. This is
+    the fixture shape of the 81 `-pvuDN` corpus rows (there `sys-apps/portage`
+    is reached as a deep dep rather than named)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuDN", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-downer"],
+    ) == [("N", "dev-libs/pg34-dep-1"), ("UD", "dev-libs/pg34-downer-1")]
+
+
+def test_pg34_downer_pubgrub_pve_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1: `-pve` on pg34-downer plans `N dep + UD downer-1`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pve-portage.txt` (argv
+    in `cmd.txt` there); only the `[ebuild]` rows are pinned. Under
+    emptytree the re-selected `-1` expands its deps (`N dep`);
+    `--solver=pubgrub` used to plan `R downer-2` (installed version, stub
+    deps) `+ N dep`. This is the fixture shape of the 88 `-pve` corpus rows
+    (there `UD portage` plus its 9 dep rows)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-downer"],
+    ) == [("N", "dev-libs/pg34-dep-1"), ("UD", "dev-libs/pg34-downer-1")]
+
+
+def test_pg34_downer_default_pv_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-downer"]) == [
+        ("N", "dev-libs/pg34-dep-1"),
+        ("UD", "dev-libs/pg34-downer-1"),
+    ]
+
+
+def test_pg34_downer_default_pvu_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pvu-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-downer"]) == [
+        ("N", "dev-libs/pg34-dep-1"),
+        ("UD", "dev-libs/pg34-downer-1"),
+    ]
+
+
+def test_pg34_downer_default_pvuD_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-downer"]) == [
+        ("N", "dev-libs/pg34-dep-1"),
+        ("UD", "dev-libs/pg34-downer-1"),
+    ]
+
+
+def test_pg34_downer_default_pvuDN_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pvuDN-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuDN", "dev-libs/pg34-downer"]) == [
+        ("N", "dev-libs/pg34-dep-1"),
+        ("UD", "dev-libs/pg34-downer-1"),
+    ]
+
+
+def test_pg34_downer_default_pve_downgrades_masked_installed(emerge_binary, fixture_env):
+    """#34 S5 G1 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g1/cap-pg34-downer-pve-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pve", "dev-libs/pg34-downer"]) == [
+        ("N", "dev-libs/pg34-dep-1"),
+        ("UD", "dev-libs/pg34-downer-1"),
     ]

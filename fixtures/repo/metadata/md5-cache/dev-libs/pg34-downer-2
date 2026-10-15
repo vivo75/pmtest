@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G1 downgrade new half (testing-only, masked under the fixture ACCEPT_KEYWORDS=amd64; installed in the vdb so no visible version is >= it); regressed = pubgrub keeps installed -2 instead of UD
+EAPI=8
+KEYWORDS=~amd64
+RDEPEND=dev-libs/pg34-dep
+SLOT=0
+_md5_=746a7f5203c7f0d4fd46eb65f8400fa8
