@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #366 in-graph || alternative puller (not installed; no USE; pulls pg366-y into the graph before pg366-a's disjunction resolves)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg366-y
+SLOT=0
+_md5_=e612597b175d178a571876ec45ce5d1d

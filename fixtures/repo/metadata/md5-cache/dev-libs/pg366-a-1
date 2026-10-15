@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #366 order-sensitive || group (not installed; first-lists pg366-x but the pg366-r targets also pull pg366-b into the graph, so Portage resolves to pg366-y in both dep orders)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-libs/pg366-x dev-libs/pg366-y )
+SLOT=0
+_md5_=8f5330224ddf4d77be8b9c012263a38b

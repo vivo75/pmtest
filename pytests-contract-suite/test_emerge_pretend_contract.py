@@ -475,6 +475,10 @@ CASES = [
     ("-pvuD: a || self-cycle plans the bootstrap sibling (pg34-self, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-self"], 0),
     ("-pvuD: an installed soft-block stays unresolved (pg34-snew, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-snew"], 1),
     ("-pv: a || group prefers the in-graph alternative (pg34-svt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-svt"], 0),
+    ("-pv: a || group prefers the in-graph alternative in dep order A B (pg366-ra, #366)", ["--pretend", "-v", "dev-libs/pg366-ra"], 0),
+    ("-pv: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "dev-libs/pg366-rb"], 0),
+    ("-pve: a || group prefers the in-graph alternative in dep order A B (pg366-ra, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-ra"], 0),
+    ("-pve: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-rb"], 0),
     ("-pv: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-tt"], 0),
     ("-pve: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-tt"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
@@ -28715,6 +28719,104 @@ def test_pg34_stt_pubgrub_pve_prefers_the_target_over_the_installed_branch(
         fixture_env,
         ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-tt"],
     ) == [("N", "dev-libs/pg34-tx-1"), ("N", "dev-libs/pg34-tt-1")]
+
+
+def test_pg366_ra_pubgrub_pv_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#366: `-pv` on pg366-ra plans `N y + N a + N b + N ra`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-366/cap-pg366-ra-pv-portage.txt`
+    (argv in `cmd.txt` there): the root lists `a` before `b`, but
+    Portage pops `b` first (LIFO) and walks `y` before `a`'s disjunction
+    resolves, so the `|| ( x y )` takes the in-graph `y`, not
+    first-listed `x`. Pre-fix pubgrub agrees here (the fixpoint moves `y`
+    first through `b`'s edge); the pin guards the walk-order fix against
+    over-correction."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg366-ra"],
+    ) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-ra-1"),
+    ]
+
+
+def test_pg366_rb_pubgrub_pv_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#366: `-pv` on pg366-rb plans `N y + N b + N a + N rb`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-366/cap-pg366-rb-pv-portage.txt`
+    (argv in `cmd.txt` there): with `b` listed first, `a` pops first but
+    only queues its disjunction -- `b` (hence `y`) still joins the graph
+    before it resolves, so the `|| ( x y )` takes `y` in this order too.
+    Pre-fix pubgrub agrees here as well; the pin guards the fix. No
+    default pin: the default solver merges both branches there (`N x`
+    beside `N y`), a separate order bug outside the pubgrub bridge."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg366-rb"],
+    ) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-rb-1"),
+    ]
+
+
+def test_pg366_ra_pubgrub_pve_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#366: `-pve` on pg366-ra plans `N y + N a + N b + N ra`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-366/cap-pg366-ra-pve-portage.txt`
+    (argv in `cmd.txt` there); same row set as under `-pv`. Pre-fix
+    pubgrub agrees; the pin guards the fix."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg366-ra"],
+    ) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-ra-1"),
+    ]
+
+
+def test_pg366_rb_pubgrub_pve_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#366: `-pve` on pg366-rb plans `N y + N b + N a + N rb`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-366/cap-pg366-rb-pve-portage.txt`
+    (argv in `cmd.txt` there); same row set as under `-pv`. Pre-fix
+    pubgrub agrees; the pin guards the fix."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg366-rb"],
+    ) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-rb-1"),
+    ]
+
+
+def test_pg366_ra_default_pv_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#366 default-solver lock under `-pv`: Portage 3.0.82.2's plan from
+    `LLM/evidence/2026-10-15-366/cap-pg366-ra-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. The
+    default solver already agrees with Portage here, so its output must
+    not move."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg366-ra"]) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-ra-1"),
+    ]
 
 
 def _pg34_snew_block_lines(stdout):

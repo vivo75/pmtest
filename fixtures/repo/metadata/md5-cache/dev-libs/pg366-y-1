@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #366 in-graph || alternative (not installed; leaf)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=8097c23a6290783e7fb1704578a22e65

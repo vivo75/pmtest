@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #366 first-listed || alternative (not installed; leaf; Portage takes it only when pg366-y is not yet in the graph)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=d7cacb0a269f6481d1c6372bdf266423

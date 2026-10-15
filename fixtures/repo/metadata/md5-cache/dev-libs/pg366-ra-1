@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #366 order shape (a) (not installed; lists pg366-a before pg366-b; Portage processes pg366-b first and resolves pg366-a's || to pg366-y)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg366-a dev-libs/pg366-b
+SLOT=0
+_md5_=651182e30a7ad87453454b2cdbfa47d9

@@ -256,16 +256,3 @@
     Backlog #365 (#34 S5 group G4c): Portage aborts on REQUIRED_USE;
     `--solver=pubgrub` exits 0.
   owner: portuale-bug
-
-- id: pubgrub-or-order-blind-virtual-pager
-  layer: l0-pubgrub
-  categories: [missing]
-  slugs: ["virtual_pager"]
-  reason: >
-    Backlog #366 (#34 S5e): Portage ranks `||` alternatives in-graph,
-    then installed, then leftmost (dep_zapdeps, dep_check.py:637-710).
-    With -e and virtual/pager as root nothing is in the graph yet, so it
-    takes the leftmost, less (confirmed with --debug). The bridge fixpoint
-    counts packages selected anywhere in the plan and picks
-    util-linux[ncurses] instead.
-  owner: portuale-bug
