@@ -262,8 +262,10 @@
   categories: [missing]
   slugs: ["virtual_pager"]
   reason: >
-    Backlog #366 (#34 S5e): Portage prefers a `||` alternative only if it
-    is already in the graph when the group is processed; the bridge
-    fixpoint is order-blind and picks util-linux[ncurses] over less under
-    -pve.
+    Backlog #366 (#34 S5e): Portage ranks `||` alternatives in-graph,
+    then installed, then leftmost (dep_zapdeps, dep_check.py:637-710).
+    With -e and virtual/pager as root nothing is in the graph yet, so it
+    takes the leftmost, less (confirmed with --debug). The bridge fixpoint
+    counts packages selected anywhere in the plan and picks
+    util-linux[ncurses] instead.
   owner: portuale-bug
