@@ -9,3 +9,4 @@ dev-libs/iusedefaultpkg plainflag
 dev-libs/globalprecedencepkg -globalforceflag globalmaskflag
 dev-libs/wildexpandpkg linguas_*
 dev-libs/usebuildpkg buildflag
+dev-libs/pg34-ulib x

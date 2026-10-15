@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S3 installed-only transitive dep (not installed, behind installed-not-in-repo pg34-gone); regressed = -pvuD on pg34-gapp plans no pg34-gextra
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=8679fa853b143717af31bd6c967ef5cd

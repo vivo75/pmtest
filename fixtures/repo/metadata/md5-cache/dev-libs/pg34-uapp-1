@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S3 deep-USE target (depends on installed pg34-ulib); regressed = -pvuD plans pg34-uextra, -pvuDN misses R pg34-ulib + N pg34-uextra
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-ulib
+SLOT=0
+_md5_=814c3d4e90790db8cb929163f410ebe9

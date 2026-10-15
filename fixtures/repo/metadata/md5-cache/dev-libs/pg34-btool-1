@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S3 deep-bdeps build dep old half (installed, same slot as -2; Portage -pvuD on pg34-blib leaves it alone); regressed = -pvuD on pg34-blib plans U to -2
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=1d76296124f8b8ff3be50cf2bce80ee0

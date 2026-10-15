@@ -446,6 +446,11 @@ CASES = [
     ("-pve: named installed argument reinstalls with its new dep (pg34-arg, #34 S2)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-arg"], 0),
     ("-pv: kept installed dep stays a leaf (pg34-app, #34 S2)", ["--pretend", "-v", "dev-libs/pg34-app"], 0),
     ("-pvu: kept installed dep stays a leaf (pg34-app, #34 S2)", ["--pretend", "-v", "--update", "dev-libs/pg34-app"], 0),
+    ("-pvuD: installed dep uses vdb USE, no uextra (pg34-uapp, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-uapp"], 0),
+    ("-pvuDN: USE drift reinstalls the installed dep (pg34-uapp, #34 S3/S4)", ["--pretend", "-v", "--update", "--deep", "--newuse", "dev-libs/pg34-uapp"], 0),
+    ("-pvuD: installed, already-built parent plans nothing (pg34-blib, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-blib"], 0),
+    ("-pvuD --with-bdeps=n: installed parent plans nothing (pg34-blib, #34 S3)", ["--pretend", "-v", "--update", "--deep", "--with-bdeps=n", "dev-libs/pg34-blib"], 0),
+    ("-pvuD: fresh dep of an installed dep still expands (pg34-app, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-app"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -27846,4 +27851,145 @@ def test_pg34_app_default_pvu_plans_app_only(emerge_binary, fixture_env):
     (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
     assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-app"]) == [
         ("N", "dev-libs/pg34-app-1")
+    ]
+
+
+def test_pg34_uapp_pubgrub_pvuD_uses_vdb_use(emerge_binary, fixture_env):
+    """#34 S3: `-pvuD` on pg34-uapp plans only the new target.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s3/cap-pg34-uapp-pvuD-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. The installed dep pg34-ulib was built with
+    `USE=""` while the config enables `x` (`package.use`); `--solver=pubgrub`
+    used to evaluate its `x?` dep with the config USE and add `N pg34-uextra`."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-uapp"],
+    ) == [("N", "dev-libs/pg34-uapp-1")]
+
+
+@pytest.mark.xfail(strict=True, reason="#34 S4: USE-drift Rebuild (R pg34-ulib) not implemented")
+def test_pg34_uapp_pubgrub_pvuDN_rebuilds_use_drift(emerge_binary, fixture_env):
+    """#34 S3/S4: `-pvuDN` on pg34-uapp plans `N uextra + R ulib + N uapp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s3/cap-pg34-uapp-pvuDN-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned. The `R pg34-ulib`
+    row (USE drift `USE="x*"`) is slice S4's engine-switch work: pubgrub
+    currently plans `N uextra + N uapp` with no reinstall."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuDN", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-uapp"],
+    ) == [
+        ("N", "dev-libs/pg34-uextra-1"),
+        ("R", "dev-libs/pg34-ulib-1"),
+        ("N", "dev-libs/pg34-uapp-1"),
+    ]
+
+
+def test_pg34_gapp_pubgrub_pvuD_expands_installed_only(emerge_binary, fixture_env):
+    """#34 S3: `-pvuD` on pg34-gapp plans the installed-only dep's own dep.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s3/cap-pg34-gapp-pvuD-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. pg34-gone is installed but not in the repo; Portage
+    expands it from the vdb (`N pg34-gextra + N pg34-gapp`), `--solver=pubgrub`
+    used to plan only `N pg34-gapp`."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"],
+    ) == [("N", "dev-libs/pg34-gextra-1"), ("N", "dev-libs/pg34-gapp-1")]
+
+
+def test_pg34_blib_pubgrub_pvuD_plans_nothing(emerge_binary, fixture_env):
+    """#34 S3 non-regression: `-pvuD` on pg34-blib plans nothing.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s3/cap-pg34-blib-pvuD-portage.txt` (argv in
+    `cmd.txt` there: `Total: 0`): an installed, already-built parent's BDEPEND
+    is not traversed for update when the parent itself is not merged. The
+    installed-BDEPEND fold stays cut pending bed evidence; this cell guards the
+    cut against over-merging (`U pg34-btool`)."""
+    assert (
+        _pg34_run(
+            emerge_binary,
+            fixture_env,
+            ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-blib"],
+        )
+        == []
+    )
+
+
+def test_pg34_blib_pubgrub_pvuD_nobdeps_plans_nothing(emerge_binary, fixture_env):
+    """#34 S3 non-regression: `-pvuD --with-bdeps=n` on pg34-blib plans nothing.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s3/cap-pg34-blib-pvuD-nobdeps-portage.txt`
+    (argv in `cmd.txt` there: `Total: 0`, identical to the with-bdeps run)."""
+    assert (
+        _pg34_run(
+            emerge_binary,
+            fixture_env,
+            [
+                "-pvuD",
+                "--with-bdeps=n",
+                "--solver=pubgrub",
+                "--getbinpkg=n",
+                "--usepkg=n",
+                "dev-libs/pg34-blib",
+            ],
+        )
+        == []
+    )
+
+
+def test_pg34_app_pubgrub_pvuD_expands_fresh_dep(emerge_binary, fixture_env):
+    """#34 S3 non-regression: `-pvuD` on pg34-app plans `N extra + N app`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s3/cap-pg34-app-pvuD-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. S2's kept-leaf rule stays off under `--deep`, and the
+    vdb reader agrees with the repo for pg34-lib (this cell already matched)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-app"],
+    ) == [("N", "dev-libs/pg34-extra-1"), ("N", "dev-libs/pg34-app-1")]
+
+
+def test_pg34_uapp_default_pvuD_uses_vdb_use(emerge_binary, fixture_env):
+    """#34 S3 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s3/cap-pg34-uapp-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-uapp"]) == [
+        ("N", "dev-libs/pg34-uapp-1")
+    ]
+
+
+def test_pg34_uapp_default_pvuDN_rebuilds_use_drift(emerge_binary, fixture_env):
+    """#34 S3 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s3/cap-pg34-uapp-pvuDN-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. The default
+    solver already reinstalls on USE drift (`R pg34-ulib USE="x*"`); pubgrub
+    follows in slice S4."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuDN", "dev-libs/pg34-uapp"]) == [
+        ("N", "dev-libs/pg34-uextra-1"),
+        ("R", "dev-libs/pg34-ulib-1"),
+        ("N", "dev-libs/pg34-uapp-1"),
+    ]
+
+
+def test_pg34_app_default_pvuD_expands_fresh_dep(emerge_binary, fixture_env):
+    """#34 S3 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s3/cap-pg34-app-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-app"]) == [
+        ("N", "dev-libs/pg34-extra-1"),
+        ("N", "dev-libs/pg34-app-1"),
     ]

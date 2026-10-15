@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S3 deep-USE installed dep (installed USE empty, IUSE x, optional dep on pg34-uextra, package.use enables x); regressed = -pvuD plans pg34-uextra from config USE instead of the vdb USE
+EAPI=8
+IUSE=x
+KEYWORDS=amd64
+RDEPEND=x? ( dev-libs/pg34-uextra )
+SLOT=0
+_md5_=1e5d034d6ac417aff6c71c1f8e2c8769

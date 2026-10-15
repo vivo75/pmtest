@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/pg34-btool
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S3 deep-bdeps installed target (installed, BDEPEND on pg34-btool; Portage -pvuD plans nothing); regressed = -pvuD plans U pg34-btool (over-merge) or --with-bdeps=n plans anything
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=59ec8a69adadd8d6164ca1d8bcda556c

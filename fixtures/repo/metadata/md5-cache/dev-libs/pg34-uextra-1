@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S3 deep-USE optional dep (not installed, behind pg34-ulib[x]); regressed = wrongly planned by -pvuD on pg34-uapp
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=388ddeee00c7334ec47a593fe5e605b2
