@@ -195,3 +195,75 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
+- id: pubgrub-exit-autounmask-use-gate
+  layer: l0-pubgrub
+  categories: [exit]
+  slugs: ["gui-libs_gtk_4", "x11-libs_gtk__3", "www-client_firefox", "mail-client_thunderbird", "app-office_libreoffice", "media-gfx_gimp", "net-analyzer_wireshark", "x11-wm_i3", "www-servers_nginx"]
+  match: "real rc=1 portuale rc=0"
+  reason: >
+    Backlog #363 (#34 S5 group G4a): Portage aborts on an autounmask USE
+    change it may not apply; `--solver=pubgrub` exits 0. Evidence
+    portuale LLM/evidence/2026-10-15-34-s5/triage.md.
+  owner: portuale-bug
+
+- id: pubgrub-exit-autounmask-use-gate-suppressed
+  layer: l0-pubgrub
+  categories: [exit]
+  slugs: ["gui-libs_gtk_4", "x11-libs_gtk__3", "www-client_firefox", "mail-client_thunderbird", "app-office_libreoffice", "media-gfx_gimp", "net-analyzer_wireshark", "x11-wm_i3", "www-servers_nginx"]
+  match: "merge-list comparison suppressed"
+  reason: >
+    Backlog #363 (#34 S5 group G4a): Portage aborts on an autounmask USE
+    change it may not apply; `--solver=pubgrub` exits 0. Evidence
+    portuale LLM/evidence/2026-10-15-34-s5/triage.md.
+  owner: portuale-bug
+
+- id: pubgrub-exit-masked-dependency
+  layer: l0-pubgrub
+  categories: [exit]
+  slugs: ["app-editors_gedit", "gnome-base_nautilus", "gnome-base_gnome-shell"]
+  match: "real rc=1 portuale rc=0"
+  reason: >
+    Backlog #364 (#34 S5 group G4b): Portage aborts on a masked
+    dependency; `--solver=pubgrub` exits 0.
+  owner: portuale-bug
+
+- id: pubgrub-exit-masked-dependency-suppressed
+  layer: l0-pubgrub
+  categories: [exit]
+  slugs: ["app-editors_gedit", "gnome-base_nautilus", "gnome-base_gnome-shell"]
+  match: "merge-list comparison suppressed"
+  reason: >
+    Backlog #364 (#34 S5 group G4b): Portage aborts on a masked
+    dependency; `--solver=pubgrub` exits 0.
+  owner: portuale-bug
+
+- id: pubgrub-exit-required-use
+  layer: l0-pubgrub
+  categories: [exit]
+  slugs: ["app-emulation_wine-vanilla"]
+  match: "real rc=1 portuale rc=0"
+  reason: >
+    Backlog #365 (#34 S5 group G4c): Portage aborts on REQUIRED_USE;
+    `--solver=pubgrub` exits 0.
+  owner: portuale-bug
+
+- id: pubgrub-exit-required-use-suppressed
+  layer: l0-pubgrub
+  categories: [exit]
+  slugs: ["app-emulation_wine-vanilla"]
+  match: "merge-list comparison suppressed"
+  reason: >
+    Backlog #365 (#34 S5 group G4c): Portage aborts on REQUIRED_USE;
+    `--solver=pubgrub` exits 0.
+  owner: portuale-bug
+
+- id: pubgrub-or-order-blind-virtual-pager
+  layer: l0-pubgrub
+  categories: [missing]
+  slugs: ["virtual_pager"]
+  reason: >
+    Backlog #366 (#34 S5e): Portage prefers a `||` alternative only if it
+    is already in the graph when the group is processed; the bridge
+    fixpoint is order-blind and picks util-linux[ncurses] over less under
+    -pve.
+  owner: portuale-bug
