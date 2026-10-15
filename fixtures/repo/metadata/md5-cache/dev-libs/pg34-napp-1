@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 config-change variant parent (not installed; RDEPEND dev-libs/pg34-nlib[f]; capture only, no fix)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-nlib[f]
+SLOT=0
+_md5_=7988a839f226345160c68e43374d3b1e

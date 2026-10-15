@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 taken-branch target (not installed; pulls pg34-zpar whose taken || branch reinstalls pg34-zlib)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-zpar
+SLOT=0
+_md5_=0ea0a196bd9d70bfb310d964accc253c

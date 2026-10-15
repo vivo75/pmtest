@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 parent requiring the USE atom (not installed; RDEPEND dev-libs/pg34-clib[f] forces reinstall of the installed flag-less clib-1); regressed = pubgrub keeps clib as a hidden leaf
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-clib[f]
+SLOT=0
+_md5_=d708c50bd047917847cf83bf2206e429

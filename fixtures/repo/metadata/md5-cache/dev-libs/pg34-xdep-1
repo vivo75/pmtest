@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 untaken-branch control subtree dep (stable, not installed; a false R xlib would pull it)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=13ab90ca08216d7c7fc6085c02737e75

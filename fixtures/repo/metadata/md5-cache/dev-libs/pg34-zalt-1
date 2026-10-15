@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 taken-branch control unselected alternative (stable, not installed; the || takes installed pg34-zlib instead)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=14bdcc0a5528205671e5d30f96c34838

@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 untaken-branch control (installed with USE empty, repo IUSE +f default-on with f? dep on pg34-xdep; pg34-xq requires xlib[f] but the solve takes the installed pg34-xalt branch, so no reinstall); regressed = round-1 pubgrub plans R xlib + N xdep
+EAPI=8
+IUSE=+f
+KEYWORDS=amd64
+RDEPEND=f? ( dev-libs/pg34-xdep )
+SLOT=0
+_md5_=83edfd6ec54386847a884210a8089577

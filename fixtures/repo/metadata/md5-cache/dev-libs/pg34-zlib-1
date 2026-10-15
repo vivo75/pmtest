@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 taken-branch reinstall (installed with USE empty, repo IUSE +mz default-on; pg34-zpar takes this || branch over pg34-zalt, so Portage re-selects the repo ebuild); regressed = skipping all || groups drops the R row
+EAPI=8
+IUSE=+mz
+KEYWORDS=amd64
+SLOT=0
+_md5_=2acee61367aabed60d159280cbc9b8d4

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 taken-branch parent (not installed; the || takes installed pg34-zlib[mz], whose USE the installed instance does not satisfy); regressed = skipping all || groups drops the R zlib row
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-libs/pg34-zlib[mz] dev-libs/pg34-zalt )
+SLOT=0
+_md5_=9ab83b3156118a5405157147a16df2ae

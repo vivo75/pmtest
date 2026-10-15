@@ -464,6 +464,13 @@ CASES = [
     ("-pvuD: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-downer"], 0),
     ("-pvuDN: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--update", "--deep", "--newuse", "dev-libs/pg34-downer"], 0),
     ("-pve: keyword-masked installed version downgrades to best visible (pg34-downer, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-downer"], 0),
+    ("-pv: parent USE atom reinstalls the installed child (pg34-capp, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-capp"], 0),
+    ("-pvu: parent USE atom reinstalls the installed child (pg34-capp, #34 S5)", ["--pretend", "-v", "--update", "dev-libs/pg34-capp"], 0),
+    ("-pvuD: parent USE atom reinstalls the installed child (pg34-capp, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-capp"], 0),
+    ("-pvuDN: parent USE atom reinstalls the installed child (pg34-capp, #34 S5)", ["--pretend", "-v", "--update", "--deep", "--newuse", "dev-libs/pg34-capp"], 0),
+    ("-pv: untaken || branch never reinstalls the installed child (pg34-xapp, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-xapp"], 0),
+    ("-pvuD: untaken || branch never reinstalls the installed child (pg34-xapp, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-xapp"], 0),
+    ("-pv: taken || branch reinstalls the installed child (pg34-ztop, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-ztop"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -28372,4 +28379,193 @@ def test_pg34_downer_default_pve_downgrades_masked_installed(emerge_binary, fixt
     assert _pg34_run(emerge_binary, fixture_env, ["-pve", "dev-libs/pg34-downer"]) == [
         ("N", "dev-libs/pg34-dep-1"),
         ("UD", "dev-libs/pg34-downer-1"),
+    ]
+
+
+def test_pg34_capp_pubgrub_pv_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2: `-pv` on pg34-capp plans `N cdep + R clib + N capp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license/news footer. `pg34-capp-1` (not installed) requires
+    `dev-libs/pg34-clib[f]` while the installed `pg34-clib-1` was built
+    with `USE=` empty and the repo ebuild defaults `+f` on, so Portage
+    re-selects the repo ebuild (`R USE="f*"`) and expands `f? ( cdep )`
+    even without `--deep`; `--solver=pubgrub` used to plan only `N capp`
+    (the installed child stayed a hidden leaf)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-capp"],
+    ) == [("N", "dev-libs/pg34-cdep-1"), ("R", "dev-libs/pg34-clib-1"), ("N", "dev-libs/pg34-capp-1")]
+
+
+def test_pg34_capp_pubgrub_pvu_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2: `-pvu` on pg34-capp plans `N cdep + R clib + N capp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pvu-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. Same
+    shape as `-pv` (the merged parent's dep is re-evaluated the same way);
+    `--solver=pubgrub` used to plan only `N capp`."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-capp"],
+    ) == [("N", "dev-libs/pg34-cdep-1"), ("R", "dev-libs/pg34-clib-1"), ("N", "dev-libs/pg34-capp-1")]
+
+
+def test_pg34_capp_pubgrub_pvuD_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2: `-pvuD` on pg34-capp plans `N cdep + R clib + N capp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. Same
+    shape as `-pv`; `--solver=pubgrub` used to plan only `N capp`. This
+    is the fixture shape of the 23 `-pvuD` corpus rows (there
+    `curl[http2]`, `xmlto[text]`, `systemd[policykit]`, `zlib[minizip]`
+    reinstall the installed child the same way)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-capp"],
+    ) == [("N", "dev-libs/pg34-cdep-1"), ("R", "dev-libs/pg34-clib-1"), ("N", "dev-libs/pg34-capp-1")]
+
+
+def test_pg34_capp_pubgrub_pvuDN_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2: `-pvuDN` on pg34-capp plans `N cdep + R clib + N capp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pvuDN-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. This
+    cell already matched through S4's USE-drift arm (the config `+f`
+    default vs the empty vdb USE); the G2 arm unions its flags instead of
+    overwriting them."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuDN", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-capp"],
+    ) == [("N", "dev-libs/pg34-cdep-1"), ("R", "dev-libs/pg34-clib-1"), ("N", "dev-libs/pg34-capp-1")]
+
+
+def test_pg34_capp_default_pv_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-capp"]) == [
+        ("N", "dev-libs/pg34-cdep-1"),
+        ("R", "dev-libs/pg34-clib-1"),
+        ("N", "dev-libs/pg34-capp-1"),
+    ]
+
+
+def test_pg34_capp_default_pvu_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pvu-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-capp"]) == [
+        ("N", "dev-libs/pg34-cdep-1"),
+        ("R", "dev-libs/pg34-clib-1"),
+        ("N", "dev-libs/pg34-capp-1"),
+    ]
+
+
+def test_pg34_capp_default_pvuD_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-capp"]) == [
+        ("N", "dev-libs/pg34-cdep-1"),
+        ("R", "dev-libs/pg34-clib-1"),
+        ("N", "dev-libs/pg34-capp-1"),
+    ]
+
+
+def test_pg34_capp_default_pvuDN_reinstalls_use_atom_child(emerge_binary, fixture_env):
+    """#34 S5 G2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s5/g2/cap-pg34-capp-pvuDN-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuDN", "dev-libs/pg34-capp"]) == [
+        ("N", "dev-libs/pg34-cdep-1"),
+        ("R", "dev-libs/pg34-clib-1"),
+        ("N", "dev-libs/pg34-capp-1"),
+    ]
+
+
+def test_pg34_xapp_pubgrub_pv_ignores_untaken_branch_use_atom(emerge_binary, fixture_env):
+    """#34 S5 G2 round 2: `-pv` on pg34-xapp plans only `N xapp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2r2/cap-pg34-xapp-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license/news footer. The `|| ( pg34-xq pg34-xalt )` takes installed
+    pg34-xalt, so pg34-xq's `RDEPEND dev-libs/pg34-xlib[f]` is never
+    evaluated and installed `pg34-xlib-1` (USE empty, repo `IUSE="+f"`)
+    stays a hidden leaf -- even though the bare `pg34-xlib` dep keeps it
+    in the plan for a false `R` to render against (the bed shape:
+    `dev-qt/qtwebengine` rebuilding `dev-libs/libxml2` for an
+    `app-editors/vim` probe). Round 1 planned `N xdep + R xlib + N xapp`
+    here (+1208 extras in `-pv` across the bed)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-xapp"],
+    ) == [("N", "dev-libs/pg34-xapp-1")]
+
+
+def test_pg34_xapp_pubgrub_pvuD_ignores_untaken_branch_use_atom(emerge_binary, fixture_env):
+    """#34 S5 G2 round 2: `-pvuD` on pg34-xapp plans only `N xapp`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2r2/cap-pg34-xapp-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. Same
+    shape as `-pv`: under `--deep` the installed members' vdb strings
+    expand, but neither carries a USE-dep atom (`xalt` bare, `xlib`
+    `f? ( xdep )`), so nothing rebuilds."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-xapp"],
+    ) == [("N", "dev-libs/pg34-xapp-1")]
+
+
+def test_pg34_xapp_default_pv_plans_target_only(emerge_binary, fixture_env):
+    """#34 S5 G2 round 2 default-solver lock: Portage 3.0.82.2's plan from
+    the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2r2/cap-pg34-xapp-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-xapp"]) == [
+        ("N", "dev-libs/pg34-xapp-1"),
+    ]
+
+
+def test_pg34_ztop_pubgrub_pv_reinstalls_taken_branch_child(emerge_binary, fixture_env):
+    """#34 S5 G2 round 2: `-pv` on pg34-ztop plans `R zlib + N zpar + N ztop`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2r2/cap-pg34-ztop-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license/news footer. The `|| ( pg34-zlib[mz] pg34-zalt )` in pg34-zpar
+    takes installed `pg34-zlib-1` (USE empty, repo `IUSE="+mz"`), so the
+    taken branch's atom reinstalls it (`R USE="mz*"`); this is the fixture
+    shape of the corpus `zlib[minizip]` row (`virtual/minizip`'s
+    `|| ( zlib[minizip] minizip-ng )`), the 23rd G2 row round 1 never
+    restored because it skipped every choice group."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-ztop"],
+    ) == [("R", "dev-libs/pg34-zlib-1"), ("N", "dev-libs/pg34-zpar-1"), ("N", "dev-libs/pg34-ztop-1")]
+
+
+def test_pg34_ztop_default_pv_reinstalls_taken_branch_child(emerge_binary, fixture_env):
+    """#34 S5 G2 round 2 default-solver lock: Portage 3.0.82.2's plan from
+    the container capture
+    `LLM/evidence/2026-10-15-34-s5/g2r2/cap-pg34-ztop-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-ztop"]) == [
+        ("R", "dev-libs/pg34-zlib-1"),
+        ("N", "dev-libs/pg34-zpar-1"),
+        ("N", "dev-libs/pg34-ztop-1"),
     ]

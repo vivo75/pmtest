@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 reinstall subtree dep (stable, not installed; the reinstalled pg34-clib-1 pulls it, so -pv on pg34-capp shows R clib plus this N row)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=ab9c8ec21e393793c4d3ffc14ecd16e2

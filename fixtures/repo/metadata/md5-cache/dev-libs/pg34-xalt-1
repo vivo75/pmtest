@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 untaken-branch control taken alternative (installed; RDEPEND bare dev-libs/pg34-xlib, satisfied and hidden; the solve takes this || branch over pg34-xq)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-xlib
+SLOT=0
+_md5_=15a877adf49aa56669c80b30a0a191ba

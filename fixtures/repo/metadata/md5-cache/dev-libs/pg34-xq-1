@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G2 round 2 untaken-branch control untaken alternative (not installed; RDEPEND dev-libs/pg34-xlib[f] is never evaluated because the solve takes the pg34-xalt branch)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-xlib[f]
+SLOT=0
+_md5_=72409f8fccc5bfbb23f239819e26342c
