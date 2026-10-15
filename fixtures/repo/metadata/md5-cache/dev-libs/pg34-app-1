@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S2 kept-leaf target (depends on installed pg34-lib); regressed = -pv also plans pg34-extra from the kept installed dep
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-lib
+SLOT=0
+_md5_=63a3ce23709521e0ec864aceb611080c

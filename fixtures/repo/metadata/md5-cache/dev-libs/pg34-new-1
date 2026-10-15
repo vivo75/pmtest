@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S2 named-argument dep (not installed); regressed = missing N row alongside the R pg34-arg under -pv
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=98ea656c3cd65b281f25bc465024a662

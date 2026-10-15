@@ -440,6 +440,12 @@ CASES = [
     ("-pv: greedy slots show only the new slot without --update (pg34-gs, #34 S1)", ["--pretend", "-v", "dev-libs/pg34-gs"], 0),
     ("-pvu: greedy slots add the installed-slot upgrade (pg34-gs, #34 S1)", ["--pretend", "-v", "--update", "dev-libs/pg34-gs"], 0),
     ("-pv: installed slot stays out without --update (pg34-multi, #34 S1)", ["--pretend", "-v", "dev-libs/pg34-multi"], 0),
+    ("-pv: named installed argument reinstalls with its new dep (pg34-arg, #34 S2)", ["--pretend", "-v", "dev-libs/pg34-arg"], 0),
+    ("-pvn: up-to-date named argument plans nothing (pg34-arg, #34 S2)", ["--pretend", "-v", "--noreplace", "dev-libs/pg34-arg"], 0),
+    ("-pvu: up-to-date named argument plans nothing (pg34-arg, #34 S2)", ["--pretend", "-v", "--update", "dev-libs/pg34-arg"], 0),
+    ("-pve: named installed argument reinstalls with its new dep (pg34-arg, #34 S2)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-arg"], 0),
+    ("-pv: kept installed dep stays a leaf (pg34-app, #34 S2)", ["--pretend", "-v", "dev-libs/pg34-app"], 0),
+    ("-pvu: kept installed dep stays a leaf (pg34-app, #34 S2)", ["--pretend", "-v", "--update", "dev-libs/pg34-app"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -27697,4 +27703,147 @@ def test_pg34_multi_default_pv_keeps_installed_slot_out(emerge_binary, fixture_e
     `LLM/evidence/2026-10-14-34-s1/`); only the `[ebuild]` rows pinned."""
     assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-multi"]) == [
         ("NS", "dev-libs/pg34-multi-2:2")
+    ]
+
+
+def test_pg34_arg_pubgrub_pv_reinstalls_named_argument(emerge_binary, fixture_env):
+    """#34 S2: `-pv` on the installed named argument plans `N pg34-new` + `R pg34-arg`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. `--solver=pubgrub` used to print `Total: 0`."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-arg"],
+    ) == [("N", "dev-libs/pg34-new-1"), ("R", "dev-libs/pg34-arg-1")]
+
+
+def test_pg34_arg_pubgrub_pvn_selective_stays_empty(emerge_binary, fixture_env):
+    """#34 S2: `-pvn` on the up-to-date named argument plans nothing.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pvn-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer."""
+    assert (
+        _pg34_run(
+            emerge_binary,
+            fixture_env,
+            ["-pvn", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-arg"],
+        )
+        == []
+    )
+
+
+def test_pg34_arg_pubgrub_pvu_update_stays_empty(emerge_binary, fixture_env):
+    """#34 S2: `-pvu` on the up-to-date named argument plans nothing.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pvu-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer."""
+    assert (
+        _pg34_run(
+            emerge_binary,
+            fixture_env,
+            ["-pvu", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-arg"],
+        )
+        == []
+    )
+
+
+def test_pg34_arg_pubgrub_pve_emptytree_reinstalls(emerge_binary, fixture_env):
+    """#34 S2: `-pve` on the installed named argument plans `N pg34-new` + `R pg34-arg`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pve-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. `--solver=pubgrub` used to print `Total: 0`."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-arg"],
+    ) == [("N", "dev-libs/pg34-new-1"), ("R", "dev-libs/pg34-arg-1")]
+
+
+def test_pg34_app_pubgrub_pv_keeps_installed_dep_a_leaf(emerge_binary, fixture_env):
+    """#34 S2 non-regression: `-pv` on pg34-app plans only the new target.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s2/cap-pg34-app-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer. The installed dep pg34-lib is a kept leaf, so the
+    transitive pg34-extra never enters the plan (this cell already matched)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-app"],
+    ) == [("N", "dev-libs/pg34-app-1")]
+
+
+def test_pg34_app_pubgrub_pvu_keeps_installed_dep_a_leaf(emerge_binary, fixture_env):
+    """#34 S2 non-regression: `-pvu` on pg34-app plans only the new target.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s2/cap-pg34-app-pvu-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned, not the
+    license-mask footer."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-app"],
+    ) == [("N", "dev-libs/pg34-app-1")]
+
+
+def test_pg34_arg_default_pv_reinstalls_named_argument(emerge_binary, fixture_env):
+    """#34 S2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-arg"]) == [
+        ("N", "dev-libs/pg34-new-1"),
+        ("R", "dev-libs/pg34-arg-1"),
+    ]
+
+
+def test_pg34_arg_default_pvn_selective_stays_empty(emerge_binary, fixture_env):
+    """#34 S2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pvn-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvn", "dev-libs/pg34-arg"]) == []
+
+
+def test_pg34_arg_default_pvu_update_stays_empty(emerge_binary, fixture_env):
+    """#34 S2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pvu-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-arg"]) == []
+
+
+def test_pg34_arg_default_pve_emptytree_reinstalls(emerge_binary, fixture_env):
+    """#34 S2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s2/cap-pg34-arg-pve-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pve", "dev-libs/pg34-arg"]) == [
+        ("N", "dev-libs/pg34-new-1"),
+        ("R", "dev-libs/pg34-arg-1"),
+    ]
+
+
+def test_pg34_app_default_pv_plans_app_only(emerge_binary, fixture_env):
+    """#34 S2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s2/cap-pg34-app-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-app"]) == [
+        ("N", "dev-libs/pg34-app-1")
+    ]
+
+
+def test_pg34_app_default_pvu_plans_app_only(emerge_binary, fixture_env):
+    """#34 S2 default-solver lock: Portage 3.0.82.2's plan from the
+    container capture `LLM/evidence/2026-10-15-34-s2/cap-pg34-app-pvu-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-app"]) == [
+        ("N", "dev-libs/pg34-app-1")
     ]

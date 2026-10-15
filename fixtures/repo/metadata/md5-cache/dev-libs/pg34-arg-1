@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S2 named-argument reinstall (installed; depends on pg34-new); regressed = -pv shows no R row for the named installed target
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-new
+SLOT=0
+_md5_=06dd2f8d3a59656485bc4ee737efacbf

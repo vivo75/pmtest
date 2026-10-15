@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S2 kept-leaf transitive dep (not installed); regressed = wrongly planned by -pv on pg34-app
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=53ae16663f83dcbf2df09cbf4e04bd2d
