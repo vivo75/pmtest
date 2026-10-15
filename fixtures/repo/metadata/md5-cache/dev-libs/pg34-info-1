@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G5/G6c installed || alternative (installed; no deps; the info-manual analog: Portage prefers the in-graph pg34-tt over this installed first-listed branch)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=ed04fe8dc31821353d69bdaec05d0193

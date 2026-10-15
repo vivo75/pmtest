@@ -474,6 +474,9 @@ CASES = [
     ("-pv: a || self-cycle plans the bootstrap sibling (pg34-self, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-self"], 0),
     ("-pvuD: a || self-cycle plans the bootstrap sibling (pg34-self, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-self"], 0),
     ("-pvuD: an installed soft-block stays unresolved (pg34-snew, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-snew"], 1),
+    ("-pv: a || group prefers the in-graph alternative (pg34-svt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-svt"], 0),
+    ("-pv: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-tt"], 0),
+    ("-pve: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-tt"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -28627,6 +28630,91 @@ def test_pg34_self_default_pvud_picks_the_bootstrap_sibling(emerge_binary, fixtu
         ("N", "dev-libs/pg34-selfboot-1"),
         ("N", "dev-libs/pg34-self-1"),
     ]
+
+
+def test_pg34_svt_pubgrub_pv_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#34 S5 G5: `-pv` on pg34-svt plans `N svb + N sv + N svt`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g5/cap-pg34-svt-pv-portage.txt`
+    (argv in `cmd.txt` there): `pg34-sv-1` first-lists `pg34-sva` but the
+    target also pulls `pg34-svb` into the graph, so the `||` resolves to
+    `svb` (depgraph.py:778-793; the `virtual/secret-service` shape from
+    bed `-pv kde-apps/kdecore-meta`). Pre-fix pubgrub takes the
+    first-listed branch and additionally merges `sva` plus its `svx`
+    subtree."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-svt"],
+    ) == [("N", "dev-libs/pg34-svb-1"), ("N", "dev-libs/pg34-sv-1"), ("N", "dev-libs/pg34-svt-1")]
+
+
+def test_pg34_svt_default_pv_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#34 S5 G5 default-solver lock: Portage 3.0.82.2's plan from
+    `LLM/evidence/2026-10-15-34-s5/g5/cap-pg34-svt-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned. The
+    default solver already agrees with Portage here, so its output must
+    not move."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-svt"]) == [
+        ("N", "dev-libs/pg34-svb-1"),
+        ("N", "dev-libs/pg34-sv-1"),
+        ("N", "dev-libs/pg34-svt-1"),
+    ]
+
+
+def test_pg34_stt_pubgrub_pv_prefers_the_target(emerge_binary, fixture_env):
+    """#34 S5 G5/G6c: `-pv` on pg34-tt plans `N tx + N tt`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g5/cap-pg34-tt-pv-portage.txt`
+    (argv in `cmd.txt` there), single-root set: the staged-ROOT
+    capture's `N pg34-info-1` row merges to the host root (the target's
+    `BDEPEND` on `tx`), which lacks the installed instance -- under the
+    single root the installed `pg34-info-1` satisfies the `||` silently.
+    Pubgrub agrees here pre-fix (the wrong branch stays a hidden kept
+    leaf); the pin guards the fix against adding rows."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-tt"],
+    ) == [("N", "dev-libs/pg34-tx-1"), ("N", "dev-libs/pg34-tt-1")]
+
+
+def test_pg34_stt_default_pv_prefers_the_target(emerge_binary, fixture_env):
+    """#34 S5 G5/G6c default-solver lock under `-pv`: Portage 3.0.82.2's
+    plan from
+    `LLM/evidence/2026-10-15-34-s5/g5/cap-pg34-tt-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned (same
+    staged-ROOT caveat as the pubgrub pin)."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-tt"]) == [
+        ("N", "dev-libs/pg34-tx-1"),
+        ("N", "dev-libs/pg34-tt-1"),
+    ]
+
+
+def test_pg34_stt_pubgrub_pve_prefers_the_target_over_the_installed_branch(
+    emerge_binary, fixture_env
+):
+    """#34 S5 G5/G6c: `-pve` on pg34-tt plans `N tx + N tt` with no
+    info-manual row, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g5/cap-pg34-tt-pve-portage.txt`
+    (argv in `cmd.txt` there), single-root set: the staged-ROOT
+    capture's `N pg34-info-1` row is the same host-root artifact as under
+    `-pv` (the installed instance is invisible there) -- under the single
+    root Portage resolves `|| ( pg34-info pg34-tt )` to the in-graph
+    target itself (the texinfo `|| ( info-manual emacs )` shape from bed
+    `-pve app-editors/emacs`) and the installed branch never enters the
+    graph, so `--emptytree` has nothing to rebuild. Pre-fix pubgrub's
+    installed-preference takes `info` (`R pg34-info-1`). No default pin:
+    the default solver prints the same `R info` row there."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-tt"],
+    ) == [("N", "dev-libs/pg34-tx-1"), ("N", "dev-libs/pg34-tt-1")]
 
 
 def _pg34_snew_block_lines(stdout):

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G5 target (not installed; RDEPEND pulls both pg34-sv and pg34-svb, putting svb in the graph so Portage resolves sv's || to it); regressed = pubgrub plans N sva + N svx
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-sv dev-libs/pg34-svb
+SLOT=0
+_md5_=0d218f13debb81dead767978af3ea43b

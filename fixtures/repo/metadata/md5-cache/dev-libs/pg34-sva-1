@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G5 first-listed || alternative (not installed; BDEPEND pulls pg34-svx, the gnome-keyring/gcr/p11-kit subtree analog); regressed = pubgrub merges this plus svx where Portage takes svb
+EAPI=8
+KEYWORDS=amd64
+BDEPEND=dev-libs/pg34-svx
+SLOT=0
+_md5_=a71032dd2d720ed503be5a75315f422c

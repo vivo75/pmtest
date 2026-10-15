@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G5 first-listed subtree leaf (not installed; the docbook/gcr/p11-kit downstream analog, reached only through pg34-sva)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=33329f60a0aafd541e980f3ab1aeb193

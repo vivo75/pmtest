@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G5/G6c root target (not installed; BDEPEND pulls pg34-tx, the emacs-analog build dependency on texinfo; the tx || then chooses between installed info and this in-graph target)
+EAPI=8
+KEYWORDS=amd64
+BDEPEND=dev-libs/pg34-tx
+SLOT=0
+_md5_=b1bf1562a8afdcf080cdc9d276c4c3fd

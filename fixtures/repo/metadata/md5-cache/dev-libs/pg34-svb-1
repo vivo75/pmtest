@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G5 in-graph || alternative (not installed; no deps; the kwallet-runtime analog, pulled into the graph by the pg34-svt target)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=6f7ce4dbb7dbed8c31b72acec6a41967
