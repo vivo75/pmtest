@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S4 deep in-slot upgrade new half (best visible, same slot; Portage -pvuD on pg34-dtop upgrades to it); regressed = -pvuD on pg34-dtop plans no U row
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=3cfd585482b5102c4b6c117bb4433911
