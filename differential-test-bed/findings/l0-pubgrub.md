@@ -13,3 +13,5 @@ Allowlisted (layer `l0-pubgrub`, `owner: portuale-bug`): exit-code differences i
 13 probes (#363 autounmask USE gate, #364 masked dependency, #365 REQUIRED_USE) and
 `virtual/pager` under `-pve` (#366, order-blind `||` preference).
 Evidence: portuale `LLM/evidence/2026-10-15-34-s5/` (`modes-e.md`, `triage.md`).
+
+Final run (Z, after the S6 refactor, 2026-10-15): runs `l0-20261015T155330Z` … `l0-20261015T164057Z`, all five modes 0/0/0/0/0 after allowlist; default-solver run `l0-20261015T170422Z` 0/448/0/0/0, unchanged since S0.
