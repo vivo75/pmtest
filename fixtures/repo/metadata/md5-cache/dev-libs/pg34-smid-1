@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G7 installed mid-chain holder of the blocked package (installed and in the repo; its RDEPEND on pg34-sblk is the graph parent Portage sees through the installed node)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-sblk
+SLOT=0
+_md5_=bacecc2bb7358fbdd20cbb970611eedf

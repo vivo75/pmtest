@@ -471,6 +471,9 @@ CASES = [
     ("-pv: untaken || branch never reinstalls the installed child (pg34-xapp, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-xapp"], 0),
     ("-pvuD: untaken || branch never reinstalls the installed child (pg34-xapp, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-xapp"], 0),
     ("-pv: taken || branch reinstalls the installed child (pg34-ztop, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-ztop"], 0),
+    ("-pv: a || self-cycle plans the bootstrap sibling (pg34-self, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-self"], 0),
+    ("-pvuD: a || self-cycle plans the bootstrap sibling (pg34-self, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-self"], 0),
+    ("-pvuD: an installed soft-block stays unresolved (pg34-snew, #34 S5)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-snew"], 1),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -28568,4 +28571,129 @@ def test_pg34_ztop_default_pv_reinstalls_taken_branch_child(emerge_binary, fixtu
         ("R", "dev-libs/pg34-zlib-1"),
         ("N", "dev-libs/pg34-zpar-1"),
         ("N", "dev-libs/pg34-ztop-1"),
+    ]
+
+
+def test_pg34_self_pubgrub_pv_picks_the_bootstrap_sibling(emerge_binary, fixture_env):
+    """#34 S5 G3: `-pv` on pg34-self plans `N selfboot + N self`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g3/cap-pg34-self-pv-portage.txt`
+    (argv in `cmd.txt` there): the `BDEPEND="|| ( pg34-self
+    pg34-selfboot )"` avoids the direct self-cycle (depgraph.py:778-793,
+    the gwydion-dylan precedent) and selects the bootstrap sibling. The
+    capture's third row (`N pg34-self-1` without the `to ROOT` suffix) is
+    the staged-ROOT BDEPEND-into-host-root split -- the real single-root
+    `dev-lang/go` probe plans 2 rows -- so only the single-root set is
+    pinned here, not the footer. Pre-fix pubgrub resolves the `||` to
+    itself and fails with a circular self-dependency, rc 1."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-self"],
+    ) == [("N", "dev-libs/pg34-selfboot-1"), ("N", "dev-libs/pg34-self-1")]
+
+
+def test_pg34_self_pubgrub_pvud_picks_the_bootstrap_sibling(emerge_binary, fixture_env):
+    """#34 S5 G3: `-pvuD` on pg34-self plans the same pair (deep changes
+    nothing with nothing installed).
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g3/cap-pg34-self-pvuD-portage.txt`
+    (argv in `cmd.txt` there); same staged-ROOT caveat as the `-pv` pin."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-self"],
+    ) == [("N", "dev-libs/pg34-selfboot-1"), ("N", "dev-libs/pg34-self-1")]
+
+
+def test_pg34_self_default_pv_picks_the_bootstrap_sibling(emerge_binary, fixture_env):
+    """#34 S5 G3 default-solver lock: Portage 3.0.82.2's plan from
+    `LLM/evidence/2026-10-15-34-s5/g3/cap-pg34-self-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned
+    (same staged-ROOT caveat as the pubgrub pin)."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-self"]) == [
+        ("N", "dev-libs/pg34-selfboot-1"),
+        ("N", "dev-libs/pg34-self-1"),
+    ]
+
+
+def test_pg34_self_default_pvud_picks_the_bootstrap_sibling(emerge_binary, fixture_env):
+    """#34 S5 G3 default-solver lock under `-pvuD`: Portage 3.0.82.2's plan
+    from `LLM/evidence/2026-10-15-34-s5/g3/cap-pg34-self-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-self"]) == [
+        ("N", "dev-libs/pg34-selfboot-1"),
+        ("N", "dev-libs/pg34-self-1"),
+    ]
+
+
+def _pg34_snew_block_lines(stdout):
+    """`[blocks]`/`[uninstall]` rows of a pg34-snew plan, verbatim."""
+    return [
+        line
+        for line in stdout.splitlines()
+        if line.startswith("[blocks") or line.startswith("[uninstall")
+    ]
+
+
+def test_pg34_snew_pubgrub_pv_keeps_soft_block_unresolved(emerge_binary, fixture_env):
+    """#34 S5 G7: `-pv` on pg34-snew plans `N snew` with an unsatisfied
+    `[blocks B]` row and no `[uninstall]`, rc 1.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g7/cap-pg34-snew-pv-portage.txt`
+    (argv in `cmd.txt` there): installed pg34-smid still needs installed
+    pg34-sblk (Portage's "pulled in by" dump names it), so the soft block
+    stays unresolved. Pre-fix pubgrub schedules `[uninstall] pg34-sblk-1`,
+    downgrades the row to `[blocks b]` and exits 0. Only the merge/block
+    rows are pinned, not the error footer."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-snew"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    assert _pg34_plan(result.stdout) == [("N", "dev-libs/pg34-snew-1")]
+    assert _pg34_snew_block_lines(result.stdout) == [
+        '[blocks B      ] dev-libs/pg34-sblk ("dev-libs/pg34-sblk" is soft blocking dev-libs/pg34-snew-1)'
+    ]
+
+
+def test_pg34_snew_pubgrub_pvud_keeps_soft_block_unresolved(emerge_binary, fixture_env):
+    """#34 S5 G7: `-pvuD` on pg34-snew plans the same blocks-only plan
+    (deep already expanded installed pg34-smid into the solution).
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-34-s5/g7/cap-pg34-snew-pvuD-portage.txt`
+    (argv in `cmd.txt` there); same pin shape as the `-pv` test."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--update", "--deep", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-snew"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    assert _pg34_plan(result.stdout) == [("N", "dev-libs/pg34-snew-1")]
+    assert _pg34_snew_block_lines(result.stdout) == [
+        '[blocks B      ] dev-libs/pg34-sblk ("dev-libs/pg34-sblk" is soft blocking dev-libs/pg34-snew-1)'
+    ]
+
+
+def test_pg34_snew_default_pvud_keeps_soft_block_unresolved(emerge_binary, fixture_env):
+    """#34 S5 G7 default-solver lock under `-pvuD`: Portage 3.0.82.2's plan
+    from `LLM/evidence/2026-10-15-34-s5/g7/cap-pg34-snew-pvuD-portage.txt`
+    (argv in `cmd.txt` there). No default pin under `-pv`: there the walk
+    keeps the satisfied-block rendering (rc 0) while Portage exits 1 --
+    its required-set closure misses the fixture chain, and walk parity is
+    out of scope for this slice (see `g7/cmd.txt` NOTE 2)."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-snew"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    assert _pg34_plan(result.stdout) == [("N", "dev-libs/pg34-snew-1")]
+    assert _pg34_snew_block_lines(result.stdout) == [
+        '[blocks B      ] dev-libs/pg34-sblk ("dev-libs/pg34-sblk" is soft blocking dev-libs/pg34-snew-1)'
     ]

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G3 bootstrap sibling of pg34-self (stable, not installed; Portage selects this over the self alternative to avoid the direct self-cycle)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f91b01c880848d7f94af17e55f9d1dc7

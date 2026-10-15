@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G7 fresh target soft-blocking an installed package (not installed; RDEPEND blocks installed pg34-sblk while installed pg34-shold still needs it transitively); regressed = pubgrub schedules an uninstall where Portage keeps the block unresolved
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-shold !dev-libs/pg34-sblk
+SLOT=0
+_md5_=4579d98d549e9e865d226d7259a2a2a8

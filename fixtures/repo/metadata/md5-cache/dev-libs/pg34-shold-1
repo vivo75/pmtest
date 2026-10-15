@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G7 installed parent chain (installed and in the repo; the systemd-utils/installed-systemd shape: kept as a leaf under -pv so the engine never reaches pg34-smid)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg34-smid
+SLOT=0
+_md5_=f3f47272d1bad5a04c89fe80111ea6e8

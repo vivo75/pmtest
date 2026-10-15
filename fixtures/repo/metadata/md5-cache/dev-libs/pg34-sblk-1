@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #34 S5 G7 installed soft-blocked package (installed and in the repo, no deps; Portage prints only the [blocks B] row for it, never an uninstall)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=8bfe961823bd6edb114b04fd5445825d
