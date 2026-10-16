@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #367 two-slot dep, SLOT 2 half (newest, not installed)
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=a3353a65a40d3c1a10b1f60bb8c811ca

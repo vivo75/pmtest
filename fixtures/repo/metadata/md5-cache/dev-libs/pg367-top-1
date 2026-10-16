@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #367 unslotted parent over a two-slot dep (not installed); regressed = pubgrub -pvuD keeps the installed slot instead of the newest
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg367-s
+SLOT=0
+_md5_=53e500402fb83ceec5e989c75485bf55

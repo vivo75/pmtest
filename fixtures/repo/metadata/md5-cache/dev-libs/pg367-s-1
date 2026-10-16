@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #367 two-slot dep, SLOT 1 half (installed); regressed = pubgrub -pvuD keeps this slot instead of the newest
+EAPI=8
+KEYWORDS=amd64
+SLOT=1
+_md5_=e311bfa10e337149561cb87703a2f604

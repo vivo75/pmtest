@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #367 installed-parent variant of pg367-top (installed); regressed = pubgrub -pvD pulls the newest slot where Portage keeps the installed one
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg367-s
+SLOT=0
+_md5_=9b6ae889fb8c7040b4262b03049f257b

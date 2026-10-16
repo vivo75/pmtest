@@ -481,6 +481,12 @@ CASES = [
     ("-pve: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-rb"], 0),
     ("-pv: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-tt"], 0),
     ("-pve: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-tt"], 0),
+    ("-pv: new parent plans only itself (pg367-top, #367 S2)", ["--pretend", "-v", "dev-libs/pg367-top"], 0),
+    ("-pvu: new parent plans only itself (pg367-top, #367 S2)", ["--pretend", "-v", "--update", "dev-libs/pg367-top"], 0),
+    ("-pvD: deep without update plans only the parent (pg367-top, #367 S2)", ["--pretend", "-v", "--deep", "dev-libs/pg367-top"], 0),
+    ("-pvuD: newest slot plus the parent (pg367-top, #367 S2)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg367-top"], 0),
+    ("-pve: newest slot plus the parent (pg367-top, #367 S2)", ["--pretend", "-v", "--emptytree", "dev-libs/pg367-top"], 0),
+    ("-pvuDN: newest slot plus the parent (pg367-top, #367 S2)", ["--pretend", "-v", "--update", "--deep", "--newuse", "dev-libs/pg367-top"], 0),
     ("-pv --columns: decorated version + [old-ver] columns", ["--pretend", "-v", "--columns", "--update", "dev-libs/upgradepkg"], 0),
     ("package.provided: a matching dependency is silently dropped", ["--pretend", "dev-libs/needsprovided"], 0),
     ("package.provided: a matching top-level target triggers the WARNING block", ["--pretend", "dev-libs/providedpkg"], 0),
@@ -27739,6 +27745,155 @@ def test_pg34_multi_default_pv_keeps_installed_slot_out(emerge_binary, fixture_e
     assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg34-multi"]) == [
         ("NS", "dev-libs/pg34-multi-2:2")
     ]
+
+
+def test_pg367_top_pubgrub_pv_plans_parent_only(emerge_binary, fixture_env):
+    """#367 S2: `-pv` on the new parent plans only itself.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-367-s0/cap-top-pv-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_pubgrub_pvu_plans_parent_only(emerge_binary, fixture_env):
+    """#367 S2: `-pvu` on the new parent plans only itself.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-367-s0/cap-top-pvu-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_pubgrub_pvd_plans_parent_only(emerge_binary, fixture_env):
+    """#367 S2: `-pvD` (deep without update) plans only the parent.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-367-s0/cap-top-pvD-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned. Pubgrub added
+    `NS s-2` here before the S1 switch fix."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_pubgrub_pvud_takes_newest_slot(emerge_binary, fixture_env):
+    """#367 S2: `-pvuD` takes the newest slot plus the parent.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-367-s0/cap-top-pvuD-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned. The
+    `deep && req.empty` mutant drops the `NS s-2` row, so this pin kills it."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("NS", "dev-libs/pg367-s-2:2"), ("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_pubgrub_pve_takes_newest_slot(emerge_binary, fixture_env):
+    """#367 S2: `-pve` takes the newest slot plus the parent.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-367-s0/cap-top-pve-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("NS", "dev-libs/pg367-s-2:2"), ("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_pubgrub_pvudn_takes_newest_slot(emerge_binary, fixture_env):
+    """#367 S2: `-pvuDN` takes the newest slot plus the parent.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-367-s0/cap-top-pvuDN-portage.txt` (argv in
+    `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuDN", "--solver=pubgrub", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("NS", "dev-libs/pg367-s-2:2"), ("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_default_pv_plans_parent_only(emerge_binary, fixture_env):
+    """#367 S2 default-solver lock: Portage 3.0.82.2's plan from the S0
+    capture `LLM/evidence/2026-10-15-367-s0/cap-top-pv-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("N", "dev-libs/pg367-top-1")]
+
+
+@pytest.mark.xfail(strict=True, reason="#362")
+def test_pg367_top_default_pvu_plans_parent_only(emerge_binary, fixture_env):
+    """#367 S2 default-solver divergence: Portage 3.0.82.2 plans `N top`
+    alone (`LLM/evidence/2026-10-15-367-s0/cap-top-pvu-portage.txt`, argv
+    in `cmd.txt` there) while the default solver pulls `NS s-2` too; that
+    is the #362 divergence (no new backlog number), so this pin is a
+    strict xfail against Portage's rows."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_default_pvd_plans_parent_only(emerge_binary, fixture_env):
+    """#367 S2 default-solver lock: Portage 3.0.82.2's plan from the S0
+    capture `LLM/evidence/2026-10-15-367-s0/cap-top-pvD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvD", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_default_pvud_takes_newest_slot(emerge_binary, fixture_env):
+    """#367 S2 default-solver lock: Portage 3.0.82.2's plan from the S0
+    capture `LLM/evidence/2026-10-15-367-s0/cap-top-pvuD-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("NS", "dev-libs/pg367-s-2:2"), ("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_default_pve_takes_newest_slot(emerge_binary, fixture_env):
+    """#367 S2 default-solver lock: Portage 3.0.82.2's plan from the S0
+    capture `LLM/evidence/2026-10-15-367-s0/cap-top-pve-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pve", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("NS", "dev-libs/pg367-s-2:2"), ("N", "dev-libs/pg367-top-1")]
+
+
+def test_pg367_top_default_pvudn_takes_newest_slot(emerge_binary, fixture_env):
+    """#367 S2 default-solver lock: Portage 3.0.82.2's plan from the S0
+    capture `LLM/evidence/2026-10-15-367-s0/cap-top-pvuDN-portage.txt`
+    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuDN", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg367-top"],
+    ) == [("NS", "dev-libs/pg367-s-2:2"), ("N", "dev-libs/pg367-top-1")]
 
 
 def test_pg34_arg_pubgrub_pv_reinstalls_named_argument(emerge_binary, fixture_env):
