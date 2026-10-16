@@ -451,6 +451,15 @@ CASES = [
     ("-pvuD: installed parent's BDEPEND upgrades without --usepkg=n (pg34-blib, #361 S1)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-blib"], 0),
     ("-pvuD --getbinpkg=n --usepkg=n: installed parent plans nothing (pg34-blib, #361 S1)", ["--pretend", "-v", "--update", "--deep", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-blib"], 0),
     ("-pvuD --with-bdeps=n: installed parent plans nothing (pg34-blib, #34 S3)", ["--pretend", "-v", "--update", "--deep", "--with-bdeps=n", "dev-libs/pg34-blib"], 0),
+    ("-pv: installed-only dep stays satisfied (pg34-gapp, #360 S4)", ["--pretend", "-v", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"], 0),
+    ("-pvu: installed-only dep stays satisfied (pg34-gapp, #360 S4)", ["--pretend", "-v", "--update", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"], 0),
+    ("-pvuD: installed-only dep expands its own dep (pg34-gapp, #360 S4)", ["--pretend", "-v", "--update", "--deep", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"], 0),
+    ("-pvuD --with-bdeps=n: installed-only dep expands its own dep (pg34-gapp, #360 S4)", ["--pretend", "-v", "--update", "--deep", "--getbinpkg=n", "--usepkg=n", "--with-bdeps=n", "dev-libs/pg34-gapp"], 0),
+    ("-pv: installed-only argument fails without similar names (pg34-gone, #360 S4)", ["--pretend", "-v", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gone"], 1),
+    ("-pvu: installed-only argument plans nothing (pg34-gone, #360 S4)", ["--pretend", "-v", "--update", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gone"], 0),
+    ("-pvuD: installed-only argument expands its own dep (pg34-gone, #360 S4)", ["--pretend", "-v", "--update", "--deep", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gone"], 0),
+    ("-pvuD: installed-only BDEPEND satisfies a merge (pg359-gbapp, #360 S4)", ["--pretend", "-v", "--update", "--deep", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg359-gbapp"], 0),
+    ("-pvuD --with-bdeps=y: installed-only BDEPEND satisfies a merge (pg359-gbapp, #360 S4)", ["--pretend", "-v", "--update", "--deep", "--with-bdeps=y", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg359-gbapp"], 0),
     ("-pvuD: fresh dep of an installed dep still expands (pg34-app, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-app"], 0),
     ("-pvuD: installed dep upgrades in its slot (pg34-dtop, #34 S4)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-dtop"], 0),
     ("-pvu: named target upgrades (pg34-dlib, #34 S4)", ["--pretend", "-v", "--update", "dev-libs/pg34-dlib"], 0),
@@ -3495,20 +3504,24 @@ def test_root_deps_pinned_output(
     has no ebuild anywhere in the fixture repo tree -- only a hand-seeded
     vdb entry. PORTAGE_RUNNING_ROOT (a portuale-specific, test-only override
     -- see running_root_from_env's own doc comment) is pointed at the
-    same fixture tree here purely as a convenient real vdb; ordinary
-    dependency resolution never consults a root's own vdb at all, only
-    the ebuild repo tree, so this is a valid, real proof the new
-    running-root check is what's excluding it, not some other
-    pre-existing mechanism."""
+    same fixture tree here purely as a convenient real vdb. Since #360 S4
+    an installed-only package satisfies a build-time edge from the
+    target-root vdb too (Portage consults the installed db for every dep
+    kind of a package being merged: S0 `s0-e-gbapp-pvuD`), so both with
+    and without --root-deps this plans just `N rootdepspkg`.
+
+    Expected rows are Portage 3.0.82.2's plan from the fresh container
+    capture `s4-rootdeps-pkg.txt` in `LLM/evidence/2026-10-16-359-exec/`
+    (`--pretend dev-libs/rootdepspkg`, fresh stage, rc 0)."""
     env = dict(fixture_env)
     env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
     args_without = ["--pretend", "dev-libs/rootdepspkg"]
     args_with = ["--pretend", "--root-deps", "dev-libs/rootdepspkg"]
 
     rust_without = _run([str(emerge_binary)], args_without, env)
-    assert rust_without.returncode == 1
-    # #135 (d): Portage's plain-miss sentence, not the bare NVC line
-    assert "there are no ebuilds to satisfy" in rust_without.stderr
+    assert rust_without.returncode == 0
+    assert rust_without.stderr == ""
+    assert rust_without.stdout.strip() == f'[ebuild  N     ] dev-libs/rootdepspkg-1.0 to {fixture_env["ROOT"]}'
 
     rust_with = _run([str(emerge_binary)], args_with, env)
     assert rust_with.returncode == 0
@@ -3527,7 +3540,10 @@ def test_bdepend_routes_to_the_running_root_for_a_cross_root_build_without_root_
     own BDEPEND (dev-libs/rootdepsprovider, no ebuild anywhere) is
     therefore satisfied by the running root and silently dropped -- no
     --root-deps needed, no "no visible ebuild" note. Same command with
-    ROOT == running root falls back to the plain unresolved-dep report."""
+    ROOT == running root resolves the same BDEPEND from the target vdb
+    instead (installed-only satisfies every dep kind since #360 S4:
+    Portage 3.0.82.2 S0 `s0-e-gbapp-pvuD`), so that control now plans
+    `N rootdepspkg` too."""
     cross = dict(fixture_env)
     cross["ROOT"] = str(tmp_path)
     cross["PORTAGE_RUNNING_ROOT"] = str(fixture_env["ROOT"])
@@ -3538,11 +3554,13 @@ def test_bdepend_routes_to_the_running_root_for_a_cross_root_build_without_root_
     assert rust.stderr == ""
     assert rust.stdout.strip() == f"[ebuild  N     ] dev-libs/rootdepspkg-1.0 to {cross['ROOT']}"
 
-    # Control: running root == target ROOT -> the feature is a no-op and
-    # the unresolved BDEPEND is reported as before.
+    # Control: running root == target ROOT -> the BDEPEND is satisfied
+    # from the target vdb instead (fresh container capture
+    # `s4-rootdeps-pkg.txt` in `LLM/evidence/2026-10-16-359-exec/`).
     same = dict(fixture_env)  # fixture_env pins RUNNING_ROOT == ROOT
     rust_same = _run([str(emerge_binary)], args, same)
-    assert "there are no ebuilds to satisfy" in rust_same.stderr
+    assert rust_same.returncode == 0
+    assert rust_same.stdout.strip() == f"[ebuild  N     ] dev-libs/rootdepspkg-1.0 to {same['ROOT']}"
 
 
 def test_root_deps_disjunctive_branch_selection_pinned_output(
@@ -3556,22 +3574,26 @@ def test_root_deps_disjunctive_branch_selection_pinned_output(
     dep_zapdeps' other_installed bin (backlog #22 slice 4) already beats
     rootdepsnonexistent's plain other -- the || group resolves to
     rootdepsprovider alone (dropping rootdepsnonexistent entirely), which
-    still reports "no visible ebuild" since it has no tree candidate at
-    all (a pre-existing, slice-4-unrelated quirk of this atom's own
-    resolution path). WITH --root-deps, rootdepsprovider's own
-    running-root satisfaction lets the closure accept it as fully
-    Available instead, so the trailing root_deps_satisfied_atoms filter
-    drops it from the queue entirely too -- nothing reported either
-    side."""
+    since #360 S4 is kept from the installed db like any installed-only
+    dep (Portage consults it for every dep kind: S0 `s0-e-gbapp-pvuD`).
+    WITH --root-deps, rootdepsprovider's own running-root satisfaction
+    lets the closure accept it as fully Available instead, so the
+    trailing root_deps_satisfied_atoms filter drops it from the queue
+    entirely too -- `N rootdepsorpkg` alone either side.
+
+    Expected rows are Portage 3.0.82.2's plan from the fresh container
+    capture `s4-rootdeps-orpkg.txt` in
+    `LLM/evidence/2026-10-16-359-exec/` (`--pretend
+    dev-libs/rootdepsorpkg`, fresh stage, rc 0)."""
     env = dict(fixture_env)
     env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
     args_without = ["--pretend", "dev-libs/rootdepsorpkg"]
     args_with = ["--pretend", "--root-deps", "dev-libs/rootdepsorpkg"]
 
     rust_without = _run([str(emerge_binary)], args_without, env)
-    assert rust_without.returncode == 1
-    # #135 (d): Portage's plain-miss sentence, not the bare NVC line
-    assert "there are no ebuilds to satisfy" in rust_without.stderr
+    assert rust_without.returncode == 0
+    assert rust_without.stderr == ""
+    assert rust_without.stdout.strip() == f'[ebuild  N     ] dev-libs/rootdepsorpkg-1.0 to {fixture_env["ROOT"]}'
 
     rust_with = _run([str(emerge_binary)], args_with, env)
     assert rust_with.returncode == 0
@@ -28237,6 +28259,161 @@ def test_pg34_blib_default_pvuD_upgrades_btool(emerge_binary, fixture_env):
     assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-blib"]) == [
         ("U", "dev-libs/pg34-btool-2")
     ]
+
+
+def test_pg34_gapp_default_pv_plans_top_only(emerge_binary, fixture_env):
+    """#360 S4: `-pv` on pg34-gapp plans only `N gapp`: the installed-only
+    `RDEPEND` (`pg34-gone`, in the vdb but with no ebuild anywhere) satisfies
+    the dep from the installed db.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `360-gapp-pv.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"],
+    ) == [("N", "dev-libs/pg34-gapp-1")]
+
+
+def test_pg34_gapp_default_pvu_plans_top_only(emerge_binary, fixture_env):
+    """#360 S4: `-pvu` on pg34-gapp plans only `N gapp` (same installed-only
+    keep as `-pv`: without `--deep` the dep is not wanted for update
+    either way, and there is nothing to update it to).
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `360-gapp-pvu.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"],
+    ) == [("N", "dev-libs/pg34-gapp-1")]
+
+
+def test_pg34_gapp_default_pvuD_expands_installed_only_dep(emerge_binary, fixture_env):
+    """#360 S4: `-pvuD` on pg34-gapp plans `N gextra + N gapp`: the kept
+    installed-only dep's own vdb `RDEPEND` still walks under `--deep`
+    though no ebuild exists for it.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `360-gapp-pvuD.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gapp"],
+    ) == [("N", "dev-libs/pg34-gextra-1"), ("N", "dev-libs/pg34-gapp-1")]
+
+
+def test_pg34_gapp_default_pvuD_nobdeps_expands_installed_only_dep(
+    emerge_binary, fixture_env
+):
+    """#360 S4: `-pvuD --with-bdeps=n` plans the same `N gextra + N gapp`
+    (the walked dep is a run-time one, so `--with-bdeps=n` changes nothing).
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `360-gapp-pvuD-bdn.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--getbinpkg=n", "--usepkg=n", "--with-bdeps=n", "dev-libs/pg34-gapp"],
+    ) == [("N", "dev-libs/pg34-gextra-1"), ("N", "dev-libs/pg34-gapp-1")]
+
+
+def test_pg34_gone_default_pv_fails_without_similar_names(emerge_binary, fixture_env):
+    """#360 S4: `-pv` on installed-only pg34-gone fails (rc 1, reinstall
+    wanted, no ebuild to reinstall from) with the bare "no ebuilds" line
+    and no similar-names block: the cp exists via the installed db.
+
+    Expected shape is Portage 3.0.82.2's output in the container capture
+    `360-gone-pv.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there: rc 1, no `Maybe you meant` block; the
+    ` for <root>` suffix stays out of scope, #395)."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["-pv", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gone"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert 'there are no ebuilds to satisfy "dev-libs/pg34-gone"' in rust.stderr
+    assert "searching for similar names" not in rust.stderr
+    assert "Maybe you meant" not in rust.stderr
+
+
+def test_pg34_gone_default_pvu_plans_nothing(emerge_binary, fixture_env):
+    """#360 S4: `-pvu` on installed-only pg34-gone plans nothing (`Total:
+    0`, rc 0): under `--update --selective` the installed argument is
+    already installed.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `360-gone-pvu.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there: `Total: 0`); only the `[ebuild]` rows
+    are pinned."""
+    assert (
+        _pg34_run(
+            emerge_binary,
+            fixture_env,
+            ["-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gone"],
+        )
+        == []
+    )
+
+
+def test_pg34_gone_default_pvuD_expands_vdb_dep(emerge_binary, fixture_env):
+    """#360 S4: `-pvuD` on installed-only pg34-gone plans `N gextra`: the
+    argument itself is already installed, but `--deep` still walks its vdb
+    `RDEPEND`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `360-gone-pvuD.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (argv in `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-gone"],
+    ) == [("N", "dev-libs/pg34-gextra-1")]
+
+
+def test_pg359_gbapp_default_pvuD_expands_installed_only_bdepend(
+    emerge_binary, fixture_env
+):
+    """#360 S4: `-pvuD` on pg359-gbapp plans `N gextra + N gbapp`: an
+    installed-only package satisfies even a `BDEPEND` edge (the Q4
+    `buildtime_hard` gate is lifted), and its vdb `RDEPEND` walks.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `s0-e-gbapp-pvuD.txt` in `LLM/evidence/2026-10-15-359-s0/out/`;
+    only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg359-gbapp"],
+    ) == [("N", "dev-libs/pg34-gextra-1"), ("N", "dev-libs/pg359-gbapp-1")]
+
+
+def test_pg359_gbapp_default_pvuD_with_bdeps_y_expands_installed_only_bdepend(
+    emerge_binary, fixture_env
+):
+    """#360 S4: `-pvuD --with-bdeps=y` on pg359-gbapp plans the same
+    `N gextra + N gbapp` rows (the parent is being merged, so its
+    `BDEPEND` walks either way).
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `s0-e-gbapp-pvuD-bdy.txt` in `LLM/evidence/2026-10-15-359-s0/out/`;
+    only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        [
+            "-pvuD",
+            "--with-bdeps=y",
+            "--getbinpkg=n",
+            "--usepkg=n",
+            "dev-libs/pg359-gbapp",
+        ],
+    ) == [("N", "dev-libs/pg34-gextra-1"), ("N", "dev-libs/pg359-gbapp-1")]
 
 
 def test_pg34_blib_pubgrub_pvuD_plans_nothing(emerge_binary, fixture_env):
