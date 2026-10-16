@@ -27792,14 +27792,64 @@ def test_pg34_gs_default_pv_selects_new_slot_only(emerge_binary, fixture_env):
     ]
 
 
-@pytest.mark.xfail(strict=True, reason="backlog #359: default solver lacks the slot-1 U row")
 def test_pg34_gs_default_pvu_upgrades_installed_slot(emerge_binary, fixture_env):
-    """#34 S1 default-solver lock: Portage 3.0.82.2's plan from the
-    container capture `LLM/evidence/2026-10-14-34-s1/cap-pg34-gs-pvu-portage.txt`
-    (argv in `cmd.txt` there); only the `[ebuild]` rows are pinned."""
+    """#359 S3: with `--update` the default solver appends the greedy slot.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-plan-359/portage/359-gs-pvu.txt` (argv in
+    `cells.txt` there); only the `[ebuild]` rows are pinned."""
     assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg34-gs"]) == [
         ("NS", "dev-libs/pg34-gs-2:2"),
         ("U", "dev-libs/pg34-gs-1.1:1"),
+    ]
+
+
+def test_pg34_gs_default_pvuD_upgrades_installed_slot(emerge_binary, fixture_env):
+    """#359 S3: `-pvuD` keeps the greedy installed-slot upgrade.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-plan-359/portage/359-gs-pvuD.txt` (argv in
+    `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-gs"]) == [
+        ("NS", "dev-libs/pg34-gs-2:2"),
+        ("U", "dev-libs/pg34-gs-1.1:1"),
+    ]
+
+
+def test_pg34_gs_default_pvuDN_upgrades_installed_slot(emerge_binary, fixture_env):
+    """#359 S3: `-pvuDN` keeps the greedy installed-slot upgrade.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-plan-359/portage/359-gs-pvuDN.txt` (argv in
+    `cells.txt` there); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuDN", "dev-libs/pg34-gs"]) == [
+        ("NS", "dev-libs/pg34-gs-2:2"),
+        ("U", "dev-libs/pg34-gs-1.1:1"),
+    ]
+
+
+def test_pg34_gs_default_pvu_range_upgrades_installed_slot(emerge_binary, fixture_env):
+    """#359 S3: greedy slots cover version-range atoms too (D5).
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-359-s0/out/s0-a-gs-range.txt`; only the
+    `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary, fixture_env, ["-pvu", ">=dev-libs/pg34-gs-1.0"]
+    ) == [
+        ("NS", "dev-libs/pg34-gs-2:2"),
+        ("U", "dev-libs/pg34-gs-1.1:1"),
+    ]
+
+
+def test_pg359_gsblk_default_pvu_plans_new_slot_only(emerge_binary, fixture_env):
+    """#359 S3: the blocker lookahead drops the blocked greedy slot.
+
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `LLM/evidence/2026-10-15-359-s0/out/s0-e-gsblk-pvu.txt` (gsblk-2 blocks
+    `:1`, so no `U` row); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg359-gsblk"]) == [
+        ("NS", "dev-libs/pg359-gsblk-2:2")
     ]
 
 
