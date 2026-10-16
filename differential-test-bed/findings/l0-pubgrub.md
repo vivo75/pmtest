@@ -15,3 +15,7 @@ Allowlisted (layer `l0-pubgrub`, `owner: portuale-bug`): exit-code differences i
 Evidence: portuale `LLM/evidence/2026-10-15-34-s5/` (`modes-e.md`, `triage.md`).
 
 Final run (Z, after the S6 refactor, 2026-10-15): runs `l0-20261015T155330Z` … `l0-20261015T164057Z`, all five modes 0/0/0/0/0 after allowlist; default-solver run `l0-20261015T170422Z` 0/448/0/0/0, unchanged since S0.
+
+## 2026-10-16 — #367 S4: pubgrub `-pvuD` / `-pve` modes not run
+
+#367 changes the pubgrub switch value only for deep-without-update; both bed modes `-pvuD` and `-pve` have update=true so their counted categories are unchanged by construction; the actual bed run is NOT done (no bed image on the host) and is left for the owner (residue #374).
