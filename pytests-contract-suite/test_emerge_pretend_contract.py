@@ -2574,7 +2574,7 @@ CASES = [
         2,
     ),
     (
-        "--update threads through dependency recursion, not just top-level",
+        "--update without --deep leaves an installed dependency alone (withdeps, #362)",
         ["--pretend", "--update", "dev-libs/withdeps"],
         0,
     ),
@@ -4755,12 +4755,17 @@ def test_libc_merges_asap_in_merge_order(emerge_binary, fixture_env):
     (almost every ebuild has an implicit build-time dep on it), by
     seeding `asap_nodes` from the graphed `virtual/libc`'s providers.
     Without the seeding portuale emitted `plainleaf, fakeglibc,
-    virtual/libc, toolchainroot` (plainleaf first, by discovery order)."""
+    virtual/libc, toolchainroot` (plainleaf first, by discovery order).
+
+    With no `--update` Portage does not want the installed
+    `virtual/libc-1.0` updated (`_want_update_pkg`, #362 S2), so the
+    whole libc leg stays silent and only the two `N` rows print.
+    Expected rows are Portage 3.0.82.2's plan from the fresh host capture
+    `s2-c-toolchainroot-p.txt` in `LLM/evidence/2026-10-16-359-exec/`
+    (same options and fixture config as the S0 captures)."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/toolchainroot"], fixture_env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        f'[ebuild  N     ] sys-libs/fakeglibc-2.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] virtual/libc-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/plainleaf-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/toolchainroot-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -5027,10 +5032,15 @@ def test_or_group_other_installed_some_bin_beats_plain_other(
     `opartlya` nor `opartlyb` has a tree ebuild (so the bracketed pair
     isn't `all_available`), but `opartlya` alone is installed
     (`some_installed`, not `all_installed`) -- `other_installed_some`
-    beats `omissingelsepartly`'s plain `other`. Both `opartlya` and
-    `opartlyb` are reported (the CHOSEN alternative's own atoms still
-    individually lack a visible tree candidate each); `omissingelsepartly`
-    (the never-chosen alternative) is dropped entirely. Backlog #19's
+    beats `omissingelsepartly`'s plain `other`. The installed `opartlya`
+    is then silently satisfied (no `--update`: Portage does not want a
+    non-argument dependency updated, #362 S2), so only `opartlyb` is
+    reported; `omissingelsepartly` (the never-chosen alternative) is
+    dropped entirely. Expected stderr is Portage 3.0.82.2's from the
+    fresh host capture `s2-c-opartly-p.txt` in
+    `LLM/evidence/2026-10-16-359-exec/` (same options and fixture config
+    as the S0 captures; the `for <root>` suffix is #395 and stays
+    omitted here). Backlog #19's
     abort path then flips the exit code to 1 (a `NoVisibleCandidate`
     dependency of this merge-bound package) and Slice 4 suppresses the
     merge list -- independent of which alternative #22 picked, matching
@@ -5042,10 +5052,6 @@ def test_or_group_other_installed_some_bin_beats_plain_other(
     _assert_abort_preamble(rust.stdout)
     # #135 (d): Portage's plain-miss block per miss, not the bare NVC lines.
     assert rust.stderr.strip().splitlines() == [
-        'emerge: there are no ebuilds to satisfy "dev-libs/opartlya".',
-        '(dependency required by "dev-libs/opartly-1.0::testrepo" [ebuild])',
-        '(dependency required by "dev-libs/opartly" [argument])',
-        '',
         'emerge: there are no ebuilds to satisfy "dev-libs/opartlyb".',
         '(dependency required by "dev-libs/opartly-1.0::testrepo" [ebuild])',
         '(dependency required by "dev-libs/opartly" [argument])',
@@ -15333,37 +15339,38 @@ def test_world_expands_to_the_fixture_world_files_own_atoms(emerge_binary, fixtu
     "@innernestedset" reference
     (contributing dev-libs/innernestedsetpkg, and -- proving the cycle
     guard -- referencing "@nestedtestset" right back without looping
-    forever or erroring). --update is added purely so upgradepkg's own
-    dependency-level entry actually upgrades (see the --update contract
-    tests) rather than staying silently AlreadyInstalled -- unrelated to
-    what this test itself is about.
+    forever or erroring). --update is added for the same reason as the
+    plain @world S0 cell (it exercises the update path); it does NOT
+    upgrade the installed upgradepkg here -- without `--deep` Portage
+    does not want a non-argument dependency updated
+    (`_want_update_pkg`, #362 S2), so upgradepkg stays silently
+    AlreadyInstalled (S0 `s0-b-world`: `N newpkg`, `N innernestedsetpkg`,
+    `N withdeps`) -- unrelated to what this test itself is about.
 
-    Merge order: newpkg/withdeps/upgradepkg are also reachable from
+    Merge order: newpkg/withdeps are also reachable from
     @system in this shared fixture profile (profiles/base+default/
     packages), so Portage's own _merge_order_bias promotes newpkg ahead of
-    the unrelated, non-system innernestedsetpkg. upgradepkg and
-    innernestedsetpkg are both genuine leaves (no dependency of their
-    own) available from round one, so Portage's own "greedily pop every
+    the unrelated, non-system innernestedsetpkg. upgradepkg would have
+    been a genuine leaf, but it never merges now; innernestedsetpkg is
+    available from round one, so Portage's own "greedily pop every
     available leaf at once" batching (_serialize_tasks'
-    ignore_priority-is-None branch) places both of them -- and
+    ignore_priority-is-None branch) places it -- and
     nestedsetpkg/dualslotpkg -- in that same first round, before withdeps
-    (which needs newpkg *and* upgradepkg placed first) becomes available
-    at all; withdeps therefore lands last, after innernestedsetpkg, even
-    though upgradepkg is withdeps' own RDEPEND target. Same Portage-grounded
-    bias + batching documented on portage-repo::merge_order (the
-    _serialize_tasks port).
+    (which needs newpkg placed first) becomes available
+    at all; withdeps therefore lands last, after innernestedsetpkg.
+    Same Portage-grounded bias + batching documented on
+    portage-repo::merge_order (the _serialize_tasks port).
 
-    An already-installed package (nestedsetpkg, dualslotpkg) is omitted
-    from the merge list entirely, matching Portage `emerge -p` -- portuale
-    used to print a per-package "is already installed" notice, dropped
-    because it polluted `emerge -puD @world` and matched nothing in Portage.
-    The merge-bound sequence (newpkg, upgradepkg, innernestedsetpkg,
+    An already-installed package (nestedsetpkg, dualslotpkg, upgradepkg)
+    is omitted from the merge list entirely, matching Portage `emerge -p`
+    -- portuale used to print a per-package "is already installed" notice,
+    dropped because it polluted `emerge -puD @world` and matched nothing
+    in Portage. The merge-bound sequence (newpkg, innernestedsetpkg,
     withdeps) is unaffected."""
     result = _run([str(emerge_binary)], ["--pretend", "--update", "@world"], fixture_env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -15378,7 +15385,11 @@ def test_world_combines_with_an_explicit_atom(emerge_binary, fixture_env):
     own doc comment for why withdeps lands last, after innernestedsetpkg.
 
     An already-installed package is omitted from the merge list, matching
-    Portage `emerge -p`; the merge-bound sequence is unaffected."""
+    Portage `emerge -p`; the merge-bound sequence is unaffected
+    (upgradepkg itself stays silently AlreadyInstalled without `--deep`:
+    #362 S2; fresh host capture `s2-c-samepkg-world-pu.txt` in
+    `LLM/evidence/2026-10-16-359-exec/` pins `N newpkg`,
+    `N innernestedsetpkg`, `N withdeps`)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--update", "dev-libs/samepkg", "@world"],
@@ -15387,7 +15398,6 @@ def test_world_combines_with_an_explicit_atom(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -17058,19 +17068,20 @@ def test_system_expands_to_the_fixture_profile_chains_own_packages_files(
     feed the exact same multi-atom/recursion machinery every other
     invocation already uses: withdeps' own RDEPEND recurses into newpkg
     again (deduped against base's own @system entry) and upgradepkg.
-    --update is added purely so upgradepkg's own dependency-level entry
-    actually upgrades (see the --update contract tests) rather than
-    staying silently AlreadyInstalled -- unrelated to what this test
-    itself is about.
+    --update is added for the same reason as the plain @world S0 cell (it
+    exercises the update path); it does NOT upgrade the installed
+    upgradepkg -- without `--deep` Portage does not want a non-argument
+    dependency updated (`_want_update_pkg`, #362 S2), so upgradepkg stays
+    silently AlreadyInstalled (S0 `s0-b-system`: `N newpkg`, `N withdeps`)
+    -- unrelated to what this test itself is about.
 
-    An already-installed package (systempkg) is omitted from the merge
-    list, matching Portage `emerge -p`; the merge-bound sequence is
-    unaffected."""
+    An already-installed package (systempkg, upgradepkg) is omitted from
+    the merge list, matching Portage `emerge -p`; the merge-bound sequence
+    is unaffected."""
     result = _run([str(emerge_binary)], ["--pretend", "--update", "@system"], fixture_env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
     ]
 
@@ -17079,7 +17090,10 @@ def test_system_combines_with_an_explicit_atom(emerge_binary, fixture_env):
     """@system can appear alongside an explicit atom in the same
     invocation, expanding in place at whatever position it's given, same
     as @world. --update is added for the same reason as the plain
-    @system test above.
+    @system test above (upgradepkg itself stays silently AlreadyInstalled
+    without `--deep`: #362 S2; fresh host capture
+    `s2-c-samepkg-system-pu.txt` in `LLM/evidence/2026-10-16-359-exec/`
+    pins `N newpkg`, `N withdeps`).
 
     An already-installed package is omitted from the merge list, matching
     Portage `emerge -p`; the merge-bound sequence is unaffected."""
@@ -17091,7 +17105,6 @@ def test_system_combines_with_an_explicit_atom(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
     ]
 
@@ -17612,9 +17625,11 @@ def test_onlydeps_suppresses_the_top_level_atom_but_shows_its_dependencies(
     """man/emerge.1: "Only merge (or pretend to merge) the dependencies
     of the packages specified, not the packages themselves." dev-libs/
     withdeps RDEPENDs on dev-libs/newpkg (New) and dev-libs/upgradepkg
-    (Upgrade, with --update -- see the --update contract tests for why
-    it's needed here at all) -- --onlydeps must print both dependency
-    lines exactly as always, but never withdeps' own [ebuild N] line --
+    (installed: without `--deep` Portage does not want it updated, so it
+    stays silently AlreadyInstalled -- #362 S2; fresh host capture
+    `s2-c-onlydeps-pu.txt` in `LLM/evidence/2026-10-16-359-exec/` pins
+    `N newpkg` alone) -- --onlydeps must print the dependency line
+    exactly as always, but never withdeps' own [ebuild N] line --
     the exact inverse of what --nodeps (see above) suppresses."""
     result = _run(
         [str(emerge_binary)],
@@ -17624,7 +17639,6 @@ def test_onlydeps_suppresses_the_top_level_atom_but_shows_its_dependencies(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
     ]
 
 
@@ -17632,12 +17646,12 @@ def test_onlydeps_short_alias_bundled_with_pretend(emerge_binary, fixture_env):
     """-o is --onlydeps's Portage short alias (see lib/_emerge/main.py's
     shortmapping); bundled with -p ("-po") it must behave identically to
     the long-flag invocation above. -u (--update) is bundled in too, for
-    the same reason the long-flag invocation above needs --update."""
+    the same reason the long-flag invocation above needs --update (the
+    installed upgradepkg stays silent without `--deep` all the same)."""
     result = _run([str(emerge_binary)], ["-pou", "dev-libs/withdeps"], fixture_env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
     ]
 
 
@@ -17745,20 +17759,60 @@ def test_update_threads_through_dependency_recursion_not_just_top_level(
     emerge_binary, fixture_env
 ):
     """dev-libs/upgradepkg is reached only as a *dependency* of
-    dev-libs/withdeps here, never a top-level atom -- --update must
-    still upgrade it, proving the flag threads uniformly through the
-    whole BFS (see resolve_pretend_graph's own doc comment), not just a
-    top-level atom. Without --update (see test_nodeps_disables_recursion_entirely's
-    sibling tests above), this same dependency stays silently
-    AlreadyInstalled instead."""
+    dev-libs/withdeps here, never a top-level atom -- and without `--deep`
+    Portage does NOT want it updated (`_want_update_pkg` false:
+    `lib/_emerge/depgraph.py:7304-7333`), so the `:8445-8458` return keeps
+    the installed 1.0 and no `U` row prints. Expected rows are Portage
+    3.0.82.2's plan from the capture `362-withdeps-pu.txt` in
+    `LLM/evidence/2026-10-15-plan-359/portage/` (reused unchanged by S0;
+    see `LLM/evidence/2026-10-15-359-s0/matrix.md`)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--update", "dev-libs/withdeps"], fixture_env
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
+    ]
+
+
+def test_update_without_deep_keeps_a_masked_installed_dependency(
+    emerge_binary, fixture_env
+):
+    """Without `--deep` Portage keeps even a keyword-masked installed
+    dependency (`depgraph.py:7972-7979`: the keep needs no visibility
+    check), so no `UD` downgrade row prints. Expected rows are Portage
+    3.0.82.2's plan from the capture `362-needskeywordmasked-pu.txt` in
+    `LLM/evidence/2026-10-15-plan-359/portage/` (reused unchanged by S0;
+    see `LLM/evidence/2026-10-15-359-s0/matrix.md`)."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "dev-libs/needskeywordmasked"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/needskeywordmasked-1.0 to {fixture_env["ROOT"]}',
+    ]
+
+
+def test_update_without_deep_keeps_an_installed_virtual_provider(
+    emerge_binary, fixture_env
+):
+    """The installed `virtual/libc-1.0` has no tree candidate left (the repo
+    holds only 2.0), but Portage walks the vardb independently and keeps it
+    (`:8445-8458`), so neither the `U` nor the `N fakeglibc` row prints.
+    Expected rows are Portage 3.0.82.2's plan from the S0 capture
+    `s0-b-toolchainroot.txt` in `LLM/evidence/2026-10-15-359-s0/out/`."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "dev-libs/toolchainroot"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/plainleaf-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/toolchainroot-1.0 to {fixture_env["ROOT"]}',
     ]
 
 
@@ -18481,17 +18535,19 @@ def test_rebuild_if_star_rebuilds_an_installed_consumer_of_a_merged_build_dep(
     emerge_binary, fixture_env
 ):
     """--rebuild-if-unbuilt / --rebuild-if-new-rev / --rebuild-if-new-ver
-    (Portage `_rebuild_config.trigger_rebuilds`): an installed package whose
-    vdb DEPEND/BDEPEND is satisfied by a package being merged this run
-    gets its own `[ebuild R]` rebuild entry -- it isn't otherwise in the
-    graph. `dev-libs/rebuildconsumer` (installed) DEPENDs
-    `dev-libs/rebuildtrigger` (installed 1.0, tree has 2.0)."""
+    (Portage `_rebuild_config.trigger_rebuilds`): only a parent already in
+    the graph is ever rebuilt. `dev-libs/rebuildconsumer` (installed)
+    DEPENDs `dev-libs/rebuildtrigger` but is reached by nothing in these
+    runs, so it gets no `[ebuild R]` row: `--pretend -u --rebuild-if-*`
+    merges the trigger alone. Expected rows are Portage 3.0.82.2's plans
+    from the S0 captures `s0-b-rebuild-unbuilt.txt`,
+    `s0-b-rebuild-newver.txt` and `s0-b-rebuild-newrev.txt` in
+    `LLM/evidence/2026-10-15-359-s0/out/`."""
     up = ["--pretend", "-u", "--rebuild-if-unbuilt", "dev-libs/rebuildtrigger"]
     rust = _run([str(emerge_binary)], up, fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
         f'[ebuild     U  ] dev-libs/rebuildtrigger-2.0 [1.0] to {fixture_env["ROOT"]}',
-        f'[ebuild   R    ] dev-libs/rebuildconsumer-1.0 to {fixture_env["ROOT"]}',
     ]
 
     # --rebuild-if-new-ver vs --rebuild-if-unbuilt only diverge for a
@@ -18500,7 +18556,14 @@ def test_rebuild_if_star_rebuilds_an_installed_consumer_of_a_merged_build_dep(
     nv = _run([str(emerge_binary)], ["--pretend", "--rebuild-if-new-ver", "dev-libs/rebuildnochange"], fixture_env)
     assert "rebuildnochangeconsumer" not in nv.stdout
     ub = _run([str(emerge_binary)], ["--pretend", "--rebuild-if-unbuilt", "dev-libs/rebuildnochange"], fixture_env)
-    assert f'[ebuild   R    ] dev-libs/rebuildnochangeconsumer-1.0 to {fixture_env["ROOT"]}' in ub.stdout
+    # The trigger itself re-merges (top-level reinstall), but its unreached
+    # consumer gets no row either. Expected rows are Portage 3.0.82.2's plan
+    # from the fresh host capture `s2-fresh-ub.txt` in
+    # `LLM/evidence/2026-10-16-359-exec/` (same options and fixture config
+    # as the S0 captures).
+    assert ub.stdout.splitlines() == [
+        f'[ebuild   R    ] dev-libs/rebuildnochange-1.0 to {fixture_env["ROOT"]}',
+    ]
 
     # --rebuild-exclude (parent) / --rebuild-ignore (dep) both suppress it.
     for extra in (
@@ -18849,21 +18912,23 @@ def test_implicit_system_deps_n_skips_the_system_first_merge_order_bias(
     `create_depgraph_params.py:120` + `depgraph._merge_order_bias`'s own
     early return): the @system-first / reference-count re-sort is
     skipped and the merge list stays in scheduler-over-discovery order.
-    `emerge -pu @world` shows it: the bias promotes `newpkg` (@system
-    reachable) ahead of the unrelated leaf `upgradepkg`, while `=n`
-    leaves both leaves in discovery order (newpkg still first -- it is
-    also earliest in @world expansion -- but upgradepkg drops behind
-    innernestedsetpkg). Bare / `=y` match the default exactly."""
+    Since #362 S2 the installed upgradepkg no longer merges without
+    `--deep` (it stays silently AlreadyInstalled), so the bias has no
+    visible effect on these rows at all: Portage prints the identical
+    three `N` rows for every variant (S0 `s0-b-world`, `s0-b-isd-y`,
+    `s0-b-isd-n` in `LLM/evidence/2026-10-15-359-s0/out/`). The bare
+    `--implicit-system-deps` form still resolves (rc 0) where Portage
+    consumes `@world` as its value and errors (rc 2) -- that argparse
+    shape stays an owner decision (S0 STOP-1), unrelated to the rows
+    pinned here. Bare / `=y` match the default exactly."""
     biased = [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
     ]
     unbiased = [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/innernestedsetpkg-1.0 to {fixture_env["ROOT"]}',
-        f'[ebuild     U  ] dev-libs/upgradepkg-2.0 [1.0] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {fixture_env["ROOT"]}',
     ]
     for extra in ([], ["--implicit-system-deps"], ["--implicit-system-deps=y"]):
@@ -27839,13 +27904,12 @@ def test_pg367_top_default_pv_plans_parent_only(emerge_binary, fixture_env):
     ) == [("N", "dev-libs/pg367-top-1")]
 
 
-@pytest.mark.xfail(strict=True, reason="#362")
 def test_pg367_top_default_pvu_plans_parent_only(emerge_binary, fixture_env):
-    """#367 S2 default-solver divergence: Portage 3.0.82.2 plans `N top`
-    alone (`LLM/evidence/2026-10-15-367-s0/cap-top-pvu-portage.txt`, argv
-    in `cmd.txt` there) while the default solver pulls `NS s-2` too; that
-    is the #362 divergence (no new backlog number), so this pin is a
-    strict xfail against Portage's rows."""
+    """#362 S2: Portage 3.0.82.2 plans `N top` alone
+    (`LLM/evidence/2026-10-15-367-s0/cap-top-pvu-portage.txt`, argv
+    in `cmd.txt` there), and the default solver now agrees (the #362
+    `_want_update_pkg` rule keeps the installed `s-1` instead of pulling
+    `NS s-2`); converted from a strict xfail by 02.359 S2."""
     assert _pg34_run(
         emerge_binary,
         fixture_env,
@@ -28209,6 +28273,66 @@ def test_pg34_uapp_default_pvuDN_rebuilds_use_drift(emerge_binary, fixture_env):
     ]
 
 
+def test_pg34_dtop_default_pvu_plans_top_only(emerge_binary, fixture_env):
+    """#362 S2: `-pvu` (no `-D`) on pg34-dtop plans only `N dtop`: without
+    `--deep` the installed dep is not wanted for update (Portage
+    `_want_update_pkg`, `lib/_emerge/depgraph.py:7304-7333`, `:8445-8458`).
+
+    Expected rows are Portage 3.0.82.2's plan from the capture
+    `362-dtop-pvu.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (reused unchanged by S0; see `LLM/evidence/2026-10-15-359-s0/matrix.md`);
+    only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-dtop"],
+    ) == [("N", "dev-libs/pg34-dtop-1")]
+
+
+def test_pg34_dtop_default_pvuN_plans_top_only(emerge_binary, fixture_env):
+    """#362 S2: `-pvuN` on pg34-dtop plans only `N dtop` (same rule as
+    `-pvu`: no `--deep`, no update wanted for the dep).
+
+    Expected rows are Portage 3.0.82.2's plan from the capture
+    `362-dtop-pvuN.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (reused unchanged by S0); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuN", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-dtop"],
+    ) == [("N", "dev-libs/pg34-dtop-1")]
+
+
+def test_pg34_uapp_default_pvN_plans_top_only(emerge_binary, fixture_env):
+    """#362 S2: `-pvN` on pg34-uapp plans only `N uapp`: `--newuse` hides the
+    installed `pg34-ulib` for the reinstall, but Portage then drops the edge
+    (`reinstall=True` plus `_ignore_dependency`), so no `R`/`N uextra` rows
+    print.
+
+    Expected rows are Portage 3.0.82.2's plan from the capture
+    `362-uapp-pvN.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (reused unchanged by S0); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvN", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-uapp"],
+    ) == [("N", "dev-libs/pg34-uapp-1")]
+
+
+def test_pg34_uapp_default_pvuN_plans_top_only(emerge_binary, fixture_env):
+    """#362 S2: `-pvuN` on pg34-uapp plans only `N uapp` (same drop as
+    `-pvN`: the update flag does not want the dep without `--deep`).
+
+    Expected rows are Portage 3.0.82.2's plan from the capture
+    `362-uapp-pvuN.txt` in `LLM/evidence/2026-10-15-plan-359/portage/`
+    (reused unchanged by S0); only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuN", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-uapp"],
+    ) == [("N", "dev-libs/pg34-uapp-1")]
+
+
 def test_pg34_app_default_pvuD_expands_fresh_dep(emerge_binary, fixture_env):
     """#34 S3 default-solver lock: Portage 3.0.82.2's plan from the
     container capture `LLM/evidence/2026-10-15-34-s3/cap-pg34-app-pvuD-portage.txt`
@@ -28242,8 +28366,8 @@ def test_pg34_dtop_pubgrub_pvu_plans_top_only(emerge_binary, fixture_env):
     `LLM/evidence/2026-10-15-34-s4/cap-pg34-dtop-pvu-portage.txt` (argv in
     `cmd.txt` there); only the `[ebuild]` rows are pinned. Without `--deep`
     the installed dep stays (this cell already matched; the S4 switches must
-    not update it). No default pin: the default solver plans `U dlib-2`
-    here (backlog candidate)."""
+    not update it). The default-solver twin is pinned by
+    `test_pg34_dtop_default_pvu_plans_top_only` (#362 S2)."""
     assert _pg34_run(
         emerge_binary,
         fixture_env,
