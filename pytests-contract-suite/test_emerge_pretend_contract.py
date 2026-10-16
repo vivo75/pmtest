@@ -448,7 +448,8 @@ CASES = [
     ("-pvu: kept installed dep stays a leaf (pg34-app, #34 S2)", ["--pretend", "-v", "--update", "dev-libs/pg34-app"], 0),
     ("-pvuD: installed dep uses vdb USE, no uextra (pg34-uapp, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-uapp"], 0),
     ("-pvuDN: USE drift reinstalls the installed dep (pg34-uapp, #34 S3/S4)", ["--pretend", "-v", "--update", "--deep", "--newuse", "dev-libs/pg34-uapp"], 0),
-    ("-pvuD: installed, already-built parent plans nothing (pg34-blib, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-blib"], 0),
+    ("-pvuD: installed parent's BDEPEND upgrades without --usepkg=n (pg34-blib, #361 S1)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-blib"], 0),
+    ("-pvuD --getbinpkg=n --usepkg=n: installed parent plans nothing (pg34-blib, #361 S1)", ["--pretend", "-v", "--update", "--deep", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-blib"], 0),
     ("-pvuD --with-bdeps=n: installed parent plans nothing (pg34-blib, #34 S3)", ["--pretend", "-v", "--update", "--deep", "--with-bdeps=n", "dev-libs/pg34-blib"], 0),
     ("-pvuD: fresh dep of an installed dep still expands (pg34-app, #34 S3)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-app"], 0),
     ("-pvuD: installed dep upgrades in its slot (pg34-dtop, #34 S4)", ["--pretend", "-v", "--update", "--deep", "dev-libs/pg34-dtop"], 0),
@@ -28091,15 +28092,51 @@ def test_pg34_gapp_pubgrub_pvuD_expands_installed_only(emerge_binary, fixture_en
     ) == [("N", "dev-libs/pg34-gextra-1"), ("N", "dev-libs/pg34-gapp-1")]
 
 
+def test_pg34_blib_default_pvuD_binflags_plans_nothing(emerge_binary, fixture_env):
+    """#361 S1: `-pvuD --getbinpkg=n --usepkg=n` on pg34-blib plans nothing.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-plan-359/portage/361-blib-pvuD.txt` (argv in
+    `cells.txt` there: `Total: 0`); only the `[ebuild]` rows are pinned.
+    An explicit `--usepkg=n` presents the `--usepkg` key (stored `False`,
+    `_emerge/main.py:1109-1114`), which turns `bdeps=auto` off
+    (`create_depgraph_params.py:97-103`), so the installed parent's BDEPEND
+    is not traversed — the same rule that makes bare `--usepkg`/`-k`,
+    `EMERGE_DEFAULT_OPTS=--usepkg=n` and `FEATURES=getbinpkg` plan nothing
+    (S0 matrix group C, `LLM/evidence/2026-10-15-359-s0/matrix.md`)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pvuD", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg34-blib"],
+    ) == []
+
+
+def test_pg34_blib_default_pvuD_upgrades_btool(emerge_binary, fixture_env):
+    """#361 S1: plain `-pvuD` on pg34-blib plans `U pg34-btool-2`.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-15-plan-359/portage/361-blib-pvuD-noflags.txt`
+    (argv in `cells.txt` there); only the `[ebuild]` rows are pinned.
+    With no `--usepkg` key anywhere, `bdeps=auto` stays on, so the
+    installed parent's BDEPEND upgrades like any other dep — the old
+    CASES label ("plans nothing") was false for this argv."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pvuD", "dev-libs/pg34-blib"]) == [
+        ("U", "dev-libs/pg34-btool-2")
+    ]
+
+
 def test_pg34_blib_pubgrub_pvuD_plans_nothing(emerge_binary, fixture_env):
     """#34 S3 non-regression: `-pvuD` on pg34-blib plans nothing.
 
     Expected rows are Portage 3.0.82.2's plan from the container capture
     `LLM/evidence/2026-10-15-34-s3/cap-pg34-blib-pvuD-portage.txt` (argv in
-    `cmd.txt` there: `Total: 0`): an installed, already-built parent's BDEPEND
-    is not traversed for update when the parent itself is not merged. The
-    installed-BDEPEND fold stays cut pending bed evidence; this cell guards the
-    cut against over-merging (`U pg34-btool`)."""
+    `cmd.txt` there: `Total: 0`): the argv's explicit `--usepkg=n` presents
+    the `--usepkg` key, which turns `bdeps=auto` off
+    (`create_depgraph_params.py:97-103`, #361 S1), so the installed
+    parent's BDEPEND is not traversed. Without the bin flags Portage plans
+    `U pg34-btool-2` (`361-blib-pvuD-noflags.txt`), which `--solver=pubgrub`
+    still does not (residue #390); this cell guards the bin-flags shape
+    against over-merging (`U pg34-btool`)."""
     assert (
         _pg34_run(
             emerge_binary,
@@ -28115,7 +28152,9 @@ def test_pg34_blib_pubgrub_pvuD_nobdeps_plans_nothing(emerge_binary, fixture_env
 
     Expected rows are Portage 3.0.82.2's plan from the container capture
     `LLM/evidence/2026-10-15-34-s3/cap-pg34-blib-pvuD-nobdeps-portage.txt`
-    (argv in `cmd.txt` there: `Total: 0`, identical to the with-bdeps run)."""
+    (argv in `cmd.txt` there: `Total: 0`): the explicit `--with-bdeps=n`
+    turns build-dep traversal off outright (and the argv's `--usepkg=n`
+    key would turn `bdeps=auto` off on its own, #361 S1)."""
     assert (
         _pg34_run(
             emerge_binary,
