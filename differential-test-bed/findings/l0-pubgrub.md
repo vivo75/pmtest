@@ -16,6 +16,20 @@ Evidence: portuale `LLM/evidence/2026-10-15-34-s5/` (`modes-e.md`, `triage.md`).
 
 Final run (Z, after the S6 refactor, 2026-10-15): runs `l0-20261015T155330Z` … `l0-20261015T164057Z`, all five modes 0/0/0/0/0 after allowlist; default-solver run `l0-20261015T170422Z` 0/448/0/0/0, unchanged since S0.
 
-## 2026-10-16 — #367 S4: pubgrub `-pvuD` / `-pve` modes not run
+## 2026-10-16 — #367 S4: pubgrub `-pvuD` / `-pve` bed runs
 
-#367 changes the pubgrub switch value only for deep-without-update; both bed modes `-pvuD` and `-pve` have update=true so their counted categories are unchanged by construction; the actual bed run is NOT done (no bed image on the host) and is left for the owner (residue #374).
+The first note on this date said the bed could not run (no image). That was
+wrong: `localhost/test-portuale:latest` exists. Both modes were run on the
+branch `backlog/359-default-solver-update` (portuale `fb4648d5`, so after #367,
+#361, #362, #359 and #360), 117 probes each, `--getbinpkg=n --usepkg=n`:
+
+| mode | run | missing/extra/version/action/exit (unexplained) |
+|---|---|---|
+| -pvuD | `l0-20261016T185128Z` | 0/0/0/0/0 |
+| -pve | `l0-20261016T190945Z` | 0/0/0/0/0 |
+
+Same as the 2026-10-15 final run. Default solver `-pv` (same branch, full run
+with multi-graph and invariants, `l0-20261016T184032Z`): set categories 0, 31
+unexplained rows (14 order, 9 advice, 6 error, 2 truncated), in line with the
+historical default-mode residue of about 32 (15 order); 120 invariant probes,
+0 violations.
