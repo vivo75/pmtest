@@ -66,6 +66,19 @@ if [ -d /porttest-overlay ] && grep -q '^porttest/' "$ATOMLIST"; then
     >> /etc/portage/make.conf
 fi
 
+# `L1_CONSUME_INSTALL_MASK="<patterns>"` (backlog #358, opt-in): append
+# the patterns to make.conf's INSTALL_MASK, in `${INSTALL_MASK}`-append
+# form so a mask already there (see above) is kept. Set in make.conf
+# (the resolved-config layer) so BOTH PMs read it identically. A
+# differing-image reinstall then makes both PMs delete real files on a
+# live system -- documentation trees only, harmless -- which is what
+# lets the gate see the stale-file bug class (#354).
+if [ -n "${L1_CONSUME_INSTALL_MASK:-}" ]; then
+  printf 'INSTALL_MASK="${INSTALL_MASK} %s"\n' "$L1_CONSUME_INSTALL_MASK" \
+    >> /etc/portage/make.conf
+  log "L1_CONSUME_INSTALL_MASK: ${L1_CONSUME_INSTALL_MASK}"
+fi
+
 # Both containers must start from an IDENTICAL `/` -- so BOTH upgrade
 # portage to <PIN> (the portage consumer merges with it; the portuale
 # consumer just needs the installed state to match). `-1` (oneshot) so
@@ -88,6 +101,21 @@ while IFS= read -r line || [ -n "$line" ]; do
 done < "$ATOMLIST"
 
 installed_cpvs > "$OUT.installed-before.txt"
+
+# Pre-merge CONTENTS snapshot (backlog #358): copy every installed
+# package's CONTENTS now, before the vdb conversions below rewrite
+# /var/db/pkg (the `mrg --vdb-backend` / FUSE-mount paths). The path
+# list further down also emits these pre-merge paths for replaced or
+# reinstalled cpvs, so a file one PM deletes and the other keeps is
+# still compared (it is in neither post-merge CONTENTS).
+rm -rf "$OUT.pre-contents"
+mkdir -p "$OUT.pre-contents"
+while read -r _cpv; do
+  _cat="${_cpv%%/*}"; _pf="${_cpv#*/}"
+  [ -f "/var/db/pkg/$_cat/$_pf/CONTENTS" ] || continue
+  mkdir -p "$OUT.pre-contents/$_cat/$_pf"
+  cp -a "/var/db/pkg/$_cat/$_pf/CONTENTS" "$OUT.pre-contents/$_cat/$_pf/CONTENTS"
+done < "$OUT.installed-before.txt"
 log "merging ${#atoms[@]} atoms (+deps) from \$PKGDIR with $($EM --version 2>/dev/null | head -1 || echo "$PM")"
 
 # `L1_CONSUME_REINSTALL=1` (the merge-path safety gate atomlist): the set
@@ -227,12 +255,41 @@ log "merged $(wc -l < "$OUT.merged-cpvs.txt") packages"
 # lines include shared parents like /usr/lib64), plus any CONFIG_PROTECT
 # `._cfg*` files the merge created and the env-update targets it
 # rewrites. /var/db/pkg is NOT here -- compared via the vdb.tar.
+#
+# Paths are extracted following Portage's `_contents_re`
+# (`lib/portage/dbapi/vartree.py:1951-1958`, backlog #357): `obj` strips
+# ` <md5> <mtime>` from the right, `sym` cuts at the LAST ` -> ` (greedy,
+# so a target containing ` -> ` mis-splits exactly as Portage splits it),
+# `dir`/`dev`/`fif` take the rest of the line. A non-matching line is
+# skipped, as Portage skips it. (The old `awk '{print $2}'` split on
+# whitespace and broke on paths with spaces.)
+contents_paths() { # $1 = CONTENTS file
+  sed -E -n \
+    -e '/^obj /{s/^obj //; s/ [^ ]+ [0-9]+$//; t emit; d}' \
+    -e '/^sym /{s/^sym //; s/ [0-9]+$//; t sym_rest; d; :sym_rest; s/(.*) -> .*/\1/; t emit; d}' \
+    -e '/^(dir|dev|fif) /{s/^[^ ]+ //; /^$/d; t emit; d}' \
+    -e 'd; :emit; p' "$1"
+}
 {
   while read -r cpv; do
     cat="${cpv%%/*}"; pf="${cpv#*/}"
     d="/var/db/pkg/$cat/$pf"
-    [ -f "$d/CONTENTS" ] && awk '$1=="obj"||$1=="sym"||$1=="dir" {print $2}' "$d/CONTENTS"
+    [ -f "$d/CONTENTS" ] && contents_paths "$d/CONTENTS"
   done < "$OUT.merged-cpvs.txt"
+  # Pre-merge paths (backlog #358, observation only, always on): for
+  # every cpv installed before the merge that is either gone afterwards
+  # (replaced by an upgrade) or re-merged now (listed in merged-cpvs),
+  # also emit its pre-merge CONTENTS paths. A file one PM deletes and
+  # the other keeps is in neither post-merge CONTENTS, so without this
+  # the snapshot never sees it.
+  while read -r cpv; do
+    cat="${cpv%%/*}"; pf="${cpv#*/}"
+    if ! grep -qxF "$cpv" "$OUT.installed-after.txt" \
+        || grep -qxF "$cpv" "$OUT.merged-cpvs.txt"; then
+      pre="$OUT.pre-contents/$cat/$pf/CONTENTS"
+      [ -f "$pre" ] && contents_paths "$pre"
+    fi
+  done < "$OUT.installed-before.txt"
   find /etc -name '._cfg????_*' 2>/dev/null
   printf '%s\n' \
     /var/lib/portage/world /var/lib/portage/config \

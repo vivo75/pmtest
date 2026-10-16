@@ -116,6 +116,16 @@ Output: `differential-test-bed/logs/l1-<timestamp>/` (`portage.*` / `portuale.*`
 
 Env: `L1_REBUILD=1` (wipe the pkgcache), `L1_SKIP_BUILD=1` (reuse it),
 `L1_JOBS`, `L1_SKIP_PORTAGE_UPGRADE`, `PORTTEST_IMAGE`, `PORTTEST_PODMAN`.
+`L1_CONSUME_REINSTALL=1` forces both PMs to re-merge the already-installed
+set (the merge-path safety gate's glibc/bash cell);
+`L1_CONSUME_INSTALL_MASK="<patterns>"` (opt-in, backlog #358) appends the
+patterns to make.conf's `INSTALL_MASK` in both consumers before the merge,
+so a reinstall deletes real files (doc trees only, e.g.
+`"/usr/share/doc /usr/share/info /usr/share/man"`) and the gate sees the
+stale-file bug class. The snapshot's path list always includes the
+**pre-merge** `CONTENTS` paths of replaced or reinstalled packages
+(copied to `<run>/<pm>.pre-contents/` before the merge), because a file
+one PM deletes and the other keeps is in neither post-merge `CONTENTS`.
 
 > **Do not pass `L1_SKIP_PORTAGE_UPGRADE=1` for L1.** The image's base
 > portage (`3.0.81.3`) predates the VDB **consolidated `metadata` file**

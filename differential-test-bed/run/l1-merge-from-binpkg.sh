@@ -15,6 +15,10 @@
 #      L1_PORTUALE_VDB=sqlite|redb (portuale merges through mrg --vdb-backend=<kind>)
 #      L1_PORTAGE_VDB_MOUNT=sqlite|redb (Portage merges through
 #        `portuale vdb mount --rw` over a database of that kind; #317)
+#      L1_CONSUME_INSTALL_MASK="<patterns>" (opt-in, #358: appended to
+#        make.conf's INSTALL_MASK in both consumers before the merge, so
+#        a reinstall deletes real files -- doc trees only -- and the gate
+#        sees the stale-file bug class; use with L1_CONSUME_REINSTALL=1)
 #      (`--reinstall`: force both PMs to re-merge an already-installed
 #      set -- the merge-path safety gate's glibc/bash cell).
 #
@@ -80,6 +84,7 @@ consume() {  # pm
     -e PKGDIR=/pkgs \
     -e "L1_SKIP_PORTAGE_UPGRADE=${L1_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L1_CONSUME_REINSTALL=${L1_CONSUME_REINSTALL:-0}" \
+    -e "L1_CONSUME_INSTALL_MASK=${L1_CONSUME_INSTALL_MASK:-}" \
     -e "L1_PORTUALE_VDB=${L1_PORTUALE_VDB:-files}" \
     -e "L1_PORTAGE_VDB_MOUNT=${L1_PORTAGE_VDB_MOUNT:-}" \
     --entrypoint /bin/bash "$IMAGE" \

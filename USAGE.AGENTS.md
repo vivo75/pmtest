@@ -17,7 +17,14 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 2. `differential-test-bed/run/l0-resolver.sh` e `differential-test-bed/run/l1-merge-from-binpkg.sh` —
    differential su albero reale (serve `localhost/test-portuale:latest`;
    poi `l0-fixture-oracle.sh`, `l2-portuale-builder.sh`,
-   `l3-source-parity.sh`). Variante VM (serve `vm/work/golden.qcow2`,
+   `l3-source-parity.sh`). L1: `L1_CONSUME_REINSTALL=1` forza il re-merge
+   del set già installato (cella glibc/bash del merge-path safety gate);
+   `L1_CONSUME_INSTALL_MASK="<pattern>"` (opt-in, backlog #358) accende
+   `INSTALL_MASK` in entrambi i consumer prima del merge così il
+   reinstall cancella file veri (solo doc) e il gate vede le
+   cancellazioni; la path list dello snapshot include sempre anche i
+   path dei `CONTENTS` pre-merge dei pacchetti sostituiti o reinstallati
+   (`<run>/<pm>.pre-contents/`). Variante VM (serve `vm/work/golden.qcow2`,
    vedi `differential-test-bed/vm/README.md`):
    `differential-test-bed/run/l0-resolver-vm.sh [atomlist]`
    (report `l0-vm-*`, mai `l0-*`),
