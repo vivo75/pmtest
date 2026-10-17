@@ -1,0 +1,9 @@
+DEFINED_PHASES=compile install
+DESCRIPTION=t355 preserve-libs probe mid library
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+RESTRICT=strip
+SLOT=0
+_md5_=48be264615be29c46ce18677a13e0216

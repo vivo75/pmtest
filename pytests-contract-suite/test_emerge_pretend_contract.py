@@ -29432,3 +29432,105 @@ def test_pg34_snew_default_pvud_keeps_soft_block_unresolved(emerge_binary, fixtu
     assert _pg34_snew_block_lines(result.stdout) == [
         '[blocks B      ] dev-libs/pg34-sblk ("dev-libs/pg34-sblk" is soft blocking dev-libs/pg34-snew-1)'
     ]
+
+
+def _t355_configroot(tmp_path, fixtures_root):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #355 S2
+    cell: the shared fixture repos plus the standalone `repo-355` overlay
+    (never `fixtures/etc` itself), `make.profile` at the fixture default
+    profile. Mirrors `_t348_configroot`, except `ROOT` is a scratch root
+    (S0's `run.sh` shape: config under `cfg/`, merges into `root/`), with
+    `PORTAGE_TMPDIR`/`DISTDIR` isolated per test and `PORTAGE_RUNNING_ROOT`
+    pinned at that root so vdb lookups stay hermetic. `FEATURES` disables
+    the sandboxes like the S0 capture root, so real merges work
+    unprivileged; the `LDPATH` seed is S0's `seed_ld`. The image variant
+    starts at `T355_V="1"` (a config var, so phases see it); the test
+    rewrites it to `"2"` between merges."""
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t355]\nlocation = {fixtures_root / 'repo-355'}\npriority = 50\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\n'
+        'FEATURES="-sandbox -usersandbox -network-sandbox"\n'
+        'T355_V="1"\n'
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    root = tmp_path / "root"
+    (root / "etc/env.d").mkdir(parents=True)
+    (root / "etc/env.d/50t355").write_text('LDPATH="/usr/lib64"\n')
+    (tmp_path / "distdir").mkdir(exist_ok=True)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["DISTDIR"] = str(tmp_path / "distdir")
+    return env
+
+
+def _t355_merge(emerge_binary, env, atom):
+    """One real `emerge` of an exact atom in the #355 hermetic root."""
+    result = subprocess.run(
+        [str(emerge_binary), "--ignore-default-opts", "-1", atom],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (atom, result.stdout, result.stderr)
+    return result
+
+
+def test_t355_same_version_reinstall_keeps_a_lib_only_the_just_preserved_lib_needs(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #355 S2: a same-version reinstall must keep a
+    registry-preserved library whose only remaining consumer is the
+    library the reinstall itself just preserved.
+
+    Expected values from Portage 3.0.82.2, S0 cell P1 (not from portuale
+    output): base-1, mid-1 (v1, `NEEDED libt355base.so.1`), app-1 (v1,
+    `NEEDs` only `libt355mid.so.1`); upgrade to base-2 (ships only
+    `.so.2`, so `.so.1` is preserved); reinstall `=t355-mid-1` with
+    `T355_V=2` (drops `libt355mid.so.1`). Portage keeps
+    `/usr/lib64/libt355base.so.1` on disk and holds both registry
+    records (`app-misc/t355-base:0` under `app-misc/t355-base-2`,
+    `app-misc/t355-mid:0` under `app-misc/t355-mid-1`); pre-fix portuale
+    deletes `libt355base.so.1` and loses the base record. Counters are
+    not pinned (merge-count dependent); cpv owners and path lists are.
+    """
+    if shutil.which("gcc") is None:
+        pytest.skip("the t355 ebuilds compile C sources in src_compile")
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    for atom in (
+        "=app-misc/t355-base-1",
+        "=app-misc/t355-mid-1",
+        "=app-misc/t355-app-1",
+    ):
+        _t355_merge(emerge_binary, env, atom)
+    _t355_merge(emerge_binary, env, "=app-misc/t355-base-2")
+    make_conf = Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/make.conf"
+    make_conf.write_text(make_conf.read_text().replace('T355_V="1"', 'T355_V="2"'))
+    _t355_merge(emerge_binary, env, "=app-misc/t355-mid-1")
+    assert (root / "usr/lib64/libt355mid.so.1").is_file()
+    assert (root / "usr/lib64/libt355base.so.1").is_file()
+    registry = json.loads(
+        (root / "var/lib/portage/preserved_libs_registry").read_text()
+    )
+    assert registry["app-misc/t355-base:0"][0] == "app-misc/t355-base-2"
+    assert registry["app-misc/t355-base:0"][2] == ["/usr/lib64/libt355base.so.1"]
+    assert registry["app-misc/t355-mid:0"][0] == "app-misc/t355-mid-1"
+    assert registry["app-misc/t355-mid:0"][2] == ["/usr/lib64/libt355mid.so.1"]
