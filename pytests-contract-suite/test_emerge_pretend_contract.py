@@ -36,6 +36,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 
@@ -29575,3 +29576,191 @@ def test_t355_space_paths_survive_merge_and_unmerge_as_portage_records_them(
     assert not (root / "usr/share/t355/c d").is_symlink()
     assert not (root / "usr/share/t355/sp dir/f").exists()
     assert (root / "usr/share/t355/a").read_text() == "decoy"
+
+
+def _t355_unmerge(emerge_binary, env, atom):
+    """One real `emerge -C` in the #355 hermetic root."""
+    result = subprocess.run(
+        [str(emerge_binary), "--ignore-default-opts", "-C", atom],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (atom, result.stdout, result.stderr)
+    return result
+
+
+def _t355_edit_keep(path):
+    """Append one line and restore the mtime, like S0's `editkeep`."""
+    data = path.read_bytes()
+    mtime_ns = path.stat().st_mtime_ns
+    path.write_bytes(data + b"admin edit\n")
+    os.utime(path, ns=(mtime_ns, mtime_ns))
+
+
+def test_t355_protected_md5_only_drift_survives_unmerge(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S4: a protected file whose content was edited with its
+    mtime put back differs only in md5, so unmerge keeps it.
+
+    Expected values from Portage 3.0.82.2, S0 cell M1 (not from portuale
+    output): `--- !md5`, kept. Pre-fix portuale removed it (mtime-only
+    check under the default `FEATURES=unmerge-orphans`).
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-m1-1")
+    live = root / "etc/t355/mod.conf"
+    _t355_edit_keep(live)
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-m1")
+    assert live.is_file(), "an md5-only drift must survive unmerge (S0 M1)"
+
+
+def test_t355_obj_replaced_by_a_directory_unmerges_cleanly(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S4: a recorded `obj` replaced on disk by a directory
+    must skip, not abort the whole unmerge.
+
+    Expected values from Portage 3.0.82.2, S0 cells T1a/T1b (not from
+    portuale output): T1a (new mtime) `--- !mtime`, T1b (recorded mtime
+    restored) `--- !obj`; rc 0 and the vdb entry gone in both. Pre-fix
+    portuale errored out (EISDIR) in the orphan arm, rc 1, vdb left stale.
+    """
+    for variant, restore_mtime in (("t1a", False), ("t1b", True)):
+        sub = tmp_path / variant
+        sub.mkdir()
+        env = _t355_configroot(sub, fixtures_root)
+        root = Path(env["ROOT"])
+        _t355_merge(emerge_binary, env, "=app-misc/t355-t1-1")
+        live = root / "usr/share/t355/o"
+        recorded_mtime = int(
+            (root / "var/db/pkg/app-misc/t355-t1-1/CONTENTS")
+            .read_text()
+            .split("obj /usr/share/t355/o ")[1]
+            .split()[-1]
+        )
+        live.unlink()
+        live.mkdir()
+        (live / "f").write_text("admin file\n")
+        if restore_mtime:
+            os.utime(live, (recorded_mtime, recorded_mtime))
+        _t355_unmerge(emerge_binary, env, "app-misc/t355-t1")
+        assert (live / "f").is_file(), f"{variant}: the directory must survive"
+        assert not (
+            root / "var/db/pkg/app-misc/t355-t1-1"
+        ).exists(), f"{variant}: the vdb entry must be gone"
+
+
+def test_t355_fifo_unlinked_by_default_and_kept_without_orphans(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S4: a fifo goes through the orphan arm under default
+    FEATURES and is kept with `-unmerge-orphans`.
+
+    Expected values from Portage 3.0.82.2, S0 cells F1a/F1b (not from
+    portuale output): F1a `<<< fif` removed, F1b `--- fif` kept. Pre-fix
+    portuale kept it in both modes (the orphan arm covered only
+    `obj`/`sym`).
+    """
+    sub = tmp_path / "f1a"
+    sub.mkdir()
+    env = _t355_configroot(sub, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-f1-1")
+    assert stat.S_ISFIFO(
+        os.lstat(root / "usr/share/t355/p").st_mode
+    ), "the merge must install a real fifo"
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-f1")
+    assert not os.path.lexists(root / "usr/share/t355/p"), "F1a: fifo removed"
+
+    sub = tmp_path / "f1b"
+    sub.mkdir()
+    env = _t355_configroot(sub, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-f1-1")
+    env_no_orphans = dict(env)
+    env_no_orphans["FEATURES"] = "-unmerge-orphans"
+    _t355_unmerge(emerge_binary, env_no_orphans, "app-misc/t355-f1")
+    assert os.path.lexists(root / "usr/share/t355/p"), "F1b: fifo kept"
+
+
+def test_t355_disabled_orphan_arm_survives_reinstall_and_unmerge(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S4: `FEATURES=-unmerge-orphans` is honoured by the
+    replace loop and by `emerge -C`.
+
+    Expected values from Portage 3.0.82.2, S0 cells B1a/B1b (not from
+    portuale output): `--- !md5 dropmod` + `--- !mtime droptouch`, both
+    kept, while the untouched `keep` still goes. Pre-fix portuale removed
+    both (`unmerge_orphans` was always true on these paths).
+    """
+
+    def planted(env):
+        root = Path(env["ROOT"])
+        _t355_merge(emerge_binary, env, "=app-misc/t355-drop-1")
+        _t355_edit_keep(root / "usr/share/t355/dropmod")
+        os.utime(root / "usr/share/t355/droptouch", (978307200, 978307200))
+        return root
+
+    # B1b: the same files through `emerge -C`.
+    sub = tmp_path / "b1b"
+    sub.mkdir()
+    env = _t355_configroot(sub, fixtures_root)
+    root = planted(env)
+    env_no_orphans = dict(env)
+    env_no_orphans["FEATURES"] = "-unmerge-orphans"
+    _t355_unmerge(emerge_binary, env_no_orphans, "app-misc/t355-drop")
+    assert not (root / "usr/share/t355/keep").exists()
+    assert (root / "usr/share/t355/dropmod").is_file()
+    assert (root / "usr/share/t355/droptouch").is_file()
+
+    # B1a: reinstall v2 (which drops both files) with `-unmerge-orphans`.
+    sub = tmp_path / "b1a"
+    sub.mkdir()
+    env = _t355_configroot(sub, fixtures_root)
+    root = planted(env)
+    make_conf = Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/make.conf"
+    make_conf.write_text(make_conf.read_text().replace('T355_V="1"', 'T355_V="2"'))
+    env_no_orphans = dict(env)
+    env_no_orphans["FEATURES"] = "-unmerge-orphans"
+    _t355_merge(emerge_binary, env_no_orphans, "=app-misc/t355-drop-1")
+    # `keep` ships in v2 too, so the reinstall refreshes it; the dropped
+    # files survive only through the honoured `-unmerge-orphans`.
+    assert (root / "usr/share/t355/keep").is_file()
+    assert (root / "usr/share/t355/dropmod").is_file()
+    assert (root / "usr/share/t355/droptouch").is_file()
+
+
+def test_t355_merged_usr_bin_survives_unmerge(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S4: on a merged-usr ROOT, `emerge -C` of a package
+    recording `dir /bin` must leave `/bin` and `/lib64` in place.
+
+    Expected values from Portage 3.0.82.2, S0 cell C1a (not from portuale
+    output): `<<< obj /bin/t355`, `--- !empty dir /bin`, `/bin` kept while
+    another package records it. Failing-first from S4: green at every
+    commit (the C1b shape, with no other recorder, needs S5's R4b and is
+    not pinned here).
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    (root / "usr/bin").mkdir(parents=True)
+    (root / "usr/lib64").mkdir(parents=True)
+    (root / "bin").symlink_to("usr/bin")
+    (root / "lib64").symlink_to("usr/lib64")
+    (root / "usr/bin/u1").write_text("untracked\n")
+    (root / "usr/lib64/u2").write_text("untracked\n")
+    _t355_merge(emerge_binary, env, "=app-misc/t355-c1a-1")
+    _t355_merge(emerge_binary, env, "=app-misc/t355-c1b-1")
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-c1a")
+    assert not (root / "bin/t355").exists()
+    assert (root / "bin/oth").is_file()
+    assert (root / "bin").is_symlink(), "/bin must survive"
+    assert (root / "lib64").is_symlink(), "/lib64 must survive"
+    assert (root / "usr/bin/u1").is_file()
+    assert (root / "usr/lib64/u2").is_file()

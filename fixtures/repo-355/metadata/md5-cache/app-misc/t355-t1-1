@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=t355 obj-replaced-by-dir probe
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=56ff750ea41d9847914bb498a47fea50

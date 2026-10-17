@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=t355 unmerge-orphans probe
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=7a256aae15b912f78aedc9f444466fd3
