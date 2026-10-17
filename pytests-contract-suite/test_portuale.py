@@ -9567,7 +9567,14 @@ def test_ebuild_network_sandbox_gives_src_phases_a_fresh_network_namespace(
     base_env["ROOT"] = str(tmp_path / "root")
 
     plain_env = dict(base_env)
-    plain_env["FEATURES"] = ""
+    # Negations, not `""`: `FEATURES` folds incrementally over the
+    # resolved config on both package managers (Portage `config.py`), so
+    # an empty value never switches a host-`make.globals` token off.
+    # Backlog #349 S4 reads the resolved list on the direct path too.
+    plain_env["FEATURES"] = (
+        "-network-sandbox -sandbox -usersandbox -userpriv "
+        "-ipc-sandbox -mount-sandbox -pid-sandbox"
+    )
     plain_env["PORTAGE_TMPDIR"] = str(tmp_path / "plain")
     plain = subprocess.run(
         [str(ebuild_binary), ebuild_path, "install"],
@@ -9604,12 +9611,21 @@ def test_ebuild_without_network_sandbox_shares_the_host_network_namespace(
     """Regression guard: with no FEATURES=network-sandbox, src_compile
     runs in the host network namespace exactly as before -- same netns as
     the portuale process, more than just `lo` visible (unless the host
-    itself only has `lo`, hence the tolerant interface check)."""
+    itself only has `lo`, hence the tolerant interface check).
+
+    The negation (not `FEATURES=""`) is what disables a config token:
+    `FEATURES` folds incrementally over the resolved config on both
+    package managers (Portage `config.py`), so an empty value never
+    switches a host-`make.globals` token off. Backlog #349 S4 reads the
+    resolved list on the direct path too, hence the explicit form."""
     ebuild_path = str(
         Path(FIXTURES_ROOT) / "repo/dev-libs/netsandboxpkg/netsandboxpkg-1.0.ebuild"
     )
     env = dict(os.environ)
-    env["FEATURES"] = ""
+    env["FEATURES"] = (
+        "-network-sandbox -sandbox -usersandbox -userpriv "
+        "-ipc-sandbox -mount-sandbox -pid-sandbox"
+    )
     env["ROOT"] = str(tmp_path / "root")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
     result = subprocess.run(
@@ -9711,9 +9727,18 @@ def test_ebuild_without_sandbox_tolerates_the_same_stray_write(
     """Regression guard: with no FEATURES=sandbox, the stray
     /var/lib write just fails with EACCES (it is not fatal on its own),
     the legit file still lands in ${D}, and `ebuild install` exits 0 --
-    exactly as before this slice. No sandbox.log is written."""
+    exactly as before this slice. No sandbox.log is written.
+
+    The negation (not `FEATURES=""`) is what disables a config token:
+    `FEATURES` folds incrementally over the resolved config on both
+    package managers (Portage `config.py`), so an empty value never
+    switches a host-`make.globals` token off. Backlog #349 S4 reads the
+    resolved list on the direct path too, hence the explicit form."""
     env = dict(os.environ)
-    env["FEATURES"] = ""
+    env["FEATURES"] = (
+        "-network-sandbox -sandbox -usersandbox -userpriv "
+        "-ipc-sandbox -mount-sandbox -pid-sandbox"
+    )
     env["ROOT"] = str(tmp_path / "root")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
     result = subprocess.run(
@@ -9749,3 +9774,388 @@ def test_output_into_a_closed_pipe_is_a_quiet_141_not_an_abort(
     proc.stderr.close()
     assert "panicked" not in err and "core dumped" not in err, err
     assert rc in (0, 141), (rc, err)
+
+
+# Backlog #349 S4 (`ebuild` reads its configuration): hermetic
+# per-test configroots plus env-dump pins. Oracle: Portage 3.0.82.2
+# captures -- `LLM/evidence/2026-10-15-346-s0/e/` (S0 cells e01-e08)
+# for the make.conf shapes below, and
+# `LLM/evidence/2026-10-17-346-exec/s4-oracle/` (fresh host-`ebuild`
+# captures of the exact `with_globals` setups) for the resolved
+# `FEATURES` lists. Nothing below comes from portuale's own output.
+
+_S4_FEATURES_BASE = "-sandbox -usersandbox -userpriv -network-sandbox"
+
+# Portage 3.0.82.2, `s4-oracle/g-setup-portage.stagelog`: the resolved
+# `FEATURES` with the host `make.globals` copy plus `test` from
+# `make.conf`. Host-`make.globals`-dependent by the settled design
+# (portuale reads it configroot-relative, Portage from its install
+# path): if the host file changes, re-capture.
+_S4_FEATURES_WITH_TEST = (
+    "assume-digests binpkg-docompress binpkg-dostrip binpkg-logs "
+    "binpkg-multi-instance buildpkg-live compress-index "
+    "config-protect-if-modified distlocks ebuild-locks fixlafiles "
+    "ipc-sandbox merge-sync multilib-strict news parallel-fetch "
+    "pid-sandbox pkgdir-index-trusted preserve-libs protect-owned "
+    "qa-unresolved-soname-deps strict test unknown-features-warn "
+    "unmerge-logs unmerge-orphans userfetch usersync xattr"
+)
+
+# Portage 3.0.82.2, `s4-oracle/e-setup-portage.stagelog`: same setup
+# with `FEATURES=-test` in the calling env, which cancels the
+# `make.conf` token.
+_S4_FEATURES_ENV_WINS = _S4_FEATURES_WITH_TEST.replace(" strict test ", " strict ")
+
+
+def _s4_configroot(tmp_path, fixtures_root, make_conf_extra="", with_globals=False):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #349 S4
+    cells: the shared fixture repos plus the standalone `repo-348`
+    overlay (never `fixtures/etc` itself), `make.profile` at the
+    fixture default profile. `make.conf` holds `PKGDIR`, the
+    sandbox-off `FEATURES` base (real phase runs work unprivileged),
+    a per-test `T348_LOGDIR` (the env-dump ebuild's channel into the
+    test's own dir), plus `make_conf_extra`. With `with_globals` a copy
+    of the host `make.globals` is placed where portuale reads it
+    (`<cfg>/usr/share/portage/config/`); Portage reads its own install
+    copy, which is the same file on this host. Returns the child env
+    (with `DISTDIR`/`PORTAGE_TMPDIR`/`FEATURES` scrubbed so `make.conf`
+    is the only source) plus the configroot path."""
+    fixtures_root = Path(fixtures_root)
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t348]\nlocation = {fixtures_root / 'repo-348'}\npriority = 60\n"
+    )
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\n'
+        f'FEATURES="{_S4_FEATURES_BASE} test"\n'
+        f'T348_LOGDIR="{logs}"\n'
+        + make_conf_extra
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    if with_globals:
+        dest = cfg / "usr/share/portage/config"
+        dest.mkdir(parents=True)
+        shutil.copy("/usr/share/portage/config/make.globals", dest / "make.globals")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    for key in ("DISTDIR", "PORTAGE_TMPDIR", "FEATURES"):
+        env.pop(key, None)
+    return env, cfg
+
+
+def _s4_env_dump(logs, phase_func="pkg_setup"):
+    """The `t348-b-env` dump for one phase: `TAG`/`declare -p` lines keyed
+    by variable name."""
+    out = {}
+    for line in (logs / f"env-{phase_func}.log").read_text().splitlines():
+        if line.startswith("declare -"):
+            try:
+                _, rest = line.split(" ", 1)
+            except ValueError:
+                continue
+            if "=" in rest:
+                name, _, value = rest.partition("=")
+                value = value.strip('"')
+                if name.startswith(("-rx ", "-x ", "-- ")):
+                    name = name.split(" ", 1)[1]
+                out[name] = value
+    return out
+
+
+def test_s4_ebuild_setup_honors_make_conf_tmpdir_and_distdir(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (349-TMP/349-DIST/349-USE/349-ARCH/349-CFG/349-REPO):
+    a direct `ebuild ... setup` with `DISTDIR`/`PORTAGE_TMPDIR` only in
+    `make.conf` builds under the configured tmpdir, splits the actual
+    distdir from the per-package fake, and exports the config values.
+
+    Portage 3.0.82.2, full argv `ebuild t348-b-env-8.ebuild setup`
+    (S0 cells `e01-full`/`e02-nodistdir`/`e03-notmpdir`, rc 0):
+    `PORTAGE_TMPDIR`/`PORTAGE_BUILDDIR` under the `make.conf` value,
+    `PORTAGE_ACTUAL_DISTDIR` the `make.conf` `DISTDIR`,
+    `USE="elibc_glibc"`, `ARCH=""` (the `ARCH="amd64"` scalar filtered
+    against a USE that never names it), `PORTAGE_CONFIGROOT` with its
+    trailing slash, `PORTAGE_REPO_NAME=t348`. (`FEATURES` needs the
+    `make.globals` copy: next pin.)"""
+    dist = tmp_path / "dist"
+    pt = tmp_path / "pt"
+    dist.mkdir()
+    pt.mkdir()
+    env, cfg = _s4_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'DISTDIR="{dist}"\nPORTAGE_TMPDIR="{pt}"\n',
+    )
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-env/t348-b-env-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "setup"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    dump = _s4_env_dump(tmp_path / "logs")
+    assert dump["PORTAGE_TMPDIR"] == str(pt)
+    assert dump["PORTAGE_BUILDDIR"] == str(pt / "portage/app-misc/t348-b-env-8")
+    assert dump["PORTAGE_ACTUAL_DISTDIR"] == str(dist)
+    assert dump["DISTDIR"] == str(pt / "portage/app-misc/t348-b-env-8/distdir")
+    assert dump["USE"] == "elibc_glibc"
+    assert dump["ARCH"] == ""
+    assert dump["PORTAGE_CONFIGROOT"] == str(cfg) + "/"
+    assert dump["PORTAGE_REPO_NAME"] == "t348"
+
+
+def test_s4_ebuild_setup_resolves_features_through_make_globals(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (349-FEAT): with the host `make.globals` copy in
+    the config root, the direct path exports the resolved
+    `FEATURES`/`PORTAGE_FEATURES` list.
+
+    Portage 3.0.82.2, full argv `ebuild t348-b-env-8.ebuild setup`
+    (`s4-oracle/g-setup-portage.stagelog`, rc 0): the host-globals fold
+    plus the `make.conf` `test` token. The expected list below is that
+    capture verbatim; it depends on the host `make.globals` by the
+    settled design, so re-capture if that file changes."""
+    dist = tmp_path / "dist"
+    pt = tmp_path / "pt"
+    dist.mkdir()
+    pt.mkdir()
+    env, cfg = _s4_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'DISTDIR="{dist}"\nPORTAGE_TMPDIR="{pt}"\n',
+        with_globals=True,
+    )
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-env/t348-b-env-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "setup"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    dump = _s4_env_dump(tmp_path / "logs")
+    assert dump["FEATURES"] == _S4_FEATURES_WITH_TEST
+    assert dump["PORTAGE_FEATURES"] == _S4_FEATURES_WITH_TEST
+
+
+def test_s4_ebuild_setup_calling_env_wins_over_make_conf(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (precedence): the calling env wins over
+    `make.conf` for `PORTAGE_TMPDIR`/`DISTDIR`, and the env `FEATURES`
+    folds over the resolved list (here `-test` cancels `make.conf`'s
+    `test`).
+
+    Portage 3.0.82.2, full argv `ebuild t348-b-env-8.ebuild setup`
+    with `PORTAGE_TMPDIR`/`DISTDIR`/`FEATURES=-test` exported (S0 cell
+    `e05-envwins`, rc 0, plus `s4-oracle/e-setup-portage.stagelog` for
+    the `make.globals`-copy setup: the builddir lands under the env
+    tmpdir, `PORTAGE_ACTUAL_DISTDIR` is the env dir, and the resolved
+    list drops `test`)."""
+    dist = tmp_path / "dist"
+    pt = tmp_path / "pt"
+    envtmp = tmp_path / "envtmp"
+    envdist = tmp_path / "envdist"
+    for d in (dist, pt, envtmp, envdist):
+        d.mkdir()
+    env, cfg = _s4_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'DISTDIR="{dist}"\nPORTAGE_TMPDIR="{pt}"\n',
+        with_globals=True,
+    )
+    env["PORTAGE_TMPDIR"] = str(envtmp)
+    env["DISTDIR"] = str(envdist)
+    env["FEATURES"] = "-test"
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-env/t348-b-env-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "setup"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    dump = _s4_env_dump(tmp_path / "logs")
+    assert dump["PORTAGE_TMPDIR"] == str(envtmp)
+    assert dump["PORTAGE_BUILDDIR"] == str(envtmp / "portage/app-misc/t348-b-env-8")
+    assert dump["PORTAGE_ACTUAL_DISTDIR"] == str(envdist)
+    assert dump["FEATURES"] == _S4_FEATURES_ENV_WINS
+    assert dump["PORTAGE_FEATURES"] == _S4_FEATURES_ENV_WINS
+
+
+def test_s4_ebuild_package_uses_multi_instance_layout_from_resolved_features(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (351-BIN, Q5 default): with `binpkg-multi-instance`
+    in the resolved `FEATURES` (host `make.globals` copy), a direct
+    `ebuild ... package` writes the multi-instance layout instead of the
+    flat one.
+
+    Portage 3.0.82.2, full argv `ebuild t348-b-env-8.ebuild package`
+    (S0 cell `e06-makeglobals-package`, rc 0,
+    `e06-makeglobals-package-portage.pkgfind`):
+    `<pkgdir>/app-misc/t348-b-env/t348-b-env-8-1.gpkg.tar` plus the
+    `Packages` index. (`Packages.gz`, which Portage also writes, is out
+    of scope for this slice.)"""
+    pt = tmp_path / "pt"
+    pt.mkdir()
+    env, cfg = _s4_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'PORTAGE_TMPDIR="{pt}"\n',
+        with_globals=True,
+    )
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-env/t348-b-env-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "package"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    pkgdir = cfg / "pkgdir"
+    assert (
+        pkgdir / "app-misc/t348-b-env/t348-b-env-8-1.gpkg.tar"
+    ).is_file(), "multi-instance layout follows the resolved FEATURES"
+    assert (pkgdir / "Packages").is_file()
+
+
+def test_s4_ebuild_fetch_uses_make_conf_distdir(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (349-DIST, direct path): with `DISTDIR` only in
+    `make.conf`, fetching finds a pre-seeded distfile there (the
+    already-verified skip path, no network).
+
+    `dev-libs/verifiedfetchpkg` carries a real `SRC_URI` with real
+    digests; fetching consults `PORTAGE_ACTUAL_DISTDIR`, i.e. the
+    `make.conf` value here. Portage 3.0.82.2 honors `make.conf`
+    `DISTDIR` on its fetch path (S0 cell `e07-fetchonly-distdir`:
+    the file lands in the configured dir); portuale has no
+    `--fetchonly`, so the direct `install` over a seeded dir is the
+    vehicle, and a wrong dir fails (fetch attempts the dead
+    `example.invalid` URI)."""
+    dist = tmp_path / "dist"
+    pt = tmp_path / "pt"
+    dist.mkdir()
+    pt.mkdir()
+    (dist / "verifiedfetchpkg-1.0.tar.gz").write_bytes(
+        b"hello from verifiedfetchpkg\n"
+    )
+    env, cfg = _s4_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'DISTDIR="{dist}"\nPORTAGE_TMPDIR="{pt}"\n',
+    )
+    env.pop("GENTOO_MIRRORS", None)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo/dev-libs/verifiedfetchpkg/verifiedfetchpkg-1.0.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "install"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+
+
+def test_s4_ebuild_die_names_the_repo_from_the_config(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (349-REPO): the direct path exports
+    `PORTAGE_REPO_NAME`, so `die` prints `::<repo>`.
+
+    Portage 3.0.82.2, full argv `ebuild t348-b-envnoeapply-7.ebuild
+    prepare` (S0 cell `e08-die-repo`, rc 1): the die block carries
+    `::t348` plus the `build.log` line. The stream move to stdout and
+    the log file itself are S6's (`351-DIE`); this pin only covers the
+    repo suffix, on whichever stream it currently prints."""
+    pt = tmp_path / "pt"
+    pt.mkdir()
+    env, cfg = _s4_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'PORTAGE_TMPDIR="{pt}"\n',
+    )
+    ebuild_path = str(
+        Path(fixtures_root)
+        / "repo-348/app-misc/t348-b-envnoeapply/t348-b-envnoeapply-7.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "prepare"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert "::t348" in result.stdout + result.stderr
+
+
+def test_s4_unmerge_honors_make_conf_clean_delay(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #349 S4 (`CLEAN_DELAY`, adjacent to 351-LIST): `emerge -C`
+    reads the delay from the resolved config (calling env highest), so
+    `CLEAN_DELAY="0"` in `make.conf` skips the countdown without any env
+    override.
+
+    Portage 3.0.82.2 honors `CLEAN_DELAY="0"` from `make.conf` (S0 cell
+    `l04`, no `Waiting ...` lines); the suite-wide autouse fixture
+    exports it via the env instead, so this pin scrubs the env to prove
+    the config read."""
+    fixtures_root = Path(fixtures_root)
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t348]\nlocation = {fixtures_root / 'repo-348'}\npriority = 60\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\nCLEAN_DELAY="0"\n'
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    root = tmp_path / "root"
+    (root / "tmp").mkdir(parents=True)
+    pt = tmp_path / "pt"
+    pt.mkdir()
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["BROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(pt)
+    env.pop("CLEAN_DELAY", None)
+    merged = subprocess.run(
+        [str(emerge_binary), "--oneshot", "=app-misc/t348-d-unmerge-1"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert merged.returncode == 0, (merged.stdout, merged.stderr)
+    removed = subprocess.run(
+        [str(emerge_binary), "-C", "=app-misc/t348-d-unmerge-1"], capture_output=True,
+        text=True, check=False, env=env,
+    )
+    assert removed.returncode == 0, (removed.stdout, removed.stderr)
+    assert "Waiting" not in removed.stdout
+    assert "Control-C" not in removed.stdout
+    assert not (root / "var/db/pkg/app-misc/t348-d-unmerge-1").exists()
