@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=t355 dir-symlink all-owned probe
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=488eb395dedf9b3ef6b48fc7cda004c5

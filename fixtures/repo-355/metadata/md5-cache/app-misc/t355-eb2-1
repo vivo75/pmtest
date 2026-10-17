@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=t355 dir-symlink probe B (same path as A)
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=e207e46f9ba128d23d54422c7e5aef3e

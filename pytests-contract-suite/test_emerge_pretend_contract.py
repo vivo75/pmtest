@@ -29764,3 +29764,195 @@ def test_t355_merged_usr_bin_survives_unmerge(
     assert (root / "lib64").is_symlink(), "/lib64 must survive"
     assert (root / "usr/bin/u1").is_file()
     assert (root / "usr/lib64/u2").is_file()
+
+
+def _t355_unmerge_out(emerge_binary, env, atom):
+    """One real `emerge -C`, returning stdout for the R4b elog pins."""
+    result = subprocess.run(
+        [str(emerge_binary), "--ignore-default-opts", "-C", atom],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (atom, result.stdout, result.stderr)
+    return result.stdout
+
+
+def test_t355_uninstall_ignore_literal_drops_the_default(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: a literal `UNINSTALL_IGNORE` replaces the default.
+
+    Expected values from Portage 3.0.82.2, S0 cell U1a (not from portuale
+    output): `--- cfgpro obj …/ign/x` kept, `<<< obj …/m.ko` removed — the
+    literal form drops the make.globals `/lib/modules/*` default. Pre-fix
+    portuale removed both.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-ign-1")
+    make_conf = Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/make.conf"
+    make_conf.write_text(
+        make_conf.read_text() + 'UNINSTALL_IGNORE="/usr/share/t355/ign/*"\n'
+    )
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-ign")
+    assert (root / "usr/share/t355/ign/x").is_file()
+    assert not (root / "lib/modules/t355/m.ko").exists()
+
+
+def test_t355_uninstall_ignore_append_keeps_the_default(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: the append form keeps the make.globals default.
+
+    Expected values from Portage 3.0.82.2, S0 cell U1b (not from portuale
+    output): both files kept (`--- cfgpro`). Pre-fix portuale removed both.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-ign-1")
+    make_conf = Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/make.conf"
+    make_conf.write_text(
+        make_conf.read_text()
+        + 'UNINSTALL_IGNORE="${UNINSTALL_IGNORE} /usr/share/t355/ign/*"\n'
+    )
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-ign")
+    assert (root / "usr/share/t355/ign/x").is_file()
+    assert (root / "lib/modules/t355/m.ko").is_file()
+
+
+def test_t355_uninstall_ignore_default_keeps_lib_modules(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: with no `UNINSTALL_IGNORE` in make.conf the
+    make.globals default still applies.
+
+    Expected values from Portage 3.0.82.2, S0 cell U1d (not from portuale
+    output): `--- cfgpro obj …/m.ko` kept, `ign/x` removed. Pre-fix portuale
+    removed both.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-ign-1")
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-ign")
+    assert not (root / "usr/share/t355/ign/x").exists()
+    assert (root / "lib/modules/t355/m.ko").is_file()
+
+
+def test_t355_lib_symlinks_survive_unmerge(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: live `/lib` and `/usr/lib` symlinks are never removed.
+
+    Expected values from Portage 3.0.82.2, S0 cell L1 (not from portuale
+    output): `--- cfgpro sym /lib` and `--- cfgpro sym /usr/lib`, both kept.
+    Pre-fix portuale removed both.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-liblink-1")
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-liblink")
+    assert (root / "lib").is_symlink(), "/lib must survive"
+    assert (root / "usr/lib").is_symlink(), "/usr/lib must survive"
+
+
+def test_t355_dir_symlink_kept_while_another_package_records_it(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: a protected directory symlink another package owns
+    is kept, with the preserved notice.
+
+    Expected values from Portage 3.0.82.2, S0 cells C1a (keep half: `--- !empty`
+    then the preserved notice) and E2 (search wording), not from portuale
+    output. E1-as-designed cannot pin S5 (Portage backs the symlink aside at
+    merge time; S0 stop-rule note (a)), so this is the redesigned probe: B
+    records the same symlink path, keeping the link via the R4b owners
+    search. Pre-fix portuale removed the link.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    # B merges first: the removed package (A) merges last, so the live
+    # symlink's mtime still matches A's recorded mtime at `-C` time and
+    # Portage reaches R4 (a second merge always replaces the link, on both
+    # PMs — Portage `mergeme` + `movefile`, like portuale).
+    _t355_merge(emerge_binary, env, "=app-misc/t355-eb2-1")
+    _t355_merge(emerge_binary, env, "=app-misc/t355-ea-1")
+    # `real/` is admin-created: portuale's install QA strips empty
+    # `dodir`'d dirs from the image (S0 cells.sh does the same `mkdir -p`
+    # for E2 on both PMs).
+    (root / "usr/share/t355/real").mkdir(parents=True, exist_ok=True)
+    (root / "usr/share/t355/real/u.txt").write_text("admin\n")
+    out = _t355_unmerge_out(emerge_binary, env, "app-misc/t355-ea")
+    assert (root / "usr/share/t355/link").is_symlink()
+    assert (root / "usr/share/t355/real/u.txt").is_file()
+    assert "Directory symlink(s) may need protection:" in out
+    assert "Searching all installed packages" in out
+    assert "One or more symlinks to directories have been preserved" in out
+    assert "safe to remove" not in out
+
+
+def test_t355_dir_symlink_removed_when_nobody_owns_it(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: a protected directory symlink nobody owns is removed
+    after the owners search.
+
+    Expected values from Portage 3.0.82.2, S0 cell E2 (not from portuale
+    output): `--- !empty sym …/link`, the full search elog, then `<<< sym`.
+    The outcome coincides pre-fix (by another route); the mechanism and the
+    elog lines are new.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-ea-1")
+    # Admin-created like E1 (portuale strips empty `dodir`'d dirs).
+    (root / "usr/share/t355/real").mkdir(parents=True, exist_ok=True)
+    (root / "usr/share/t355/real/u.txt").write_text("admin\n")
+    out = _t355_unmerge_out(emerge_binary, env, "app-misc/t355-ea")
+    assert not os.path.lexists(root / "usr/share/t355/link")
+    assert (root / "usr/share/t355/real/u.txt").is_file()
+    assert "Directory symlink(s) may need protection:" in out
+    assert "safe to remove. Removing them now" in out
+    assert "One or more symlinks" not in out
+
+
+def test_t355_fully_owned_dir_symlink_goes_silently(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: a directory symlink whose children are all owned
+    regular files is unlinked with no notice.
+
+    Expected values from Portage 3.0.82.2, S0 cell E3 (not from portuale
+    output): `<<< sym`, `<<< obj`, no elog. Pre-fix portuale reached the
+    same outcome through the mtime arm; this pins the R4 route.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-e3-1")
+    out = _t355_unmerge_out(emerge_binary, env, "app-misc/t355-e3")
+    assert not os.path.lexists(root / "usr/share/t355/z-link")
+    assert not (root / "usr/share/t355/a-real/f").exists()
+    assert "may need protection" not in out
+
+
+def test_t355_dir_entry_that_is_a_live_symlink_is_unlinked(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #356 S5: a `dir` entry that is a live symlink takes the sym
+    branch.
+
+    Expected values from Portage 3.0.82.2, S0 cell D1 (not from portuale
+    output): `<<< dir …/d`, the symlink removed, its empty target kept.
+    Pre-fix portuale left the symlink in place (`rmdir` fails with ENOTDIR).
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-d1-1")
+    live = root / "opt/t355/d"
+    shutil.rmtree(root / "opt/t355/d")
+    (root / "opt/t355/other").mkdir()
+    live.symlink_to("other")
+    _t355_unmerge(emerge_binary, env, "app-misc/t355-d1")
+    assert not os.path.lexists(live)
+    assert (root / "opt/t355/other").is_dir()
