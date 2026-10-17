@@ -1968,7 +1968,9 @@ def test_ebuild_debug_flag_enables_real_set_x_tracing(ebuild_binary, tmp_path):
         check=True,
         env=debug_env,
     )
-    assert any(line.startswith("+ ") for line in with_debug.stderr.splitlines())
+    # Since #351 S6 bash's stderr rides stdout through the foreground tee
+    # (Portage S0 cells m01/m02), so the set-x trace shows up there.
+    assert any(line.startswith("+ ") for line in with_debug.stdout.splitlines())
 
 
 def _real_build_env(tmp_path):
@@ -4270,8 +4272,8 @@ def test_standalone_ebuild_setup_sees_the_full_resolved_config_env(
         env=env,
     )
     assert result.returncode == 0, result.stderr
-    # Phase output lands on stderr (the phase runner's own stream).
-    assert "CC=makeconf-cc" in result.stderr
+    # Phase output lands on stdout (#351 S6: foreground tee, S0 cells m01/m02).
+    assert "CC=makeconf-cc" in result.stdout
 
 
 def _cfg_with_envdump_tmpdir(tmp_path, probe):
@@ -4321,16 +4323,16 @@ def test_standalone_ebuild_setup_sees_the_per_package_tmpdir(
 
     r = run({})
     assert r.returncode == 0, r.stderr
-    assert f"PORTAGE_TMPDIR={probe}" in r.stderr
-    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in r.stderr
+    assert f"PORTAGE_TMPDIR={probe}" in r.stdout
+    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in r.stdout
 
     # Precedence leg: a process PORTAGE_TMPDIR beats the env file's.
     other = tmp_path / "process-tmp"
     other.mkdir()
     r = run({"PORTAGE_TMPDIR": str(other)})
     assert r.returncode == 0, r.stderr
-    assert f"PORTAGE_TMPDIR={other}" in r.stderr
-    assert f"PORTAGE_BUILDDIR={other}/portage/dev-libs/envdumppkg-1.0" in r.stderr
+    assert f"PORTAGE_TMPDIR={other}" in r.stdout
+    assert f"PORTAGE_BUILDDIR={other}/portage/dev-libs/envdumppkg-1.0" in r.stdout
 
 
 def test_standalone_ebuild_setup_fails_for_a_missing_per_package_tmpdir(
@@ -4386,7 +4388,7 @@ def test_emerge_atom_source_build_sees_the_per_package_tmpdir(
     )
     assert result.returncode == 0, result.stderr
     assert f">>> Completed (1 of 1) dev-libs/envdumppkg-1.0::testrepo to {root}" in result.stdout
-    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in result.stderr
+    assert f"PORTAGE_BUILDDIR={probe}/portage/dev-libs/envdumppkg-1.0" in result.stdout
 
 
 def test_emerge_atom_source_build_fails_for_a_missing_per_package_tmpdir(
@@ -4529,7 +4531,7 @@ def test_standalone_ebuild_setup_sees_the_per_package_features(
         capture_output=True, text=True, check=False, env=env,
     )
     assert result.returncode == 0, result.stderr
-    assert "standalone-probe" in result.stderr
+    assert "standalone-probe" in result.stdout
 
 
 def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
@@ -6185,8 +6187,14 @@ def test_emerge_serial_merge_status_lines_carry_portages_leading_blank(
     assert len(statuses) == 9
     for i in statuses:
         assert lines[i - 1] == "", repr(lines[max(0, i - 2) : i + 1])
+    # Since #351 S6 the install chain streams through the foreground tee and
+    # Portage's shape shows: two blanks before `>>> Installing`
+    # (S0 cell `m08-emerge-jobs1-portage.stdout`, byte-identical).
     for i in statuses[1:]:
-        assert lines[i - 2] != "", repr(lines[i - 2 : i + 1])
+        if lines[i].startswith(">>> Installing ("):
+            assert lines[i - 2] == "" and lines[i - 3] != "", repr(lines[i - 3 : i + 1])
+        else:
+            assert lines[i - 2] != "", repr(lines[i - 2 : i + 1])
     first = statuses[0]
     assert lines[first - 1] == "" and lines[first - 2] == "", repr(
         lines[max(0, first - 3) : first + 1]
@@ -6367,7 +6375,9 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     log = tmp_path / "pt0" / log_rel
     assert log.is_file() and log.stat().st_size > 0
 
-    # Default: streamed, no build.log written.
+    # Default: streamed. The test env sets FEATURES=keepwork, and Portage
+    # keeps `${T}/build.log` then too (#351 S6; host Portage 3.0.82.2
+    # keepwork re-run), the streamed output being teed into it.
     root, env = _root(1)
     r = subprocess.run(
         [str(emerge_binary), "dev-libs/packagepkg"],
@@ -6375,7 +6385,7 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     )
     assert r.returncode == 0, r.stderr
     assert f">>> Completed (1 of 1) dev-libs/packagepkg-1.0::testrepo to {root}" in r.stdout
-    assert not (tmp_path / "pt1" / log_rel).is_file()
+    assert (tmp_path / "pt1" / log_rel).is_file()
 
 
 def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path):
@@ -9722,7 +9732,7 @@ def test_ebuild_sandbox_denies_and_fails_on_a_write_outside_the_build_tree(
         env=env,
     )
     assert result.returncode != 0
-    assert "ACCESS DENIED" in result.stderr
+    assert "ACCESS DENIED" in result.stdout
     log = tmp_path / "pt" / _FSSANDBOX_SANDBOX_LOG
     assert log.is_file() and log.stat().st_size > 0
     assert "/var/lib/portage-portuale-sandbox-probe" in log.read_text()
@@ -10373,3 +10383,236 @@ def test_s5_stale_environment_notice_goes_to_stderr(
         "sourced. Run\n"
         ">>> 'clean' to start with a fresh environment.\n"
     ) in second.stderr
+
+
+def test_s6_unpack_prints_markers_on_stdout_and_writes_build_log(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S6 (351-MARK, 351-DIE): a direct `ebuild ... unpack`
+    tees Portage's phase markers to stdout and writes `${T}/build.log`.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-phases-8.ebuild unpack` (S0 cell `m01-unpack`, rc 0): stdout
+    is exactly `>>> Unpacking source...` + `>>> Source unpacked in
+    <workdir>` (124 B); stderr carries only config warnings, no markers;
+    every phase byte also lands in the build log."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "unpack"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    workdir = tmp_path / "base/tmp/portage/app-misc/t348-b-phases-8/work"
+    assert result.stdout.splitlines() == [
+        ">>> Unpacking source...",
+        f">>> Source unpacked in {workdir}",
+    ]
+    assert ">>>" not in result.stderr
+    build_log = tmp_path / "base/tmp/portage/app-misc/t348-b-phases-8/temp/build.log"
+    assert build_log.is_file()
+    assert build_log.read_text() == result.stdout
+
+
+def test_s6_install_chain_prints_test_not_enabled_marker(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S6 (351-MARK): a fresh direct `ebuild ... install`
+    without `test` in `FEATURES` prints Portage's
+    `>>> Test phase [not enabled]` marker inside the chain.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-phases-8.ebuild install` (S0 cell `m02-fresh-install`, rc
+    0): the chain runs unpack through install, the `test` leg prints
+    `>>> Test phase [not enabled]: app-misc/t348-b-phases-8` instead of
+    running, and the install leg prints its `Install`/`Completed
+    installing` pair plus the two `Final size` lines, all on stdout."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "install"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert ">>> Test phase [not enabled]: app-misc/t348-b-phases-8" in result.stdout
+    assert ">>> Install app-misc/t348-b-phases-8 into " in result.stdout
+    assert ">>> Completed installing app-misc/t348-b-phases-8 into " in result.stdout
+    assert "Final size of build directory:" in result.stdout
+    assert "Final size of installed tree:" in result.stdout
+    assert ">>>" not in result.stderr
+
+
+def test_s6_restrict_test_disables_test_phase(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S6 (351-MARK): with `RESTRICT=test`, a direct
+    `ebuild ... test` prints Portage's `[disabled because of
+    RESTRICT=test]` marker instead of running.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-phasert-8.ebuild test` with `test` in `FEATURES` (S0 cell
+    `m03-phasert-test`, rc 0): stdout ends with the einfo `Skipping
+    make test/check` line and
+    `>>> Test phase [disabled because of RESTRICT=test]`; `Forcing
+    test.` stays on stderr."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    env["FEATURES"] = _S5_FEATURES_BASE + " test"
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phasert/t348-b-phasert-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "test"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert "Skipping make test/check due to ebuild restriction." in result.stdout
+    assert (
+        ">>> Test phase [disabled because of RESTRICT=test]: "
+        "app-misc/t348-b-phasert-8"
+    ) in result.stdout
+    assert "Forcing test." in result.stderr
+
+
+def test_s6_die_block_goes_to_stdout_with_build_log(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S6 (351-DIE): a dying phase prints Portage's `die`
+    block on stdout (with `::<repo>`) and writes `${T}/build.log`.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-envnoeapply-7.ebuild prepare` (S0 cell `m06-die`, rc 1):
+    the `ERROR: ... ::t348 failed (prepare phase):` block, the
+    `The complete build log is located at '<T>/build.log'.` line and the
+    `Working directory:`/`S:` lines are all on stdout; stderr carries no
+    phase output; `${T}/build.log` exists."""
+    env, cfg = _s5_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'FEATURES="{_S5_FEATURES_BASE} test"\n',
+    )
+    env["FEATURES"] = _S5_FEATURES_BASE + " test"
+    ebuild_path = str(
+        Path(fixtures_root)
+        / "repo-348/app-misc/t348-b-envnoeapply/t348-b-envnoeapply-7.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "prepare"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    assert (
+        "ERROR: app-misc/t348-b-envnoeapply-7::t348 failed (prepare phase):"
+        in result.stdout
+    )
+    t_dir = (
+        tmp_path / "base/tmp/portage/app-misc/t348-b-envnoeapply-7/temp"
+    )
+    assert (
+        f"The complete build log is located at '{t_dir}/build.log'."
+        in result.stdout
+    )
+    assert "Working directory:" in result.stdout
+    assert "ERROR" not in result.stderr
+    build_log = t_dir / "build.log"
+    assert build_log.is_file()
+    assert "failed (prepare phase)" in build_log.read_text()
+
+
+def test_s6_port_logdir_writes_plog_and_symlink(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S6 (351-DIE, `PORT_LOGDIR`): with `PORT_LOGDIR` set,
+    the build log lives under it and `${T}/build.log` links to it.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-envnoeapply-7.ebuild prepare` with `PORT_LOGDIR` exported
+    (S0 cell `m07-port-logdir`, rc 1): the real log is
+    `<logdir>/app-misc:t348-b-envnoeapply-7:<timestamp>.log`, the `die`
+    block names it in `The complete build log is located at '...'.`
+    plus the `For convenience, a symlink to the build log is located
+    at '${T}/build.log'.` line, and `${T}/build.log` is that symlink."""
+    env, cfg = _s5_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'FEATURES="{_S5_FEATURES_BASE} test"\n',
+    )
+    env["FEATURES"] = _S5_FEATURES_BASE + " test"
+    plogs = tmp_path / "plogs"
+    plogs.mkdir()
+    env["PORT_LOGDIR"] = str(plogs)
+    ebuild_path = str(
+        Path(fixtures_root)
+        / "repo-348/app-misc/t348-b-envnoeapply/t348-b-envnoeapply-7.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "prepare"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 1, (result.stdout, result.stderr)
+    logs = list(plogs.glob("app-misc:t348-b-envnoeapply-7:*.log"))
+    assert len(logs) == 1, [p.name for p in plogs.iterdir()]
+    t_log = (
+        tmp_path
+        / "base/tmp/portage/app-misc/t348-b-envnoeapply-7/temp/build.log"
+    )
+    assert t_log.is_symlink(), "T/build.log links to the real log"
+    assert t_log.resolve() == logs[0]
+    assert (
+        f"The complete build log is located at '{logs[0]}'." in result.stdout
+    )
+    assert (
+        "For convenience, a symlink to the build log is located at "
+        f"'{t_log}'." in result.stdout
+    )
+
+
+def test_s6_emerge_foreground_streams_markers_and_build_log(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S6 (351-MARK): a serial foreground `emerge
+    --oneshot` streams the phase markers on stdout like a direct
+    `ebuild` run, and keeps `${T}/build.log` under `keepwork`.
+
+    Portage 3.0.82.2, full argv `emerge --oneshot --package-moves=n
+    --jobs=1 app-misc/t348-b-phases` (S0 cell `m08-emerge-jobs1`, rc
+    0): the full `>>>` phase stream (`Unpacking`, `[not enabled]`,
+    `Install`, `Completed installing`, both `Final size` lines)
+    interleaves the `Emerging`/`Installing`/`Completed` status lines on
+    stdout; nothing marker-shaped reaches stderr. (Without `keepwork`
+    the post-merge `clean` removes the builddir on both sides, so the
+    log assertion needs it — verified against host Portage 3.0.82.2.)"""
+    env, cfg = _s5_configroot(
+        tmp_path,
+        fixtures_root,
+        make_conf_extra=f'FEATURES="{_S5_FEATURES_BASE} keepwork"\n',
+    )
+    env["FEATURES"] = _S5_FEATURES_BASE + " keepwork"
+    root = tmp_path / "root"
+    root.mkdir()
+    env["ROOT"] = str(root)
+    result = subprocess.run(
+        [
+            str(emerge_binary),
+            "--oneshot",
+            "--package-moves=n",
+            "--jobs=1",
+            "app-misc/t348-b-phases",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert ">>> Unpacking source..." in result.stdout
+    assert ">>> Test phase [not enabled]: app-misc/t348-b-phases-8" in result.stdout
+    assert ">>> Install app-misc/t348-b-phases-8 into " in result.stdout
+    assert ">>> Completed installing app-misc/t348-b-phases-8 into " in result.stdout
+    assert "Final size of build directory:" in result.stdout
+    assert ">>>" not in result.stderr
+    build_log = (
+        tmp_path / "base/tmp/portage/app-misc/t348-b-phases-8/temp/build.log"
+    )
+    assert build_log.is_file()
+    assert ">>> Unpacking source..." in build_log.read_text()
