@@ -1954,12 +1954,19 @@ def test_ebuild_debug_flag_enables_real_set_x_tracing(ebuild_binary, tmp_path):
         line.startswith("+ ") for line in without_debug.stderr.splitlines()
     )
 
+    # A fresh builddir for the second leg: since #351 S5 a stamped phase
+    # prints Portage's skip pair instead of spawning (S0 cell
+    # `s02-unpack-again`), so re-running `pretend` here would trace
+    # nothing on either side — the `+ ` lines only exist when the phase
+    # body actually spawns.
+    debug_env = dict(env)
+    debug_env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir-debug")
     with_debug = subprocess.run(
         [str(ebuild_binary), "--debug", ebuild_path, "pretend"],
         capture_output=True,
         text=True,
         check=True,
-        env=env,
+        env=debug_env,
     )
     assert any(line.startswith("+ ") for line in with_debug.stderr.splitlines())
 
@@ -10159,3 +10166,210 @@ def test_s4_unmerge_honors_make_conf_clean_delay(
     assert "Waiting" not in removed.stdout
     assert "Control-C" not in removed.stdout
     assert not (root / "var/db/pkg/app-misc/t348-d-unmerge-1").exists()
+
+
+_S5_FEATURES_BASE = (
+    "-sandbox -usersandbox -userpriv -network-sandbox -ipc-sandbox "
+    "-pid-sandbox -news"
+)
+
+
+def _s5_configroot(tmp_path, fixtures_root, make_conf_extra=""):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #351 S5
+    cells: the shared fixture repos plus the `repo-348` overlay (never
+    `fixtures/etc` itself), `make.profile` at the fixture default
+    profile. `make.conf` holds `PKGDIR`, the sandbox-off `FEATURES`
+    base (real phase runs work unprivileged, mirroring the S0 `s/`
+    family), per-test `PORTAGE_TMPDIR`/`DISTDIR` (mirrored in the child
+    env, as in S0), and a per-test `T348_LOGDIR` so the phases
+    fixture's log channel stays inside the test dir. Returns the child
+    env plus the configroot path."""
+    fixtures_root = Path(fixtures_root)
+    cfg = tmp_path / "cfg"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = testrepo\n\n"
+        f"[testrepo]\nlocation = {fixtures_root / 'repo'}\n\n"
+        f"[overlay]\nlocation = {fixtures_root / 'overlay'}\npriority = 10\n\n"
+        f"[independentoverlay]\nlocation = {fixtures_root / 'independentoverlay'}\n"
+        "priority = 20\nmasters = overlay\n\n"
+        f"[layoutmasteroverlay]\nlocation = {fixtures_root / 'layoutmasteroverlay'}\n"
+        "priority = 30\n\n"
+        f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
+        f"[t348]\nlocation = {fixtures_root / 'repo-348'}\npriority = 60\n"
+    )
+    logs = tmp_path / "logs"
+    logs.mkdir()
+    base = tmp_path / "base"
+    (base / "tmp").mkdir(parents=True)
+    (base / "dist").mkdir(parents=True)
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\n'
+        f'FEATURES="{_S5_FEATURES_BASE}"\n'
+        f'PORTAGE_TMPDIR="{base / "tmp"}"\n'
+        f'DISTDIR="{base / "dist"}"\n'
+        f'T348_LOGDIR="{logs}"\n' + make_conf_extra
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(
+        fixtures_root / "repo/profiles/default"
+    )
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["PORTAGE_TMPDIR"] = str(base / "tmp")
+    env["DISTDIR"] = str(base / "dist")
+    env["FEATURES"] = _S5_FEATURES_BASE
+    return env, cfg
+
+
+def _s5_builddir(tmp_path):
+    return tmp_path / "base/tmp/portage/app-misc/t348-b-phases-8"
+
+
+def test_s5_unpack_twice_prints_portage_skip_lines(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S5 (351-STAMP): a repeated direct `ebuild ...
+    unpack` prints Portage's stamp skip pair per chain phase instead
+    of re-running anything, after the WORKDIR freshness line.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-phases-8.ebuild unpack` run twice in one builddir (S0 cells
+    `s01-unpack` then `s02-unpack-again`, both rc 0): the first run is
+    silent (no WORKDIR yet, nothing stamped); the second prints
+    `>>> WORKDIR is up-to-date, keeping...` then one skip pair per
+    `pretend`/`setup`/`unpack`, on stdout. The expected text below is
+    the `s02` capture with the test's own builddir."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    first = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "unpack"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert first.returncode == 0, (first.stdout, first.stderr)
+    assert "already executed" not in first.stdout
+    assert "WORKDIR" not in first.stdout
+    second = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "unpack"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert second.returncode == 0, (second.stdout, second.stderr)
+    builddir = _s5_builddir(tmp_path)
+    assert second.stdout.splitlines() == [
+        ">>> WORKDIR is up-to-date, keeping...",
+        ">>> It appears that 'pretend' has already executed for "
+        "'t348-b-phases-8'; skipping.",
+        f">>> Remove '{builddir}/.pretended' to force pretend.",
+        ">>> It appears that 'setup' has already executed for "
+        "'t348-b-phases-8'; skipping.",
+        f">>> Remove '{builddir}/.setuped' to force setup.",
+        ">>> It appears that 'unpack' has already executed for "
+        "'t348-b-phases-8'; skipping.",
+        f">>> Remove '{builddir}/.unpacked' to force unpack.",
+    ]
+
+
+def test_s5_setup_unpack_recreates_a_stale_workdir(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S5 (351-STAMP): `setup unpack` on a builddir whose
+    `WORKDIR` predates `.unpacked` prints Portage's recreation line
+    and unpacks anyway.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-phases-8.ebuild setup unpack` on a clean builddir (S0 cell
+    `s07a-setup-unpack`, rc 0): the `setup` leg creates `WORKDIR`
+    without stamping `.unpacked`, so the `unpack` leg prints
+    `>>> Not marked as unpacked; recreating WORKDIR...` before the
+    phase markers."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    result = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "setup", "unpack"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert (
+        result.stdout.splitlines().count(
+            ">>> Not marked as unpacked; recreating WORKDIR..."
+        )
+        == 1
+    )
+
+
+def test_s5_noauto_install_runs_despite_its_stamp(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S5 (351-STAMP): under `FEATURES=noauto` a stamped
+    `install` re-runs while every other stamped phase still skips.
+
+    Portage 3.0.82.2, S0 cell `s06-noauto-install` (rc 0): with
+    `noauto` in `FEATURES`, `doebuild.py` skips the stamp check for
+    `install` only (`if not (mydo == "install" and "noauto" in
+    mysettings.features)`). Here `unpack`+`install` stamp the chain
+    first; the `noauto` re-`install` then skips `unpack` but not
+    `install`, while a plain re-`install` skips both."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    for argv in (["unpack"], ["install"]):
+        result = subprocess.run(
+            [str(ebuild_binary), ebuild_path, *argv],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert result.returncode == 0, (argv, result.stdout, result.stderr)
+    noauto_env = dict(env)
+    noauto_env["FEATURES"] = _S5_FEATURES_BASE + " noauto"
+    forced = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "install"],
+        capture_output=True, text=True, check=False, env=noauto_env,
+    )
+    assert forced.returncode == 0, (forced.stdout, forced.stderr)
+    assert "'unpack' has already executed" in forced.stdout
+    assert "'install' has already executed" not in forced.stdout
+    plain = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "install"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert plain.returncode == 0, (plain.stdout, plain.stderr)
+    assert "'install' has already executed" in plain.stdout
+
+
+def test_s5_stale_environment_notice_goes_to_stderr(
+    ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #351 S5 (351-STAMP): with `${T}/environment` left over
+    from a previous run, a direct `ebuild ... unpack` warns on stderr
+    before anything runs.
+
+    Portage 3.0.82.2, full argv `ebuild
+    t348-b-phases-8.ebuild unpack` run twice in one builddir (S0 cell
+    `s02-unpack-again`, stderr lines 9-10, rc 0): the first run saves
+    `${T}/environment` (the vendored `save-ebuild-env.sh`, as in
+    Portage), so the second run's `bin/ebuild`-equivalent notice wraps
+    the message at 70 columns with a `>>> ` prefix per line, on
+    stderr."""
+    env, cfg = _s5_configroot(tmp_path, fixtures_root)
+    ebuild_path = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    first = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "unpack"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert first.returncode == 0, (first.stdout, first.stderr)
+    assert "Existing ${T}/environment" not in first.stderr
+    second = subprocess.run(
+        [str(ebuild_binary), ebuild_path, "unpack"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert second.returncode == 0, (second.stdout, second.stderr)
+    assert (
+        ">>> Existing ${T}/environment for 't348-b-phases-8' will be "
+        "sourced. Run\n"
+        ">>> 'clean' to start with a fresh environment.\n"
+    ) in second.stderr
