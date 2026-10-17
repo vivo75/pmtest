@@ -29534,3 +29534,44 @@ def test_t355_same_version_reinstall_keeps_a_lib_only_the_just_preserved_lib_nee
     assert registry["app-misc/t355-base:0"][2] == ["/usr/lib64/libt355base.so.1"]
     assert registry["app-misc/t355-mid:0"][0] == "app-misc/t355-mid-1"
     assert registry["app-misc/t355-mid:0"][2] == ["/usr/lib64/libt355mid.so.1"]
+
+
+def test_t355_space_paths_survive_merge_and_unmerge_as_portage_records_them(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #357 S3: `CONTENTS` paths with spaces unmerge exactly as
+    Portage records them.
+
+    Expected values from Portage 3.0.82.2, S0 cell S1 (not from portuale
+    output): merging `=app-misc/t355-space-1` (variant 1) records
+    `obj /usr/share/t355/a b.txt <md5> <mtime>`,
+    `sym /usr/share/t355/c d -> a b.txt <mtime>` and
+    `obj /usr/share/t355/sp dir/f <md5> <mtime>` in `CONTENTS`
+    (`S1-pg-merge.contents` shape, mtimes aside); after an admin-created
+    decoy `/usr/share/t355/a`, `emerge -C` removes all three entries
+    and keeps the decoy. Pre-fix portuale removed the decoy and leaked
+    all three (the whitespace split truncated every path at the first
+    space).
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t355-space-1")
+    contents = (
+        root / "var/db/pkg/app-misc/t355-space-1/CONTENTS"
+    ).read_text()
+    assert "obj /usr/share/t355/a b.txt " in contents
+    assert "sym /usr/share/t355/c d -> a b.txt " in contents
+    assert "obj /usr/share/t355/sp dir/f " in contents
+    (root / "usr/share/t355/a").write_text("decoy")
+    result = subprocess.run(
+        [str(emerge_binary), "--ignore-default-opts", "-C", "app-misc/t355-space"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert not (root / "usr/share/t355/a b.txt").exists()
+    assert not (root / "usr/share/t355/c d").is_symlink()
+    assert not (root / "usr/share/t355/sp dir/f").exists()
+    assert (root / "usr/share/t355/a").read_text() == "decoy"
