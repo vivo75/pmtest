@@ -7018,8 +7018,9 @@ def test_s6_user_config_validates_each_file_like_portage(
     root below replays the same shape; `<ROOT>` is the scratch
     configroot. Merge-row deltas vs Portage are the standing cosmetics:
     no `:0/1::t341` slot/repo suffix without `-v`, no trailing `0 KiB`
-    (matrix §1.6), `USE="x"` for Portage's `USE="(x)"` (portuale never
-    renders the forced-flag parens), and the `#` mask-column marker is
+    (matrix §1.6); the forced `USE="(x)"` matches Portage since #346 S1
+    (the kept user-profile `package.use.force` entry now forces `x`
+    through the last profile level). The `#` mask-column marker is
     Portage's own (the kept mask and unmask lines both match). No pin
     covers the `package.env` use-dep crash cell (`C-userenv-crash`):
     Portage's reader accepts that line and dies later with
@@ -7029,7 +7030,7 @@ def test_s6_user_config_validates_each_file_like_portage(
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
-        f'[ebuild  N    #] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
+        f'[ebuild  N    #] dev-libs/t341-dep-1 to {env["ROOT"]} USE="(x)" ',
     ]
     R = "<ROOT>"
     expected = [
@@ -7067,6 +7068,491 @@ def test_s6_user_config_validates_each_file_like_portage(
     ]
     lines = result.stderr.replace(str(cfg), R).splitlines()
     assert lines == expected
+
+
+def _t346_user_profile_root(tmp_path, fixtures_root, files, make_profile=True):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #346 S1
+    cells: `_t341_configroot` plus `etc/portage/profile/<name>` per
+    `files`. With `make_profile=False` the `make.profile` symlink is
+    removed (S0 u15: Portage then aborts as invalid-profile). Returns
+    the env dict plus the configroot path (for warning-path
+    normalisation)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    cfg = tmp_path / "cfg"
+    if not make_profile:
+        (cfg / "etc/portage/make.profile").unlink()
+    prof = cfg / "etc/portage/profile"
+    prof.mkdir(parents=True, exist_ok=True)
+    for name, content in files.items():
+        (prof / name).write_text(content)
+    return env, cfg
+
+
+def _t346_merge_line(env, use):
+    """The expected non-verbose `emerge --pretend dev-libs/t341-dep`
+    stdout line for the S1 cells (Portage prints the same row with a
+    trailing `/` after the root and a `These are the packages …` +
+    `Calculating dependencies` preamble, which portuale omits on
+    `--pretend` success by its long-standing convention)."""
+    return f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="{use}" '
+
+
+def test_s1_baseline_merges_without_the_user_profile(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1 baseline: with no user profile, `dev-libs/t341-dep`
+    (IUSE `x`) merges with `USE="-x"`.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u01-baseline`, rc 0, stdout row
+    `[ebuild  N     ] dev-libs/t341-dep-1 to <cfg>/ USE="-x"`). The
+    hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(tmp_path, fixtures_root, {})
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "-x")]
+    assert result.stderr == ""
+
+
+def test_s1_user_use_force_enables_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `use.force` = `x` forces the flag.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u02-useforce`, rc 0, stdout row
+    `USE="(x)"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"use.force": "x\n"}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "(x)")]
+    assert result.stderr == ""
+
+
+def test_s1_user_make_defaults_use_enables_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `make.defaults` `USE="x"` enables
+    the flag.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u03-makedefaults`, rc 0, stdout row
+    `USE="x"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"make.defaults": 'USE="x"\n'}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "x")]
+    assert result.stderr == ""
+
+
+def test_s1_user_profile_package_use_enables_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `package.use`
+    `dev-libs/t341-dep x` enables the flag.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u04-packageuse`, rc 0, stdout row
+    `USE="x"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"package.use": "dev-libs/t341-dep x\n"}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "x")]
+    assert result.stderr == ""
+
+
+def test_s1_user_package_use_mask_masks_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `package.use.mask` masks a flag the
+    user `package.use` enables.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u05-useforcemask`, rc 0, stdout row
+    `USE="(-x)"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {
+            "package.use.mask": "dev-libs/t341-dep x\n",
+            "package.use": "dev-libs/t341-dep x\n",
+        },
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "(-x)")]
+    assert result.stderr == ""
+
+
+def test_s1_user_package_use_force_enables_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `package.use.force`
+    `dev-libs/t341-dep x` forces the flag.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u06-useforcefile`, rc 0, stdout row
+    `USE="(x)"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"package.use.force": "dev-libs/t341-dep x\n"}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "(x)")]
+    assert result.stderr == ""
+
+
+def test_s1_user_use_mask_masks_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `use.mask` = `x` masks a flag the
+    user `package.use` enables.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u07-usemask`, rc 0, stdout row
+    `USE="(-x)"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {
+            "use.mask": "x\n",
+            "package.use": "dev-libs/t341-dep x\n",
+        },
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "(-x)")]
+    assert result.stderr == ""
+
+
+def test_s1_user_profile_accept_keywords_unmasks_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `package.accept_keywords`
+    `dev-libs/bareacceptkeywordspkg ~amd64` accepts the package.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/bareacceptkeywordspkg` (S0 cell `u08-acceptkeywords`, rc 0,
+    stdout row `[ebuild  N    ~] dev-libs/bareacceptkeywordspkg-1.0 to
+    <cfg>/`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"package.accept_keywords": "dev-libs/bareacceptkeywordspkg ~amd64\n"},
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/bareacceptkeywordspkg"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N    ~] dev-libs/bareacceptkeywordspkg-1.0 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s1_user_profile_packages_feed_at_profile_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `packages` `dev-libs/t341-dep`
+    (unstarred) joins `@profile` (the node always carries
+    `profile-set`).
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n @profile`
+    (S0 cell `u09-packages-atprofile`, rc 0, merging `t341-dep`). The
+    hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"packages": "dev-libs/t341-dep\n"}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "@profile"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "-x")]
+    assert result.stderr == ""
+
+
+def test_s1_user_profile_eapi_rejects_wildcards_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: with user-profile `eapi` = `5`, a `*/` wildcard
+    in `package.use` is dropped with one warning.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u10-eapi5wild`, rc 0, `USE="-x"`, one
+    `--- Invalid atom in <cfg>/etc/portage/profile/package.use:
+    */t341-dep` line on stderr). The hermetic root below replays the
+    same shape."""
+    env, cfg = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"eapi": "5\n", "package.use": "*/t341-dep x\n"},
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "-x")]
+    assert result.stderr.strip() == (
+        f"--- Invalid atom in {cfg}/etc/portage/profile/package.use: */t341-dep"
+    )
+
+
+def test_s1_user_profile_wildcards_without_eapi_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: without a user-profile `eapi` file, a `*/`
+    wildcard in `package.use` is kept (`extended_syntax`).
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u11-noeapiwild`, rc 0, stdout row
+    `USE="x"`, no warning). The hermetic root below replays the same
+    shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"package.use": "*/t341-dep x\n"}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "x")]
+    assert result.stderr == ""
+
+
+def test_s1_user_use_stable_mask_masks_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `use.stable.mask` = `x` masks the
+    flag on the stable-keyworded `t341-dep`, over a user `package.use`
+    enabling it.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u12-usestablemask`, rc 0, stdout row
+    `USE="(-x)"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {
+            "use.stable.mask": "x\n",
+            "package.use": "dev-libs/t341-dep x\n",
+        },
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "(-x)")]
+    assert result.stderr == ""
+
+
+def test_s1_user_package_use_stable_force_enables_the_flag_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: user-profile `package.use.stable.force`
+    `dev-libs/t341-dep x` forces the flag.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u13-usestableforce`, rc 0, stdout row
+    `USE="(x)"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"package.use.stable.force": "dev-libs/t341-dep x\n"},
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "(x)")]
+    assert result.stderr == ""
+
+
+def test_s1_user_unmask_counters_chain_mask_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: a user-profile `package.unmask` lifts a chain
+    `package.mask` (S1 preserves the working #341 behaviour).
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` against a scratch chain profile masking
+    `t341-dep` (S0 cell `u14-chainmask-userunmask`, rc 0, `[ebuild N #]`
+    with `USE="-x"`). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"package.unmask": "dev-libs/t341-dep\n"}
+    )
+    cfg = tmp_path / "cfg"
+    chain = tmp_path / "chainmask"
+    chain.mkdir()
+    (chain / "parent").write_text(
+        os.path.relpath(fixtures_root / "repo/profiles/default", chain) + "\n"
+    )
+    (chain / "package.mask").write_text("dev-libs/t341-dep\n")
+    (cfg / "etc/portage/make.profile").unlink()
+    (cfg / "etc/portage/make.profile").symlink_to(chain)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N    #] dev-libs/t341-dep-1 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s1_chain_mask_without_user_unmask_stays_masked(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1 control for the cell above: the same chain mask
+    with no user unmask stays masked.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u14b-chainmask-only`, rc 1, the
+    `package.mask` masked block; Portage adds a `for <root>.` suffix to
+    the header line, which portuale omits by convention). The hermetic
+    root below replays the same shape."""
+    env, _ = _t346_user_profile_root(tmp_path, fixtures_root, {})
+    cfg = tmp_path / "cfg"
+    chain = tmp_path / "chainmask"
+    chain.mkdir()
+    (chain / "parent").write_text(
+        os.path.relpath(fixtures_root / "repo/profiles/default", chain) + "\n"
+    )
+    (chain / "package.mask").write_text("dev-libs/t341-dep\n")
+    (cfg / "etc/portage/make.profile").unlink()
+    (cfg / "etc/portage/make.profile").symlink_to(chain)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/t341-dep", "dev-libs/t341-dep-1::t341", "package.mask"
+    )
+
+
+def test_s1_no_make_profile_ignores_the_user_profile(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: without `make.profile` the user profile is
+    ignored entirely (the node is appended only when a profile
+    resolves).
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` (S0 cell `u15-nomakeprofile`, rc 1: Portage
+    aborts the whole run as invalid-profile, while portuale resolves
+    with an empty chain and reports the package masked by the missing
+    keyword — same exit code, documented reason gap). The hermetic
+    root below pins portuale's side."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"use.force": "x\n"}, make_profile=False
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/t341-dep", "dev-libs/t341-dep-1::t341", "missing keyword"
+    )
+
+
+def test_s1_user_profile_parent_is_never_walked(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: a `parent` file inside the user profile is never
+    walked (the node is appended, not visited).
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/t341-dep` with the user profile holding only a `parent`
+    pointer at a scratch profile enabling `x` (S0 cell
+    `u16-parent-ignored`, rc 0, `USE="-x"`). The hermetic root below
+    replays the same shape."""
+    pointed = tmp_path / "uparent"
+    pointed.mkdir()
+    (pointed / "package.use").write_text("dev-libs/t341-dep x\n")
+    env, cfg = _t346_user_profile_root(tmp_path, fixtures_root, {})
+    (cfg / "etc/portage/profile/parent").write_text(
+        os.path.relpath(pointed, cfg / "etc/portage/profile") + "\n"
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [_t346_merge_line(env, "-x")]
+    assert result.stderr == ""
+
+
+def test_s1_info_reports_user_make_defaults_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: `emerge --info` picks up the user-profile
+    `make.defaults` (`USE` and `FEATURES` lines).
+
+    Portage 3.0.82.2, full argv `emerge --info --package-moves=n` (S0
+    cell `u17-info`: `USE="… test x"` and a `FEATURES="… test …"` line;
+    the `…` rest is host make.globals content, which hermetic roots
+    never see by the settled make.globals design — portuale's FEATURES
+    line is its own incremental stack, pinned exactly). The hermetic
+    root below pins portuale's lines."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"make.defaults": 'USE="x"\nFEATURES="test"\n'},
+    )
+    result = _run([str(emerge_binary)], ["--info"], env)
+    assert result.returncode == 0
+    use_line = next(
+        line for line in result.stdout.splitlines() if line.startswith("USE=")
+    )
+    assert use_line.startswith('USE="amd64 baz foo globalforceflag test x"')
+    features_line = next(
+        line for line in result.stdout.splitlines() if line.startswith("FEATURES=")
+    )
+    assert features_line == 'FEATURES="test unmerge-orphans"'
+
+
+def test_s1_starred_packages_stay_out_of_at_profile(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: a starred user `packages` line never joins
+    `@profile` (`ProfilePackageSet.load` drops `*` lines), so only the
+    unstarred masked member is reported.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n @profile`
+    (S0 cell `u18-profile-starred`, rc 1, the `~amd64 keyword` masked
+    block for `dev-libs/bareacceptkeywordspkg` with `(dependency
+    required by "@profile" [argument])` before the footer; Portage adds
+    a `for <root>.` suffix to the header line, which portuale omits by
+    convention). The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"packages": "*dev-libs/t341-dep\ndev-libs/bareacceptkeywordspkg\n"},
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "@profile"], env)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/bareacceptkeywordspkg",
+        "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
+        "~amd64 keyword",
+    ).replace(
+        "\nFor more information,",
+        '\n(dependency required by "@profile" [argument])\nFor more information,',
+    )
+    assert "dev-libs/t341-dep" not in result.stderr
+
+
+def test_s1_unstarred_packages_leave_at_system_alone(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S1: an unstarred user `packages` line changes
+    nothing about `@system`.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n @system`
+    (S0 cell `u19-system-unstarred`, rc 0, the fixture 4-package set).
+    The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path, fixtures_root, {"packages": "dev-libs/t341-dep\n"}
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "@system"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/newpkg-1.0 to {env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/upgradepkg-2.0 to {env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/systempkg-1.0 to {env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/withdeps-1.0 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
 
 
 def _t341_cmd_invalid(emerge_binary, env, atom):
