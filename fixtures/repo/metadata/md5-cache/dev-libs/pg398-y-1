@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #398 flip-path || alternative Y (not installed; leaf; also pulled plainly by pg398-b after the flip)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=72e5fbddb27deedbb63c8f8dd6218b6d

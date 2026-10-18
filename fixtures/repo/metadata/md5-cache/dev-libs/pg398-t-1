@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #398 flip-path top (not installed; lists pg398-a before pg398-c)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg398-a dev-libs/pg398-c
+SLOT=0
+_md5_=9230830fb63f41d8959db7ccd396a72a

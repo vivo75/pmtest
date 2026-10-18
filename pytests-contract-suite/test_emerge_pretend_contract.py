@@ -490,6 +490,7 @@ CASES = [
     ("-pv: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "dev-libs/pg366-rb"], 0),
     ("-pve: a || group prefers the in-graph alternative in dep order A B (pg366-ra, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-ra"], 0),
     ("-pve: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-rb"], 0),
+    ("-pv --autounmask-use=y: a flip-revealed || group defers to the drained graph (pg398-t, #398)", ["--pretend", "-v", "--autounmask-use=y", "dev-libs/pg398-t"], 1),
     ("-pv: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-tt"], 0),
     ("-pve: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-tt"], 0),
     ("-pv: new parent plans only itself (pg367-top, #367 S2)", ["--pretend", "-v", "dev-libs/pg367-top"], 0),
@@ -9175,6 +9176,66 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
         '(dependency required by "dev-libs/aucasctop-1.0::testrepo" [ebuild])',
         '(dependency required by "dev-libs/aucasctop" [argument])',
     ]
+
+
+def test_autounmask_flip_revealed_disjunction_defers_to_the_drained_graph(
+    emerge_binary, fixture_env
+):
+    """#398: a flip-revealed `||` group defers to the drained graph.
+
+    `pg398-t` pulls `pg398-a` plainly, then `pg398-c`, whose
+    `pg398-a[flip]` flips the already-resolved slot on. The flip reveals
+    `|| ( dev-libs/pg398-x dev-libs/pg398-y )` while `pg398-b` (queued
+    behind the trigger) still has to pull `pg398-y` into the graph.
+    Choosing at flip time picks first-listed `pg398-x` with neither
+    alternative visible yet; Portage 3.0.82.2 defers the group and picks
+    the in-graph `pg398-y`.
+
+    Expected rows and change block are Portage 3.0.82.2's, from host
+    captures `LLM/evidence/2026-10-18-398/v3-t-portage.txt`
+    (`emerge -pv --autounmask-use=y dev-libs/pg398-t`, rc 1) and
+    `v3-t-backtrackY-portage.txt`
+    (`--autounmask-backtrack=y` added, rc 1, no "terminated early"
+    notice): five rows `y a b c t`, no `x`, the `>=dev-libs/pg398-a-1
+    flip` change with the three-line `# required by` chain. Pre-fix
+    portuale planned a sixth row, `N pg398-x-1`, picked at flip time."""
+    base = ["--pretend", "-v", "--autounmask-use=y", "dev-libs/pg398-t"]
+    rust = _run([str(emerge_binary)], base, fixture_env)
+    assert rust.returncode == 1
+    assert rust.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/pg398-y-1::testrepo to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/pg398-a-1::testrepo to {fixture_env["ROOT"]} USE="flip" ',
+        f'[ebuild  N     ] dev-libs/pg398-b-1::testrepo to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/pg398-c-1::testrepo to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/pg398-t-1::testrepo to {fixture_env["ROOT"]}',
+        "",
+        "Total: 5 packages (5 new), Size of downloads: 0 KiB",
+    ]
+    assert rust.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/pg398-c-1::testrepo\n"
+        "# required by dev-libs/pg398-t-1::testrepo\n"
+        "# required by dev-libs/pg398-t (argument)\n"
+        ">=dev-libs/pg398-a-1 flip\n"
+        + BACKTRACK_TERMINATED_EARLY
+    )
+
+    # --autounmask-backtrack=y: the loop re-drives with the flip applied,
+    # so the group resolves through the normal deferred path on both
+    # sides -- same five rows, no "terminated early" notice.
+    ab = ["--pretend", "-v", "--autounmask-use=y", "--autounmask-backtrack=y", "dev-libs/pg398-t"]
+    rust_ab = _run([str(emerge_binary)], ab, fixture_env)
+    assert rust_ab.returncode == 1
+    assert rust_ab.stdout.splitlines() == rust.stdout.splitlines()
+    assert rust_ab.stderr == (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/pg398-c-1::testrepo\n"
+        "# required by dev-libs/pg398-t-1::testrepo\n"
+        "# required by dev-libs/pg398-t (argument)\n"
+        ">=dev-libs/pg398-a-1 flip\n"
+    )
 
 
 def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways(
