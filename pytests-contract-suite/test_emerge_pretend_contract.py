@@ -30037,6 +30037,54 @@ def test_pg366_ra_default_pv_prefers_the_in_graph_alternative(emerge_binary, fix
     ]
 
 
+def test_pg366_rb_default_pv_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#369 S5: `-pv` on pg366-rb plans `N y + N b + N a + N rb`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container captures
+    `LLM/evidence/2026-10-15-plan-359/portage/369-rb-pv.txt` and
+    `LLM/evidence/2026-10-16-359-exec/s5-rb-pv.txt` (fresh stage per cell);
+    never portuale's output. Only the `[ebuild]` rows are pinned. Before
+    the deferred `||` stack the default solver also planned `N pg366-x-1`:
+    `a`'s `|| ( x y )` was chosen at expansion time, before `b`'s plain
+    `y` was queued."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pv", "dev-libs/pg366-rb"]) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-rb-1"),
+    ]
+
+
+def test_pg366_ra_default_pve_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#369 S5: `-pve` on pg366-ra plans `N y + N a + N b + N ra`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container capture
+    `LLM/evidence/2026-10-16-359-exec/s5-ra-pve.txt` (fresh stage);
+    never portuale's output. Only the `[ebuild]` rows are pinned."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pve", "dev-libs/pg366-ra"]) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-ra-1"),
+    ]
+
+
+def test_pg366_rb_default_pve_prefers_the_in_graph_alternative(emerge_binary, fixture_env):
+    """#369 S5: `-pve` on pg366-rb plans `N y + N b + N a + N rb`, rc 0.
+
+    Expected rows are Portage 3.0.82.2's plan from the container captures
+    `LLM/evidence/2026-10-15-plan-359/portage/369-rb-pve.txt` and
+    `LLM/evidence/2026-10-16-359-exec/s5-rb-pve.txt` (fresh stage per cell);
+    never portuale's output. Only the `[ebuild]` rows are pinned. Same
+    expand-time mischoice as `-pv` before the deferred `||` stack."""
+    assert _pg34_run(emerge_binary, fixture_env, ["-pve", "dev-libs/pg366-rb"]) == [
+        ("N", "dev-libs/pg366-y-1"),
+        ("N", "dev-libs/pg366-b-1"),
+        ("N", "dev-libs/pg366-a-1"),
+        ("N", "dev-libs/pg366-rb-1"),
+    ]
+
+
 def _pg34_snew_block_lines(stdout):
     """`[blocks]`/`[uninstall]` rows of a pg34-snew plan, verbatim."""
     return [
