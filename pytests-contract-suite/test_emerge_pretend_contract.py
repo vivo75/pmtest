@@ -635,6 +635,13 @@ CASES = [
     # `test_s9_*` functions (each docstring cites its H-bid-mask oracle
     # cell: host Portage 3.0.82.2, two-instance PKGDIR).
     ("#341 S9: build-id match cell earns Portage's rc 1", ["--pretend", "--usepkgonly", "dev-libs/t341-dep"], 1),
+    # #346 S3: build-id lines in user package.accept_keywords/package.use.
+    # Same shared-root shape as the S9 entry (the shared root holds no t341
+    # repo and no such binpkg, so both sides take the plain miss, rc 1, like
+    # Portage); the instance selection itself is pinned hermetically per
+    # cell by the `test_s3_*` functions (each docstring cites its B oracle
+    # cell: host Portage 3.0.82.2, two-instance PKGDIR).
+    ("#346 S3: build-id user-config cell earns Portage's rc 1", ["--pretend", "--usepkgonly", "dev-libs/t341-dep"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -6516,6 +6523,185 @@ def _t341_bid_configroot(tmp_path, fixtures_root, mask_line):
         mask_line + "\n"
     )
     return env
+
+
+def _t341_bid_cell_configroot(
+    tmp_path, fixtures_root, keywords, use1, use2, ak_line="", use_line=""
+):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #346 S3
+    cells: the S4 root (fixture repos plus the `repo-341` overlay) with a
+    two-instance `$PKGDIR` whose `KEYWORDS` and per-build `USE` vary per
+    cell, plus user `package.accept_keywords` (`ak_line`) and
+    `package.use` (`use_line`) lines. Mirrors S0 `scripts/b.sh` (`B`/`B_USE`):
+    build 1 `BUILD_TIME` 1000, build 2 `BUILD_TIME` 2000, `IUSE: x`,
+    `SLOT: 0/1`, `REPO: t341`."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    pkgdir = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir"
+    pkgdir.mkdir(parents=True, exist_ok=True)
+    entries = []
+    for bid, bt, use in (("1", 1000, use1), ("2", 2000, use2)):
+        entries.append(
+            "CPV: dev-libs/t341-dep-1\n"
+            "DEFINED_PHASES: -\n"
+            f"DESCRIPTION: backlog #346 S3 oracle build {bid}\n"
+            "EAPI: 8\n"
+            "IUSE: x\n"
+            f"KEYWORDS: {keywords}\n"
+            "SLOT: 0/1\n"
+            f"USE: {use}\n"
+            "REPO: t341\n"
+            f"PATH: dev-libs/t341-dep-1-{bid}.tbz2\n"
+            f"BUILD_ID: {bid}\n"
+            f"BUILD_TIME: {bt}\n"
+        )
+    (pkgdir / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 2\n\n" + "\n".join(entries) + "\n"
+    )
+    (Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/package.accept_keywords").write_text(
+        ak_line + "\n" if ak_line else ""
+    )
+    (Path(env["PORTAGE_CONFIGROOT"]) / "etc/portage/package.use").write_text(
+        use_line + "\n" if use_line else ""
+    )
+    return env
+
+
+def test_s3_bid_accept_keywords_bid2_accepts_only_build_2(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S3: a user `package.accept_keywords` line
+    `=dev-libs/t341-dep-1-2 ~amd64` accepts only the binary instance with
+    that build-id (Portage compares `_pkg_str` objects throughout,
+    dep:2994-3008); the older build 1 stays masked.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --usepkgonly=y dev-libs/t341-dep` (S0 cell
+    `b01-ak-bid2`, rc 0, stdout `[binary  N    ~]
+    dev-libs/t341-dep-1-2:0/1::t341 to <ROOT>/ USE="-x" 0 KiB`). The pin
+    below uses the `--pretend` short-line convention (no `:slot::repo`/`0
+    KiB` suffix); the signal is the `-2` instance suffix with the `~`
+    marker."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "~amd64", "", "", ak_line="=dev-libs/t341-dep-1-2 ~amd64"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N    ~] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s3_bid_accept_keywords_bid1_accepts_only_build_1(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S3: the mirror of the bid2 pin with user line
+    `=dev-libs/t341-dep-1-1 ~amd64`: only build 1 is accepted.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --usepkgonly=y dev-libs/t341-dep` (S0 cell
+    `b02-ak-bid1`, rc 0, stdout `[binary  N    ~]
+    dev-libs/t341-dep-1-1:0/1::t341 to <ROOT>/ USE="-x" 0 KiB`). Same
+    `--pretend` short-line convention as the bid2 pin."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "~amd64", "", "", ak_line="=dev-libs/t341-dep-1-1 ~amd64"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N    ~] dev-libs/t341-dep-1-1 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s3_bid_package_use_bid1_leaves_the_newer_build_mergeable(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S3: a user `package.use` line `=dev-libs/t341-dep-1-1
+    x` applies only to build 1, so with `--binpkg-respect-use=y` build 1's
+    effective USE matches its baked USE and build 2 (untouched, baked USE
+    empty) still merges as the newest eligible build.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --usepkgonly=y --binpkg-respect-use=y
+    dev-libs/t341-dep` (S0 cell `b04-use-bid1-respect`, rc 0, stdout
+    `[binary  N     ] dev-libs/t341-dep-1-2:0/1::t341 to <ROOT>/ USE="-x" 0
+    KiB`). Same `--pretend` short-line convention as the bid pins."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "amd64", "x", "", use_line="=dev-libs/t341-dep-1-1 x"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "--binpkg-respect-use=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N     ] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s3_bid_range_atom_ignores_the_build_id(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S3: a `>=` atom carrying a build-id ignores it (the id
+    is consulted only in the `=` branch, dep:2994-3008), so the newest
+    build merges.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --usepkgonly=y dev-libs/t341-dep` (S0 cell
+    `b05-range-ignored`, rc 0, stdout `[binary  N    ~]
+    dev-libs/t341-dep-1-2:0/1::t341 to <ROOT>/ USE="-x" 0 KiB`). Same
+    `--pretend` short-line convention as the bid pins."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "~amd64", "", "", ak_line=">=dev-libs/t341-dep-1-2 ~amd64"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N    ~] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def test_s3_bid_package_use_without_respect_use_leaves_display_use_alone(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S3: without `--binpkg-respect-use` a user `package.use`
+    build-id line does not move the displayed USE: a binary merges with its
+    baked USE.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --usepkgonly=y dev-libs/t341-dep` (S0 cell
+    `b06-use-bid-norespect`, rc 0, stdout `[binary  N     ]
+    dev-libs/t341-dep-1-2:0/1::t341 to <ROOT>/ USE="-x" 0 KiB`). Same
+    `--pretend` short-line convention as the bid pins."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "amd64", "x", "", use_line="=dev-libs/t341-dep-1-2 x"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N     ] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
 
 
 def test_s9_build_id_mask_masks_only_the_equal_instance(
