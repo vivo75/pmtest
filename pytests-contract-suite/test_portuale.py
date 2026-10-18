@@ -1649,6 +1649,135 @@ def test_mrg_remote_merge_replaces_a_same_slot_version(
         "setup-1.0\npreinst-1.0\npostinst-1.0\n"
         "setup-2.0\npreinst-2.0\nprerm-1.0\npostrm-1.0\npostinst-2.0\n"
     )
+
+def test_direct_ebuild_merge_prints_the_portage_listing(emerge_binary, tmp_path):
+    """Backlog #403 (S10): a direct `ebuild <file> merge` prints Portage's
+    per-file listing on stdout -- the collision line, `>>> Merging`,
+    one line per entry, `>>> <cpv> merged.` -- and nothing else new.
+    Expected rows come from the S403 oracle Portage capture
+    `LLM/evidence/2026-10-18-403/l/l01-ebuild-merge-portage.stdout`
+    (argv in `l01-ebuild-merge-portage.argv`: `ebuild …/t348-b-phases-7.ebuild
+    merge` on a fresh ROOT); the entry lines are compared as a
+    root-normalized multiset because Portage's sibling-subtree order is
+    readdir-derived while portuale traverses sorted (matrix.md §"Order").
+    `NOCOLOR=yes` pins the plain ` * ` shape (oracle cell l10); the
+    default colored shape is covered by the Rust unit test."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["NOCOLOR"] = "yes"
+
+    v1 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/pg403-listpkg/pg403-listpkg-1.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r = subprocess.run(
+        [str(ebuild_link), v1, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r.returncode == 0, r.stderr
+    assert (root / "var/db/pkg/dev-libs/pg403-listpkg-1.0").is_dir()
+
+    lines = r.stdout.splitlines()
+    assert " * checking 3 files for package collisions" in lines
+    assert f">>> Merging dev-libs/pg403-listpkg-1.0 to {root}/" in lines
+    assert f">>> dev-libs/pg403-listpkg-1.0 merged." in lines
+    merger_idx = lines.index(f">>> Merging dev-libs/pg403-listpkg-1.0 to {root}/")
+    merged_idx = lines.index(">>> dev-libs/pg403-listpkg-1.0 merged.")
+    entries = sorted(
+        line.replace(str(root), "<ROOT>")
+        for line in lines[merger_idx + 1 : merged_idx]
+    )
+    assert entries == [
+        ">>> <ROOT>/usr/",
+        ">>> <ROOT>/usr/share/",
+        ">>> <ROOT>/usr/share/pg403-listpkg/",
+        ">>> <ROOT>/usr/share/pg403-listpkg/keep.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/link -> old.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/old.txt",
+    ]
+
+
+def test_direct_ebuild_qmerge_replacement_prints_safely_unmerging(
+    emerge_binary, tmp_path
+):
+    """Backlog #403 (S10): `ebuild <file> qmerge` over an installed older
+    version prints the replace loop exactly like Portage -- the merge
+    entries (`---` kept, `===` identical, `>>>` new), then
+    `>>> Safely unmerging …`, one `--- replaced` line per old entry in
+    reverse-sorted CONTENTS order, the deferred `<<< dir` removals,
+    `>>> Original …`, `>>> <cpv> merged.` -- compared verbatim after root
+    normalization (the replace side is order-deterministic on both).
+    Expected rows come from the S403 oracle Portage capture
+    `LLM/evidence/2026-10-18-403/l/l05-qmerge-portage.stdout`
+    (argv in `l05-qmerge-portage.argv`: merge 7, `install` 8, `qmerge` 8).
+    `NOCOLOR=yes` pins the plain ` * ` shape (oracle cell l10)."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["NOCOLOR"] = "yes"
+
+    v1 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/pg403-listpkg/pg403-listpkg-1.0.ebuild"
+    )
+    v2 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/pg403-listpkg/pg403-listpkg-2.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r1 = subprocess.run(
+        [str(ebuild_link), v1, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r1.returncode == 0, r1.stderr
+    r2 = subprocess.run(
+        [str(ebuild_link), v2, "install"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert r2.returncode == 0, r2.stderr
+    r = subprocess.run(
+        [str(ebuild_link), v2, "qmerge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert not (root / "var/db/pkg/dev-libs/pg403-listpkg-1.0").exists()
+    assert (root / "usr/share/pg403-listpkg/new.txt").is_file()
+
+    listing = [
+        line.replace(str(root), "<ROOT>") for line in r.stdout.splitlines()
+    ]
+    assert listing == [
+        " * checking 4 files for package collisions",
+        ">>> Merging dev-libs/pg403-listpkg-2.0 to <ROOT>/",
+        "--- <ROOT>/usr/",
+        "--- <ROOT>/usr/share/",
+        "--- <ROOT>/usr/share/pg403-listpkg/",
+        "=== <ROOT>/usr/share/pg403-listpkg/keep.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/link -> new.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/new.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/old.txt",
+        ">>> Safely unmerging already-installed instance...",
+        "--- replaced obj <ROOT>/usr/share/pg403-listpkg/old.txt",
+        "--- replaced sym <ROOT>/usr/share/pg403-listpkg/link",
+        "--- replaced obj <ROOT>/usr/share/pg403-listpkg/keep.txt",
+        "--- replaced dir <ROOT>/usr/share/pg403-listpkg",
+        "--- replaced dir <ROOT>/usr/share",
+        "--- replaced dir <ROOT>/usr",
+        ">>> Original instance of package unmerged safely.",
+        ">>> dev-libs/pg403-listpkg-2.0 merged.",
+    ]
+
     assert (root / "usr/share/binpkgrmpkg/payload-2.0.txt").is_file()
     assert not (root / "usr/share/binpkgrmpkg/payload-1.0.txt").exists()
     assert (root / "var/db/pkg/dev-libs/binpkgrmpkg-2.0/CONTENTS").is_file()
@@ -6646,6 +6775,135 @@ def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_p
         "setup-1.0\npreinst-1.0\npostinst-1.0\n"
         "setup-2.0\npreinst-2.0\nprerm-1.0\npostrm-1.0\npostinst-2.0\n"
     )
+
+def test_direct_ebuild_merge_prints_the_portage_listing(emerge_binary, tmp_path):
+    """Backlog #403 (S10): a direct `ebuild <file> merge` prints Portage's
+    per-file listing on stdout -- the collision line, `>>> Merging`,
+    one line per entry, `>>> <cpv> merged.` -- and nothing else new.
+    Expected rows come from the S403 oracle Portage capture
+    `LLM/evidence/2026-10-18-403/l/l01-ebuild-merge-portage.stdout`
+    (argv in `l01-ebuild-merge-portage.argv`: `ebuild …/t348-b-phases-7.ebuild
+    merge` on a fresh ROOT); the entry lines are compared as a
+    root-normalized multiset because Portage's sibling-subtree order is
+    readdir-derived while portuale traverses sorted (matrix.md §"Order").
+    `NOCOLOR=yes` pins the plain ` * ` shape (oracle cell l10); the
+    default colored shape is covered by the Rust unit test."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["NOCOLOR"] = "yes"
+
+    v1 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/pg403-listpkg/pg403-listpkg-1.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r = subprocess.run(
+        [str(ebuild_link), v1, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r.returncode == 0, r.stderr
+    assert (root / "var/db/pkg/dev-libs/pg403-listpkg-1.0").is_dir()
+
+    lines = r.stdout.splitlines()
+    assert " * checking 3 files for package collisions" in lines
+    assert f">>> Merging dev-libs/pg403-listpkg-1.0 to {root}/" in lines
+    assert f">>> dev-libs/pg403-listpkg-1.0 merged." in lines
+    merger_idx = lines.index(f">>> Merging dev-libs/pg403-listpkg-1.0 to {root}/")
+    merged_idx = lines.index(">>> dev-libs/pg403-listpkg-1.0 merged.")
+    entries = sorted(
+        line.replace(str(root), "<ROOT>")
+        for line in lines[merger_idx + 1 : merged_idx]
+    )
+    assert entries == [
+        ">>> <ROOT>/usr/",
+        ">>> <ROOT>/usr/share/",
+        ">>> <ROOT>/usr/share/pg403-listpkg/",
+        ">>> <ROOT>/usr/share/pg403-listpkg/keep.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/link -> old.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/old.txt",
+    ]
+
+
+def test_direct_ebuild_qmerge_replacement_prints_safely_unmerging(
+    emerge_binary, tmp_path
+):
+    """Backlog #403 (S10): `ebuild <file> qmerge` over an installed older
+    version prints the replace loop exactly like Portage -- the merge
+    entries (`---` kept, `===` identical, `>>>` new), then
+    `>>> Safely unmerging …`, one `--- replaced` line per old entry in
+    reverse-sorted CONTENTS order, the deferred `<<< dir` removals,
+    `>>> Original …`, `>>> <cpv> merged.` -- compared verbatim after root
+    normalization (the replace side is order-deterministic on both).
+    Expected rows come from the S403 oracle Portage capture
+    `LLM/evidence/2026-10-18-403/l/l05-qmerge-portage.stdout`
+    (argv in `l05-qmerge-portage.argv`: merge 7, `install` 8, `qmerge` 8).
+    `NOCOLOR=yes` pins the plain ` * ` shape (oracle cell l10)."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["NOCOLOR"] = "yes"
+
+    v1 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/pg403-listpkg/pg403-listpkg-1.0.ebuild"
+    )
+    v2 = str(
+        Path(FIXTURES_ROOT) / "repo/dev-libs/pg403-listpkg/pg403-listpkg-2.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r1 = subprocess.run(
+        [str(ebuild_link), v1, "merge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r1.returncode == 0, r1.stderr
+    r2 = subprocess.run(
+        [str(ebuild_link), v2, "install"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert r2.returncode == 0, r2.stderr
+    r = subprocess.run(
+        [str(ebuild_link), v2, "qmerge"], capture_output=True, text=True, check=False, env=env
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert not (root / "var/db/pkg/dev-libs/pg403-listpkg-1.0").exists()
+    assert (root / "usr/share/pg403-listpkg/new.txt").is_file()
+
+    listing = [
+        line.replace(str(root), "<ROOT>") for line in r.stdout.splitlines()
+    ]
+    assert listing == [
+        " * checking 4 files for package collisions",
+        ">>> Merging dev-libs/pg403-listpkg-2.0 to <ROOT>/",
+        "--- <ROOT>/usr/",
+        "--- <ROOT>/usr/share/",
+        "--- <ROOT>/usr/share/pg403-listpkg/",
+        "=== <ROOT>/usr/share/pg403-listpkg/keep.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/link -> new.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/new.txt",
+        ">>> <ROOT>/usr/share/pg403-listpkg/old.txt",
+        ">>> Safely unmerging already-installed instance...",
+        "--- replaced obj <ROOT>/usr/share/pg403-listpkg/old.txt",
+        "--- replaced sym <ROOT>/usr/share/pg403-listpkg/link",
+        "--- replaced obj <ROOT>/usr/share/pg403-listpkg/keep.txt",
+        "--- replaced dir <ROOT>/usr/share/pg403-listpkg",
+        "--- replaced dir <ROOT>/usr/share",
+        "--- replaced dir <ROOT>/usr",
+        ">>> Original instance of package unmerged safely.",
+        ">>> dev-libs/pg403-listpkg-2.0 merged.",
+    ]
+
 
 
 def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(

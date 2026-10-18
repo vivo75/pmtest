@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture: direct-path merge/unmerge listing (backlog #403)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=047a51789d3bdb8de34c97c6a0430b66
