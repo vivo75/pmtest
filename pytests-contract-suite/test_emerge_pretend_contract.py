@@ -654,6 +654,16 @@ CASES = [
     #  Rust-black-box-tested in test_portuale.py, deliberately not run
     #  through these shared CASES against the read-only fixture ROOT.)
     ("genuinely unrecognized option", ["--totally-fake-option", "dev-libs/newpkg"], 2),
+    # (#347 S8: argparse error lines, rc 2 on both sides -- texts pinned
+    # by test_s8_argparse_error_lines_match_portage from the S0 C cells.)
+    ("#347 S8: bad --backtrack value", ["--pretend", "--backtrack=x", "dev-libs/newpkg"], 2),
+    ("#347 S8: bad --color choice", ["--pretend", "--color=maybe", "dev-libs/newpkg"], 2),
+    ("#347 S8: bad --with-bdeps choice", ["--pretend", "--with-bdeps=x", "dev-libs/newpkg"], 2),
+    ("#347 S8: bad --with-bdeps-auto choice", ["--pretend", "--with-bdeps-auto=x", "dev-libs/newpkg"], 2),
+    ("#347 S8: bad --onlydeps-with-rdeps choice", ["--pretend", "--onlydeps-with-rdeps=x", "dev-libs/newpkg"], 2),
+    ("#347 S8: bad --onlydeps-with-ideps choice", ["--pretend", "--onlydeps-with-ideps=x", "dev-libs/newpkg"], 2),
+    ("#347 S8: bad --autounmask-backtrack choice", ["--pretend", "--autounmask-backtrack=x", "dev-libs/newpkg"], 2),
+    ("#347 S8: unrecognized long option", ["--frobnicate", "dev-libs/newpkg"], 2),
     ("recursion: basic dependency chain", ["--pretend", "dev-libs/withdeps"], 0),
     ("recursion: diamond dependency dedup", ["--pretend", "dev-libs/diamond"], 0),
     ("recursion: dependency cycle terminates", ["--pretend", "dev-libs/cycle-a"], 0),
@@ -8102,7 +8112,7 @@ def test_s7_exclude_rejects_non_plain_atoms_like_portage(
     )
     assert result.stderr == (
         f"emerge: error: Invalid Atom(s) in --exclude parameter: '{atom}' "
-        "(only package names and slot atoms (with wildcards) allowed)\n"
+        "(only package names and slot atoms (with wildcards) allowed)\n\n"
     )
 
 
@@ -8137,7 +8147,7 @@ def test_s7_exclude_two_bad_atoms_joined_with_comma(
     assert result.stderr == (
         "emerge: error: Invalid Atom(s) in --exclude parameter: "
         "'dev-libs/t341-dep::t341,>=dev-libs/t341-dep-1' "
-        "(only package names and slot atoms (with wildcards) allowed)\n"
+        "(only package names and slot atoms (with wildcards) allowed)\n\n"
     )
 
 
@@ -8164,7 +8174,7 @@ def test_s7_usepkg_exclude_rejects_repo_atom_like_portage(
     assert result.stderr == (
         "emerge: error: Invalid Atom(s) in --usepkg-exclude parameter: "
         "'dev-libs/t341-dep::t341' "
-        "(only package names and slot atoms (with wildcards) allowed)\n"
+        "(only package names and slot atoms (with wildcards) allowed)\n\n"
     )
 
 
@@ -8191,7 +8201,7 @@ def test_s7_buildpkg_exclude_rejects_blocker_without_the_suffix(
     )
     assert result.stderr == (
         "emerge: error: Invalid Atom(s) in --buildpkg-exclude parameter: "
-        "'!dev-libs/t341-dep'\n"
+        "'!dev-libs/t341-dep'\n\n"
     )
 
 
@@ -8227,7 +8237,7 @@ def test_s7_buildpkg_exclude_is_checked_before_the_strict_families(
     assert result.stdout == ""
     assert result.stderr == (
         "emerge: error: Invalid Atom(s) in --buildpkg-exclude parameter: "
-        "'!dev-libs/t341-dep'\n"
+        "'!dev-libs/t341-dep'\n\n"
     )
 
 
@@ -8273,7 +8283,7 @@ def test_s7_strict_families_share_the_exclude_message(
     )
     assert result.stderr == (
         f"emerge: error: Invalid Atom(s) in --{flag} parameter: '{atom}' "
-        "(only package names and slot atoms (with wildcards) allowed)\n"
+        "(only package names and slot atoms (with wildcards) allowed)\n\n"
     )
 
 
@@ -15990,7 +16000,7 @@ def test_short_flag_bundle_pv_enables_both_pretend_and_verbose(emerge_binary, fi
     for plain boolean short options, verified directly against real
     argparse before relying on it. Prior to this slice, a bundled token
     like this matched no table entry at all and was reported as
-    "unrecognized option", a worse outcome than even a "recognized, not
+    "unrecognized arguments", a worse outcome than even a "recognized, not
     implemented" report would have been, since -p and -v genuinely are
     both implemented."""
     for bundle in ("-pv", "-vp"):
@@ -16025,7 +16035,7 @@ def test_short_flag_bundle_reports_the_first_out_of_scope_character(
         [str(emerge_binary)], ["-pz", "dev-libs/useflagpkg"], fixture_env
     )
     assert unrecognized.returncode == 2
-    assert unrecognized.stderr.strip() == 'emerge: unrecognized option "-z"'
+    assert unrecognized.stderr.strip() == "emerge: error: unrecognized arguments: -z"
 
 
 def test_bundled_verbose_never_consumes_the_next_token_as_its_value(
@@ -19731,7 +19741,7 @@ def test_deep_rejects_a_negative_inline_value(emerge_binary, fixture_env):
     )
     assert result.returncode == 2
     assert result.stdout == ""
-    assert result.stderr.strip() == 'emerge: invalid --deep parameter: "-1"'
+    assert result.stderr.strip() == "emerge: error: Invalid --deep parameter: '-1'"
 
 
 def test_jobs_and_load_average_are_scheduling_only_under_pretend(
@@ -19762,7 +19772,7 @@ def test_jobs_and_load_average_are_scheduling_only_under_pretend(
         assert rust.returncode == 0
         assert rust.stdout == expected
     for args, message in (
-        (["--pretend", "--jobs=x"], 'emerge: invalid --jobs parameter: "x"'),
+        (["--pretend", "--jobs=x"], "emerge: error: Invalid --jobs parameter: 'x'"),
         (["--pretend", "-jx"], 'emerge: invalid -j parameter: "x"'),
         (
             ["--pretend", "--load-average"],
@@ -19770,17 +19780,140 @@ def test_jobs_and_load_average_are_scheduling_only_under_pretend(
         ),
         (
             ["--pretend", "--load-average=0"],
-            'emerge: invalid --load-average parameter: "0"',
+            "emerge: error: Invalid --load-average parameter: '0'",
         ),
         (
             ["--pretend", "--load-average=x"],
-            'emerge: invalid --load-average parameter: "x"',
+            "emerge: error: Invalid --load-average parameter: 'x'",
         ),
     ):
         rust = _run([str(emerge_binary)], args, fixture_env)
         assert rust.returncode == 2
         assert rust.stdout == ''
         assert rust.stderr.strip() == message
+
+
+@pytest.mark.parametrize(
+    "args,stderr",
+    [
+        (
+            ["--pretend", "--jobs=x"],
+            "emerge: error: Invalid --jobs parameter: 'x'\n\n",
+        ),
+        (
+            ["--pretend", "--load-average=x"],
+            "emerge: error: Invalid --load-average parameter: 'x'\n\n",
+        ),
+        (
+            ["--pretend", "--deep=x"],
+            "emerge: error: Invalid --deep parameter: 'x'\n\n",
+        ),
+        (
+            ["--pretend", "--backtrack=x"],
+            "emerge: error: Invalid --backtrack parameter: 'x'\n\n",
+        ),
+        (
+            ["--pretend", "--color=maybe"],
+            "emerge: error: argument --color: invalid choice: 'maybe' "
+            "(choose from 'y', 'n')\n",
+        ),
+        (
+            ["--pretend", "--with-bdeps=x"],
+            "emerge: error: argument --with-bdeps: invalid choice: 'x' "
+            "(choose from 'y', 'n')\n",
+        ),
+        (
+            ["--pretend", "--with-bdeps-auto=x"],
+            "emerge: error: argument --with-bdeps-auto: invalid choice: 'x' "
+            "(choose from 'y', 'n')\n",
+        ),
+        (
+            ["--pretend", "--onlydeps-with-rdeps=x"],
+            "emerge: error: argument --onlydeps-with-rdeps: invalid choice: 'x' "
+            "(choose from 'True', 'y', 'n')\n",
+        ),
+        (
+            ["--pretend", "--onlydeps-with-ideps=x"],
+            "emerge: error: argument --onlydeps-with-ideps: invalid choice: 'x' "
+            "(choose from 'True', 'y', 'n')\n",
+        ),
+        (
+            ["--pretend", "--autounmask-backtrack=x"],
+            "emerge: error: argument --autounmask-backtrack: invalid choice: 'x' "
+            "(choose from 'y', 'n')\n",
+        ),
+        (
+            ["--frobnicate"],
+            "emerge: error: unrecognized arguments: --frobnicate\n",
+        ),
+        (
+            ["--pretend", "--exclude", "=a/b-1"],
+            "emerge: error: Invalid Atom(s) in --exclude parameter: '=a/b-1' "
+            "(only package names and slot atoms (with wildcards) allowed)\n\n",
+        ),
+        (
+            ["--pretend", "--buildpkg-exclude", "!dev-libs/t341-dep"],
+            "emerge: error: Invalid Atom(s) in --buildpkg-exclude parameter: "
+            "'!dev-libs/t341-dep'\n\n",
+        ),
+    ],
+    ids=[
+        "c01-jobs",
+        "c03-load-average",
+        "c04-deep",
+        "c05-backtrack",
+        "c06-color",
+        "c07-with-bdeps",
+        "c08-with-bdeps-auto",
+        "c09-onlydeps-with-rdeps",
+        "c10-onlydeps-with-ideps",
+        "c11-autounmask-backtrack",
+        "c12-frobnicate",
+        "c13-exclude-badatom",
+        "c14-buildpkg-exclude-badatom",
+    ],
+)
+def test_s8_argparse_error_lines_match_portage(
+    emerge_binary, fixture_env, args, stderr
+):
+    """Plan #347 S8 (347-ERR): every option-parsing failure prints
+    Portage's `emerge: error:` line, without the `usage:` block (347-USG
+    cut: its option order comes from a `frozenset`, so it is not
+    reproducible byte for byte). Messages Portage passes to
+    `parser.error` (`--jobs`, `--load-average`, `--deep`,
+    `--backtrack`, `--exclude`, `--buildpkg-exclude`) carry their
+    trailing `\\n`, so a blank line follows (rule D4); argparse-native
+    errors (`invalid choice`, `unrecognized arguments`) end in one
+    `\\n`. stdout is empty, rc 2.
+
+    Oracle: Portage 3.0.82.2, this host (S0 C cells
+    `LLM/evidence/2026-10-15-346-s0/c/`, `PYTHONHASHSEED=0` runs), full
+    argv per row `emerge -p --package-moves=n <flag> dev-libs/t341-dep`
+    (c12: `emerge --frobnicate dev-libs/t341-dep`, no `--package-moves`;
+    every row dies in arg parsing, so `-p` vs the hermetic root changes
+    nothing and only the `emerge: error:` tail is pinned):
+    `c01-jobs-seed-portage.stderr` (`Invalid --jobs parameter: 'x'`),
+    `c03-load-average-seed-portage.stderr`,
+    `c04-deep-seed-portage.stderr`,
+    `c05-backtrack-seed-portage.stderr`,
+    `c06-color-seed-portage.stderr` (`argument --color: invalid choice:
+    'maybe' (choose from 'y', 'n')`),
+    `c07-with-bdeps-seed-portage.stderr`,
+    `c08-with-bdeps-auto-seed-portage.stderr`,
+    `c09-onlydeps-with-rdeps-seed-portage.stderr`,
+    `c10-onlydeps-with-ideps-seed-portage.stderr`,
+    `c11-autounmask-backtrack-seed-portage.stderr`,
+    `c12-frobnicate-seed-portage.stderr` (`unrecognized arguments:
+    --frobnicate`), `c13-exclude-badatom-seed-portage.stderr`
+    (`Invalid Atom(s) in --exclude parameter: '=a/b-1' (only …)`),
+    `c14-buildpkg-exclude-badatom-seed-portage.stderr` (no `(only …)`
+    suffix, `_emerge/main.py:839-845`)."""
+    result = _run(
+        [str(emerge_binary)], [*args, "dev-libs/t341-dep"], fixture_env
+    )
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr == stderr
 
 
 def test_implicit_system_deps_n_skips_the_system_first_merge_order_bias(
@@ -21462,7 +21595,7 @@ def test_genuinely_unrecognized_option_gets_a_distinct_message(emerge_binary, fi
         [str(emerge_binary)], ["--totally-fake-option", "dev-libs/newpkg"], fixture_env
     )
     assert result.returncode == 2
-    assert result.stderr.strip() == 'emerge: unrecognized option "--totally-fake-option"'
+    assert result.stderr.strip() == "emerge: error: unrecognized arguments: --totally-fake-option"
 
 
 def _b1_root(tmp_path, world_atoms, installed):

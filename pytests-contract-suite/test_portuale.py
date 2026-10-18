@@ -210,6 +210,41 @@ def test_mrg_runs_the_emerge_codepath(mrg_binary, emerge_binary, fixture_env):
     assert "[ebuild  N     ] dev-libs/newpkg-1.0" in mrg.stdout
 
 
+def test_mrg_forwards_rebuild_and_usepkg_exclude(mrg_binary, emerge_binary, fixture_env):
+    """Plan #347 S8 (347-MRG): `mrg` accepts `--rebuild-exclude`,
+    `--rebuild-ignore` and `--usepkg-exclude` (repeatable atom lists,
+    `action: "append"` in Portage `_emerge/main.py`) and forwards one
+    `--long=<value>` per occurrence to the emerge codepath, so the run
+    is byte-identical through both applets (exit code included)."""
+    args = [
+        "--rebuild-exclude",
+        "cat/a",
+        "--rebuild-ignore",
+        "cat/b",
+        "--usepkg-exclude",
+        "cat/c",
+        "-p",
+        "dev-libs/newpkg",
+    ]
+    mrg = subprocess.run(
+        [str(mrg_binary), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=fixture_env,
+    )
+    emerge = subprocess.run(
+        [str(emerge_binary), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=fixture_env,
+    )
+    assert mrg.returncode == emerge.returncode == 0
+    assert mrg.stdout == emerge.stdout
+    assert "[ebuild  N     ] dev-libs/newpkg-1.0" in mrg.stdout
+
+
 def test_mrg_solver_selects_the_resolution_backend(mrg_binary, emerge_binary, fixture_env):
     """`--solver=` is portuale-only (Portage emerge has none): `mrg` parses
     exactly portage/pubgrub/resolvo and forwards `--solver=<value>` to the
