@@ -11212,3 +11212,76 @@ def test_autoclean_leaves_a_different_slot_instance_protected(
     assert not [ln for ln in lines if ln.startswith(">>> Unmerging")]
     assert restored.is_dir()
     assert (root / "var/db/pkg/app-misc/t348-b-phases-8").is_dir()
+
+
+def test_ebuild_sources_the_profile_user_and_env_hook_bashrcs_like_portage(
+    ebuild_binary, tmp_path
+):
+    """`/etc/portage/bashrc` (`PORTAGE_BASHRC`), a profile's
+    `profile.bashrc` (`PORTAGE_BASHRC_FILES`) and the
+    `/etc/portage/env/<cat>/<pn>` hook (`PM_EBUILD_HOOK_DIR`) are sourced
+    before every phase (backlog #372). Expected sequence captured with
+    host Portage 3.0.82.2 (`ebuild <file> manifest clean compile`, same
+    config root; `LLM/evidence/2026-10-18-372-s0/portage-marks.txt` in
+    portuale): per phase the profile bashrc first, then the user bashrc,
+    then the env hook; the `depend` phase sources only the user bashrc.
+    `clean` is not implemented by portuale's `ebuild`, so the compared
+    sequence starts at `pretend`."""
+    root = tmp_path / "cfg"
+    marks = tmp_path / "marks"
+    repo = root / "repo"
+    profile = repo / "profiles/base"
+    (repo / "metadata").mkdir(parents=True)
+    profile.mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("bashrcrepo\n")
+    (repo / "metadata/layout.conf").write_text("masters =\nthin-manifests = true\n")
+    (profile / "eapi").write_text("8\n")
+    (profile / "make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\nIUSE_IMPLICIT="prefix"\n'
+    )
+    pkg = repo / "dev-util/bashrcprobe"
+    pkg.mkdir(parents=True)
+    ebuild = pkg / "bashrcprobe-1.ebuild"
+    ebuild.write_text(
+        'EAPI=8\nDESCRIPTION="bashrc probe"\nSLOT="0"\nKEYWORDS="amd64"\n'
+        'S="${WORKDIR}"\n'
+    )
+    etc = root / "etc/portage"
+    (etc / "repos.conf").mkdir(parents=True)
+    (etc / "repos.conf/r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = bashrcrepo\n[bashrcrepo]\nlocation = {repo}\n"
+    )
+    (etc / "make.profile").symlink_to(profile)
+    (etc / "make.conf").write_text(
+        'ACCEPT_KEYWORDS="amd64"\n'
+        'FEATURES="-sandbox -usersandbox -network-sandbox -pid-sandbox -ipc-sandbox"\n'
+    )
+    (etc / "env/dev-util").mkdir(parents=True)
+    for path, tag in (
+        (etc / "bashrc", "user"),
+        (profile / "profile.bashrc", "profile"),
+        (etc / "env/dev-util/bashrcprobe", "hook-pn"),
+    ):
+        path.write_text(f'echo "{tag} ${{EBUILD_PHASE:-none}}" >> {marks}\n')
+
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "tmp")
+    env["DISTDIR"] = str(tmp_path / "dist")
+    (tmp_path / "dist").mkdir()
+    result = subprocess.run(
+        [str(ebuild_binary), str(ebuild), "compile"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    expected = []
+    for phase in ("pretend", "setup", "unpack", "prepare", "configure", "compile"):
+        expected += [f"profile {phase}", f"user {phase}", f"hook-pn {phase}"]
+    lines = marks.read_text().splitlines()
+    # The `depend` phase runs only when the host's depcachedir has no entry
+    # for this (fresh) repo path; Portage sources the user bashrc alone there.
+    assert [ln for ln in lines if "depend" in ln] in ([], ["user depend"])
+    assert [ln for ln in lines if "depend" not in ln] == expected
