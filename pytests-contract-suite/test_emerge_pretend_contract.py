@@ -17451,7 +17451,7 @@ def _libcheck_root(tmp_path):
     portage_dir.mkdir(parents=True)
     (portage_dir / "world").write_text("dev-libs/dcworld\n")
 
-    def install(package, rdepend="", needed_elf=""):
+    def install(package, rdepend="", needed_elf="", restrict=""):
         d = tmp_path / "var" / "db" / "pkg" / "dev-libs" / f"{package}-1.0"
         d.mkdir(parents=True)
         (d / "CATEGORY").write_text("dev-libs\n")
@@ -17460,6 +17460,8 @@ def _libcheck_root(tmp_path):
             (d / "RDEPEND").write_text(rdepend + "\n")
         if needed_elf:
             (d / "NEEDED.ELF.2").write_text(needed_elf + "\n")
+        if restrict:
+            (d / "RESTRICT").write_text(restrict + "\n")
 
     install("dcworld", rdepend="dev-libs/dcconsumer")
     install(
@@ -17470,6 +17472,9 @@ def _libcheck_root(tmp_path):
         "dclib",
         rdepend="dev-libs/dclibdep",
         needed_elf="X86_64;/usr/lib/libdclib.so.1;libdclib.so.1;;libc.so.6",
+        # With `preserve-libs` in FEATURES (make.globals) Portage scans only the
+        # cleanlist packages that restrict it (`_calc_depclean`, #383).
+        restrict="preserve-libs",
     )
     install("dclibdep")
     install("dcplainorphan")
@@ -17515,7 +17520,7 @@ def test_depclean_lib_check_disabled_removes_the_provider_and_warns(
     """emerge -pc --depclean-lib-check=n: the soname scan is skipped, so
     dclib + dclibdep + dcplainorphan are all removed, and the no-args
     advisory gains the `Depclean may break link level dependencies`
-    paragraph."""
+    paragraph (only with `preserve-libs` off, see below)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "-c", "--depclean-lib-check=n"],
@@ -17530,8 +17535,17 @@ def test_depclean_lib_check_disabled_removes_the_provider_and_warns(
         " dev-libs/dclib",
         " dev-libs/dclibdep",
     ]
-    assert " * Depclean may break link level dependencies. Thus, it is" in result.stdout
     assert ">>> Checking for lib consumers..." not in result.stderr
+    # The advisory paragraph needs `preserve-libs` OFF as well as the scan off
+    # (actions.py:816-818): with make.globals' default it is absent ...
+    assert " * Depclean may break link level dependencies. Thus, it is" not in result.stdout
+    # ... and present under `FEATURES=-preserve-libs`.
+    off_env = _libcheck_env(fixture_env, tmp_path / "off")
+    off_env["FEATURES"] = "-preserve-libs"
+    off = _run(
+        [str(emerge_binary)], ["--pretend", "-c", "--depclean-lib-check=n"], off_env
+    )
+    assert " * Depclean may break link level dependencies. Thus, it is" in off.stdout
 
 
 def test_depclean_lib_check_pinned_output(
