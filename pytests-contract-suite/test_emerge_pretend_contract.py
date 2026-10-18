@@ -490,7 +490,6 @@ CASES = [
     ("-pv: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "dev-libs/pg366-rb"], 0),
     ("-pve: a || group prefers the in-graph alternative in dep order A B (pg366-ra, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-ra"], 0),
     ("-pve: a || group prefers the in-graph alternative in dep order B A (pg366-rb, #366)", ["--pretend", "-v", "--emptytree", "dev-libs/pg366-rb"], 0),
-    ("-pv --autounmask-use=y: a flip-revealed || group defers to the drained graph (pg398-t, #398)", ["--pretend", "-v", "--autounmask-use=y", "dev-libs/pg398-t"], 1),
     ("-pv: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "dev-libs/pg34-tt"], 0),
     ("-pve: a || group prefers the target over the installed branch (pg34-tt, #34 S5)", ["--pretend", "-v", "--emptytree", "dev-libs/pg34-tt"], 0),
     ("-pv: new parent plans only itself (pg367-top, #367 S2)", ["--pretend", "-v", "dev-libs/pg367-top"], 0),
@@ -3090,6 +3089,7 @@ CASES = [
         ["--pretend", "dev-libs/libgit2-glib"],
         0,
     ),
+    ("-pv --autounmask-use=y: a flip-revealed || group defers to the drained graph (pg398-t, #398)", ["--pretend", "-v", "--autounmask-use=y", "dev-libs/pg398-t"], 1),
 ]
 
 
