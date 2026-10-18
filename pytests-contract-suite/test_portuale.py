@@ -2574,8 +2574,9 @@ def test_emerge_buildpkgonly_per_entry_binpkg_compress_from_package_env(
     )
     neighbour = Path(env["PKGDIR"]) / "dev-libs/packagepkg-1.0.tbz2"
     assert neighbour.is_file()
-    assert magic(neighbour)[:3] == b"BZh", (
-        "the unmatched neighbour keeps the run-wide bzip2 fallback bytes"
+    # Portage's make.globals default is BINPKG_COMPRESS="zstd" (embedded, #384).
+    assert magic(neighbour) == b"\x28\xb5\x2f\xfd", (
+        "the unmatched neighbour keeps the run-wide zstd default bytes"
     )
 
 

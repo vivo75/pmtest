@@ -6074,7 +6074,7 @@ def _wildcard_mask_configroot(tmp_path, fixtures_root, mask_line):
         "priority = 30\n\n"
         f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(
         fixtures_root / "repo/profiles/default"
     )
@@ -6127,7 +6127,11 @@ def _t341_configroot(tmp_path, fixtures_root):
         f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
         f"[t341]\nlocation = {fixtures_root / 'repo-341'}\npriority = 50\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    # `FEATURES="-news"`: the embedded make.globals turns `news` on, and the
+    # pins below were written for a root with no unread-news notice (#384).
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\nFEATURES="-news"\n'
+    )
     (cfg / "etc/portage/make.profile").symlink_to(
         fixtures_root / "repo/profiles/default"
     )
@@ -7347,7 +7351,7 @@ def _t341_profile_configroot(tmp_path, fixtures_root, repo="repo-341", layout=No
         f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
         f"[t341]\nlocation = {dst}\npriority = 50\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(dst / "profiles/t341/noeapi")
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}, cfg, dst
 
@@ -7628,7 +7632,7 @@ def _t341_user_configroot(tmp_path, fixtures_root):
         f"[repnamesection]\nlocation = {fixtures_root / 'repnamerepo'}\npriority = 40\n\n"
         f"[t341]\nlocation = {fixtures_root / 'repo-341'}\npriority = 50\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(
         fixtures_root / "repo/profiles/default"
     )
@@ -8175,7 +8179,18 @@ def test_s1_info_reports_user_make_defaults_like_portage(
     features_line = next(
         line for line in result.stdout.splitlines() if line.startswith("FEATURES=")
     )
-    assert features_line == 'FEATURES="test unmerge-orphans"'
+    # Portage's own make.globals tokens (embedded, #384) minus the root's
+    # `-news` (`_t341_configroot`), plus the user profile's `test`, sorted.
+    assert features_line == (
+        'FEATURES="assume-digests binpkg-docompress binpkg-dostrip binpkg-logs '
+        'binpkg-multi-instance buildpkg-live compress-index '
+        'config-protect-if-modified distlocks ebuild-locks fixlafiles '
+        'ipc-sandbox merge-sync merge-wait multilib-strict network-sandbox '
+        'parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs '
+        'protect-owned qa-unresolved-soname-deps sandbox strict test '
+        'unknown-features-warn unmerge-logs unmerge-orphans userfetch userpriv '
+        'usersandbox usersync xattr"'
+    )
 
 
 def test_s1_starred_packages_stay_out_of_at_profile(
@@ -10999,7 +11014,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "empty-pkgdir"}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "empty-pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
     (cfg / "etc/portage/binrepos.conf").write_text(
         f"[bh]\nsync-uri = file://{binhost}\npriority = 1\n"
@@ -11088,7 +11103,9 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=Non
     (cfg / "etc/portage/repos.conf").write_text(
         "[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = " + str(repo) + "\n"
     )
-    (cfg / "etc/portage/make.conf").write_text('PKGDIR="' + str(pkgdir) + '"\n')
+    (cfg / "etc/portage/make.conf").write_text(
+        'PKGDIR="' + str(pkgdir) + '"\nFEATURES="-news"\n'
+    )
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
     for name in binpkg_files:
         dest = pkgdir / "dev-libs" / name
@@ -11264,7 +11281,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "empty-pkgdir"}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "empty-pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
     # Fragment 1: the shared fixture binhost (has dev-libs/remotebinpkg).
     (cfg / "etc/portage/binrepos.conf/10-a.conf").write_text(
@@ -11357,7 +11374,7 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
     dest = pkgdir / "dev-libs/packagepkg/packagepkg-1.0-3.xpak"
     dest.parent.mkdir(parents=True)
@@ -11419,7 +11436,7 @@ def test_pkgdir_scan_skips_portage_invalid_class_and_aborts_the_rest(
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
     args = ["--pretend", "--usepkgonly", "dev-libs/binaryonlypkg"]
@@ -11733,7 +11750,7 @@ def test_usepkg_binary_of_a_since_removed_ebuild_is_reinstalled_only_when_it_dif
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
 
     vdb = cfg / "var/db/pkg/dev-libs/idbinpkg-1.0"
@@ -11934,7 +11951,7 @@ def _multi_instance_tree(tmp_path, remote_builds, local_builds=()):
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
     (cfg / "etc/portage/binrepos.conf").write_text(
         f"[bh]\nsync-uri = file://{binhost}\npriority = 1\nverify-signature = false\n"
@@ -12071,7 +12088,7 @@ def _slotop_pin_tree(tmp_path):
     (cfg / "etc/portage/repos.conf").write_text(
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "pkgdir"}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
@@ -12159,7 +12176,7 @@ def _slotop_new_slot_tree(tmp_path):
         f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
     )
     pkgdir = tmp_path / "pkgdir"
-    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\n')
+    (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
     # The installed consumer came from a binary (BUILD_ID/BUILD_TIME in its
     # vdb) that is still in `$PKGDIR` with the same identity -- the host's
@@ -21701,18 +21718,6 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
         f'PKGDIR="{tmp_path / "pkgdir"}"\n'
         'FEATURES="${FEATURES} -userfetch splitdebug"\n'
     )
-    globals_dir = cfg / "usr/share/portage/config"
-    globals_dir.mkdir(parents=True)
-    (globals_dir / "make.globals").write_text(
-        "# Number of times 'emerge --sync' will run before giving up.\n"
-        "# Don't edit this.\n"
-        'PORTAGE_TMPDIR="/var/tmp"\n'
-        'CONFIG_PROTECT="/etc"\n'
-        'CONFIG_PROTECT_MASK="/etc/env.d"\n'
-        'FEATURES="assume-digests distlocks merge-sync\n'
-        '          network-sandbox sandbox userfetch"\n'
-        'FEATURES="${FEATURES} -binpkg-multi-instance"\n'
-    )
     (cfg / "etc/profile.env").write_text(
         "export CONFIG_PROTECT='/usr/share/config /var/bind'\n"
         "export LANG='C.utf8'\n"
@@ -21734,13 +21739,21 @@ def test_info_stacks_make_globals_profile_env_and_info_vars(
     assert any(ln.startswith("KiB Mem:") for ln in lines)
     assert any(ln.startswith("KiB Swap:") for ln in lines)
     assert lines.index("Repositories:") > 2
-    # make.globals base + profile + make.conf, "-tok" resolved, sorted:
-    # merge-sync (globals) stays until profile -merge-sync; userfetch
-    # added by globals+profile, removed by make.conf; -binpkg-multi-
-    # instance never present.
+    # The embedded make.globals (Portage's own file plus `xattr`; a file
+    # under the config root is ignored, #384) + profile + make.conf, "-tok"
+    # resolved, sorted: the profile's `-merge-sync` and make.conf's
+    # `-userfetch` drop two base tokens, `sandbox`/`splitdebug` are added.
+    # Expected computed from the globals text with Portage's FEATURES
+    # accumulation (host /usr/share/portage/config/make.globals).
     assert (
-        '\nFEATURES="assume-digests distlocks network-sandbox sandbox '
-        'splitdebug"\n' in rust.stdout
+        '\nFEATURES="assume-digests binpkg-docompress binpkg-dostrip '
+        'binpkg-logs binpkg-multi-instance buildpkg-live compress-index '
+        'config-protect-if-modified distlocks ebuild-locks fixlafiles '
+        'ipc-sandbox merge-wait multilib-strict network-sandbox news '
+        'parallel-fetch pid-sandbox pkgdir-index-trusted preserve-libs '
+        'protect-owned qa-unresolved-soname-deps sandbox splitdebug strict '
+        'unknown-features-warn unmerge-logs unmerge-orphans userpriv '
+        'usersandbox usersync xattr"\n' in rust.stdout
     )
     # CONFIG_PROTECT: env.d + globals, union, sorted.
     assert (
@@ -21843,8 +21856,14 @@ def test_info_shows_the_calling_env_over_make_conf(
     assert "conf-bzip2-219" not in rust.stdout
     assert "conf-bunzip2-219" not in rust.stdout
     # Incremental fold: the calling env stacks onto make.conf, sorted.
-    assert '\nCONFIG_PROTECT="/conf-protect-219 /env-protect-219"\n' in rust.stdout
-    assert '\nCONFIG_PROTECT_MASK="/conf-mask-219 /env-mask-219"\n' in rust.stdout
+    # The embedded make.globals contributes `/etc` and `/etc/env.d` (#384).
+    assert (
+        '\nCONFIG_PROTECT="/conf-protect-219 /env-protect-219 /etc"\n' in rust.stdout
+    )
+    assert (
+        '\nCONFIG_PROTECT_MASK="/conf-mask-219 /env-mask-219 /etc/env.d"\n'
+        in rust.stdout
+    )
     assert '\nENV_UNSET="CONF_UNSET_219 ENV_UNSET_219"\n' in rust.stdout
 
 
@@ -28427,7 +28446,7 @@ def _t348_configroot(tmp_path, fixtures_root):
     )
     (cfg / "etc/portage/make.conf").write_text(
         f'PKGDIR="{cfg / "pkgdir"}"\n'
-        'FEATURES="-sandbox -usersandbox -network-sandbox"\n'
+        'FEATURES="-sandbox -usersandbox -network-sandbox -news"\n'
     )
     (cfg / "etc/portage/make.profile").symlink_to(
         fixtures_root / "repo/profiles/default"
@@ -31112,7 +31131,11 @@ def _t355_configroot(tmp_path, fixtures_root):
     )
     (cfg / "etc/portage/make.conf").write_text(
         f'PKGDIR="{cfg / "pkgdir"}"\n'
-        'FEATURES="-sandbox -usersandbox -network-sandbox"\n'
+        # `-protect-owned`: with Portage's default FEATURES a second merge over a
+        # path another package owns aborts ("NOT merged due to file
+        # collisions", checked with host Portage 3.0.82.2, #384); these cells
+        # exercise the merge/unmerge paths, so the abort is switched off.
+        'FEATURES="-sandbox -usersandbox -network-sandbox -news -protect-owned"\n'
         'T355_V="1"\n'
     )
     (cfg / "etc/portage/make.profile").symlink_to(
