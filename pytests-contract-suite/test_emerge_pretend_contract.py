@@ -642,6 +642,16 @@ CASES = [
     # cell by the `test_s3_*` functions (each docstring cites its B oracle
     # cell: host Portage 3.0.82.2, two-instance PKGDIR).
     ("#346 S3: build-id user-config cell earns Portage's rc 1", ["--pretend", "--usepkgonly", "dev-libs/t341-dep"], 1),
+    # #347 S9: --getbinpkg-exclude/include filter the remote index. The
+    # shared root's binhost holds dev-libs/remotebinpkg as a remote-only
+    # binary (no ebuild anywhere); excluding it leaves the top-level
+    # argument with no match, so both sides take the plain miss, rc 1
+    # (S0 cell g01-exclude's shape: host Portage 3.0.82.2, hermetic
+    # file:// binhost). The filter itself is pinned hermetically per
+    # cell by the `test_s9_getbinpkg_*` functions (each docstring cites
+    # its G oracle cell: host Portage 3.0.82.2, two remote-only
+    # binaries).
+    ("#347 S9: excluded remote-only binary earns Portage's rc 1", ["--pretend", "--getbinpkg", "--getbinpkg-exclude", "dev-libs/remotebinpkg", "dev-libs/remotebinpkg"], 1),
     ("no atom given", ["--pretend"], 2),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
@@ -6712,6 +6722,474 @@ def test_s3_bid_package_use_without_respect_use_leaves_display_use_alone(
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
         f'[binary  N     ] dev-libs/t341-dep-1-2 to {env["ROOT"]} USE="-x" ',
+    ]
+    assert result.stderr == ""
+
+
+def _s9_getbinpkg_configroot(tmp_path, fixtures_root, extra_binrepos="", mask=""):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #347 S9
+    cells: the S4 root (fixture repos plus the `repo-341` overlay) with a
+    scratch `s346g` repo (profiles only, NO ebuilds — exclusion is
+    visible as resolve/abort) and a scratch `file://` binhost holding
+    two remote-only binaries, `app-misc/s346-gbin-a-1` and
+    `app-misc/s346-gbin-b-1`. Mirrors S0 `scripts/g.sh` (`G_SETUP`):
+    same `Packages` entry fields (`EAPI: 8`, `KEYWORDS: amd64`,
+    `SLOT: 0`, empty `USE:`, `REPO: s346g`, `BUILD_ID: 1`), same
+    `[s346gbin]` section (priority 1). `extra_binrepos` appends lines to
+    `binrepos.conf` (per-repo keys); `mask` writes `package.mask`."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    cfg = Path(env["PORTAGE_CONFIGROOT"])
+    repo = tmp_path / "s346g"
+    (repo / "profiles").mkdir(parents=True)
+    (repo / "metadata").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("s346g\n")
+    (repo / "profiles/categories").write_text("app-misc\n")
+    (repo / "metadata/layout.conf").write_text("masters = testrepo\n")
+    with (cfg / "etc/portage/repos.conf").open("a") as f:
+        f.write(f"\n[s346g]\nlocation = {repo}\npriority = 70\n")
+    binhost = tmp_path / "binhost"
+    binhost.mkdir()
+    (binhost / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 2\n\n"
+        + "".join(
+            f"CPV: app-misc/{pn}-1\nDEFINED_PHASES: -\n"
+            f"DESCRIPTION: backlog #347 S9 oracle remote binary {pn}\n"
+            f"EAPI: 8\nIUSE:\nKEYWORDS: amd64\nSLOT: 0\nUSE:\nREPO: s346g\n"
+            f"PATH: app-misc/{pn}-1.gpkg.tar\nBUILD_ID: 1\nBUILD_TIME: 1000\n"
+            f"SIZE: 100\n\n"
+            for pn in ("s346-gbin-a", "s346-gbin-b")
+        )
+    )
+    (cfg / "etc/portage/binrepos.conf").write_text(
+        f"[s346gbin]\nsync-uri = file://{binhost}\npriority = 1\n" + extra_binrepos
+    )
+    if mask:
+        (cfg / "etc/portage/package.mask").write_text(mask)
+    return env
+
+
+def test_s9_getbinpkg_exclude_hides_the_remote(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: `--getbinpkg-exclude app-misc/s346-gbin-a` keeps
+    that remote out of the pool, so the top-level argument has no match
+    and aborts with the plain miss (the getbinpkg sets never reach the
+    `--exclude` skip rule — that consults `excluded_pkgs` only).
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --getbinpkg-exclude
+    app-misc/s346-gbin-a app-misc/s346-gbin-a app-misc/s346-gbin-b`
+    (S0 cell `g01-exclude`, rc 1, stderr `emerge: there are no ebuilds
+    to satisfy "app-misc/s346-gbin-a".`). The pin below uses the
+    `--pretend` convention (stdout empty on abort, per the #351 S7 Q6
+    ruling) and pins the miss first line only (the similar-names
+    suggestions are portuale's own)."""
+    env = _s9_getbinpkg_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--getbinpkg-exclude",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert (
+        result.stderr.splitlines()[0]
+        == 'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a".'
+    )
+
+
+def test_s9_getbinpkg_exclude_leaves_the_other_target(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: the positive side of the exclude cell — excluding
+    `a` still merges `b`.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --getbinpkg-exclude
+    app-misc/s346-gbin-a app-misc/s346-gbin-b` (S0 cell
+    `g01b-exclude-other-target`, rc 0, stdout `[binary  N g   ]
+    app-misc/s346-gbin-b-1-1::s346g to <ROOT>/ 1 KiB`). The pin below
+    uses `--pretend` short lines (no `:slot::repo`, no `to`-slash, no
+    size — portuale's convention)."""
+    env = _s9_getbinpkg_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--getbinpkg-exclude",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N g   ] app-misc/s346-gbin-b-1-1 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s9_getbinpkg_include_is_a_whitelist(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: a non-empty `--getbinpkg-include` is a whitelist
+    — the non-listed remote never becomes a candidate.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --getbinpkg-include
+    app-misc/s346-gbin-a app-misc/s346-gbin-a app-misc/s346-gbin-b`
+    (S0 cell `g02-include`, rc 1, stderr `emerge: there are no ebuilds
+    to satisfy "app-misc/s346-gbin-b".`). Same `--pretend`/miss-line
+    convention as the exclude pin."""
+    env = _s9_getbinpkg_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--getbinpkg-include",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert (
+        result.stderr.splitlines()[0]
+        == 'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-b".'
+    )
+
+
+def test_s9_getbinpkg_include_merges_the_listed_target(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: the positive side of the include cell — the
+    listed remote merges.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --getbinpkg-include
+    app-misc/s346-gbin-a app-misc/s346-gbin-a` (S0 cell
+    `g02b-include-only-target`, rc 0, stdout `[binary  N g   ]
+    app-misc/s346-gbin-a-1-1::s346g to <ROOT>/ 1 KiB`). Same
+    `--pretend` short-line convention as the g01b pin."""
+    env = _s9_getbinpkg_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--getbinpkg-include",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-a",
+        ],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N g   ] app-misc/s346-gbin-a-1-1 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s9_getbinpkg_overlap_warns_and_cancels(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: an atom in both CLI lists warns and cancels from
+    both — per binrepo first (each side overridden by the other), then
+    the CLI-overlap line — so nothing is filtered and both remotes
+    merge.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --getbinpkg-exclude
+    app-misc/s346-gbin-a --getbinpkg-include app-misc/s346-gbin-a
+    app-misc/s346-gbin-a app-misc/s346-gbin-b` (S0 cell `g03-both`,
+    rc 0, both `[binary  N g   ]` rows plus the three warning groups).
+    Portage prints the per-repo pair for every binrepo it sees
+    (`[s346gbin]`, `[gentoo]`, `[f1r]` — the last two are the host
+    install-path leak, S0 PROVENANCE.md H2); portuale reads
+    `binrepos.conf` from the configroot only, so the pin asserts the
+    `[s346gbin]` pair plus the CLI-overlap text. Same `--pretend`
+    short-line convention for the rows."""
+    env = _s9_getbinpkg_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--getbinpkg-exclude",
+            "app-misc/s346-gbin-a",
+            "--getbinpkg-include",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N g   ] app-misc/s346-gbin-a-1-1 to {env["ROOT"]}',
+        f'[binary  N g   ] app-misc/s346-gbin-b-1-1 to {env["ROOT"]}',
+    ]
+    assert (
+        "\n!!! The following getbinpkg-exclude atoms for [s346gbin] have "
+        "been overridden by the --getbinpkg-include option:\n\n"
+        "    app-misc/s346-gbin-a\n" in result.stderr
+    )
+    assert (
+        "\n!!! The following getbinpkg-include atoms for [s346gbin] have "
+        "been overridden by the --getbinpkg-exclude option:\n\n"
+        "    app-misc/s346-gbin-a\n" in result.stderr
+    )
+    assert (
+        "\n!!! The following atoms appear in both the --getbinpkg-exclude "
+        "and --getbinpkg-include command line arguments:\n\n"
+        "    app-misc/s346-gbin-a\n" in result.stderr
+    )
+
+
+def test_s9_getbinpkg_repo_key_filters_like_the_flag(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: the per-binrepo `getbinpkg-exclude` key folds
+    into the same filter (Q7 default yes).
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg app-misc/s346-gbin-a
+    app-misc/s346-gbin-b` with `getbinpkg-exclude =
+    app-misc/s346-gbin-a` in the `[s346gbin]` section (S0 cell
+    `g04-repokey`, rc 1, stderr `emerge: there are no ebuilds to
+    satisfy "app-misc/s346-gbin-a".`). Same `--pretend`/miss-line
+    convention as the g01 pin."""
+    env = _s9_getbinpkg_configroot(
+        tmp_path,
+        fixtures_root,
+        extra_binrepos="getbinpkg-exclude = app-misc/s346-gbin-a\n",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert (
+        result.stderr.splitlines()[0]
+        == 'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a".'
+    )
+
+
+def test_s9_getbinpkg_repo_bad_atom_warns_and_is_dropped(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: only package names and slot atoms are allowed in
+    the per-binrepo keys — a bad atom warns and is dropped, so nothing
+    is filtered.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg app-misc/s346-gbin-a
+    app-misc/s346-gbin-b` with `getbinpkg-exclude = =bad/atom-1` in
+    the `[s346gbin]` section (S0 cell `g05-repobadatom`, rc 0, both
+    rows plus the invalid-atoms warning). Same `--pretend`
+    short-line convention for the rows; the warning is byte-exact."""
+    env = _s9_getbinpkg_configroot(
+        tmp_path,
+        fixtures_root,
+        extra_binrepos="getbinpkg-exclude = =bad/atom-1\n",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N g   ] app-misc/s346-gbin-a-1-1 to {env["ROOT"]}',
+        f'[binary  N g   ] app-misc/s346-gbin-b-1-1 to {env["ROOT"]}',
+    ]
+    assert (
+        "\n!!! The following atoms are invalid in getbinpkg-exclude "
+        "attribute for binrepo [s346gbin] (only package names and slot "
+        "atoms allowed):\n\n    =bad/atom-1\n" in result.stderr
+    )
+
+
+def test_s9_getbinpkg_cli_include_overrides_the_repo_key(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9: `--getbinpkg-include` overrides a per-repo
+    exclude (and the reverse), each with a warning — while the include
+    whitelist still hides the non-listed remote.
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --getbinpkg-include
+    app-misc/s346-gbin-b app-misc/s346-gbin-a app-misc/s346-gbin-b`
+    with `getbinpkg-exclude = app-misc/s346-gbin-b` in `[s346gbin]`
+    (S0 cell `g06-cli-overrides-repo`, rc 1 on `a` with exactly the
+    exclude-overridden warning). The reverse warning must NOT print.
+    Same `--pretend`/miss-line convention as the g01 pin."""
+    env = _s9_getbinpkg_configroot(
+        tmp_path,
+        fixtures_root,
+        extra_binrepos="getbinpkg-exclude = app-misc/s346-gbin-b\n",
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--getbinpkg-include",
+            "app-misc/s346-gbin-b",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert (
+        'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a".'
+        in result.stderr
+    )
+    assert (
+        "\n!!! The following getbinpkg-exclude atoms for [s346gbin] have "
+        "been overridden by the --getbinpkg-include option:\n\n"
+        "    app-misc/s346-gbin-b\n" in result.stderr
+    )
+    assert "overridden by the --getbinpkg-exclude option" not in result.stderr
+
+
+def test_s9_partly_excluded_target_reports_the_masked_sibling(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9 (347-PX): with `--exclude app-misc/s346-gbin-a`
+    and `b` user-masked, the excluded argument is skipped silently and
+    the masked one reports the masked block (not the plain miss).
+
+    Portage 3.0.82.2 on this host, full argv `emerge -pv
+    --package-moves=n --getbinpkg --exclude app-misc/s346-gbin-a
+    app-misc/s346-gbin-a app-misc/s346-gbin-b` (S0 cell
+    `g07-partly-excluded`, rc 1, masked-`b` block on stderr). Stdout
+    stays empty per the #351 S7 Q6 ruling (Portage prints its
+    resolution preamble even under `-p`; portuale's `--pretend` never
+    does). The header carries no `for <ROOT>` suffix (pinned
+    convention); the row shape is Portage's."""
+    env = _s9_getbinpkg_configroot(
+        tmp_path, fixtures_root, mask="app-misc/s346-gbin-b\n"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--exclude",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "app-misc/s346-gbin-b", "app-misc/s346-gbin-b-1::s346g", "package.mask"
+    )
+
+
+def test_s9_excluded_and_masked_remote_is_skipped(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9 (347-PX): an argument that is both `--exclude`d
+    and masked is skipped silently — the sibling still merges.
+
+    No S0 cell covers this arrangement (S0 `g07-partly-excluded` pairs
+    an excluded argument with a *separate* masked one); the expectation
+    below is grounded in a live host probe instead (Portage 3.0.82.2,
+    same hermetic `file://` setup as the S9 helper, full argv `emerge
+    -pv --package-moves=n --getbinpkg --exclude app-misc/s346-gbin-b
+    app-misc/s346-gbin-a app-misc/s346-gbin-b`, rc 0, only the `a`
+    `[binary  N g   ]` row). Same `--pretend` short-line convention
+    for the row."""
+    env = _s9_getbinpkg_configroot(
+        tmp_path, fixtures_root, mask="app-misc/s346-gbin-b\n"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--exclude",
+            "app-misc/s346-gbin-b",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N g   ] app-misc/s346-gbin-a-1-1 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s9_excluded_remote_is_skipped(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #347 S9 (347-PX): an `--exclude`d remote-only argument is
+    skipped silently — the sibling still merges.
+
+    No S0 cell covers this arrangement either; grounded in a live host
+    probe like the sibling pin (Portage 3.0.82.2, same hermetic
+    `file://` setup, full argv `emerge -pv --package-moves=n
+    --getbinpkg --exclude app-misc/s346-gbin-a app-misc/s346-gbin-a
+    app-misc/s346-gbin-b`, rc 0, only the `b` row). Same `--pretend`
+    short-line convention for the row."""
+    env = _s9_getbinpkg_configroot(tmp_path, fixtures_root)
+    result = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--package-moves=n",
+            "--getbinpkg",
+            "--exclude",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-a",
+            "app-misc/s346-gbin-b",
+        ],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[binary  N g   ] app-misc/s346-gbin-b-1-1 to {env["ROOT"]}',
     ]
     assert result.stderr == ""
 
@@ -16203,7 +16681,7 @@ Binary packages:
       --buildpkg-exclude ATOMS  skip the binary package for matching packages
   -k, --usepkg / -K, --usepkgonly  use a usable binary package when one exists (-K: only, never build)
   -g, --getbinpkg / -G, --getbinpkgonly  also fetch binary packages from a remote binhost (-G: only)
-      --getbinpkg-exclude ATOMS, --getbinpkg-include ATOMS  validated like --exclude; fetch filtering is not modelled
+      --getbinpkg-exclude ATOMS, --getbinpkg-include ATOMS  filter remote binhost entries like --exclude; binrepos.conf keys fold in
       --usepkg-exclude ATOMS, --usepkg-include ATOMS  narrow which packages may come from a binary
       --binpkg-respect-use[=y|n]  reject a binary package built with the wrong USE
       --binpkg-changed-deps[=y|n]  reject a binary whose recorded deps differ from the ebuild (auto unless -K)
