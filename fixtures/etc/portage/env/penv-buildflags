@@ -8,5 +8,8 @@ MAKEOPTS="-j7"
 CC="fixture-cc"
 CXX="fixture-cxx"
 AR="fixture-ar"
-RUSTFLAGS="-C target-cpu=fixturepkg"
+# RUSTFLAGS continues over a line break (backlog #409): Portage getconfig
+# drops the backslash-newline pair, so the value is unchanged.
+RUSTFLAGS="-C \
+target-cpu=fixturepkg"
 ENV_UNSET="PENV_UNSET"
