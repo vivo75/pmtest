@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #398 plain puller of pg398-y (not installed; no USE; walks after the flip so Y reaches the graph late)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg398-y
+SLOT=0
+_md5_=57ac993bc5d9d4f55b4035dac67dda52

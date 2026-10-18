@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #398 flip-path || alternative X (not installed; leaf; first-listed in pg398-a's flip-gated group)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=60f3501a753da919c7c6663237bbf843
