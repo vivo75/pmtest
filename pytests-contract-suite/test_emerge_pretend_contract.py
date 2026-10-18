@@ -2131,6 +2131,7 @@ CASES = [
     ("package.accept_keywords: ** accepts no-keywords package", ["--pretend", "dev-libs/livekeywordpkg"], 0),
     ("package.accept_keywords: -amd64 revokes a globally-accepted keyword", ["--pretend", "dev-libs/keywordrevokedpkg"], 1),
     ("#346 S2: revoked keyword without profile keywords earns Portage's rc 1", ["--pretend", "-v", "dev-libs/keywordrevokedpkg"], 1),
+    ("#351 S7: non-pretend top-level all-masked abort earns Portage's rc 1", ["--oneshot", "dev-libs/keywordrevokedpkg"], 1),
     ("package.accept_keywords: \"*\" accepts any stable keyword", ["--pretend", "dev-libs/starkeywordpkg"], 0),
     ("package.accept_keywords: \"~*\" accepts any testing keyword", ["--pretend", "dev-libs/tildestarkeywordpkg"], 0),
     ("package.accept_keywords: bare atom implicitly grants ~arch", ["--pretend", "dev-libs/bareacceptkeywordspkg"], 0),
@@ -7932,6 +7933,67 @@ def test_s2_cross_file_minus_cancels_like_portage(
         "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
         "~amd64 keyword",
     ) in result.stderr
+
+
+@pytest.mark.parametrize(
+    "args,lines",
+    [
+        pytest.param(
+            ["--oneshot", "dev-libs/bareacceptkeywordspkg"],
+            [
+                "Calculating dependencies ... done!",
+                "Dependency resolution took (backtrack: 0/20).",
+                "",
+            ],
+            id="oneshot",
+        ),
+        pytest.param(
+            ["--ask=n", "-v", "dev-libs/bareacceptkeywordspkg"],
+            [
+                "",
+                "These are the packages that would be merged, in order:",
+                "",
+                "Calculating dependencies ... done!",
+                "Dependency resolution took (backtrack: 0/20).",
+                "",
+            ],
+            id="ask-verbose",
+        ),
+    ],
+)
+def test_s7_abort_masked_top_level_prints_resolution_notice(
+    emerge_binary, tmp_path, fixtures_root, args, lines
+):
+    """Backlog #351 S7 (351-ABORT): a non-`--pretend` run that aborts on
+    a top-level all-masked target prints the resolution notice on
+    stdout -- what `show_resolution_header` prints on the other abort
+    arms -- before the masked block on stderr (rc 1).
+
+    Oracle: Portage 3.0.82.2 (S0 A cells
+    `LLM/evidence/2026-10-15-346-s0/a/`), full argv `emerge --oneshot
+    --package-moves=n dev-libs/bareacceptkeywordspkg` (cell
+    `a01-masked-top-oneshot-portage.stdout`: the two lines, rc 1) and
+    `emerge --ask=n -v --package-moves=n
+    dev-libs/bareacceptkeywordspkg` (cell `a04-masked-top-ask-portage.stdout`:
+    the header plus the two lines, rc 1). The wall-clock seconds
+    Portage prints are cut per the determinism convention; only the
+    `backtrack: 0/20` signal is asserted. The hermetic root below
+    replays the same shape (`--package-moves=n` changes nothing
+    observable here). The `-p`/`-pv` all-masked arm stays silent by the
+    S7 Q6 ruling (cells `a02`/`a03`; pinned by the existing
+    `stdout == ""` asserts), and stderr is unchanged (`_all_masked`)."""
+    # A non-pretend abort exits before any merge, so running without
+    # `--pretend` against this throwaway ROOT is safe (the suite's
+    # `--pretend`-only convention guards merges, and none happens here).
+    env = _t341_configroot(tmp_path, fixtures_root)
+    result = _run([str(emerge_binary)], args, env)
+    assert result.returncode == 1
+    assert result.stdout.splitlines() == lines
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/bareacceptkeywordspkg",
+        "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
+        "~amd64 keyword",
+    )
 
 
 def _t341_cmd_invalid(emerge_binary, env, atom):
@@ -27943,7 +28005,11 @@ def test_t348_s5_unsupported_eapi_oneshot_and_buildpkgonly_mask(
         [str(emerge_binary)], ["--oneshot", "=app-misc/t348-d-eapi99-1"], env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout.splitlines() == [
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
+    ]  # #346 S7: Portage prints the notice before the masked block
     assert result.stderr.strip() == _all_masked_eapi(
         "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-eapi99-1::t348", "EAPI 99"
     )
@@ -27951,7 +28017,11 @@ def test_t348_s5_unsupported_eapi_oneshot_and_buildpkgonly_mask(
         [str(emerge_binary)], ["--buildpkgonly", "=app-misc/t348-d-eapi7a-1"], env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout.splitlines() == [
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
+    ]  # #346 S7: Portage prints the notice before the masked block
     assert result.stderr.strip() == _all_masked_eapi(
         "=app-misc/t348-d-eapi7a-1", "app-misc/t348-d-eapi7a-1::t348", "EAPI 7_alpha"
     )
@@ -28078,7 +28148,11 @@ def test_t348_s5_binpkg_with_unsupported_eapi_is_masked(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout.splitlines() == [
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
+    ]  # #346 S7: Portage prints the notice before the masked block
     assert result.stderr.strip() == _all_masked_eapi(
         "=app-misc/t348-s5-bineapi-1", "app-misc/t348-s5-bineapi-1", "EAPI 99"
     )
