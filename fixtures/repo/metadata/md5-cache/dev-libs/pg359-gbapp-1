@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/pg34-gone
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #359 S0 installed-only BDEPEND probe (BDEPEND on installed-not-in-repo pg34-gone); decides the buildtime_hard gate for #360
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=b6670b759bdf7cec225e6c60716b922a

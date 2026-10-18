@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #359 S0 virtual-deferral probe, first-listed || alternative (nothing pulls it)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=a38dbd1462acb7cf9efc581136070ca7

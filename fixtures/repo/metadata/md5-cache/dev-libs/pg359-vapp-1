@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #359 S0 virtual-deferral probe target (RDEPEND on virtual/pg359-v plus dev-libs/pg359-vb, which needs pg359-vy)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=virtual/pg359-v dev-libs/pg359-vb
+SLOT=0
+_md5_=9368db32eaac3cd693e342da4a376506

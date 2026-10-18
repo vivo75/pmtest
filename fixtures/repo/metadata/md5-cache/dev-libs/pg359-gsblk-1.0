@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #359 S0 greedy-slots blocker-lookahead probe, SLOT 1 old half (1.0 installed)
+EAPI=8
+KEYWORDS=amd64
+SLOT=1
+_md5_=f21a19a09fcbba32257e567584989c66

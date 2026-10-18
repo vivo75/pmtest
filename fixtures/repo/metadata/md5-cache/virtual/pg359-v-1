@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #359 S0 virtual-deferral probe, virtual offering || ( pg359-vx pg359-vy )
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-libs/pg359-vx dev-libs/pg359-vy )
+SLOT=0
+_md5_=a5c9d3239ba35f792c78b41918a9bc1c

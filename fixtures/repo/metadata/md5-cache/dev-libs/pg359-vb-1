@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #359 S0 virtual-deferral probe, plain dep pulling pg359-vy into the graph
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/pg359-vy
+SLOT=0
+_md5_=c427dd754ffe11c904db8051b08d4951
