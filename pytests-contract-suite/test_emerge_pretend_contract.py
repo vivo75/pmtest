@@ -2120,6 +2120,7 @@ CASES = [
     ("package.accept_keywords: profile-level entry extends visibility", ["--pretend", "dev-libs/profileacceptkeywordspkg"], 0),
     ("package.accept_keywords: ** accepts no-keywords package", ["--pretend", "dev-libs/livekeywordpkg"], 0),
     ("package.accept_keywords: -amd64 revokes a globally-accepted keyword", ["--pretend", "dev-libs/keywordrevokedpkg"], 1),
+    ("#346 S2: revoked keyword without profile keywords earns Portage's rc 1", ["--pretend", "-v", "dev-libs/keywordrevokedpkg"], 1),
     ("package.accept_keywords: \"*\" accepts any stable keyword", ["--pretend", "dev-libs/starkeywordpkg"], 0),
     ("package.accept_keywords: \"~*\" accepts any testing keyword", ["--pretend", "dev-libs/tildestarkeywordpkg"], 0),
     ("package.accept_keywords: bare atom implicitly grants ~arch", ["--pretend", "dev-libs/bareacceptkeywordspkg"], 0),
@@ -7739,6 +7740,188 @@ def test_s1_unstarred_packages_leave_at_system_alone(
         f'[ebuild  N     ] dev-libs/withdeps-1.0 to {env["ROOT"]}',
     ]
     assert result.stderr == ""
+
+
+def _t346_user_file_root(tmp_path, fixtures_root, files):
+    """A hermetic per-test PORTAGE_CONFIGROOT for the backlog #346 S2
+    cells: `_t341_configroot` plus `etc/portage/<name>` per `files`
+    (user-level files, not the user profile directory). Returns the env
+    dict plus the configroot path (for warning-path normalisation)."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    cfg = tmp_path / "cfg"
+    for name, content in files.items():
+        (cfg / "etc/portage" / name).write_text(content)
+    return env, cfg
+
+
+def test_s2_user_package_keywords_accepts_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S2: user `package.keywords`
+    `dev-libs/bareacceptkeywordspkg ~amd64` accepts the package, with
+    the message-only deprecation warning on stderr.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/bareacceptkeywordspkg` (S0 cell `k01-user-keywords`, rc 0,
+    stdout row `[ebuild  N    ~] dev-libs/bareacceptkeywordspkg-1.0 to
+    <cfg>/`, stderr `<cfg>/etc/portage/package.keywords is deprecated,
+    use <cfg>/etc/portage/package.accept_keywords instead` besides
+    Portage's own repo warnings and `UserWarning` frame, which portuale
+    omits by the S2 Q3 ruling). The hermetic root below replays the
+    same shape."""
+    env, cfg = _t346_user_file_root(
+        tmp_path,
+        fixtures_root,
+        {"package.keywords": "dev-libs/bareacceptkeywordspkg ~amd64\n"},
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/bareacceptkeywordspkg"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N    ~] dev-libs/bareacceptkeywordspkg-1.0 to {env["ROOT"]}',
+    ]
+    assert result.stderr.strip() == (
+        f"{cfg}/etc/portage/package.keywords is deprecated, "
+        f"use {cfg}/etc/portage/package.accept_keywords instead"
+    )
+
+
+def test_s2_user_profile_package_keywords_adds_a_stable_keyword_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S2: user-profile `package.keywords`
+    `dev-libs/bareacceptkeywordspkg amd64` adds the stable keyword to
+    the package's own KEYWORDS, so it merges with no `~` marker.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/bareacceptkeywordspkg` (S0 cell `k02-userprofile-amd64`,
+    rc 0, stdout row `[ebuild  N     ] dev-libs/bareacceptkeywordspkg-1.0
+    to <cfg>/`, no warning). The hermetic root below replays the same
+    shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"package.keywords": "dev-libs/bareacceptkeywordspkg amd64\n"},
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/bareacceptkeywordspkg"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/bareacceptkeywordspkg-1.0 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s2_chain_package_keywords_adds_a_stable_keyword_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S2: a chain profile's `package.keywords`
+    `dev-libs/bareacceptkeywordspkg amd64` does the same as the
+    user-profile cell above.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/bareacceptkeywordspkg` against a scratch chain profile
+    (S0 cell `k03-chain-amd64`, rc 0, `[ebuild  N     ]`, no warning).
+    The hermetic root below replays the same shape."""
+    env, _ = _t346_user_profile_root(tmp_path, fixtures_root, {})
+    cfg = tmp_path / "cfg"
+    chain = tmp_path / "chainkw"
+    chain.mkdir()
+    (chain / "parent").write_text(
+        os.path.relpath(fixtures_root / "repo/profiles/default", chain) + "\n"
+    )
+    (chain / "package.keywords").write_text(
+        "dev-libs/bareacceptkeywordspkg amd64\n"
+    )
+    (cfg / "etc/portage/make.profile").unlink()
+    (cfg / "etc/portage/make.profile").symlink_to(chain)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/bareacceptkeywordspkg"],
+        env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/bareacceptkeywordspkg-1.0 to {env["ROOT"]}',
+    ]
+    assert result.stderr == ""
+
+
+def test_s2_profile_minus_empties_the_keywords_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S2: user-profile `package.keywords`
+    `dev-libs/bareacceptkeywordspkg -~amd64` removes the package's own
+    keyword, so it stays masked with the bare `missing keyword` reason.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/bareacceptkeywordspkg` (S0 cell `k04-profile-minus`, rc 1,
+    `- dev-libs/bareacceptkeywordspkg-1.0::testrepo (masked by: missing
+    keyword)`; Portage also prints the resolution preamble on stdout,
+    which portuale omits on `--pretend` by convention). The hermetic
+    root below replays the same shape."""
+    env, _ = _t346_user_profile_root(
+        tmp_path,
+        fixtures_root,
+        {"package.keywords": "dev-libs/bareacceptkeywordspkg -~amd64\n"},
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/bareacceptkeywordspkg"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/bareacceptkeywordspkg",
+        "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
+        "missing keyword",
+    )
+
+
+def test_s2_cross_file_minus_cancels_like_portage(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #346 S2: user `package.keywords` `… ~amd64` plus user
+    `package.accept_keywords` `… -~amd64` stays masked: the keywords
+    file is read first, so the accept entry cancels it incrementally.
+
+    Portage 3.0.82.2, full argv `emerge -p --package-moves=n
+    dev-libs/bareacceptkeywordspkg` (S0 cell `k05-cross-minus`, rc 1,
+    `(masked by: ~amd64 keyword)`, and the deprecation warning fires
+    because the keywords file yielded an entry). The hermetic root
+    below replays the same shape."""
+    env, cfg = _t346_user_file_root(
+        tmp_path,
+        fixtures_root,
+        {
+            "package.keywords": "dev-libs/bareacceptkeywordspkg ~amd64\n",
+            "package.accept_keywords": "dev-libs/bareacceptkeywordspkg -~amd64\n",
+        },
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/bareacceptkeywordspkg"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    warning = (
+        f"{cfg}/etc/portage/package.keywords is deprecated, "
+        f"use {cfg}/etc/portage/package.accept_keywords instead"
+    )
+    assert result.stderr.strip().splitlines()[0] == warning
+    assert _all_masked(
+        "dev-libs/bareacceptkeywordspkg",
+        "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
+        "~amd64 keyword",
+    ) in result.stderr
 
 
 def _t341_cmd_invalid(emerge_binary, env, atom):
