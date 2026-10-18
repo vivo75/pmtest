@@ -3090,6 +3090,7 @@ CASES = [
         0,
     ),
     ("-pv --autounmask-use=y: a flip-revealed || group defers to the drained graph (pg398-t, #398)", ["--pretend", "-v", "--autounmask-use=y", "dev-libs/pg398-t"], 1),
+    ("#404: --clean --pretend still lists the outdated unmergepkg (autoclean reuse guard)", ["--clean", "--pretend"], 0),
 ]
 
 

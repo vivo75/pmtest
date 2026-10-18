@@ -10909,3 +10909,306 @@ def test_s6_emerge_foreground_streams_markers_and_build_log(
     )
     assert build_log.is_file()
     assert ">>> Unpacking source..." in build_log.read_text()
+
+
+def _t404_autoclean_env(tmp_path, fixtures_root):
+    """Child env for the backlog #404 auto-clean pins: `_s5_configroot`
+    (hermetic `repo-348` configroot, sandbox-off `FEATURES`, per-test
+    tmp/dist) plus `AUTOCLEAN="yes"` in `make.conf`, `NOCOLOR=yes` for
+    the plain listing shape, and a scratch `ROOT`. `CLEAN_DELAY` is
+    scrubbed from the child env (the suite pins it to 0): the 5-second
+    default then applies, so any countdown line fails the pin, proving
+    the auto-clean run never counts down (`unmerge.py:638`)."""
+    env, cfg = _s5_configroot(
+        tmp_path, fixtures_root, make_conf_extra='AUTOCLEAN="yes"\n'
+    )
+    env.pop("CLEAN_DELAY", None)
+    env["NOCOLOR"] = "yes"
+    root = tmp_path / "root"
+    root.mkdir()
+    env["ROOT"] = str(root)
+    return env, root
+
+
+def test_autoclean_after_merge_unmerges_the_outdated_leftover(
+    emerge_binary, ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #404 (02.346 S11): with a user-set `AUTOCLEAN=yes`, a
+    successful non-pretend merge is followed by the `--clean`
+    selection, which unmerges the outdated same-slot leftover.
+
+    Expected rows from the Portage 3.0.82.2 capture
+    `LLM/evidence/2026-10-18-404/l/cl01c-autoclean-leftover-portage.stdout`
+    (full argv in `cl01c-autoclean-leftover-portage.argv`: 7 merged via
+    `ebuild`, 8 merged over it, the saved 7 vdb entry restored, world
+    holding both packages, then `emerge --oneshot --package-moves=n
+    app-misc/t348-b-phaseslim`): the `>>> Auto-cleaning packages...`
+    and `>>> Using system located in ROOT tree <root>/` headers, the
+    selection table (`selected: 7` / `protected: 8`), the two slated
+    lines and `>>> Unmerging (1 of 1) …`. One known delta, a
+    pre-existing manual-path shape left untouched per the #404 brief
+    (fixing it would move the `--clean`/`-C` pins): Portage prints a
+    blank line between the `will not be removed.` line and the first
+    `>>> Unmerging`, portuale does not, so the pin asserts per-line
+    presence rather than a verbatim block."""
+    env, root = _t404_autoclean_env(tmp_path, fixtures_root)
+    v7 = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-7.ebuild"
+    )
+    v8 = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    r = subprocess.run(
+        [str(ebuild_binary), v7, "merge"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (v7, r.stdout, r.stderr)
+    saved = tmp_path / "saved7"
+    shutil.copytree(root / "var/db/pkg/app-misc/t348-b-phases-7", saved)
+    r = subprocess.run(
+        [str(ebuild_binary), v8, "merge"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (v8, r.stdout, r.stderr)
+    shutil.copytree(saved, root / "var/db/pkg/app-misc/t348-b-phases-7")
+    r = subprocess.run(
+        [str(ebuild_binary), v8, "merge"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    shutil.copytree(saved, root / "var/db/pkg/app-misc/t348-b-phases-7")
+    (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
+    (root / "var/lib/portage/world").write_text(
+        "app-misc/t348-b-phases\napp-misc/t348-b-phaseslim\n"
+    )
+    r = subprocess.run(
+        [
+            str(emerge_binary),
+            "--oneshot",
+            "--package-moves=n",
+            "app-misc/t348-b-phaseslim",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    lines = r.stdout.splitlines()
+    assert ">>> Auto-cleaning packages..." in lines
+    assert f">>> Using system located in ROOT tree {root}/" in lines
+    assert "    selected: 7 " in lines
+    assert "   protected: 8 " in lines
+    assert "     omitted: none " in lines
+    assert "All selected packages: =app-misc/t348-b-phases-7" in lines
+    assert ">>> 'Selected' packages are slated for removal." in lines
+    assert ">>> 'Protected' and 'omitted' packages will not be removed." in lines
+    assert ">>> Unmerging (1 of 1) app-misc/t348-b-phases-7..." in lines
+    assert not [ln for ln in lines if ln.startswith(">>> Waiting")]
+    assert not (root / "var/db/pkg/app-misc/t348-b-phases-7").exists()
+    assert (root / "var/db/pkg/app-misc/t348-b-phases-8").is_dir()
+
+
+def test_autoclean_after_fresh_merge_reports_no_outdated_packages(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #404 (02.346 S11): with `AUTOCLEAN=yes` and nothing
+    outdated, the post-merge run prints the two headers and Portage's
+    `>>> No outdated packages were found on your system.`
+
+    Expected rows from the Portage 3.0.82.2 capture
+    `LLM/evidence/2026-10-18-404/l/cl02-autoclean-fresh-portage.stdout`
+    (full argv in `cl02-autoclean-fresh-portage.argv`: `emerge
+    --oneshot --package-moves=n app-misc/t348-b-phases` on a fresh
+    root). The pin merges the smaller `t348-b-phaseslim` instead: the
+    auto-clean block is package-independent."""
+    env, root = _t404_autoclean_env(tmp_path, fixtures_root)
+    r = subprocess.run(
+        [
+            str(emerge_binary),
+            "--oneshot",
+            "--package-moves=n",
+            "app-misc/t348-b-phaseslim",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    lines = r.stdout.splitlines()
+    assert ">>> Auto-cleaning packages..." in lines
+    assert f">>> Using system located in ROOT tree {root}/" in lines
+    assert ">>> No outdated packages were found on your system." in lines
+    assert not [ln for ln in lines if ln.startswith(">>> Waiting")]
+    assert not [ln for ln in lines if ln.startswith(">>> Unmerging")]
+
+
+def test_autoclean_stays_off_without_a_userset_yes(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #404 (02.346 S11): scope — with `AUTOCLEAN` unset or
+    `=no` in `make.conf` (the make.globals default is `no`), a
+    successful merge prints no auto-clean block.
+
+    Expected (absence) from the Portage 3.0.82.2 captures
+    `LLM/evidence/2026-10-18-404/l/cl03-autoclean-unset-portage.stdout`
+    and `cl04-autoclean-no-portage.stdout` (same merge shape as the
+    `cl02` pin, `AUTOCLEAN` line dropped / set to `no`)."""
+    for extra, tag in (("", "unset"), ('AUTOCLEAN="no"\n', "explicit-no")):
+        env, cfg = _s5_configroot(tmp_path / tag, fixtures_root, make_conf_extra=extra)
+        env.pop("CLEAN_DELAY", None)
+        env["NOCOLOR"] = "yes"
+        root = tmp_path / tag / "root"
+        root.mkdir(parents=True)
+        env["ROOT"] = str(root)
+        r = subprocess.run(
+            [
+                str(emerge_binary),
+                "--oneshot",
+                "--package-moves=n",
+                "app-misc/t348-b-phaseslim",
+            ],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert r.returncode == 0, (tag, r.stdout, r.stderr)
+        assert "Auto-cleaning" not in r.stdout, tag
+
+
+def test_autoclean_skipped_under_pretend_and_on_a_failed_merge(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #404 (02.346 S11): scope — Portage gates the run on a
+    successful non-pretend merge (`actions.py:694-704`: `retval ==
+    EX_OK and not (buildpkgonly or fetchonly or pretend)`), so
+    `--pretend` and a failed merge print no auto-clean block even with
+    `AUTOCLEAN=yes`.
+
+    Expected (absence) from the Portage 3.0.82.2 captures
+    `LLM/evidence/2026-10-18-404/l/cl06-autoclean-pretend-portage.stdout`
+    (`--pretend --oneshot`, rc 0) and
+    `cl07-autoclean-fail-portage.stdout` (scratch `s404-fail` repo,
+    `die` in `src_install`, rc 1); the pin rebuilds the failing repo
+    inline (no fixture touched), mirroring the oracle recipe."""
+    env, root = _t404_autoclean_env(tmp_path, fixtures_root)
+    r = subprocess.run(
+        [
+            str(emerge_binary),
+            "--pretend",
+            "--oneshot",
+            "--package-moves=n",
+            "app-misc/t348-b-phaseslim",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "Auto-cleaning" not in r.stdout
+
+    import hashlib
+
+    repo = tmp_path / "repo"
+    fcfg = tmp_path / "fcfg"
+    (fcfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles/default").mkdir(parents=True)
+    (repo / "metadata/md5-cache/app-misc").mkdir(parents=True)
+    (repo / "app-misc/s404-fail").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("s404\n")
+    (repo / "profiles/categories").write_text("app-misc\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ACCEPT_KEYWORDS="amd64"\nUSE=""\n'
+    )
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (repo / "metadata/layout.conf").write_text(
+        "masters = testrepo\nthin-manifests = true\n"
+    )
+    (fcfg / "etc/portage/repos.conf").write_text(
+        f"[s404]\nlocation = {repo}\n"
+    )
+    (fcfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    fail_ebuild = (
+        'EAPI=8\nDESCRIPTION="s404 failing probe"\nSLOT="0"\nKEYWORDS="amd64"\n'
+        '\nsrc_install() {\n\tdie "boom"\n}\n'
+    )
+    (repo / "app-misc/s404-fail/s404-fail-1.0.ebuild").write_text(fail_ebuild)
+    (repo / "metadata/md5-cache/app-misc/s404-fail-1.0").write_text(
+        "DEFINED_PHASES=install\nDESCRIPTION=s404 failing probe\nEAPI=8\n"
+        "KEYWORDS=amd64\nSLOT=0\n"
+        f"_md5_={hashlib.md5(fail_ebuild.encode()).hexdigest()}\n"
+    )
+    froot = tmp_path / "froot"
+    froot.mkdir()
+    fenv = dict(os.environ)
+    fenv["PORTAGE_CONFIGROOT"] = str(fcfg)
+    fenv["ROOT"] = str(froot)
+    fenv["DISTDIR"] = str(tmp_path / "fdist")
+    fenv["PORTAGE_TMPDIR"] = str(tmp_path / "fpt")
+    fenv["FEATURES"] = _S5_FEATURES_BASE
+    fenv["AUTOCLEAN"] = "yes"
+    fenv.pop("CLEAN_DELAY", None)
+    (tmp_path / "fdist").mkdir()
+    (tmp_path / "fpt").mkdir()
+    (fcfg / "etc/portage/make.conf").write_text(
+        f'PORTAGE_TMPDIR="{tmp_path / "fpt"}"\n'
+        f'DISTDIR="{tmp_path / "fdist"}"\n'
+        f'FEATURES="{_S5_FEATURES_BASE}"\n'
+        'AUTOCLEAN="yes"\n'
+    )
+    r = subprocess.run(
+        [str(emerge_binary), "--oneshot", "--package-moves=n", "app-misc/s404-fail"],
+        capture_output=True, text=True, check=False, env=fenv,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert "Auto-cleaning" not in r.stdout
+
+
+def test_autoclean_leaves_a_different_slot_instance_protected(
+    emerge_binary, ebuild_binary, tmp_path, fixtures_root
+):
+    """Backlog #404 (02.346 S11): only an older same-CP+slot instance
+    is outdated — an instance in another slot is protected, so the run
+    reports no outdated packages and removes nothing.
+
+    Expected rows from the Portage 3.0.82.2 capture
+    `LLM/evidence/2026-10-18-404/l/cl05-autoclean-slot-portage.stdout`
+    (same recipe as the leftover pin, but the restored 7 entry's
+    `SLOT` is edited to `1`: its consolidated `metadata` file is
+    deleted with the edit, or Portage keeps serving the stale
+    `SLOT=0`, documented in `PROVENANCE.md`)."""
+    env, root = _t404_autoclean_env(tmp_path, fixtures_root)
+    v7 = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-7.ebuild"
+    )
+    v8 = str(
+        Path(fixtures_root) / "repo-348/app-misc/t348-b-phases/t348-b-phases-8.ebuild"
+    )
+    r = subprocess.run(
+        [str(ebuild_binary), v7, "merge"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (v7, r.stdout, r.stderr)
+    saved = tmp_path / "saved7"
+    shutil.copytree(root / "var/db/pkg/app-misc/t348-b-phases-7", saved)
+    r = subprocess.run(
+        [str(ebuild_binary), v8, "merge"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (v8, r.stdout, r.stderr)
+    restored = root / "var/db/pkg/app-misc/t348-b-phases-7"
+    shutil.copytree(saved, restored)
+    (restored / "SLOT").write_text("1\n")
+    (restored / "metadata").unlink(missing_ok=True)
+    (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
+    (root / "var/lib/portage/world").write_text(
+        "app-misc/t348-b-phases\napp-misc/t348-b-phaseslim\n"
+    )
+    r = subprocess.run(
+        [
+            str(emerge_binary),
+            "--oneshot",
+            "--package-moves=n",
+            "app-misc/t348-b-phaseslim",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    lines = r.stdout.splitlines()
+    assert ">>> Auto-cleaning packages..." in lines
+    assert f">>> Using system located in ROOT tree {root}/" in lines
+    assert ">>> No outdated packages were found on your system." in lines
+    assert not [ln for ln in lines if ln.startswith(">>> Unmerging")]
+    assert restored.is_dir()
+    assert (root / "var/db/pkg/app-misc/t348-b-phases-8").is_dir()
