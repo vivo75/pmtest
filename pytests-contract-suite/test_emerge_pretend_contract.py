@@ -2342,7 +2342,7 @@ CASES = [
     ("--verbose=y inline form enables", ["--pretend", "--verbose=y", "dev-libs/useflagpkg"], 0),
     ("short-flag bundle -pv: both implemented flags", ["-pv", "dev-libs/useflagpkg"], 0),
     ("short-flag bundle -vp: order doesn't matter", ["-vp", "dev-libs/useflagpkg"], 0),
-    ("short-flag bundle -pf: pretend + unimplemented option", ["-pf", "dev-libs/useflagpkg"], 2),
+    ("short-flag bundle -pA: pretend + unimplemented option", ["-pA", "dev-libs/useflagpkg"], 2),
     ("short-flag bundle -pz: pretend + genuinely unrecognized", ["-pz", "dev-libs/useflagpkg"], 2),
     ("bundled -v never consumes a following token as its value", ["-pv", "n"], 1),
     ("--help is now implemented, not rejected", ["--help"], 0),
@@ -16634,18 +16634,19 @@ def test_short_flag_bundle_pv_enables_both_pretend_and_verbose(emerge_binary, fi
 def test_short_flag_bundle_reports_the_first_out_of_scope_character(
     emerge_binary, fixture_env
 ):
-    """-pf (pretend + Portage-but-unimplemented -f/--fetchonly) and -pz
+    """-pA (pretend + Portage-but-unimplemented -A/--alert; -f/--fetchonly was
+    the example until #401 implemented it) and -pz
     (pretend + a genuinely unrecognized "-z") each decompose left to
     right, processing "-p" silently and then reporting on the next
     character exactly as a standalone occurrence of it would -- same
     messages, same exit code."""
     unimplemented = _run(
-        [str(emerge_binary)], ["-pf", "dev-libs/useflagpkg"], fixture_env
+        [str(emerge_binary)], ["-pA", "dev-libs/useflagpkg"], fixture_env
     )
     assert unimplemented.returncode == 2
     assert (
         unimplemented.stderr.strip()
-        == 'emerge: option "--fetchonly" is a Portage emerge option, but is not yet '
+        == 'emerge: option "--alert" is a Portage emerge option, but is not yet '
         'implemented in portuale -- run "emerge --help" for the options '
         "and actions that are."
     )
