@@ -347,6 +347,7 @@ def _corpus_context(request: pytest.FixtureRequest, tmp_path_factory: pytest.Tem
 
 def pytest_terminal_summary(terminalreporter, exitstatus, config):
     corpus.write_blessed()
+    corpus.write_harvest()
     if corpus.drifted:
         terminalreporter.section("corpus drift (flagged for review)")
         for line in corpus.drifted:

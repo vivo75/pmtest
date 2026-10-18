@@ -38,6 +38,7 @@ EXPANDED_CORPUS = CORPUS_DIR / "expanded.json.xz"
 
 STRICT = os.environ.get("PORTUALE_CORPUS_STRICT") == "1"
 BLESS = os.environ.get("PORTUALE_CORPUS_BLESS") == "1"
+HARVEST = os.environ.get("PORTUALE_CORPUS_HARVEST") == "1"
 
 current_nodeid: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "current_nodeid", default=None
@@ -80,7 +81,7 @@ def normalize(text: str) -> str:
 # test changed on top of it (fixture roots, overrides, CLEAN_DELAY, ...).
 _HOST_ENV = dict(os.environ)
 _IGNORED_ENV = {"PYTEST_CURRENT_TEST", "PORTUALE_CORPUS_STRICT",
-                "PORTUALE_CORPUS_BLESS"}
+                "PORTUALE_CORPUS_BLESS", "PORTUALE_CORPUS_HARVEST"}
 
 
 def env_key(env: dict[str, str]) -> dict[str, str]:
@@ -147,6 +148,10 @@ _contract_cases: dict[str, dict] | None = None
 drifted: list[str] = []
 blessed: dict[str, dict] = {}
 blessed_expanded: dict[str, dict] = {}
+# HARVEST mode bookkeeping: stored keys some call matched, and the calls
+# that matched nothing (nodeid, args, env, result record), in call order.
+matched_keys: set[str] = set()
+unmatched_calls: list[tuple[str, dict]] = []
 
 
 def _nodekey(nodeid: str) -> str:
@@ -258,16 +263,60 @@ def check_contract_call(args, env, result) -> tuple[str | None, str | None]:
         if c["args"] == ident["args"] and c["env"] == ident["env"]
     ]
     if not candidates:
+        if HARVEST:
+            with _lock:
+                unmatched_calls.append((nodeid, {
+                    **ident,
+                    **result_record(result.returncode, result.stdout, result.stderr),
+                }))
         return None, None
     # A call beyond how many times this exact args+env was harvested (a
     # test issuing more repeats today than it did at harvest time) keeps
     # resolving to the last candidate, matching the pre-fix behaviour of
     # always finding *some* entry rather than going unmatched.
     key, stored = candidates[min(occurrence, len(candidates) - 1)]
+    if HARVEST:
+        with _lock:
+            matched_keys.add(key)
     message = compare(key, stored, args, env, result)
     if message:
         flag(key, message, stored, args, env, result, blessed)
     return key, message
+
+
+def _base_test(key: str) -> str:
+    """`dir/file.py::test[id]#n` -> `file.py::test` (parameter id, ordinal
+    and suite dir dropped): the test function a stored entry belongs to."""
+    return _nodekey(key.rsplit("#", 1)[0]).split("[", 1)[0]
+
+
+def write_harvest() -> None:
+    """`PORTUALE_CORPUS_HARVEST=1`, run over the *whole* suite: rebuild the
+    entries that went stale. A stored key no call matched is an orphan
+    (its parametrize id or args changed, so it silently checks nothing) and
+    is dropped; the calls of the test functions that had orphans and found
+    no entry are recorded afresh from the current Rust output. Entries that
+    were matched, and calls of every other test, are left as they are. The
+    result is a snapshot of Rust, not an agreement with the Python
+    reference."""
+    if not HARVEST:
+        return
+    cases = dict(_contract())
+    orphans = [k for k in cases if k not in matched_keys]
+    stale_tests = {_base_test(k) for k in orphans}
+    for k in orphans:
+        del cases[k]
+    ordinals: dict[str, int] = {}
+    added = 0
+    for nodeid, record in unmatched_calls:
+        if _base_test(nodeid + "#0") not in stale_tests:
+            continue
+        n = ordinals.get(nodeid, 0)
+        ordinals[nodeid] = n + 1
+        cases[f"{nodeid}#{n}"] = record
+        added += 1
+    save(CONTRACT_CORPUS, cases)
+    print(f"corpus harvest: dropped {len(orphans)} orphan(s), recorded {added} call(s)")
 
 
 def write_blessed() -> None:
