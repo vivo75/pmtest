@@ -3091,6 +3091,13 @@ CASES = [
     ),
     ("-pv --autounmask-use=y: a flip-revealed || group defers to the drained graph (pg398-t, #398)", ["--pretend", "-v", "--autounmask-use=y", "dev-libs/pg398-t"], 1),
     ("#404: --clean --pretend still lists the outdated unmergepkg (autoclean reuse guard)", ["--clean", "--pretend"], 0),
+    ("#375: --update-if-installed skips a package that is not installed (pg367-top)", ["-pvD", "--update-if-installed", "dev-libs/pg367-top"], 0),
+    ("#375: --update-if-installed updates an installed package (unsatuseslotalt)", ["-pv", "--update-if-installed", "dev-libs/unsatuseslotalt"], 0),
+    ("#396: --usepkgonly=n drops the ebuild database (a new package has no candidate)", ["-pv", "--usepkgonly=n", "dev-libs/pg367-top"], 1),
+    ("#396: --usepkgonly=n -u on an installed package plans nothing (pg34-blib)", ["-pvuD", "--usepkgonly=n", "dev-libs/pg34-blib"], 0),
+    ("#396: -K -u on an installed package without a binary plans nothing (pg34-blib)", ["-pvuDK", "dev-libs/pg34-blib"], 0),
+    ("#393: --update --package-moves=n keeps an installed same-version other slot (slotmovepkg)", ["--pretend", "--update", "--package-moves=n", "dev-libs/slotmovepkg"], 0),
+    ("#392: a new-slot row diffs USE against the installed other slot (no USE without -v)", ["--pretend", "--update", "dev-libs/unsatuseslotalt"], 0),
 ]
 
 
@@ -3110,7 +3117,23 @@ def _assert_abort_preamble(stdout: str) -> None:
     assert lines[3].startswith("Dependency resolution took (backtrack: ") and lines[3].endswith(").")
 
 
+# ` for <root>` suffix of the last `_run` call's unsatisfied-dependency
+# messages (backlog #395): Portage appends it when the target root differs
+# from the running root (`depgraph.py:6502-6503`); portuale takes the running
+# root from `PORTAGE_RUNNING_ROOT` (default `/`). The `_all_masked*` helpers
+# read it so a test with its own ROOT pins the full Portage line.
+_LAST_ROOT_SUFFIX = ""
+
+
+def _root_suffix(env: dict[str, str]) -> str:
+    root = env.get("ROOT", "/").rstrip("/")
+    running = env.get("PORTAGE_RUNNING_ROOT", "/").rstrip("/")
+    return "" if root == running else f" for {root}/"
+
+
 def _run(cmd: list[str], args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
+    global _LAST_ROOT_SUFFIX
+    _LAST_ROOT_SUFFIX = _root_suffix(env)
     result = subprocess.run(
         [*cmd, *args], capture_output=True, text=True, env=env, check=False
     )
@@ -3136,7 +3159,7 @@ def _all_masked(atom: str, cpv_repo: str, reason: str) -> str:
     matching ebuilds are all masked -- what portuale prints instead of
     the bare "there are no ebuilds to satisfy" line."""
     return (
-        f'!!! All ebuilds that could satisfy "{atom}" have been masked.\n'
+        f'!!! All ebuilds that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
         "!!! One of the following masked packages is required to complete your request:\n"
         f"- {cpv_repo} (masked by: {reason})\n"
         "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
@@ -6808,7 +6831,7 @@ def test_s9_getbinpkg_exclude_hides_the_remote(
     assert result.stdout == ""
     assert (
         result.stderr.splitlines()[0]
-        == 'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a".'
+        == f'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a"{_LAST_ROOT_SUFFIX}.'
     )
 
 
@@ -6875,7 +6898,7 @@ def test_s9_getbinpkg_include_is_a_whitelist(
     assert result.stdout == ""
     assert (
         result.stderr.splitlines()[0]
-        == 'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-b".'
+        == f'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-b"{_LAST_ROOT_SUFFIX}.'
     )
 
 
@@ -7001,7 +7024,7 @@ def test_s9_getbinpkg_repo_key_filters_like_the_flag(
     assert result.stdout == ""
     assert (
         result.stderr.splitlines()[0]
-        == 'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a".'
+        == f'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a"{_LAST_ROOT_SUFFIX}.'
     )
 
 
@@ -7081,7 +7104,7 @@ def test_s9_getbinpkg_cli_include_overrides_the_repo_key(
     assert result.returncode == 1
     assert result.stdout == ""
     assert (
-        'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a".'
+        f'emerge: there are no ebuilds to satisfy "app-misc/s346-gbin-a"{_LAST_ROOT_SUFFIX}.'
         in result.stderr
     )
     assert (
@@ -7445,7 +7468,7 @@ def test_s5_eapi5_node_keeps_modern_atoms_noeapi_drops_them(
     lines = _t341_normalize(result.stderr, cfg, dst, fixtures_root).splitlines()
     assert lines == expected + [""] + _all_masked(
         "dev-libs/t341-dep", "dev-libs/t341-dep-1::t341", "package.mask"
-    ).splitlines() + [""]
+    ).replace(_LAST_ROOT_SUFFIX, " for <ROOT>/").splitlines() + [""]
 
 
 def test_s5_formats_repo_deps_and_build_id_accepted(emerge_binary, tmp_path, fixtures_root):
@@ -7498,7 +7521,7 @@ def test_s5_formats_repo_deps_and_build_id_accepted(emerge_binary, tmp_path, fix
     ]
     lines = _t341_normalize(result.stderr, cfg, dst, fixtures_root).splitlines()
     assert lines[: len(expected)] == expected
-    assert 'emerge: there are no ebuilds to satisfy "dev-libs/t341-dep".' in "\n".join(
+    assert 'emerge: there are no ebuilds to satisfy "dev-libs/t341-dep" for <ROOT>/.' in "\n".join(
         lines[len(expected) :]
     )
 
@@ -7573,7 +7596,7 @@ def test_s5_nokey_layout_key_ignored_without_default_eapi_format(
     ]
     lines = _t341_normalize(result.stderr, cfg, dst, fixtures_root).splitlines()
     assert lines[: len(expected)] == expected
-    assert 'emerge: there are no ebuilds to satisfy "dev-libs/t341-dep".' in "\n".join(
+    assert 'emerge: there are no ebuilds to satisfy "dev-libs/t341-dep" for <ROOT>/.' in "\n".join(
         lines[len(expected) :]
     )
 
@@ -8588,7 +8611,7 @@ def test_s7_cmd_build_id_atom_with_no_build_resolves_to_no_ebuilds(
     assert result.stdout == ""
     assert (
         result.stderr
-        == 'emerge: there are no ebuilds to satisfy "=dev-libs/t341-dep-1-2".\n'
+        == f'emerge: there are no ebuilds to satisfy "=dev-libs/t341-dep-1-2"{_LAST_ROOT_SUFFIX}.\n'
     )
 
 
@@ -17027,14 +17050,16 @@ def test_preserved_rebuild_set_is_empty_when_the_registry_is_empty(
     emerge_binary, fixture_env, tmp_path
 ):
     """No preserved_libs_registry (or an empty one) -> @preserved-rebuild
-    expands to nothing, which hits the same "nothing to resolve" error an
-    empty target list from any other source would."""
+    expands to nothing, and Portage 3.0.82.2 treats an empty target list as
+    a plain empty merge list: rc 0, no rows (backlog #371; captured in
+    portuale `LLM/evidence/2026-10-18-s8/out-emptyroot-portage.txt`)."""
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
     args = ["--pretend", "@preserved-rebuild"]
     result = _run([str(emerge_binary)], args, env)
-    assert result.returncode == 2
+    assert result.returncode == 0
     assert result.stdout == ""
+    assert "no package atoms" not in result.stderr
 
 
 def test_world_missing_file_expands_to_system_not_an_error(
@@ -17045,7 +17070,7 @@ def test_world_missing_file_expands_to_system_not_an_error(
     `@selected u @system` (`_sets/base.py::WorldSet`), so with no world
     file it collapses to `@system` -- a non-empty list -- not an empty
     one. `@selected` alone stays just the world file, so *it* still hits
-    the "nothing to resolve" empty-target error. PORTAGE_CONFIGROOT stays
+    an empty merge list (rc 0). PORTAGE_CONFIGROOT stays
     pointed at the real fixtures (valid repos.conf/profile); only ROOT is
     an empty tmp_path with no var/lib/portage/world."""
     env = dict(fixture_env)
@@ -17056,15 +17081,23 @@ def test_world_missing_file_expands_to_system_not_an_error(
     assert w_rust.returncode == 0, w_rust.stderr
     assert w_rust.stdout != ""
 
-    # @selected alone -> empty -> the same "nothing to resolve" error.
+    # @selected alone -> empty -> Portage 3.0.82.2: rc 0, nothing listed
+    # (backlog #371; portuale `LLM/evidence/2026-10-18-s8/out-emptyroot-portage.txt`).
     s = _run([str(emerge_binary)], ["--pretend", "@selected"], env)
-    assert s.returncode == 2
+    assert s.returncode == 0
     assert s.stdout == ""
-    assert (
-        s.stderr.strip()
-        == "emerge: no package atoms to resolve (the target list, "
-        "after expanding any @world/@selected/@system/@installed/@<set>, is empty)"
-    )
+    assert "no package atoms" not in s.stderr
+
+
+def test_empty_target_list_verbose_prints_total_zero(emerge_binary, fixture_env, tmp_path):
+    """Backlog #371: `-pv @preserved-rebuild` on an empty registry is an
+    empty merge list in Portage 3.0.82.2 -- the `Total: 0 packages` line and
+    rc 0 (portuale `LLM/evidence/2026-10-18-s8/out/c371-preserved.txt`)."""
+    env = dict(fixture_env)
+    env["ROOT"] = str(tmp_path)
+    result = _run([str(emerge_binary)], ["-pv", "@preserved-rebuild"], env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines()[-1] == "Total: 0 packages, Size of downloads: 0 KiB"
 
 
 def test_world_sets_unresolvable_set_name_is_a_real_error(emerge_binary, fixture_env, tmp_path):
@@ -22273,7 +22306,7 @@ def _b1_merges(stdout):
 
 def _b1_run(args, env, emerge_binary):
     rust = _run([str(emerge_binary)], args, env)
-    assert rust.returncode == 0
+    assert rust.returncode == 0, rust.stderr
     return rust
 
 
@@ -28482,7 +28515,7 @@ def _all_masked_eapi(atom: str, cpv: str, reason: str) -> str:
     are that wrap, byte for byte), then the shared `MASKED PACKAGES`
     footer. Compared `.strip()`ed like `_all_masked`."""
     return (
-        f'!!! All ebuilds that could satisfy "{atom}" have been masked.\n'
+        f'!!! All ebuilds that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
         "!!! One of the following masked packages is required to complete your request:\n"
         f"- {cpv} (masked by: {reason})\n"
         "\nThe current version of portage supports EAPI '9'. You must upgrade to a\n"
@@ -31650,3 +31683,127 @@ def test_t355_dir_entry_that_is_a_live_symlink_is_unlinked(
     _t355_unmerge(emerge_binary, env, "app-misc/t355-d1")
     assert not os.path.lexists(live)
     assert (root / "opt/t355/other").is_dir()
+
+
+def test_update_if_installed_skips_uninstalled_arguments(emerge_binary, fixture_env):
+    """#375: `--update-if-installed` implies `--update` and skips an argument
+    with no installed instance (`depgraph.py` `_select_files`,
+    `create_depgraph_params.py:139-143`). Expected from Portage 3.0.82.2:
+    portuale `LLM/evidence/2026-10-18-s8/out/c375-*.txt` -- the new
+    `pg367-top` gives `Total: 0 packages`, the installed
+    `unsatuseslotalt` gives its `NS` row."""
+    top = _run(
+        [str(emerge_binary)],
+        ["-pvD", "--update-if-installed", "dev-libs/pg367-top"],
+        fixture_env,
+    )
+    assert top.returncode == 0, top.stderr
+    assert top.stdout.splitlines()[-1] == "Total: 0 packages, Size of downloads: 0 KiB"
+    assert "pg367-top" not in top.stdout
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["-pv", "--update-if-installed", "dev-libs/unsatuseslotalt"],
+    ) == [("NS", "dev-libs/unsatuseslotalt-2.0:2")]
+
+
+def test_usepkgonly_n_drops_the_ebuild_database(emerge_binary, fixture_env):
+    """#396: `--usepkgonly=n` keeps the key in Portage's `myopts`, so
+    `"--usepkgonly" not in myopts` (`depgraph.py:809`) leaves the ebuild
+    database out. Expected from Portage 3.0.82.2, portuale
+    `LLM/evidence/2026-10-18-s8/out/c396-*.txt`: a NEW package has no
+    candidate (rc 1, `no ebuilds to satisfy`); an installed one under `-u`
+    plans nothing (`Total: 0`, rc 0), with `-K` the same."""
+    new = _run(
+        [str(emerge_binary)], ["-pv", "--usepkgonly=n", "dev-libs/pg367-top"], fixture_env
+    )
+    assert new.returncode == 1
+    assert 'there are no ebuilds to satisfy "dev-libs/pg367-top"' in new.stderr
+    for extra in (["--usepkgonly=n"], ["-K"]):
+        old = _run(
+            [str(emerge_binary)],
+            ["-pvuD", *extra, "dev-libs/pg34-blib"],
+            fixture_env,
+        )
+        assert old.returncode == 0, (extra, old.stderr)
+        assert old.stdout.splitlines()[-1] == "Total: 0 packages, Size of downloads: 0 KiB"
+        assert "[ebuild" not in old.stdout
+
+
+def test_new_slot_row_has_no_use_string_without_verbose(emerge_binary, fixture_env):
+    """#392: `NS` rows diff USE against the highest installed instance of
+    another slot (output.py `set_pkg_info`, `cp_matches[-1]`), so a flag that
+    is off in both prints nothing at plain `-p`. Expected from Portage
+    3.0.82.2: portuale `LLM/evidence/2026-10-18-s8/out/c392-*.txt`; `-v`
+    still lists every flag."""
+    plain = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "dev-libs/unsatuseslotalt"],
+        fixture_env,
+    )
+    assert plain.returncode == 0, plain.stderr
+    assert "USE=" not in plain.stdout
+    verbose = _run(
+        [str(emerge_binary)], ["-pvu", "dev-libs/unsatuseslotalt"], fixture_env
+    )
+    assert 'USE="-unsatuseorflag"' in verbose.stdout
+
+
+def test_update_package_moves_n_keeps_same_version_in_other_slot(emerge_binary, fixture_env):
+    """#393: with `--package-moves=n` the installed `slotmovepkg-1.0:0` and the
+    tree's `slotmovepkg-1.0:1` share a cpv; under `--update` Portage 3.0.82.2
+    keeps the installed instance and lists nothing (portuale
+    `LLM/evidence/2026-10-18-s8/out/c393-*.txt`)."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "--package-moves=n", "dev-libs/slotmovepkg"],
+        fixture_env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "[ebuild" not in result.stdout
+
+
+def _repos_conf_usepkg_env(fixture_env, fixtures_root, tmp_path, extra):
+    """The fixture config tree with `extra` lines added to `[testrepo]` in
+    `repos.conf` (locations made absolute, as a copied tree needs)."""
+    cfg = tmp_path / "cfg373"
+    shutil.copytree(fixtures_root / "etc", cfg / "etc", symlinks=True)
+    for child in fixtures_root.iterdir():
+        if child.name != "etc":
+            (cfg / child.name).symlink_to(child)
+    conf = cfg / "etc/portage/repos.conf/repos.conf"
+    out = []
+    for line in conf.read_text().splitlines():
+        if line.startswith("location = ") and not line.split("= ", 1)[1].startswith("/"):
+            line = f"location = {fixtures_root / line.split('= ', 1)[1]}"
+        out.append(line)
+        if line == f"location = {fixtures_root / 'repo'}":
+            out.extend(extra)
+    conf.write_text("\n".join(out) + "\n")
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    return env
+
+
+def test_repos_conf_usepkg_exclude_and_include_fold_into_the_cli_lists(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """#373: `usepkg-exclude`/`usepkg-include` in a `repos.conf` section act
+    like the CLI options with `::<reponame>` appended
+    (`repository/config.py:253-282`, `depgraph.py:384-392`). Expected from
+    Portage 3.0.82.2, portuale `LLM/evidence/2026-10-18-s8/out373/`: the
+    only binary of `binaryonlypkg` is dropped by an exclude or a
+    non-matching include (rc 1) and kept by a matching include (rc 0).
+    Portage words the rc-1 abort `All ebuilds ... have been masked`; the
+    wording is the separate #416."""
+    args = ["--pretend", "--usepkg", "dev-libs/binaryonlypkg"]
+    for extra, rc in (
+        ([], 0),
+        (["usepkg-exclude = dev-libs/binaryonlypkg"], 1),
+        (["usepkg-include = dev-libs/doesnotexist-anywhere"], 1),
+        (["usepkg-include = dev-libs/binaryonlypkg"], 0),
+    ):
+        env = _repos_conf_usepkg_env(fixture_env, fixtures_root, tmp_path, extra)
+        result = _run([str(emerge_binary)], args, env)
+        assert result.returncode == rc, (extra, result.stdout, result.stderr)
+        shutil.rmtree(tmp_path / "cfg373")
