@@ -250,7 +250,7 @@ CASES = [
     ("--load-average=N is accepted and inert under --pretend", ["--pretend", "--load-average=2.5", "dev-libs/newpkg"], 0),
     ("--load-average with a separate value, inert under --pretend", ["--pretend", "--load-average", "2.5", "dev-libs/newpkg"], 0),
     ("-l2.5 attached short form, inert under --pretend", ["--pretend", "-l2.5", "dev-libs/newpkg"], 0),
-    ("--load-average without a value is a parse error", ["--pretend", "--load-average", "dev-libs/newpkg"], 2),
+    ("--load-average followed by a non-number stands alone (insert_optional_args, #405)", ["--pretend", "--load-average", "dev-libs/newpkg"], 0),
     ("--load-average=0 is a parse error (real requires a positive number)", ["--pretend", "--load-average=0", "dev-libs/newpkg"], 2),
     ("--implicit-system-deps=y is the default (bias on)", ["--pretend", "--update", "--implicit-system-deps=y", "@world"], 0),
     ("--implicit-system-deps bare counts as y", ["--pretend", "--update", "--implicit-system-deps", "@world"], 0),
@@ -20406,11 +20406,8 @@ def test_jobs_and_load_average_are_scheduling_only_under_pretend(
         assert rust.stdout == expected
     for args, message in (
         (["--pretend", "--jobs=x"], "emerge: error: Invalid --jobs parameter: 'x'"),
-        (["--pretend", "-jx"], 'emerge: invalid -j parameter: "x"'),
-        (
-            ["--pretend", "--load-average"],
-            'emerge: option "--load-average" requires a positive number',
-        ),
+        # `-jx`: Portage recycles the rest of the bundle (#405, Portage 3.0.82.2).
+        (["--pretend", "-jx"], "emerge: error: unrecognized arguments: -x"),
         (
             ["--pretend", "--load-average=0"],
             "emerge: error: Invalid --load-average parameter: '0'",
@@ -20757,20 +20754,29 @@ def test_exclude_inline_equals_form_and_missing_argument(emerge_binary, fixture_
     missing_arg = _run([str(emerge_binary)], ["--pretend", "--exclude"], fixture_env)
     assert missing_arg.returncode == 2
     assert missing_arg.stdout == ""
-    assert missing_arg.stderr.strip() == 'emerge: option "--exclude" requires an argument'
-
-
-def test_exclude_is_not_bundle_compatible(emerge_binary, fixture_env):
-    """Unlike -v/-D, -X's own value is required, not optional, so this
-    portuale deliberately doesn't support bundling it -- a specific message
-    instead of a misleading generic one."""
-    result = _run([str(emerge_binary)], ["-pX", "dev-libs/upgradepkg"], fixture_env)
-    assert result.returncode == 2
-    assert result.stdout == ""
-    assert result.stderr.strip() == (
-        "emerge: -X (--exclude) requires an argument and can't be bundled with "
-        "other short flags in portuale"
+    assert (
+        missing_arg.stderr.strip()
+        == "emerge: error: argument --exclude/-X: expected one argument"
     )
+
+
+def test_exclude_bundles_like_portage(emerge_binary, fixture_env):
+    """`-pX <atom>`: argparse lets the last letter of a short bundle take the next
+    argument as its value, so it equals `--pretend --exclude=<atom>` (#405; Portage
+    3.0.82.2 answers `-pX` alone with `expected one argument`, pinned in
+    test_portuale.py)."""
+    bundled = _run(
+        [str(emerge_binary)],
+        ["-pX", "dev-libs/upgradepkg", "--update", "dev-libs/upgradepkg"],
+        fixture_env,
+    )
+    spelled = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--exclude=dev-libs/upgradepkg", "--update", "dev-libs/upgradepkg"],
+        fixture_env,
+    )
+    assert bundled.returncode == spelled.returncode == 0
+    assert bundled.stdout == spelled.stdout == ""
 
 
 def test_json_is_not_a_portage_emerge_option(emerge_binary, fixture_env):

@@ -11286,3 +11286,54 @@ def test_ebuild_sources_the_profile_user_and_env_hook_bashrcs_like_portage(
     # for this (fresh) repo path; Portage sources the user bashrc alone there.
     assert [ln for ln in lines if "depend" in ln] in ([], ["user depend"])
     assert [ln for ln in lines if "depend" not in ln] == expected
+
+
+@pytest.mark.parametrize(
+    "argv, line",
+    [
+        (["--color"], "argument --color: expected one argument"),
+        (["--exclude"], "argument --exclude/-X: expected one argument"),
+        (["-X"], "argument --exclude/-X: expected one argument"),
+        (["-pX"], "argument --exclude/-X: expected one argument"),
+        (["--reinstall-atoms"], "argument --reinstall-atoms: expected one argument"),
+        (["--useoldpkg-atoms"], "argument --useoldpkg-atoms: expected one argument"),
+        (["--rebuild-exclude"], "argument --rebuild-exclude: expected one argument"),
+        (["--rebuild-ignore"], "argument --rebuild-ignore: expected one argument"),
+        (["--usepkg-exclude"], "argument --usepkg-exclude: expected one argument"),
+        (["--usepkg-include"], "argument --usepkg-include: expected one argument"),
+        (["--getbinpkg-exclude"], "argument --getbinpkg-exclude: expected one argument"),
+        (["--getbinpkg-include"], "argument --getbinpkg-include: expected one argument"),
+        (["--buildpkg-exclude"], "argument --buildpkg-exclude: expected one argument"),
+        (["--with-bdeps"], "argument --with-bdeps: expected one argument"),
+        (["--with-bdeps-auto"], "argument --with-bdeps-auto: expected one argument"),
+        (["--autounmask-backtrack"], "argument --autounmask-backtrack: expected one argument"),
+        (["--autounmask-use"], "argument --autounmask-use: expected one argument"),
+        (["--autounmask-license"], "argument --autounmask-license: expected one argument"),
+        (
+            ["--rebuilt-binaries-timestamp"],
+            "argument --rebuilt-binaries-timestamp: expected one argument",
+        ),
+        (["--quickpkg-direct"], "argument --quickpkg-direct: expected one argument"),
+        (["--quickpkg-direct-root"], "argument --quickpkg-direct-root: expected one argument"),
+        (["-jx"], "unrecognized arguments: -x"),
+        (["-j2x"], "unrecognized arguments: -2x"),
+        (["-jx2"], "unrecognized arguments: -x2"),
+        (["-l2x"], "unrecognized arguments: -2x"),
+        (["-lx"], "unrecognized arguments: -x"),
+        (["-zp"], "unrecognized arguments: -zp"),
+        (["-pzv"], "unrecognized arguments: -z"),
+    ],
+)
+def test_emerge_option_errors_are_argparse_lines_like_portage(emerge_binary, argv, line):
+    """Backlog #405 (b)(c): an option missing its value, or a malformed `-j`/`-l`
+    cluster, prints Portage's argparse line and exits 2. Expected values captured
+    on Portage 3.0.82.2 / Python 3.14.8 (`LLM/evidence/2026-10-18-405-s0/compare.txt`
+    in portuale: last stderr line and rc of `emerge <argv>` on both PMs). Portage
+    also prints a `usage:` block whose option order is hash-random; portuale omits
+    it (the 347-USG cut), so only the last line is compared with Portage and the
+    whole stderr is pinned here."""
+    result = subprocess.run(
+        [str(emerge_binary), *argv], capture_output=True, text=True, check=False
+    )
+    assert result.returncode == 2
+    assert result.stderr == f"emerge: error: {line}\n"
