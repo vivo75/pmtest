@@ -11510,6 +11510,7 @@ _FETCHONLY_LISTING = (
         (["-f"], True),
         (["-F"], True),
         (["-f"], False),
+        (["--keep-going", "-f"], False),
     ],
 )
 def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
@@ -11566,7 +11567,15 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
         assert result.stdout == (
             header + fetching + downloading + f"\n>>> Failed to emerge dev-util/fetchprobe-1 for {root_dir}\n"
         )
-        assert result.stderr == "!!! Couldn't download 'probe-1.tar.gz'. Aborting.\n"
+        summary = (
+            " * \n * The following package has failed to build, install, or execute postinst:\n"
+            " * \n"
+            f" *  (dev-util/fetchprobe-1:0/0::fetchrepo, ebuild scheduled for merge to '{root_dir}')\n"
+            " * \n"
+        )
+        assert result.stderr == "!!! Couldn't download 'probe-1.tar.gz'. Aborting.\n" + (
+            summary if "--keep-going" in argv else ""
+        )
     # Fetch-only never writes the vdb, the world file or the resume list.
     assert not (tmp_path / "root/var").exists()
 
@@ -11605,7 +11614,10 @@ def _fetchonly_extra_packages(root):
             "dev-util/fetchrestrict",
             "",
             1,
-            "\n\n\n\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n",
+            "\n\n\n\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n"
+            "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}:\n\n"
+            " * The following files cannot be fetched for fetchrestrict:\n"
+            " *    probe-1.tar.gz\n",
             "\n!!! dev-util/fetchrestrict-1 has fetch restriction turned on.\n"
             "!!! This probably means that this ebuild's files must be downloaded\n"
             "!!! manually.  See the comments in the ebuild for more information.\n\n"
@@ -11618,7 +11630,10 @@ def _fetchonly_extra_packages(root):
             "",
             1,
             "\n\n>>> Fetching (1 of 1) dev-util/fetchrestrict-1::fetchrepo for {root}\n"
-            "\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n",
+            "\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n"
+            "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}:\n\n"
+            " * The following files cannot be fetched for fetchrestrict:\n"
+            " *    probe-1.tar.gz\n",
             "\n!!! dev-util/fetchrestrict-1 has fetch restriction turned on.\n"
             "!!! This probably means that this ebuild's files must be downloaded\n"
             "!!! manually.  See the comments in the ebuild for more information.\n\n"
@@ -11644,8 +11659,8 @@ def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
     `Failed to emerge` block even under `-p`, and lists no URI; `FEATURES=mirror` makes
     the listing as `--fetch-all-uri` does. Captured on Portage 3.0.82.2 with the
     same root (`LLM/evidence/2026-10-19-b415/` in portuale: `setup.sh`, `cells.sh`),
-    modulo the cuts the other fetchonly pin names plus the trailing `elog` summary
-    block Portage prints after `Failed to emerge` (backlog #422)."""
+    modulo the cuts the other fetchonly pin names; the `Messages for package` block
+    after `Failed to emerge` is `pkg_nofetch`'s elog summary (backlog #422)."""
     root = _fetchonly_root(tmp_path)
     _fetchonly_extra_packages(root)
     env = dict(os.environ)
@@ -11655,6 +11670,8 @@ def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
         ROOT=str(tmp_path / "root"),
         DISTDIR=str(tmp_path / "dist"),
         NOCOLOR="yes",
+        # Only the echo module: portuale's `save_summary` line and file are not under test.
+        PORTAGE_ELOG_SYSTEM="echo",
     )
     if features:
         env["FEATURES"] = features
