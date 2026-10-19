@@ -32023,3 +32023,29 @@ def test_similar_names_search_reads_the_databases_portage_reads(
     assert lines[0] == first
     assert lines[1:3] == ["", "emerge: searching for similar names..."]
     assert lines[3] == f"emerge: Maybe you meant any of these: {tail}?"
+
+
+@pytest.mark.parametrize(
+    "atom, needle",
+    [
+        ("dev-libs/maskneedpkg", "have been masked"),
+        ("dev-libs/requiredusebadpkg", "REQUIRED_USE flag constraints are unsatisfied"),
+        ("dev-libs/requiredusebadparentpkg", "REQUIRED_USE flag constraints are unsatisfied"),
+        ("dev-libs/pg34-napp", "USE changes are necessary"),
+    ],
+)
+def test_pubgrub_aborts_like_the_default_solver(emerge_binary, fixture_env, atom, needle):
+    """Backlog #363/#364/#365: `--solver=pubgrub` aborts rc 1 with the same notices where
+    Portage does (masked dependency, REQUIRED_USE, autounmask USE change not allowed). The
+    default solver's output for these atoms is already pinned against Portage 3.0.82.2
+    (`maskneedpkg`, `requiredusebad*` tests above; `pg34-napp` in
+    `LLM/evidence/2026-10-15-34-s5/triage.md` G4a), so the pubgrub run must equal it."""
+    base = ["-pv", "--getbinpkg=n", "--usepkg=n", atom]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == 1
+    assert needle in default.stderr
+    assert pubgrub.returncode == 1
+    assert pubgrub.stderr == default.stderr
+    if atom != "dev-libs/pg34-napp":  # its merge-list rows differ: backlog #429
+        assert pubgrub.stdout == default.stdout
