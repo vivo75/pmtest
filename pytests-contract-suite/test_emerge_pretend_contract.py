@@ -3099,6 +3099,8 @@ CASES = [
     ("#393: --update --package-moves=n keeps an installed same-version other slot (slotmovepkg)", ["--pretend", "--update", "--package-moves=n", "dev-libs/slotmovepkg"], 0),
     ("#392: a new-slot row diffs USE against the installed other slot (no USE without -v)", ["--pretend", "--update", "dev-libs/unsatuseslotalt"], 0),
     ("#402: --binpkg-respect-use on the shared root misses like Portage (no t341 repo)", ["--pretend", "--usepkgonly", "--binpkg-respect-use=y", "dev-libs/t341-dep"], 1),
+    ("#391: moves-on never rewrites ebuild deps (movedepconsumer -pv --deep aborts)", ["-pv", "--deep", "dev-libs/movedepconsumer"], 1),
+    ("#391: moves-on never rewrites ebuild deps (movedepconsumer --pretend aborts)", ["--pretend", "dev-libs/movedepconsumer"], 1),
 ]
 
 
@@ -21637,11 +21639,15 @@ def test_quiet_drops_the_mask_column_and_the_use_line(emerge_binary, fixture_env
         # A `move dev-libs/oldmovepkg dev-libs/newmovepkg` in the fixture
         # repo's profiles/updates/2Q-2024, with the vdb still holding
         # dev-libs/oldmovepkg-1.0 under its pre-move dir.
+        # (`-pv --deep` and `-p --tree --deep dev-libs/movedepconsumer`
+        # with moves on are pinned by test_391_*, not here: since #391
+        # they abort rc 1 like Portage instead of matching this harvest.
+        # The explicit ids keep the harvest-time ordinals ([argsN] is
+        # part of the corpus key): renumbering would orphan every
+        # surviving row's entry (#405a).
         ["-pv", "dev-libs/newmovepkg"],
         ["-pv", "dev-libs/oldmovepkg"],
-        ["-pv", "--deep", "dev-libs/movedepconsumer"],
         ["-pv", "dev-libs/slotmovepkg"],
-        ["-p", "--tree", "--deep", "dev-libs/movedepconsumer"],
         # --package-moves=n: no move applied anywhere.
         ["-pv", "--package-moves=n", "dev-libs/newmovepkg"],
         ["-pv", "--package-moves=n", "dev-libs/oldmovepkg"],
@@ -21649,14 +21655,25 @@ def test_quiet_drops_the_mask_column_and_the_use_line(emerge_binary, fixture_env
         ["-pv", "--package-moves=n", "--deep", "dev-libs/movedepconsumer"],
         ["-pv", "--package-moves", "y", "dev-libs/newmovepkg"],
     ],
+    ids=[
+        "args0",
+        "args1",
+        "args3",
+        "args5",
+        "args6",
+        "args7",
+        "args8",
+        "args9",
+    ],
 )
 def test_profiles_updates_package_moves_pinned_output(
     emerge_binary, fixture_env, args
 ):
     """Portage profiles/updates/ package moves (portage.update /
     _do_global_updates): `move`/`slotmove` directives, applied at read
-    time (portuale never syncs), rewrite command-line atoms, `*DEPEND`
-    strings and an installed package's identity."""
+    time (portuale never syncs), rewrite command-line atoms, installed
+    and binary `*DEPEND` strings (never repository ebuild metadata,
+    #391) and an installed package's identity."""
     rust = _run([str(emerge_binary)], args, fixture_env)
     _assert_harvested(rust)
 
@@ -21697,6 +21714,48 @@ def test_package_moves_n_disables_profiles_updates(emerge_binary, fixture_env):
     old = _run([str(emerge_binary)], ["-p", "--package-moves=n", "dev-libs/oldmovepkg"], fixture_env)
     assert old.returncode == 1
     assert 'there are no ebuilds to satisfy "dev-libs/oldmovepkg".' in old.stderr
+
+
+def test_391_movedepconsumer_with_moves_on_aborts_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #391: `dev-libs/movedepconsumer` names
+    `RDEPEND="dev-libs/oldmovepkg"`, which the fixture
+    `profiles/updates/2Q-2024` moves to `dev-libs/newmovepkg`. Portage
+    3.0.82.2 with moves on aborts both `-pv --deep` and `--pretend`
+    with rc 1 (`no ebuilds to satisfy "dev-libs/oldmovepkg"`,
+    backtrack 1/20): global updates rewrite the vdb, the world file and
+    binary entries (`_do_global_updates`, `move_ent`, `update_ents`) but
+    never repository ebuild metadata, so the dep has no ebuild and the
+    installed entry was renamed away. portuale used to rewrite ebuild
+    `*DEPEND` at read time and return rc 0.
+
+    Grounding: host Portage 3.0.82.2 on a fresh stage of this fixture
+    tree (`LLM/evidence/2026-10-19-391/portage-{deep,p}.txt`, rc 1
+    both; the `-p --tree --deep` shape aborts the same way and stays
+    pinned here after leaving the harvest list). The Portage lines
+    carry the ` for <root>` suffix (#395); the fixture runs pin
+    `PORTAGE_RUNNING_ROOT` to ROOT so portuale prints none."""
+    for args in (
+        ["-pv", "--deep", "dev-libs/movedepconsumer"],
+        ["--pretend", "dev-libs/movedepconsumer"],
+        ["-p", "--tree", "--deep", "dev-libs/movedepconsumer"],
+    ):
+        rust = _run([str(emerge_binary)], args, fixture_env)
+        assert rust.returncode == 1, (args, rust.stdout, rust.stderr)
+        _assert_abort_preamble(rust.stdout)
+        assert (
+            f'emerge: there are no ebuilds to satisfy "dev-libs/oldmovepkg"{_LAST_ROOT_SUFFIX}.'
+            in rust.stderr
+        ), (args, rust.stderr)
+        assert (
+            '(dependency required by "dev-libs/movedepconsumer-1.0::testrepo" [ebuild])'
+            in rust.stderr
+        ), (args, rust.stderr)
+        assert (
+            '(dependency required by "dev-libs/movedepconsumer" [argument])'
+            in rust.stderr
+        ), (args, rust.stderr)
 
 
 def test_info_prints_the_deterministic_config_block(
@@ -31684,6 +31743,71 @@ def test_t355_dir_entry_that_is_a_live_symlink_is_unlinked(
     _t355_unmerge(emerge_binary, env, "app-misc/t355-d1")
     assert not os.path.lexists(live)
     assert (root / "opt/t355/other").is_dir()
+
+
+def test_t381_replace_keeps_a_file_recorded_under_a_second_symlinked_path(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #381: same-slot replace where the replacer records the file
+    under a second symlinked spelling of the same directory.
+
+    Expected values from Portage 3.0.82.2, S0 cell V1
+    (`LLM/evidence/2026-10-19-381/`, not from portuale output):
+    `--- replaced obj …/usr/share/t381/f` and the file survives with the
+    replacer's content. Pre-fix portuale deleted it (the orphan arm on the
+    exact-only ownership check).
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    env["T381_W"] = "normal"
+    _t355_merge(emerge_binary, env, "=app-misc/t381-rep-1")
+    (root / "alias").symlink_to("usr/share/t381")
+    env["T381_W"] = "alias"
+    _t355_merge(emerge_binary, env, "=app-misc/t381-rep-2")
+    assert (root / "usr/share/t381/f").read_text() == "alias 2\n"
+
+
+def test_t381_replace_keeps_a_file_when_the_old_record_uses_the_alias_spelling(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #381: the mirror of the previous test — the replaced
+    instance records `/alias/f`, the replacer `/usr/share/t381/f`.
+
+    Expected values from Portage 3.0.82.2, S0 cell V2
+    (`LLM/evidence/2026-10-19-381/`): `--- replaced obj …/alias/f` and the
+    file survives with the replacer's content. Pre-fix portuale deleted it.
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    (root / "usr/share/t381").mkdir(parents=True)
+    (root / "alias").symlink_to("usr/share/t381")
+    env["T381_W"] = "alias"
+    _t355_merge(emerge_binary, env, "=app-misc/t381-rep-1")
+    env["T381_W"] = "normal"
+    _t355_merge(emerge_binary, env, "=app-misc/t381-rep-2")
+    assert (root / "usr/share/t381/f").read_text() == "normal 2\n"
+
+
+def test_t381_replace_keeps_a_dir_claimed_through_the_alias_spelling(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #381: the replaced instance is a keepdir `dir` entry, the
+    replacer records a file under the symlinked spelling of that directory.
+
+    Expected values from Portage 3.0.82.2, S0 cell V3
+    (`LLM/evidence/2026-10-19-381/`): the `.keep` file is removed on both
+    sides, the directory itself survives on both (`--- replaced dir` on
+    Portage, `--- !empty dir` pre-fix on portuale — same tree either way).
+    """
+    env = _t355_configroot(tmp_path, fixtures_root)
+    root = Path(env["ROOT"])
+    _t355_merge(emerge_binary, env, "=app-misc/t381-k-1")
+    (root / "alias").symlink_to("usr/share/t381")
+    _t355_merge(emerge_binary, env, "=app-misc/t381-k-2")
+    sub = root / "usr/share/t381/sub"
+    assert sub.is_dir()
+    assert (sub / "f").read_text() == "k2\n"
+    assert not list(sub.glob(".keep*"))
 
 
 def test_update_if_installed_skips_uninstalled_arguments(emerge_binary, fixture_env):

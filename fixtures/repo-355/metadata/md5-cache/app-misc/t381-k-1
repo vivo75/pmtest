@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=t381 keepdir probe replaced by a file under an alias
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=37c70be1dbb23eac51368d9477d3e4da

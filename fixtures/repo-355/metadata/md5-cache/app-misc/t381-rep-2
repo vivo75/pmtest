@@ -1,0 +1,8 @@
+DEFINED_PHASES=install
+DESCRIPTION=t381 replace probe under normal or symlinked spelling
+EAPI=8
+HOMEPAGE=none
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=5406d88cdcf78d6a7348b234754d8682
