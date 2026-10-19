@@ -3155,6 +3155,16 @@ def _assert_harvested(result: subprocess.CompletedProcess) -> None:
     assert corpus.BLESS or result.corpus_drift is None, result.corpus_drift
 
 
+# Backlog #406: Portage prints the resolution notice before a top-level all-masked abort
+# under `-p` too (`LLM/evidence/2026-10-15-346-s0/a/a02-masked-top-p-portage.stdout`; the
+# wall-clock seconds are cut).
+_TOP_LEVEL_ABORT_STDOUT = (
+    "\nThese are the packages that would be merged, in order:\n\n"
+    "Calculating dependencies ... done!\n"
+    "Dependency resolution took (backtrack: 0/20).\n\n"
+)
+
+
 def _all_masked(atom: str, cpv_repo: str, reason: str) -> str:
     """Portage `_show_unsatisfied_dep`'s "All ebuilds that could satisfy
     <atom> have been masked" report, stripped (as the assertions below
@@ -4290,7 +4300,7 @@ def test_invalid_use_conditional_in_depend_masks_the_package(
     args = ["--pretend", "dev-libs/fucyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
-    assert rust.stdout == ""
+    assert rust.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert rust.stderr == (
         "\n"
         '!!! All ebuilds that could satisfy "dev-libs/fucyclec" have been masked.\n'
@@ -6070,7 +6080,7 @@ def test_invalid_defaulted_use_dep_conditional_masks_the_package(emerge_binary, 
     Full stderr pinned."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/usedeppkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr == (
         "\n"
         '!!! All ebuilds that could satisfy "dev-libs/usedeppkg" have been masked.\n'
@@ -6128,7 +6138,7 @@ def test_user_package_mask_extended_wildcards_mask_the_package(
     env = _wildcard_mask_configroot(tmp_path, fixtures_root, mask_line)
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/foo"], env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/foo", "dev-libs/foo-1.0::testrepo", "package.mask"
     )
@@ -6169,7 +6179,7 @@ def _t341_masked(emerge_binary, env, cell, reason):
     pin the `invalid:` masked block (Portage's exit code 1, empty stdout)."""
     result = _run([str(emerge_binary)], ["--pretend", f"app-misc/{cell}"], env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         f"app-misc/{cell}", f"app-misc/{cell}-1::t341", reason
     )
@@ -6520,7 +6530,7 @@ def test_s4_binary_rewritten_rdepend_masks_invalid(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "app-misc/t341-good",
         "app-misc/t341-good-1::t341",
@@ -7150,7 +7160,7 @@ def test_s9_partly_excluded_target_reports_the_masked_sibling(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "app-misc/s346-gbin-b", "app-misc/s346-gbin-b-1::s346g", "package.mask"
     )
@@ -7334,7 +7344,7 @@ def test_s9_build_id_atom_masked_reports_the_masked_instance(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "=dev-libs/t341-dep-1-2",
         "dev-libs/t341-dep-1::t341",
@@ -7418,7 +7428,7 @@ def test_s5_eapi5_node_keeps_modern_atoms_noeapi_drops_them(
     env, cfg, dst = _t341_profile_configroot(tmp_path, fixtures_root)
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     R = "<REPO>"
     expected = [
         f"--- Invalid atom in {R}/profiles/t341/packages: dev-libs/t341-dep::t341",
@@ -8125,7 +8135,7 @@ def test_s1_chain_mask_without_user_unmask_stays_masked(
     (cfg / "etc/portage/make.profile").symlink_to(chain)
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/t341-dep", "dev-libs/t341-dep-1::t341", "package.mask"
     )
@@ -8149,7 +8159,7 @@ def test_s1_no_make_profile_ignores_the_user_profile(
     )
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/t341-dep"], env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/t341-dep", "dev-libs/t341-dep-1::t341", "missing keyword"
     )
@@ -8239,7 +8249,7 @@ def test_s1_starred_packages_stay_out_of_at_profile(
     )
     result = _run([str(emerge_binary)], ["--pretend", "@profile"], env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/bareacceptkeywordspkg",
         "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
@@ -8409,7 +8419,7 @@ def test_s2_profile_minus_empties_the_keywords_like_portage(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/bareacceptkeywordspkg",
         "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
@@ -8443,7 +8453,7 @@ def test_s2_cross_file_minus_cancels_like_portage(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     warning = (
         f"{cfg}/etc/portage/package.keywords is deprecated, "
         f"use {cfg}/etc/portage/package.accept_keywords instead"
@@ -9078,7 +9088,7 @@ def test_invalid_use_conditional_group_masks_the_package(emerge_binary, fixture_
     the use-dep one). Full stderr pinned."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-vcs/somercurial"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr == (
         "\n"
         '!!! All ebuilds that could satisfy "dev-vcs/somercurial" have been masked.\n'
@@ -10112,7 +10122,7 @@ def test_autounmask_no_keyword_suggestion_by_default(emerge_binary, fixture_env)
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/autounmaskkeywordpkg",
         "dev-libs/autounmaskkeywordpkg-1.0::testrepo",
@@ -12806,7 +12816,7 @@ def test_use_stable_force_and_package_use_stable_mask_skip_an_unstable_candidate
 def test_package_mask_hides_with_no_matching_unmask(emerge_binary, fixture_env):
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/hardmaskedpkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/hardmaskedpkg", "dev-libs/hardmaskedpkg-1.0::testrepo", "package.mask"
     )
@@ -12846,7 +12856,7 @@ def test_license_eula_style_group_is_masked_by_the_portage_default_accept_licens
     package.mask already produces."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/eulapkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/eulapkg", "dev-libs/eulapkg-1.0::testrepo", "SomeEula license(s)"
     )
@@ -12895,7 +12905,7 @@ def test_an_overlay_own_license_groups_stacks_with_the_main_repo(
         [str(emerge_binary)], ["--pretend", "dev-libs/crossrepolicensepkg"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/crossrepolicensepkg",
         "dev-libs/crossrepolicensepkg-1.0::testrepo",
@@ -12922,7 +12932,7 @@ def test_license_use_conditional_visible_when_flag_off_masked_when_forced_on(
         [str(emerge_binary)], ["--pretend", "dev-libs/uselicensepkgforced"], fixture_env
     )
     assert forced_on.returncode == 1
-    assert forced_on.stdout == ''
+    assert forced_on.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert forced_on.stderr.strip() == _all_masked(
         "dev-libs/uselicensepkgforced",
         "dev-libs/uselicensepkgforced-1.0::testrepo",
@@ -12948,7 +12958,7 @@ def test_package_properties_narrows_acceptance_for_one_package(emerge_binary, fi
     default that leaves dev-libs/propertiespkg (above) visible."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/interactivepkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/interactivepkg", "dev-libs/interactivepkg-1.0::testrepo", "PROPERTIES"
     )
@@ -12961,7 +12971,7 @@ def test_package_accept_restrict_narrows_acceptance_for_one_package(emerge_binar
     package.properties above, just for RESTRICT instead of PROPERTIES."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/restrictedpkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/restrictedpkg", "dev-libs/restrictedpkg-1.0::testrepo", "RESTRICT"
     )
@@ -12975,7 +12985,7 @@ def test_repo_level_package_mask_hides_a_package(emerge_binary, fixture_env):
     user-level mask produces."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/repomaskedpkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/repomaskedpkg", "dev-libs/repomaskedpkg-1.0::testrepo", "package.mask"
     )
@@ -12989,7 +12999,7 @@ def test_profile_level_package_mask_hides_a_package(emerge_binary, fixture_env):
     repo-level and user-level sources."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/profilemaskedpkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/profilemaskedpkg", "dev-libs/profilemaskedpkg-1.0::testrepo", "package.mask"
     )
@@ -14846,7 +14856,7 @@ def test_overlay_implicit_masters_inherits_the_main_repos_own_package_mask(
     scoping, so it still applies to the overlay's own copy."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/mastermaskedpkg"], fixture_env)
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/mastermaskedpkg", "dev-libs/mastermaskedpkg-1.0::overlay", "package.mask"
     )
@@ -14903,7 +14913,7 @@ def test_explicit_masters_inherits_a_non_main_declared_masters_mask(emerge_binar
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/independentmasteroverlaypkg",
         "dev-libs/independentmasteroverlaypkg-1.0::independentoverlay",
@@ -14925,7 +14935,7 @@ def test_layout_conf_masters_middle_tier_and_repo_name_override(emerge_binary, f
         [str(emerge_binary)], ["--pretend", "dev-libs/layoutmasterpkg"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/layoutmasterpkg",
         "dev-libs/layoutmasterpkg-1.0::layoutrenamed",
@@ -15134,7 +15144,7 @@ def test_usepkg_exclude_drops_the_only_binary_candidate(emerge_binary, fixture_e
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     # Portage 3.0.82.2 (`LLM/evidence/2026-10-18-s8/out373/c373-exclude.txt` in portuale,
     # backlog #416): the dropped binary stays in the pool as a reason-less masked row.
     assert result.stderr.strip() == _all_masked(
@@ -15162,7 +15172,7 @@ def test_usepkg_include_gates_binary_eligibility_both_ways(emerge_binary, fixtur
         fixture_env,
     )
     assert non_matching.returncode == 1
-    assert non_matching.stdout == ''
+    assert non_matching.stdout == _TOP_LEVEL_ABORT_STDOUT
     # Same reason-less masked row as `--usepkg-exclude` (backlog #416).
     assert non_matching.stderr.strip() == _all_masked(
         "dev-libs/binaryonlypkg", "dev-libs/binaryonlypkg-1.0", ""
@@ -28618,7 +28628,7 @@ def test_t348_s5_unsupported_eapi_pretend_masks_by_eapi(
         [str(emerge_binary)], ["--pretend", "=app-misc/t348-d-eapi99-1"], env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked_eapi(
         "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-eapi99-1::t348", "EAPI 99"
     )
@@ -28639,7 +28649,7 @@ def test_t348_s5_unsupported_eapi_alpha_pretend_masks_by_eapi(
         [str(emerge_binary)], ["--pretend", "=app-misc/t348-d-eapi7a-1"], env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked_eapi(
         "=app-misc/t348-d-eapi7a-1", "app-misc/t348-d-eapi7a-1::t348", "EAPI 7_alpha"
     )
@@ -28661,7 +28671,7 @@ def test_t348_s5_unsupported_eapi_pretend_names_masked_target_only(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked_eapi(
         "=app-misc/t348-d-eapi99-1", "app-misc/t348-d-eapi99-1::t348", "EAPI 99"
     )
@@ -31964,7 +31974,7 @@ def test_s3_bid_package_use_respect_use_reports_the_mask_block(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/t341-dep",
         "dev-libs/t341-dep-1::t341",
@@ -32103,7 +32113,7 @@ def test_changed_deps_top_level_binary_reports_the_mask_block(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
         "dev-libs/bcdeppkg", "dev-libs/bcdeppkg-1.0::testrepo", "changed deps"
     )
