@@ -15134,10 +15134,10 @@ def test_usepkg_exclude_drops_the_only_binary_candidate(emerge_binary, fixture_e
     )
     assert result.returncode == 1
     assert result.stdout == ""
-    # binaryonlypkg has no ebuild, so Portage `not cp_exists` -> the
-    # --misspell-suggestions block is appended after the abort line.
-    assert result.stderr.splitlines()[0] == (
-        'emerge: there are no ebuilds to satisfy "dev-libs/binaryonlypkg".'
+    # Portage 3.0.82.2 (`LLM/evidence/2026-10-18-s8/out373/c373-exclude.txt` in portuale,
+    # backlog #416): the dropped binary stays in the pool as a reason-less masked row.
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/binaryonlypkg", "dev-libs/binaryonlypkg-1.0", ""
     )
 
 
@@ -15162,6 +15162,10 @@ def test_usepkg_include_gates_binary_eligibility_both_ways(emerge_binary, fixtur
     )
     assert non_matching.returncode == 1
     assert non_matching.stdout == ''
+    # Same reason-less masked row as `--usepkg-exclude` (backlog #416).
+    assert non_matching.stderr.strip() == _all_masked(
+        "dev-libs/binaryonlypkg", "dev-libs/binaryonlypkg-1.0", ""
+    )
 
     matching = _run(
         [str(emerge_binary)],
@@ -31983,3 +31987,39 @@ def test_emerge_without_target_or_action_prints_the_short_help_and_exits_1(
     result = _run([str(emerge_binary)], args, fixture_env)
     assert result.returncode == 1
     assert result.stdout == _SHORT_HELP
+
+
+@pytest.mark.parametrize(
+    "args, first, tail",
+    [
+        (
+            ["-pv", "--usepkgonly=n", "dev-libs/pg367-top"],
+            'emerge: there are no ebuilds to satisfy "dev-libs/pg367-top".',
+            "dev-libs/pg367-itop, dev-libs/pg367-s, dev-libs/pg34-btool",
+        ),
+        (
+            ["-pv", "--usepkg", "--usepkgonly=n", "dev-libs/pg367-top"],
+            'emerge: there are no ebuilds to satisfy "dev-libs/pg367-top".',
+            "dev-libs/pg367-itop, dev-libs/pg367-s, dev-libs/pg34-btool",
+        ),
+        (
+            ["-pvK", "dev-libs/doesnotexist"],
+            'emerge: there are no binary packages to satisfy "dev-libs/doesnotexist".',
+            "dev-libs/nomtarget, dev-libs/unsatuseinst, dev-libs/nestedsetpkg",
+        ),
+    ],
+)
+def test_similar_names_search_reads_the_databases_portage_reads(
+    emerge_binary, fixture_env, args, first, tail
+):
+    """Backlog #417: the `searching for similar names` block's candidates come from the
+    installed db, the ebuild db unless `--usepkgonly` (any value) drops it, and the binary db
+    under `--usepkg` (`similar_name_search(dbs, atom)`); `cp_exists` reads the same set.
+    Expected text captured on Portage 3.0.82.2 (`LLM/evidence/2026-10-18-s8/out/c396-pv-upo-n-new.txt`,
+    `c396-pv-usepkg-upo-n-new.txt`, `c396-pv-K-installed-nonexistent.txt` in portuale)."""
+    result = _run([str(emerge_binary)], args, fixture_env)
+    assert result.returncode == 1
+    lines = result.stderr.splitlines()
+    assert lines[0] == first
+    assert lines[1:3] == ["", "emerge: searching for similar names..."]
+    assert lines[3] == f"emerge: Maybe you meant any of these: {tail}?"
