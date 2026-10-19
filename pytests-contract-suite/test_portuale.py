@@ -11502,3 +11502,91 @@ def test_direct_ebuild_merge_refuses_an_image_path_with_a_line_ending(
     ]
     assert not (root / "var/db/pkg/dev-libs/lineendingpkg-1.0").exists()
     assert not (root / "usr/share/lineendingtest").exists()
+
+
+@pytest.mark.parametrize(
+    "formats, expected",
+    [
+        ("", ["profile", "userprofile", "wild", "slot", "exact"]),
+        (
+            "profile-formats = profile-bashrcs\n",
+            ["profile", "gated", "userprofile", "wild", "slot", "exact"],
+        ),
+    ],
+)
+def test_ebuild_sources_package_bashrc_by_atom_specificity_like_portage(
+    ebuild_binary, tmp_path, formats, expected
+):
+    """`package.bashrc` (backlog #413): per profile node whose `profile-formats`
+    name `profile-bashrcs` (the user profile `/etc/portage/profile` always),
+    the files of the atoms matching the package are sourced after that node's
+    `profile.bashrc`, least specific atom first, whatever the order in the
+    file. Expected sequence captured with host Portage 3.0.82.2 (`ebuild <file>
+    compile`, same config root; `LLM/evidence/2026-10-19-b413/` in portuale:
+    `probe.py`, both PMs, with and without the format). Without the format the
+    repo profile's `package.bashrc` is ignored."""
+    root = tmp_path / "cfg"
+    marks = tmp_path / "marks"
+    repo = root / "repo"
+    profile = repo / "profiles/base"
+    (repo / "metadata").mkdir(parents=True)
+    profile.mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("bashrcrepo\n")
+    (repo / "metadata/layout.conf").write_text(
+        "masters =\nthin-manifests = true\n" + formats
+    )
+    (profile / "eapi").write_text("8\n")
+    (profile / "make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\nIUSE_IMPLICIT="prefix"\n'
+    )
+    pkg = repo / "dev-util/bashrcprobe"
+    pkg.mkdir(parents=True)
+    ebuild = pkg / "bashrcprobe-1.ebuild"
+    ebuild.write_text(
+        'EAPI=8\nDESCRIPTION="p"\nSLOT="0"\nKEYWORDS="amd64"\nS="${WORKDIR}"\n'
+    )
+    etc = root / "etc/portage"
+    (etc / "repos.conf").mkdir(parents=True)
+    (etc / "repos.conf/r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = bashrcrepo\n[bashrcrepo]\nlocation = {repo}\n"
+    )
+    (etc / "make.profile").symlink_to(profile)
+    (etc / "make.conf").write_text(
+        'ACCEPT_KEYWORDS="amd64"\n'
+        'FEATURES="-sandbox -usersandbox -network-sandbox -pid-sandbox -ipc-sandbox"\n'
+    )
+    user = etc / "profile"
+    (user / "bashrc").mkdir(parents=True)
+    (user / "package.bashrc").write_text(
+        "=dev-util/bashrcprobe-1 exact\ndev-util/bashrcprobe slot\n"
+        "dev-util/* wild\nsys-apps/other nomatch\n"
+    )
+    (profile / "bashrc").mkdir()
+    (profile / "package.bashrc").write_text("dev-util/bashrcprobe gated\n")
+    for path, tag in (
+        (user / "bashrc/exact", "exact"),
+        (user / "bashrc/slot", "slot"),
+        (user / "bashrc/wild", "wild"),
+        (user / "bashrc/nomatch", "nomatch"),
+        (user / "profile.bashrc", "userprofile"),
+        (profile / "profile.bashrc", "profile"),
+        (profile / "bashrc/gated", "gated"),
+    ):
+        path.write_text(f'echo "{tag} ${{EBUILD_PHASE:-none}}" >> {marks}\n')
+
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "tmp")
+    env["DISTDIR"] = str(tmp_path / "dist")
+    (tmp_path / "dist").mkdir()
+    result = subprocess.run(
+        [str(ebuild_binary), str(ebuild), "compile"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    seen = [
+        ln.split()[0]
+        for ln in marks.read_text().splitlines()
+        if ln.endswith(" compile")
+    ]
+    assert seen == expected
