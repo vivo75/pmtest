@@ -23,6 +23,14 @@ case $ATOMLIST in
   *) echo "atom list must live under $TEST_DIR/ (it is bind-mounted at /TEST)" >&2; exit 2 ;;
 esac
 
+# The main list resolves the running root against the container host
+# (backlog #242 Slice D, #399): default it so a direct run matches
+# l0-fixture-oracle-all.sh. An explicit env value still wins; other lists
+# keep the default staging.
+case $ATOMLIST in
+  */l0-fixture-oracle.txt) FX_HOST_RUNNING_ROOT=${FX_HOST_RUNNING_ROOT:-1} ;;
+esac
+
 RUN="l0-fx-$(timestamp)"
 OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
