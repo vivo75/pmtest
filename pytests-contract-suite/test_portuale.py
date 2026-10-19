@@ -7439,6 +7439,64 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     assert not mtimedb.exists()  # resume list cleared on success
 
 
+def test_emerge_resume_applies_interactive_packages_like_portage(emerge_binary, tmp_path):
+    """Portage `Scheduler.py::_background_mode` / `_get_interactive_tasks`
+    (lines 483-519) reads `PROPERTIES=interactive` of every entry of a
+    resumed list: the `I` column shows, and `--resume -j2` prints the
+    "Sending package output to stdio" notice and runs with `--jobs=1`.
+    Expected text captured from Portage 3.0.82.2 on the 421 oracle root
+    (`LLM/evidence/2026-10-19-b421/portage.txt`)."""
+    import json
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
+
+    r = subprocess.run(
+        [
+            str(emerge_binary),
+            "dev-libs/schedbad",
+            "dev-libs/schedok",
+            "dev-libs/interactivemergepkg",
+        ],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1
+    saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
+    assert [x[2] for x in saved["resume"]["mergelist"]] == [
+        "dev-libs/schedbad-1.0",
+        "dev-libs/schedok-1.0",
+        "dev-libs/interactivemergepkg-1.0",
+    ]
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--pretend"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert f"[ebuild  N     ] dev-libs/schedbad-1.0 to {root}" in r.stdout
+    assert f"[ebuild IN     ] dev-libs/interactivemergepkg-1.0 to {root}" in r.stdout
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--skipfirst", "-j2"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert (
+        ">>> Sending package output to stdio due to interactive package(s):\n\n"
+        f"  dev-libs/interactivemergepkg-1.0 for {root}\n\n"
+        ">>> Setting --jobs=1 due to the above interactive package(s)\n"
+        ">>> In order to temporarily mask interactive updates, you may\n"
+        ">>> specify --accept-properties=-interactive\n"
+    ) in r.stdout
+    assert "Jobs:" not in r.stdout
+
+
 def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_path):
     """`emerge --resume` replays real builds, so resumed entries need the
     same phase env as a fresh `emerge <atom>` build: the run-wide
