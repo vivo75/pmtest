@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: #394 top whose RDEPEND reaches installed changeddepspkg (--changed-deps control)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/changeddepspkg
+SLOT=0
+_md5_=c5b422649ac196fa1a8f4993fa15e4d6

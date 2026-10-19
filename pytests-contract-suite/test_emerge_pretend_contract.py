@@ -32179,3 +32179,44 @@ def test_respect_use_dependency_binary_reports_the_mask_block_with_the_chain(
             '(dependency required by "app-misc/t341-built" [argument])',
         ],
     )
+
+
+@pytest.mark.parametrize("flag", ["unbuilt", "new-rev", "new-ver"])
+def test_rebuild_if_restart_rebuilds_an_installed_parent_reached_by_the_walk(
+    emerge_binary, fixture_env, flag
+):
+    """Backlog #394: `-u --deep --rebuild-if-<flag>` on a top whose installed consumer has a
+    build-time dep that updates restarts the walk (`_rebuild_config`) and adds `rR` for the
+    consumer. Expected from Portage 3.0.82.2 (`LLM/evidence/2026-10-19-394/out/`, cells
+    a-unbuilt-deep / a-newrev / a-newver: `U rebuildtrigger-2.0 [1.0]`, `rR rebuildconsumer-1.0`,
+    `N` top, `backtrack: 1/20`)."""
+    args = ["--pretend", "--update", "--deep", f"--rebuild-if-{flag}", "dev-libs/r394top"]
+    result = _run([str(emerge_binary)], args, fixture_env)
+    assert result.returncode == 0
+    root = fixture_env["ROOT"]
+    assert result.stdout.splitlines() == [
+        f"[ebuild     U  ] dev-libs/rebuildtrigger-2.0 [1.0] to {root}",
+        f"[ebuild  rR    ] dev-libs/rebuildconsumer-1.0 to {root}",
+        f"[ebuild  N     ] dev-libs/r394top-1 to {root}",
+    ]
+    as_json = _run([str(emerge_binary)], [*args, "--json"], fixture_env)
+    assert json.loads(as_json.stdout)["backtrack"]["restarts"] == 1
+
+
+@pytest.mark.parametrize(
+    "args, rows",
+    [
+        (
+            ["--update", "--deep"],
+            ["[ebuild     U  ] dev-libs/rebuildtrigger-2.0 [1.0]", "[ebuild  N     ] dev-libs/r394top-1"],
+        ),
+        (["--update", "--rebuild-if-unbuilt"], ["[ebuild  N     ] dev-libs/r394top-1"]),
+    ],
+)
+def test_rebuild_if_restart_controls_stay_unchanged(emerge_binary, fixture_env, args, rows):
+    """Backlog #394 controls (Portage 3.0.82.2, cells a-noflag / a-unbuilt-nodeep): without
+    `--rebuild-if-*` or without `--deep` the consumer is not rebuilt."""
+    result = _run([str(emerge_binary)], ["--pretend", *args, "dev-libs/r394top"], fixture_env)
+    assert result.returncode == 0
+    root = fixture_env["ROOT"]
+    assert result.stdout.splitlines() == [f"{row} to {root}" for row in rows]

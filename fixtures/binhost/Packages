@@ -1,6 +1,6 @@
 TIMESTAMP: 0
 VERSION: 0
-PACKAGES: 13
+PACKAGES: 14
 
 BUILD_ID: 1
 CPV: dev-libs/remotebinpkg-1.0
@@ -176,4 +176,17 @@ SLOT: 0
 USE: foo
 BUILD_ID: 1
 BUILD_TIME: 1000
+
+BUILD_ID: 1
+BUILD_TIME: 100
+CPV: dev-libs/bcdepparent-1.0
+DEFINED_PHASES: -
+EAPI: 8
+IUSE:
+KEYWORDS: amd64
+RDEPEND: dev-libs/bcdeppkg
+REPO: gentoo
+SIZE: 4096
+SLOT: 0
+USE:
 

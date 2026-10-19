@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: #394 top whose RDEPEND reaches installed rebuildconsumer (--rebuild-if-* restart)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/rebuildconsumer
+SLOT=0
+_md5_=55ef50474538a71eced53e0baf971566
