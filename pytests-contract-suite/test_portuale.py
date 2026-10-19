@@ -6487,6 +6487,61 @@ def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
     assert "Load avg:" not in out
 
 
+def test_emerge_signal_while_building_stops_the_phase_and_exits_128_plus_n(
+    emerge_binary, tmp_path
+):
+    """Backlog #411: a `SIGINT`/`SIGTERM` during a build prints
+    `\\n\\nExiting on signal N`, stops the running phase and exits `128+N`
+    (Portage `Scheduler.py` `merge` `sighandler`; `actions.py`
+    `emergeexitsig`). Phases run in their own session, so a terminal `^C`
+    reaches only the emerge process. Expected shape captured from Portage
+    3.0.82.2 in a pty: `LLM/evidence/2026-10-19-b411/portage-ctrlc.txt`
+    (rc 130, the sleeping compile gone). `schedslow` sleeps 120 s in
+    `src_compile`, so a surviving phase shows as a live `sleep 120`."""
+    import shutil
+    import time
+
+    def _sleepers(pt):
+        found = []
+        for d in os.listdir("/proc"):
+            if not d.isdigit():
+                continue
+            try:
+                cwd = os.readlink(f"/proc/{d}/cwd")
+                cmd = Path(f"/proc/{d}/cmdline").read_bytes().replace(b"\0", b" ")
+            except OSError:
+                continue
+            if cmd.strip() == b"sleep 120" and cwd.startswith(str(pt)):
+                found.append(d)
+        return found
+
+    for n, (sig, rc) in enumerate([(signal.SIGINT, 130), (signal.SIGTERM, 143)]):
+        root = tmp_path / f"sigroot{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        pt = tmp_path / f"sigpt{n}"
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(pt)
+        proc = subprocess.Popen(
+            [str(emerge_binary), "--oneshot", "dev-libs/schedslow"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            env=env,
+        )
+        deadline = time.time() + 120
+        while not _sleepers(pt):
+            assert proc.poll() is None and time.time() < deadline
+            time.sleep(0.2)
+        proc.send_signal(sig)
+        out, err = proc.communicate(timeout=60)
+        assert proc.returncode == rc, (out, err)
+        assert f"\n\nExiting on signal {int(sig)}\n" in err, err
+        assert not _sleepers(pt), "the compile phase outlived the signal"
+
+
 def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
     emerge_binary, tmp_path
 ):
