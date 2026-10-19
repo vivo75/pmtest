@@ -11876,3 +11876,110 @@ def test_ebuild_sources_package_bashrc_by_atom_specificity_like_portage(
         if ln.endswith(" compile")
     ]
     assert seen == expected
+
+
+def _serve_dir(directory):
+    """Serves `directory` over loopback HTTP on a free port; returns `(server, port)`."""
+    import functools
+    import http.server
+    import threading
+
+    class _Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+    server = http.server.ThreadingHTTPServer(
+        ("127.0.0.1", 0), functools.partial(_Quiet, directory=str(directory))
+    )
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, server.server_address[1]
+
+
+def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_portage(
+    emerge_binary, tmp_path
+):
+    """Backlog #424: `-f --getbinpkg` downloads a remote binary into its binrepo's
+    `location` and `-pf` lists its URI (nothing once it is there); a binary already
+    downloaded is still verified. Expected bytes captured on Portage 3.0.82.2 with the
+    same index and fixture binary (`LLM/evidence/2026-10-19-b424/` in portuale:
+    `setup.sh`, `cells.sh`), modulo the cuts the other fetchonly pins name; the wget
+    progress block is portuale's own `wget` output (Portage ran its `FETCHCOMMAND`)."""
+    import shutil
+
+    root = _fetchonly_root(tmp_path)
+    (root / "repo/profiles/categories").write_text("dev-util\ndev-libs\n")
+    binhost = tmp_path / "binhost"
+    (binhost / "dev-libs").mkdir(parents=True)
+    binary = binhost / "dev-libs/gpkgreadpkg-1.0.gpkg.tar"
+    shutil.copy(Path(FIXTURES_ROOT) / "pkgdir/dev-libs/gpkgreadpkg-1.0.gpkg.tar", binary)
+    (binhost / "Packages").write_text(
+        "TIMESTAMP: 1\nVERSION: 0\nPACKAGES: 1\n\nBUILD_ID: 1\n"
+        "CPV: dev-libs/gpkgreadpkg-1.0\nDEFINED_PHASES: -\nEAPI: 8\nKEYWORDS: amd64\n"
+        "MTIME: 1000\nBUILD_TIME: 1000\nPATH: dev-libs/gpkgreadpkg-1.0.gpkg.tar\n"
+        f"REPO: fetchrepo\nSIZE: {binary.stat().st_size}\nSLOT: 0\nUSE:\n"
+    )
+    server, port = _serve_dir(binhost)
+    try:
+        location = tmp_path / "binrepo"
+        (root / "etc/portage/binrepos.conf").write_text(
+            f"[tmpbinhost]\nsync-uri = http://127.0.0.1:{port}\npriority = 1\n"
+            f"location = {location}\n"
+        )
+        with (root / "etc/portage/make.conf").open("a") as conf:
+            conf.write(
+                f'PKGDIR="{tmp_path / "pkgdir"}"\nPORTAGE_TRUST_HELPER="/bin/true"\n'
+                'FEATURES="${FEATURES} binpkg-ignore-signature -binpkg-request-signature"\n'
+            )
+        env = dict(os.environ)
+        env.update(
+            PORTAGE_CONFIGROOT=str(root),
+            PORTAGE_TMPDIR=str(tmp_path / "tmp"),
+            ROOT=str(tmp_path / "root"),
+            DISTDIR=str(tmp_path / "dist"),
+            NOCOLOR="yes",
+        )
+
+        def run(*argv):
+            return subprocess.run(
+                [str(emerge_binary), *argv, "dev-libs/gpkgreadpkg"],
+                capture_output=True, text=True, check=False, env=env,
+                stdin=subprocess.DEVNULL,
+            )
+
+        listing = (
+            "\nThese are the packages that would be fetched, in order:\n\n"
+            "Calculating dependencies ... done!\n"
+            "Dependency resolution took (backtrack: 0/20).\n\n\n"
+        )
+        uri = f"http://127.0.0.1:{port}/dev-libs/gpkgreadpkg-1.0.gpkg.tar\n"
+        result = run("-pf", "--getbinpkg")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == listing + uri
+        assert not location.exists()
+
+        header = (
+            "Calculating dependencies ... done!\n"
+            "Dependency resolution took (backtrack: 0/20).\n\n\n"
+            f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}\n"
+        )
+        verify = (
+            " * gpkgreadpkg-1.0.gpkg.tar size ;-) ..."
+            + " " * (80 - len("gpkgreadpkg-1.0.gpkg.tar size ;-) ...") - 3 - 7)
+            + "[ ok ]\n"
+        )
+        result = run("-f", "--getbinpkg")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.startswith(header)
+        assert result.stdout.endswith(verify)
+        assert (location / "dev-libs/gpkgreadpkg-1.0.gpkg.tar").read_bytes() == binary.read_bytes()
+
+        # Already downloaded: verified again, not fetched again, and not listed.
+        result = run("-f", "--getbinpkgonly")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == header + verify
+        result = run("-pf", "--getbinpkg")
+        assert result.returncode == 0, result.stderr
+        assert result.stdout == listing[:-1]
+    finally:
+        server.shutdown()
+        server.server_close()
