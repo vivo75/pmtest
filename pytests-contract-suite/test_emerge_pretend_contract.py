@@ -509,7 +509,7 @@ CASES = [
     ("--exclude=ATOM inline form", ["--pretend", "--update", "--exclude=dev-libs/upgradepkg", "dev-libs/upgradepkg"], 0),
     ("--exclude prevents a not-yet-installed package from being offered", ["--pretend", "--exclude", "dev-libs/newpkg", "dev-libs/newpkg"], 0),
     ("--exclude with no argument is a real, immediate usage error", ["--pretend", "--exclude"], 2),
-    ("-X bundled with other short flags is not supported", ["-pX", "dev-libs/upgradepkg"], 2),
+    ("-X bundled with other short flags takes the next argument, leaving no target (Portage: help, rc 1)", ["-pX", "dev-libs/upgradepkg"], 1),
     ("--json: new install", ["--pretend", "--json", "dev-libs/newpkg"], 0),
     ("--json: with --verbose, includes use_flags", ["--pretend", "-v", "--json", "dev-libs/useflagpkg"], 0),
     ("--json: diamond dependency, required_by lists both owners", ["--pretend", "--json", "dev-libs/diamond"], 0),
@@ -652,7 +652,7 @@ CASES = [
     # its G oracle cell: host Portage 3.0.82.2, two remote-only
     # binaries).
     ("#347 S9: excluded remote-only binary earns Portage's rc 1", ["--pretend", "--getbinpkg", "--getbinpkg-exclude", "dev-libs/remotebinpkg", "dev-libs/remotebinpkg"], 1),
-    ("no atom given", ["--pretend"], 2),
+    ("no atom given", ["--pretend"], 1),
     # (A plain `emerge <atom>` with no --pretend is now a real source
     #  build + merge -- a non-dry-run path, Rust-black-box-tested in
     #  test_portuale.py, not exercised via these shared CASES.)
@@ -31965,3 +31965,21 @@ def test_s3_bid_package_use_respect_use_reports_the_mask_block(
         "dev-libs/t341-dep-1::t341",
         "use flag configuration mismatch",
     )
+
+
+_SHORT_HELP = 'emerge: command-line interface to the Portage system\nUsage:\n   emerge [ options ] [ action ] [ ebuild | tbz2 | file | @set | atom ] [ ... ]\n   emerge [ options ] [ action ] < @system | @world >\n   emerge < --sync | --metadata | --info >\n   emerge --resume [ --pretend | --ask | --skipfirst ]\n   emerge --help\nOptions: -[abBcCdDefgGhjkKlnNoOpPqrsStuUvVwW]\n          [ --color < y | n >            ] [ --columns    ]\n          [ --complete-graph             ] [ --deep       ]\n          [ --jobs JOBS ] [ --keep-going ] [ --load-average LOAD            ]\n          [ --newrepo   ] [ --newuse     ] [ --noconfmem  ] [ --nospinner   ]\n          [ --oneshot   ] [ --onlydeps   ] [ --quiet-build [ y | n ]        ]\n          [ --reinstall changed-use      ] [ --with-bdeps < y | n >         ]\nActions:  [ --depclean | --list-sets | --search | --sync | --version        ]\n\n   For more help consult the man page.\n'
+
+
+@pytest.mark.parametrize(
+    "args",
+    [["--pretend"], ["--load-average", "--pretend"], ["-l", "-p"], ["-uDN"]],
+)
+def test_emerge_without_target_or_action_prints_the_short_help_and_exits_1(
+    emerge_binary, fixture_env, args
+):
+    """Portage 3.0.82.2 (host `emerge <args>`, stdout byte-identical, rc 1,
+    backlog #405 tail): no target and no action prints `emerge_help()`'s short
+    usage block, not an error line."""
+    result = _run([str(emerge_binary)], args, fixture_env)
+    assert result.returncode == 1
+    assert result.stdout == _SHORT_HELP
