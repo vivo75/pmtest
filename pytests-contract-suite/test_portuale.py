@@ -11458,6 +11458,162 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
     assert not (tmp_path / "root/var").exists()
 
 
+def _fetchonly_extra_packages(root):
+    """Backlog #415's oracle packages on top of `_fetchonly_root`: a `RESTRICT=fetch`
+    one and one with a USE-conditional second distfile (the Manifest lines are those
+    of the 14-byte payload, reused for the 3-byte `extra` file: Portage lists without
+    checking sizes)."""
+    repo = root / "repo"
+    manifest = (repo / "dev-util/fetchprobe/Manifest").read_text()
+    for name, extra, body in (
+        ("fetchrestrict", "", 'RESTRICT="fetch"\n'),
+        (
+            "fetchcond",
+            "DIST extra-1.tar.gz 3 " + manifest.split(" ", 3)[3],
+            'IUSE="flag"\n',
+        ),
+    ):
+        pkg = repo / "dev-util" / name
+        pkg.mkdir(parents=True)
+        src = "https://example.invalid/probe-1.tar.gz"
+        if name == "fetchcond":
+            src += " flag? ( https://example.invalid/extra-1.tar.gz )"
+        (pkg / f"{name}-1.ebuild").write_text(
+            f'EAPI=8\nDESCRIPTION="x"\nSRC_URI="{src}"\n{body}SLOT="0"\nKEYWORDS="amd64"\n'
+        )
+        (pkg / "Manifest").write_text(manifest + extra)
+
+
+@pytest.mark.parametrize(
+    "argv, atom, features, rc, stdout_tail, stderr",
+    [
+        (
+            ["-pf"],
+            "dev-util/fetchrestrict",
+            "",
+            1,
+            "\n\n\n\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n",
+            "\n!!! dev-util/fetchrestrict-1 has fetch restriction turned on.\n"
+            "!!! This probably means that this ebuild's files must be downloaded\n"
+            "!!! manually.  See the comments in the ebuild for more information.\n\n"
+            " * The following files cannot be fetched for fetchrestrict:\n"
+            " *    probe-1.tar.gz\n",
+        ),
+        (
+            ["-f"],
+            "dev-util/fetchrestrict",
+            "",
+            1,
+            "\n\n>>> Fetching (1 of 1) dev-util/fetchrestrict-1::fetchrepo for {root}\n"
+            "\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n",
+            "\n!!! dev-util/fetchrestrict-1 has fetch restriction turned on.\n"
+            "!!! This probably means that this ebuild's files must be downloaded\n"
+            "!!! manually.  See the comments in the ebuild for more information.\n\n"
+            " * The following files cannot be fetched for fetchrestrict:\n"
+            " *    probe-1.tar.gz\n",
+        ),
+        (
+            ["-pf"],
+            "dev-util/fetchcond",
+            "mirror",
+            0,
+            "https://example.invalid/probe-1.tar.gz \n\nhttps://example.invalid/extra-1.tar.gz \n",
+            "",
+        ),
+        (["-pf"], "dev-util/fetchcond", "", 0, "https://example.invalid/probe-1.tar.gz \n", ""),
+    ],
+)
+def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
+    emerge_binary, tmp_path, argv, atom, features, rc, stdout_tail, stderr
+):
+    """Backlog #415 (b)(c): `RESTRICT=fetch` prints Portage's `has fetch restriction
+    turned on` notice (not `Couldn't download`), runs `pkg_nofetch`, exits 1 with the
+    `Failed to emerge` block even under `-p`, and lists no URI; `FEATURES=mirror` makes
+    the listing as `--fetch-all-uri` does. Captured on Portage 3.0.82.2 with the
+    same root (`LLM/evidence/2026-10-19-b415/` in portuale: `setup.sh`, `cells.sh`),
+    modulo the cuts the other fetchonly pin names plus the trailing `elog` summary
+    block Portage prints after `Failed to emerge` (backlog #422)."""
+    root = _fetchonly_root(tmp_path)
+    _fetchonly_extra_packages(root)
+    env = dict(os.environ)
+    env.update(
+        PORTAGE_CONFIGROOT=str(root),
+        PORTAGE_TMPDIR=str(tmp_path / "tmp"),
+        ROOT=str(tmp_path / "root"),
+        DISTDIR=str(tmp_path / "dist"),
+        NOCOLOR="yes",
+    )
+    if features:
+        env["FEATURES"] = features
+    (tmp_path / "dist").mkdir(exist_ok=True)
+    result = subprocess.run(
+        [str(emerge_binary), *argv, atom],
+        capture_output=True, text=True, check=False, env=env, stdin=subprocess.DEVNULL,
+    )
+    assert result.returncode == rc, (result.stdout, result.stderr)
+    assert result.stdout.endswith(stdout_tail.format(root=tmp_path / "root")), result.stdout
+    assert result.stderr == stderr
+    assert not (tmp_path / "root/var").exists()
+
+
+@pytest.mark.parametrize("argv", [["--resume", "-f"], ["--resume", "-pf"]])
+def test_emerge_resume_fetchonly_fetches_without_merging_like_portage(
+    emerge_binary, tmp_path, argv
+):
+    """Backlog #415 (d): `--resume --fetchonly` fetches the saved list and merges
+    nothing (`-p` lists the URIs); the saved resume list stays. portuale used to
+    run the whole merge. Expected bytes captured on Portage 3.0.82.2
+    (`LLM/evidence/2026-10-19-b415/resume-portage.txt` in portuale), modulo the
+    wall-clock seconds portuale cuts, the trailing `/` on `ROOT` and the colour of
+    the verify line (`NOCOLOR=yes` here)."""
+    root = _fetchonly_root(tmp_path)
+    good = "cp {src} \"${{DISTDIR}}/${{FILE}}\"".format(src=tmp_path / "src/probe-1.tar.gz")
+    env = dict(os.environ)
+    env.update(
+        PORTAGE_CONFIGROOT=str(root),
+        PORTAGE_TMPDIR=str(tmp_path / "tmp"),
+        ROOT=str(tmp_path / "root"),
+        DISTDIR=str(tmp_path / "dist"),
+        NOCOLOR="yes",
+    )
+    (tmp_path / "dist").mkdir(exist_ok=True)
+
+    def run(args, cmd):
+        return subprocess.run(
+            [str(emerge_binary), *args],
+            capture_output=True, text=True, check=False, stdin=subprocess.DEVNULL,
+            env={**env, "FETCHCOMMAND": cmd, "RESUMECOMMAND": cmd},
+        )
+
+    seed = run(["dev-util/fetchprobe"], "/bin/false ${FILE}")
+    assert seed.returncode == 1
+    saved = (tmp_path / "root/var/cache/edb/mtimedb").read_bytes()
+    result = run(argv, good)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    head = "Calculating dependencies ... done!\nDependency resolution took .\n\n*** Resuming merge...\n"
+    if "-pf" in argv:
+        assert result.stdout == (
+            "\nThese are the packages that would be fetched, in order:\n\n"
+            + head + "\nhttps://example.invalid/probe-1.tar.gz \n"
+        )
+        assert list((tmp_path / "dist").iterdir()) == []
+    else:
+        verify = (
+            " * probe-1.tar.gz BLAKE2B SHA512 size ;-) ..."
+            + " " * (80 - len("probe-1.tar.gz BLAKE2B SHA512 size ;-) ...") - 3 - 7)
+            + "[ ok ]\n"
+        )
+        root_dir = tmp_path / "root"
+        assert result.stdout == (
+            head + f"\n>>> Fetching (1 of 1) dev-util/fetchprobe-1::fetchrepo for {root_dir}\n"
+            ">>> Downloading 'https://example.invalid/probe-1.tar.gz'\n" + verify
+        )
+        assert (tmp_path / "dist/probe-1.tar.gz").is_file()
+    assert result.stderr == ""
+    assert (tmp_path / "root/var/cache/edb/mtimedb").read_bytes() == saved
+    assert not (tmp_path / "root/var/db").exists()
+
+
 def test_direct_ebuild_merge_refuses_an_image_path_with_a_line_ending(
     emerge_binary, tmp_path
 ):
