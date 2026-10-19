@@ -17,6 +17,17 @@ pms:
     ebuild: ../portuale/target/release/portuale
     mrg: ../portuale/target/release/portuale
     version: git
+  portuale-bed:
+    # Frozen copy of the portuale binary for bed runs, so cargo can rebuild
+    # target/release meanwhile. Refresh: cp -p ../portuale/target/release/portuale /var/tmp/bedbin/
+    # Run with PMTEST_PM=portuale-bed PMTEST_NO_BUILD=1.
+    type: portage-compatible
+    repo: ../portuale
+    package: portuale
+    emerge: /var/tmp/bedbin/portuale
+    ebuild: /var/tmp/bedbin/portuale
+    mrg: /var/tmp/bedbin/portuale
+    version: git
   portage-cli:
     type: portage-compatible
     repo: 3rdparty/portage-cli  # lu-zero/portage-cli, see 3rdparty/repos.toml

@@ -11456,3 +11456,49 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
         assert result.stderr == "!!! Couldn't download 'probe-1.tar.gz'. Aborting.\n"
     # Fetch-only never writes the vdb, the world file or the resume list.
     assert not (tmp_path / "root/var").exists()
+
+
+def test_direct_ebuild_merge_refuses_an_image_path_with_a_line_ending(
+    emerge_binary, tmp_path
+):
+    """Backlog #380: Portage scans the image before copying and refuses a
+    package that installs a file whose name holds `\\n` or `\\r`
+    (`vartree.py` `paths_with_newlines`). Expected stdout, rc 1 and the
+    untouched root are Portage 3.0.82.2's: portuale
+    `LLM/evidence/2026-10-18-380/portage-file.txt` (`ebuild … merge` of a
+    package installing `a\\nb` and `c\\rd`; `NOCOLOR=yes` pins the plain
+    ` * ` shape)."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["NOCOLOR"] = "yes"
+
+    ebuild = str(
+        Path(FIXTURES_ROOT)
+        / "repo/dev-libs/lineendingpkg/lineendingpkg-1.0.ebuild"
+    )
+    ebuild_link = tmp_path / "ebuild"
+    ebuild_link.symlink_to(Path(emerge_binary).resolve())
+    r = subprocess.run(
+        [str(ebuild_link), ebuild, "merge"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert r.stdout.splitlines()[-6:] == [
+        " * This package installs one or more files containing line ending characters:",
+        " * ",
+        " * \t/usr/share/lineendingtest/two\\nlines",
+        " * ",
+        " * package dev-libs/lineendingpkg-1.0 NOT merged",
+        " * ",
+    ]
+    assert not (root / "var/db/pkg/dev-libs/lineendingpkg-1.0").exists()
+    assert not (root / "usr/share/lineendingtest").exists()
