@@ -3098,6 +3098,7 @@ CASES = [
     ("#396: -K -u on an installed package without a binary plans nothing (pg34-blib)", ["-pvuDK", "dev-libs/pg34-blib"], 0),
     ("#393: --update --package-moves=n keeps an installed same-version other slot (slotmovepkg)", ["--pretend", "--update", "--package-moves=n", "dev-libs/slotmovepkg"], 0),
     ("#392: a new-slot row diffs USE against the installed other slot (no USE without -v)", ["--pretend", "--update", "dev-libs/unsatuseslotalt"], 0),
+    ("#402: --binpkg-respect-use on the shared root misses like Portage (no t341 repo)", ["--pretend", "--usepkgonly", "--binpkg-respect-use=y", "dev-libs/t341-dep"], 1),
 ]
 
 
@@ -31807,3 +31808,36 @@ def test_repos_conf_usepkg_exclude_and_include_fold_into_the_cli_lists(
         result = _run([str(emerge_binary)], args, env)
         assert result.returncode == rc, (extra, result.stdout, result.stderr)
         shutil.rmtree(tmp_path / "cfg373")
+
+
+def test_s3_bid_package_use_respect_use_reports_the_mask_block(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #402: with `--binpkg-respect-use=y` a user `package.use`
+    line that no binary build's baked USE satisfies reports Portage's
+    masked block — one cpv-deduped `use flag configuration mismatch`
+    row — not the plain `no binary packages` miss.
+
+    Portage 3.0.82.2, full argv `emerge -pv --package-moves=n
+    --usepkgonly=y --binpkg-respect-use=y dev-libs/t341-dep` (S0 cell
+    `b03-use-bid2-respect`, rc 1, stderr `!!! All ebuilds that could
+    satisfy "dev-libs/t341-dep" ...` + `- dev-libs/t341-dep-1::t341
+    (masked by: use flag configuration mismatch)`; re-run live on this
+    host 2026-10-19 with the same text). The pin below uses the
+    `--pretend` short-line convention (stdout empty on abort, stderr
+    compared stripped via `_all_masked`)."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "amd64", "x", "", use_line="=dev-libs/t341-dep-1-2 x"
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "--binpkg-respect-use=y", "dev-libs/t341-dep"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/t341-dep",
+        "dev-libs/t341-dep-1::t341",
+        "use flag configuration mismatch",
+    )
