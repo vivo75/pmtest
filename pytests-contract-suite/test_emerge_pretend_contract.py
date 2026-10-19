@@ -32220,3 +32220,22 @@ def test_rebuild_if_restart_controls_stay_unchanged(emerge_binary, fixture_env, 
     assert result.returncode == 0
     root = fixture_env["ROOT"]
     assert result.stdout.splitlines() == [f"{row} to {root}" for row in rows]
+
+
+@pytest.mark.parametrize(
+    "deep, rows",
+    [("0", []), ("1", []), ("2", ["[ebuild  N     ] dev-libs/newpkg-1.0"])],
+)
+def test_pubgrub_bounded_deep_matches_the_default_solver(emerge_binary, fixture_env, deep, rows):
+    """Backlog #368 (c)/#432: `--solver=pubgrub` honours `--deep=N` (it used to treat every N
+    as unlimited, planning `newpkg` already at 1). The default solver's `--deep=N` is pinned
+    against Portage 3.0.82.2's `_too_deep` (`depgraph.py:7359-7375`; the deep=0/1 pins on
+    `dev-libs/deeppkg` above), so both solvers must print the same plan: `deeppkg` (depth 0)
+    -> `deeppkg2` (depth 1) -> `newpkg` (depth 2)."""
+    base = ["--pretend", "--update", f"--deep={deep}", "--getbinpkg=n", "--usepkg=n", "dev-libs/deeppkg"]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == pubgrub.returncode == 0
+    assert default.stdout == pubgrub.stdout
+    root = fixture_env["ROOT"]
+    assert default.stdout.splitlines() == [f"{row} to {root}" for row in rows]
