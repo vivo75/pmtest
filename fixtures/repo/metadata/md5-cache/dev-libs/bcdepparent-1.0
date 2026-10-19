@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture: parent of dev-libs/bcdeppkg -- the --binpkg-changed-deps dependency disclosure
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/bcdeppkg
+SLOT=0
+_md5_=eaed14c276eedf929cff60daa80b8961

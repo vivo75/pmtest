@@ -11889,7 +11889,8 @@ def test_binpkg_changed_deps_explicit_override(
     y_args = ["--pretend", "--getbinpkgonly", "--binpkg-changed-deps=y", "dev-libs/bcdeppkg"]
     ry = _run([str(emerge_binary)], y_args, fixture_env)
     assert ry.returncode == 1
-    assert 'no binary packages to satisfy "dev-libs/bcdeppkg"' in ry.stderr
+    # Backlog #420: Portage reports the rejected binary as a masked row.
+    assert "- dev-libs/bcdeppkg-1.0::gentoo (masked by: changed deps)" in ry.stderr
     # ...whereas plain --getbinpkgonly keeps it (check off by default) --
     # but its own dep is unresolvable, so the resolve aborts (exit 1, no
     # merge list since Slice 4) with the dep note on stderr.
@@ -32049,3 +32050,122 @@ def test_pubgrub_aborts_like_the_default_solver(emerge_binary, fixture_env, atom
     assert pubgrub.stderr == default.stderr
     if atom != "dev-libs/pg34-napp":  # its merge-list rows differ: backlog #429
         assert pubgrub.stdout == default.stdout
+
+
+_BCDEP_PKG_ROW = (
+    "BUILD_ID: 1\nBUILD_TIME: 100\nCPV: dev-libs/bcdeppkg-1.0\nDEFINED_PHASES: -\nEAPI: 8\n"
+    "KEYWORDS: amd64\nRDEPEND: dev-libs/bcdepold\nREPO: testrepo\nSLOT: 0\nUSE:\n"
+    "PATH: dev-libs/bcdeppkg-1.0.tbz2\n"
+)
+_BCDEP_PARENT_ROW = (
+    "BUILD_ID: 1\nBUILD_TIME: 100\nCPV: dev-libs/bcdepparent-1.0\nDEFINED_PHASES: -\nEAPI: 8\n"
+    "KEYWORDS: amd64\nRDEPEND: dev-libs/bcdeppkg\nREPO: testrepo\nSLOT: 0\nUSE:\n"
+    "PATH: dev-libs/bcdepparent-1.0.tbz2\n"
+)
+
+
+def _bcdep_cell_configroot(tmp_path, fixtures_root, rows):
+    """Hermetic root for the backlog #420 changed-deps cells: the #341 S4 root
+    with a `$PKGDIR` index holding only `rows` (index-only, `--pretend` never
+    opens an archive). The binary `bcdeppkg` was built with `RDEPEND=bcdepold`
+    while the tree ebuild says `bcdepnew`."""
+    env = _t341_configroot(tmp_path, fixtures_root)
+    pkgdir = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir"
+    pkgdir.mkdir(parents=True, exist_ok=True)
+    (pkgdir / "Packages").write_text(
+        f"VERSION: 0\nTIMESTAMP: 0\nPACKAGES: {len(rows)}\n\n" + "\n".join(rows) + "\n"
+    )
+    return env
+
+
+def _masked_with_chain(masked: str, chain: list[str]) -> str:
+    """`_all_masked`'s block with the `(dependency required by ...)` chain between the
+    row and the Handbook footer, as Portage prints it for a dependency edge."""
+    body, footer = masked.split("\n\nFor more information", 1)
+    return body + "\n\n" + "\n".join(chain) + "\nFor more information" + footer
+
+
+def test_changed_deps_top_level_binary_reports_the_mask_block(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #420: a top-level binary that `--binpkg-changed-deps=y` rejects
+    (baked `RDEPEND` differs from the tree ebuild's) is a masked row, not the
+    plain `no binary packages` miss.
+
+    Portage 3.0.82.2 (`LLM/evidence/2026-10-19-b420/portage-B.txt`, full argv
+    `emerge -pv --package-moves=n --usepkgonly=y --binpkg-changed-deps=y
+    dev-libs/t420cdep`, rc 1): `- dev-libs/t420cdep-1.0::t420repo (masked by:
+    changed deps)` under the `All ebuilds that could satisfy` heading."""
+    env = _bcdep_cell_configroot(tmp_path, fixtures_root, [_BCDEP_PKG_ROW])
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "--binpkg-changed-deps=y", "dev-libs/bcdeppkg"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.strip() == _all_masked(
+        "dev-libs/bcdeppkg", "dev-libs/bcdeppkg-1.0::testrepo", "changed deps"
+    )
+
+
+def test_changed_deps_dependency_binary_reports_the_mask_block_with_the_chain(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #420: the same rejection on a DEPENDENCY edge discloses the masked
+    block and then the `(dependency required by ...)` chain (Portage
+    `_show_unsatisfied_dep` over the bintree; `portage-C.txt` in
+    `LLM/evidence/2026-10-19-b420/`, rc 1)."""
+    env = _bcdep_cell_configroot(
+        tmp_path, fixtures_root, [_BCDEP_PARENT_ROW, _BCDEP_PKG_ROW]
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "--binpkg-changed-deps=y", "dev-libs/bcdepparent"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stderr.strip() == _masked_with_chain(
+        _all_masked("dev-libs/bcdeppkg", "dev-libs/bcdeppkg-1.0::testrepo", "changed deps"),
+        [
+            '(dependency required by "dev-libs/bcdepparent-1.0::testrepo" [binary])',
+            '(dependency required by "dev-libs/bcdepparent" [argument])',
+        ],
+    )
+
+
+def test_respect_use_dependency_binary_reports_the_mask_block_with_the_chain(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #420: a dependency whose only binaries fail `--binpkg-respect-use`
+    reports one cpv-deduped `use flag configuration mismatch` row plus the chain
+    (`portage-A.txt` in `LLM/evidence/2026-10-19-b420/`, rc 1; cell = the #402
+    two-build `t341-dep` shape under a binary parent)."""
+    env = _t341_bid_cell_configroot(
+        tmp_path, fixtures_root, "amd64", "x", "", use_line="=dev-libs/t341-dep-1-2 x"
+    )
+    pkgdir = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir" / "Packages"
+    text = pkgdir.read_text().replace("PACKAGES: 2", "PACKAGES: 3")
+    text += (
+        "\nCPV: app-misc/t341-built-1\nDEFINED_PHASES: -\nEAPI: 8\nKEYWORDS: amd64\n"
+        "RDEPEND: dev-libs/t341-dep:0/1=\nSLOT: 0\nUSE:\nREPO: t341\n"
+        "PATH: app-misc/t341-built-1.tbz2\n"
+    )
+    pkgdir.write_text(text)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkgonly=y", "--binpkg-respect-use=y", "app-misc/t341-built"],
+        env,
+    )
+    assert result.returncode == 1
+    assert result.stderr.strip() == _masked_with_chain(
+        _all_masked(
+            "dev-libs/t341-dep:0/1=",
+            "dev-libs/t341-dep-1::t341",
+            "use flag configuration mismatch",
+        ),
+        [
+            '(dependency required by "app-misc/t341-built-1::t341" [binary])',
+            '(dependency required by "app-misc/t341-built" [argument])',
+        ],
+    )
