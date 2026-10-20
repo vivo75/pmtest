@@ -10609,36 +10609,6 @@ def test_autounmask_use_resolves_the_opt_conditional_dependency_via_the_child_fl
     ]
 
 
-def test_autounmask_use_parent_flip_suggestion_is_suppressed_by_autounmask_use_n(
-    emerge_binary, fixture_env
-):
-    """Both --autounmask-use mechanisms (Part A's plain candidate flip
-    and Part B's opt=-aware parent flip) share the same
-    autounmask_suggest_use gate -- an explicit --autounmask-use=n
-    suppresses both at once. The unflipped dep aborts the resolve (exit
-    1, no merge list since Slice 4)."""
-    result = _run(
-        [str(emerge_binary)],
-        ["--pretend", "--autounmask-use=n", "dev-libs/useeqparentoffpkg"],
-        fixture_env,
-    )
-    assert result.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
-    _assert_abort_preamble(result.stdout)
-    # Backlog #20: the child row plus the parent-conditional row Portage
-    # appends (`violated_conditionals`' all-conditional branch,
-    # depgraph.py:6768-6858; oracle: abort-capture tree,
-    # `--pretend --autounmask-use=n dev-libs/useeqparentoffpkg`).
-    assert result.stderr.splitlines() == [
-        "",
-        'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/useeqchildpkg[eqflag=]".',
-        "!!! One of the following packages is required to complete your request:",
-        "- dev-libs/useeqchildpkg-1.0::testrepo (Change USE: -eqflag)",
-        "- dev-libs/useeqparentoffpkg-1.0::testrepo (Change USE: +eqflag)",
-        '(dependency required by "dev-libs/useeqparentoffpkg-1.0::testrepo" [ebuild])',
-        '(dependency required by "dev-libs/useeqparentoffpkg" [argument])',
-    ]
-
-
 def test_autounmask_use_parent_flip_fails_like_portage_when_the_child_flag_is_masked(
     emerge_binary, fixture_env
 ):
@@ -15528,7 +15498,9 @@ def test_use_dep_equal_parent_mismatches_when_parent_flag_is_disabled(emerge_bin
     test_autounmask_use_resolves_the_opt_conditional_dependency_via_the_child_flip)
     the dependency is reported unresolvable and aborts the resolve (exit
     1, no merge list since Slice 4), not silently dropped or
-    incorrectly satisfied."""
+    incorrectly satisfied. The same `autounmask_suggest_use` gate also
+    suppresses Part A's plain candidate flip, so `=n` silences both
+    --autounmask-use mechanisms at once."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask-use=n", "dev-libs/useeqparentoffpkg"],
@@ -20409,9 +20381,11 @@ def test_complete_graph_does_not_merge_a_missing_deep_dep_of_an_installed_pkg(
     non-complete, then the complete pass may only merge what phase 1
     already would."""
     plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/deeppkg"], fixture_env)
+    assert plain.returncode == 0, plain.stderr
     assert "newpkg" not in plain.stdout
 
     cg = _run([str(emerge_binary)], ["--pretend", "--complete-graph", "dev-libs/deeppkg"], fixture_env)
+    assert cg.returncode == 0, cg.stderr
     assert "newpkg" not in cg.stdout
     assert cg.stdout == plain.stdout
 
@@ -20421,6 +20395,7 @@ def test_complete_graph_does_not_merge_a_missing_deep_dep_of_an_installed_pkg(
     off = _run(
         [str(emerge_binary)], ["--pretend", "--complete-graph=n", "dev-libs/deeppkg"], fixture_env
     )
+    assert off.returncode == 0, off.stderr
     assert off.stdout == plain.stdout
 
 

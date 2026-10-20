@@ -104,23 +104,41 @@ def test_fixture_packages_satisfy_output_invariants(options, emerge_binary, fixt
         _report(list(pool.map(one, _fixture_atoms())))
 
 
-def _determinism_args() -> list[list[str]]:
-    return [args for _, args, _ in CASES] + [
-        ["--pretend", "--update", "--deep", "--newuse", s]
+def _determinism_args() -> list[tuple[list[str], int | None]]:
+    """Each invocation with its expected exit code; `None` (the set
+    invocations, which have no CASES row) only requires a normal emerge
+    status. Without this, runs that all crash alike would compare equal."""
+    return [(args, rc) for _, args, rc in CASES] + [
+        (["--pretend", "--update", "--deep", "--newuse", s], None)
         for s in ("@world", "@system", "@selected")
     ]
+
+
+def _same_and_sane(runs, expected_rc):
+    """None if all runs agree and the first has the expected status, else
+    a problem string."""
+    first = runs[0]
+    if expected_rc is None:
+        if first.returncode not in (0, 1):
+            return f"abnormal exit status {first.returncode}"
+    elif first.returncode != expected_rc:
+        return f"exit status {first.returncode}, expected {expected_rc}"
+    if not all((r.returncode, r.stdout, r.stderr) ==
+               (first.returncode, first.stdout, first.stderr) for r in runs[1:]):
+        return "differs"
+    return None
 
 
 def test_repeated_runs_are_byte_identical(emerge_binary, fixture_env):
     """§9: each contract case three times; any difference is iteration
     order leaking into output."""
 
-    def one(args):
+    def one(item):
+        args, rc = item
         runs = [_run(emerge_binary, args, fixture_env) for _ in range(3)]
-        first = runs[0]
-        same = all((r.returncode, r.stdout, r.stderr) ==
-                   (first.returncode, first.stdout, first.stderr) for r in runs[1:])
-        return " ".join(args), None if same else ["output differs between identical runs"]
+        problem = _same_and_sane(runs, rc)
+        return " ".join(args), None if problem is None else [
+            "output differs between identical runs" if problem == "differs" else problem]
 
     with ThreadPoolExecutor(WORKERS) as pool:
         results = list(pool.map(one, _determinism_args()))
@@ -135,16 +153,16 @@ def test_output_is_identical_under_shuffled_directory_order(emerge_binary, fixtu
 
     seeds = ("1", "17", "4242")
 
-    def one(args):
+    def one(item):
+        args, rc = item
         runs = [
             _run(emerge_binary, args, {**fixture_env, "PORTUALE_SHUFFLE_DIRS": seed})
             for seed in seeds
         ]
-        first = runs[0]
-        same = all((r.returncode, r.stdout, r.stderr) ==
-                   (first.returncode, first.stdout, first.stderr) for r in runs[1:])
-        return " ".join(args), None if same else [
-            "output differs between PORTUALE_SHUFFLE_DIRS seeds " + ", ".join(seeds)]
+        problem = _same_and_sane(runs, rc)
+        return " ".join(args), None if problem is None else [
+            "output differs between PORTUALE_SHUFFLE_DIRS seeds " + ", ".join(seeds)
+            if problem == "differs" else problem]
 
     with ThreadPoolExecutor(WORKERS) as pool:
         results = list(pool.map(one, _determinism_args()))
@@ -176,17 +194,32 @@ def test_repos_conf_section_order_does_not_change_output(emerge_binary, fixture_
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(configroot)
 
-    def one(args):
-        want = _run(emerge_binary, args, fixture_env)
-        got = _run(emerge_binary, args, env)
-        same = (got.returncode, got.stdout, got.stderr) == \
-               (want.returncode, want.stdout, want.stderr)
-        return " ".join(args), None if same else ["output differs with repos.conf sections reversed"]
+    def one(item):
+        args, rc = item
+        runs = [_run(emerge_binary, args, fixture_env), _run(emerge_binary, args, env)]
+        problem = _same_and_sane(runs, rc)
+        return " ".join(args), None if problem is None else [
+            "output differs with repos.conf sections reversed"
+            if problem == "differs" else problem]
 
     with ThreadPoolExecutor(WORKERS) as pool:
         results = list(pool.map(one, _determinism_args()))
     lines = [label for label, problems in results if problems]
     assert not lines, "repos.conf file-order-dependent output for:\n" + "\n".join(lines)
+
+
+def test_determinism_helper_rejects_runs_that_agree_but_fail():
+    """`_same_and_sane` must not accept identical runs with the wrong exit
+    status (the vacuity that hid in the metamorphic tests, backlog #449)."""
+    from types import SimpleNamespace
+
+    def run(rc):
+        return SimpleNamespace(returncode=rc, stdout="", stderr="")
+
+    assert _same_and_sane([run(101)] * 3, None) == "abnormal exit status 101"
+    assert _same_and_sane([run(0)] * 3, 1) == "exit status 0, expected 1"
+    assert _same_and_sane([run(0), run(1)], 0) == "differs"
+    assert _same_and_sane([run(0)] * 3, 0) is None
 
 
 # -- the checker itself --------------------------------------------------
