@@ -512,7 +512,6 @@ CASES = [
     ("-X bundled with other short flags takes the next argument, leaving no target (Portage: help, rc 1)", ["-pX", "dev-libs/upgradepkg"], 1),
     ("--json: new install", ["--pretend", "--json", "dev-libs/newpkg"], 0),
     ("--json: with --verbose, includes use_flags", ["--pretend", "-v", "--json", "dev-libs/useflagpkg"], 0),
-    ("--json: diamond dependency, required_by lists both owners", ["--pretend", "--json", "dev-libs/diamond"], 0),
     ("--json: upgrade includes from_version", ["--pretend", "--update", "--json", "dev-libs/upgradepkg"], 0),
     ("--json: blocker match (satisfied -> rc 0, Portage `b`)", ["--pretend", "--json", "dev-libs/blockerpkg"], 0),
     ("--json: solvable slot conflict reconciled", ["--pretend", "--json", "dev-libs/slotconflictparent"], 0),
@@ -599,13 +598,11 @@ CASES = [
     # #341 S5: profile files (per-node EAPI, formats). All four S0
     # profile cells run the same argv (`dev-libs/t341-dep`); only the
     # configroot differs, so one shared-root CASES entry (the plain miss,
-    # rc 1, like Portage) plus the hermetic `test_s5_*` pins below.
+    # rc 1, like Portage) plus the hermetic `test_s5_*` pins below. #341
+    # S6 (user-config atom validation) has the same argv and the same
+    # shared-root miss, so it shares this entry too; the hermetic
+    # `test_s6_*` pin replays the S0 user-config cell (rc 0).
     ("#341 S5: profile EAPI/formats validation earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep"], 1),
-    # #341 S6: user config (`/etc/portage` + `/etc/portage/profile` atom
-    # validation). Same argv and same shared-root miss (rc 1, like
-    # Portage: the shared root sees no t341 repo); the hermetic
-    # `test_s6_*` pin above replays the S0 user-config cell (rc 0).
-    ("#341 S6: user-config atom validation earns Portage's rc 1", ["--pretend", "dev-libs/t341-dep"], 1),
     # #341 S7: command line + `--exclude`-style options. Bad package
     # atoms and bad option atoms fail before resolution, so the shared
     # root (which sees no t341 repo) still earns Portage's exit code;
@@ -630,18 +627,13 @@ CASES = [
     ("#341 S8: unknown set earns Portage's rc 1", ["--pretend", "@s341"], 1),
     # #341 S9: build-id matching against binary candidates. The shared
     # root holds no t341 repo and no such binpkg, so this argv is the
-    # plain miss (rc 1) on both sides, like the S5/S6 entries above; the
-    # instance selection itself is pinned hermetically per cell by the
-    # `test_s9_*` functions (each docstring cites its H-bid-mask oracle
-    # cell: host Portage 3.0.82.2, two-instance PKGDIR).
+    # plain miss (rc 1) on both sides, like the S5 entry above; #346 S3
+    # (build-id lines in user package.accept_keywords/package.use) has the
+    # same argv and shares this entry. The instance selection itself is
+    # pinned hermetically per cell by the `test_s9_*` and `test_s3_*`
+    # functions (each docstring cites its oracle cell: host Portage
+    # 3.0.82.2, two-instance PKGDIR).
     ("#341 S9: build-id match cell earns Portage's rc 1", ["--pretend", "--usepkgonly", "dev-libs/t341-dep"], 1),
-    # #346 S3: build-id lines in user package.accept_keywords/package.use.
-    # Same shared-root shape as the S9 entry (the shared root holds no t341
-    # repo and no such binpkg, so both sides take the plain miss, rc 1, like
-    # Portage); the instance selection itself is pinned hermetically per
-    # cell by the `test_s3_*` functions (each docstring cites its B oracle
-    # cell: host Portage 3.0.82.2, two-instance PKGDIR).
-    ("#346 S3: build-id user-config cell earns Portage's rc 1", ["--pretend", "--usepkgonly", "dev-libs/t341-dep"], 1),
     # #347 S9: --getbinpkg-exclude/include filter the remote index. The
     # shared root's binhost holds dev-libs/remotebinpkg as a remote-only
     # binary (no ebuild anywhere); excluding it leaves the top-level
@@ -675,7 +667,6 @@ CASES = [
     ("#347 S8: bad --autounmask-backtrack choice", ["--pretend", "--autounmask-backtrack=x", "dev-libs/newpkg"], 2),
     ("#347 S8: unrecognized long option", ["--frobnicate", "dev-libs/newpkg"], 2),
     ("recursion: basic dependency chain", ["--pretend", "dev-libs/withdeps"], 0),
-    ("recursion: diamond dependency dedup", ["--pretend", "dev-libs/diamond"], 0),
     ("recursion: dependency cycle terminates", ["--pretend", "dev-libs/cycle-a"], 0),
     (
         "recursion: unbreakable build-time cycle is a fatal error",
@@ -2034,11 +2025,6 @@ CASES = [
         0,
     ),
     (
-        "--buildpkgonly: off by default, a New->New dependency chain resolves fine",
-        ["--pretend", "dev-libs/dualdep"],
-        0,
-    ),
-    (
         "--buildpkgonly: a New package depending on another New package fails to resolve",
         ["--pretend", "--buildpkgonly", "dev-libs/dualdep"],
         1,
@@ -2064,11 +2050,6 @@ CASES = [
         1,
     ),
     (
-        "--tree: indents a diamond dependency, shown once",
-        ["--pretend", "--tree", "dev-libs/diamond"],
-        0,
-    ),
-    (
         "--tree --unordered-display: children in discovery order, not alphabetical",
         ["--pretend", "--tree", "--unordered-display", "dev-libs/treeorderpkg"],
         0,
@@ -2088,7 +2069,6 @@ CASES = [
         ["--pretend", "--tree", "--columns", "dev-libs/newpkg"],
         2,
     ),
-    ("profile config: real USE flag gates a dependency", ["--pretend", "dev-libs/useflagpkg"], 0),
     (
         "USE_EXPAND: VIDEO_CARDS=nvidia expands to video_cards_nvidia, gates a dependency",
         ["--pretend", "-v", "dev-libs/useexpandpkg"],
@@ -2102,11 +2082,6 @@ CASES = [
     (
         "USE_EXPAND_UNPREFIXED: ARCH=amd64 contributes the bare flag amd64, gates a dependency",
         ["--pretend", "-v", "dev-libs/archusepkg"],
-        0,
-    ),
-    (
-        "-pv groups IUSE by USE_EXPAND variable (VIDEO_CARDS=\"...\")",
-        ["--pretend", "-v", "dev-libs/useexpandpkg"],
         0,
     ),
     (
@@ -2129,9 +2104,7 @@ CASES = [
         ["--pretend", "-v", "dev-libs/unstableusepkg"],
         0,
     ),
-    ("package.mask: hidden, no unmask", ["--pretend", "dev-libs/hardmaskedpkg"], 1),
     ("package.mask + package.unmask: masked then unmasked", ["--pretend", "dev-libs/maskedandunmaskedpkg"], 0),
-    ("package.mask: -atom removal leaves candidate unaffected", ["--pretend", "dev-libs/samepkg"], 0),
     ("package.mask: repo-level profiles/package.mask hides a package", ["--pretend", "dev-libs/repomaskedpkg"], 1),
     ("package.mask: profile-level package.mask hides a package", ["--pretend", "dev-libs/profilemaskedpkg"], 1),
     ("package.mask: profile-level package.unmask cancels a repo-level mask", ["--pretend", "dev-libs/repomaskedthenprofileunmaskedpkg"], 0),
@@ -2326,15 +2299,11 @@ CASES = [
     ("multi-atom: a later nonexistent atom still aborts the whole run", ["--pretend", "dev-libs/newpkg", "dev-libs/does-not-exist"], 1),
     ("--misspell-suggestions: a near-miss package name gets suggestions", ["--pretend", "dev-libs/newpgk"], 1),
     ("--misspell-suggestions=n: no suggestions", ["--pretend", "--misspell-suggestions=n", "dev-libs/newpgk"], 1),
-    ("--misspell-suggestions: a masked (existing) cp gets no name suggestions", ["--pretend", "dev-libs/autounmaskkeywordpkg"], 1),
     ("--debug: resolver trace on both streams", ["--pretend", "--debug", "dev-libs/newpkg"], 0),
     ("-d: --debug short alias, resolver trace", ["--pretend", "-d", "dev-libs/newpkg"], 0),
     ("-pd: --debug bundles with -p", ["-pd", "dev-libs/newpkg"], 0),
     ("--debug + a slot conflict: resolver trace survives backtracking (#62: rc 1 like Portage)", ["--pretend", "--debug", "dev-libs/slotconfgroup"], 1),
     ("--verbose is now implemented, not rejected", ["--pretend", "--verbose", "dev-libs/newpkg"], 0),
-    ("-v short alias is now implemented, not rejected", ["--pretend", "-v", "dev-libs/newpkg"], 0),
-    ("without --verbose, USE= is never shown even for a package with IUSE", ["--pretend", "dev-libs/useflagpkg"], 0),
-    ("-v on a package with no IUSE at all: no USE= line", ["--pretend", "-v", "dev-libs/newpkg"], 0),
     ("-v combined with a real-but-unimplemented option: still rejected", ["--pretend", "-v", "--accept-properties", "dev-libs/newpkg"], 2),
     ("-v explicit disable via a following \"n\" token", ["--pretend", "-v", "n", "dev-libs/useflagpkg"], 0),
     ("-v explicit enable via a following \"y\" token", ["--pretend", "-v", "y", "dev-libs/useflagpkg"], 0),
@@ -2828,11 +2797,6 @@ CASES = [
         0,
     ),
     (
-        "new-slot install: -v keeps the S column ahead of the -v-only mask column",
-        ["--pretend", "-v", "dev-libs/newslotpkg:1"],
-        0,
-    ),
-    (
         "new-slot install: --columns S column",
         ["--pretend", "--columns", "dev-libs/newslotpkg:1"],
         0,
@@ -2875,21 +2839,6 @@ CASES = [
     (
         "interactive bracket column: an installed interactive package reinstalls as [ebuild Ir]",
         ["--pretend", "dev-libs/interactiveinstalledpkg"],
-        0,
-    ),
-    (
-        "Total: counters line (-v) with a dependency",
-        ["--pretend", "-v", "dev-libs/useexpandpkg"],
-        0,
-    ),
-    (
-        "Total: counters line (-v) counts a new-slot install separately",
-        ["--pretend", "-v", "dev-libs/newslotpkg:1"],
-        0,
-    ),
-    (
-        "Total: counters line (-v) with a blocker Conflict: line",
-        ["--pretend", "-v", "dev-libs/blockerpkg"],
         0,
     ),
     (

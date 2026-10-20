@@ -152,6 +152,8 @@ blessed_expanded: dict[str, dict] = {}
 # that matched nothing (nodeid, args, env, result record), in call order.
 matched_keys: set[str] = set()
 unmatched_calls: list[tuple[str, dict]] = []
+# HARVEST mode: the test functions that made at least one call this session.
+seen_bases: set[str] = set()
 
 
 def _nodekey(nodeid: str) -> str:
@@ -256,6 +258,8 @@ def check_contract_call(args, env, result) -> tuple[str | None, str | None]:
     ident = case_identity(list(args), env)
     ident_key = (nodeid, json.dumps(ident, sort_keys=True))
     with _lock:
+        if HARVEST:
+            seen_bases.add(_base_test(nodeid + "#0"))
         occurrence = _ident_occurrence.get(ident_key, 0)
         _ident_occurrence[ident_key] = occurrence + 1
     candidates = [
@@ -297,7 +301,8 @@ def write_harvest() -> None:
     is dropped; the calls of the test functions that had orphans and found
     no entry are recorded afresh from the current Rust output. So is a call
     that follows a rename: its test has no stored entry at all and its
-    args+env equal those of a dropped orphan. Entries that were matched,
+    args+env equal those of a dropped orphan whose test function no longer
+    runs. Entries that were matched,
     and calls of every other test (including tests added after the
     harvest, which pin their output in the test body), are left as they
     are. The
@@ -311,6 +316,7 @@ def write_harvest() -> None:
     orphan_idents = {
         json.dumps({"args": cases[k]["args"], "env": cases[k]["env"]}, sort_keys=True)
         for k in orphans
+        if _base_test(k) not in seen_bases
     }
     for k in orphans:
         del cases[k]

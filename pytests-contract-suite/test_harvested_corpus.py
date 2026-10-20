@@ -58,11 +58,24 @@ def test_harvest_records_a_renamed_test_and_drops_its_old_entries(tmp_path, monk
     monkeypatch.setattr(corpus, "CONTRACT_CORPUS", path)
     monkeypatch.setattr(corpus, "HARVEST", True)
     monkeypatch.setattr(corpus, "_contract_cases", corpus.load(path))
+    # A second orphan whose test function still runs: a different test
+    # that merely shares its argv must not be recorded because of it.
+    still = {"args": ["--pretend", "e/f"], "env": {}, **rec}
+    stored["tests/t.py::test_still_runs#0"] = still
+    corpus.save(path, stored)
+    monkeypatch.setattr(corpus, "_contract_cases", corpus.load(path))
     monkeypatch.setattr(corpus, "matched_keys", {"tests/t.py::test_kept#0"})
+    monkeypatch.setattr(corpus, "seen_bases", {"t.py::test_kept", "t.py::test_still_runs"})
     monkeypatch.setattr(corpus, "unmatched_calls", [
         ("suite/t.py::test_renamed", {**ident, **rec}),
         ("suite/t.py::test_brand_new", {"args": ["--pretend", "x/y"], "env": {}, **rec}),
+        ("suite/t.py::test_coincidence", {"args": ["--pretend", "e/f"], "env": {}, **rec}),
+        ("suite/t.py::test_still_runs", {"args": ["--pretend", "g/h"], "env": {}, **rec}),
     ])
     corpus.write_harvest()
     keys = set(corpus.load(path))
-    assert keys == {"tests/t.py::test_kept#0", "suite/t.py::test_renamed#0"}
+    assert keys == {
+        "tests/t.py::test_kept#0",
+        "suite/t.py::test_renamed#0",
+        "suite/t.py::test_still_runs#0",  # stale test: its orphan is re-recorded
+    }
