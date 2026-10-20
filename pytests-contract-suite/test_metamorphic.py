@@ -148,7 +148,10 @@ def _atoms(args: list[str]) -> list[tuple[str, str]]:
 
 def _materialize(dst: Path) -> Path:
     root = dst / "fixtures"
-    shutil.copytree(FIXTURES_ROOT, root)
+    # symlinks=True: `etc/portage/make.profile` is a relative symlink, and
+    # following it breaks the profile's `../base` parent -- every run then
+    # fails identically and the comparison proves nothing.
+    shutil.copytree(FIXTURES_ROOT, root, symlinks=True)
     return root
 
 
@@ -202,6 +205,9 @@ def _normalised(result: subprocess.CompletedProcess, roots: list[Path],
 
 
 def _duplicate_iuse(root: Path, args: list[str]) -> tuple[list[str], None]:
+    """Duplicate the first IUSE token of every fixture package the subset's
+    cases name (one pass over the whole tree, shared by all cases)."""
+    changed = False
     for cat, pkg in _atoms(args):
         cache = [
             f for repo in REPO_NAMES
@@ -209,10 +215,8 @@ def _duplicate_iuse(root: Path, args: list[str]) -> tuple[list[str], None]:
             if f.is_file()
         ]
         ebuilds = sorted(root.glob(f"*/{cat}/{pkg}/*.ebuild"))
-        changed = False
         for path in [*cache, *ebuilds]:
-            text = path.read_text()
-            lines = text.splitlines(keepends=True)
+            lines = path.read_text().splitlines(keepends=True)
             for i, line in enumerate(lines):
                 m = re.match(r"^(IUSE=)(['\"]?)([^'\"]*)\2\s*$", line)
                 if not m or not m.group(3).split():
@@ -220,13 +224,11 @@ def _duplicate_iuse(root: Path, args: list[str]) -> tuple[list[str], None]:
                 tokens = m.group(3).split()
                 dup = " ".join([tokens[0], *tokens])
                 lines[i] = f"{m.group(1)}{m.group(2)}{dup}{m.group(2)}\n"
+                _atomic_write(path, "".join(lines))
                 changed = True
                 break
-            if changed:
-                _atomic_write(path, "".join(lines))
-        if changed:
-            return args, None
-    pytest.skip("no fixture package with a non-empty IUSE in this case's atoms")
+    assert changed, "no fixture package with a non-empty IUSE in the subset's atoms"
+    return args, None
 
 
 _UNRELATED_EBUILD = """EAPI=8
@@ -272,7 +274,8 @@ def _add_empty_overlay(root: Path, args: list[str]) -> tuple[list[str], None]:
 
 
 _CATEGORY_OLD = "dev-libs"
-_CATEGORY_NEW = "dev-libs-rn"
+# Same length as the old name, so column-aligned markers (`^   ^`) do not move.
+_CATEGORY_NEW = "dev-libx"
 
 
 def _rename_category(root: Path, args: list[str]) -> tuple[list[str], Callable]:
@@ -295,7 +298,8 @@ def _rename_category(root: Path, args: list[str]) -> tuple[list[str], Callable]:
         if old + "/" in text:
             _atomic_write(path, text.replace(old + "/", new + "/"))
     rewritten = [a.replace(old + "/", new + "/") for a in args]
-    return rewritten, lambda s: s.replace(new + "/", old + "/")
+    # the bare name too: --json prints the category on its own
+    return rewritten, lambda s: s.replace(new, old)
 
 
 def _reorder_package_use(root: Path, args: list[str]) -> tuple[list[str], None]:
@@ -328,18 +332,50 @@ def pristine_fixtures(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return _materialize(tmp_path_factory.mktemp("metamorphic-pristine"))
 
 
+def _subset_args() -> list[str]:
+    return [arg for _, args, _ in SUBSET for arg in args]
+
+
+def _rewrite_args(transform_id: str, args: list[str]) -> list[str]:
+    if transform_id == "rename-category":
+        return [a.replace(_CATEGORY_OLD + "/", _CATEGORY_NEW + "/") for a in args]
+    return args
+
+
+@pytest.fixture(scope="session")
+def transformed_fixtures(tmp_path_factory: pytest.TempPathFactory):
+    """One transformed copy of `fixtures/` per transform, built on first use
+    and shared by every case: the runs only read the tree (the pristine copy
+    has always been shared the same way), so copying 24 MB per case was most
+    of this file's run time."""
+    built: dict[str, tuple[Path, Callable | None]] = {}
+
+    def get(transform_id: str, transform) -> tuple[Path, Callable | None]:
+        if transform_id not in built:
+            root = _materialize(tmp_path_factory.mktemp(f"metamorphic-{transform_id}"))
+            before = _tree_fingerprint(root)
+            _, rewrite = transform(root, _subset_args())
+            assert _tree_fingerprint(root) != before, (
+                f"transform {transform_id!r} did not modify the fixture tree")
+            built[transform_id] = (root, rewrite)
+        return built[transform_id]
+
+    return get
+
+
 @pytest.mark.parametrize("case", SUBSET, ids=[d for d, _, _ in SUBSET])
 @pytest.mark.parametrize("transform", TRANSFORMS)
 def test_transform_does_not_change_output(case, transform, emerge_binary,
-                                          pristine_fixtures, tmp_path):
+                                          pristine_fixtures, transformed_fixtures):
     description, args, _ = case
-    root = _materialize(tmp_path)
-    before = _tree_fingerprint(root)
-    transformed_args, rewrite = transform(root, list(args))
-    assert _tree_fingerprint(root) != before, (
-        f"transform {description!r} did not modify the fixture tree")
+    transform_id = transform.__name__.lstrip("_").replace("_", "-")
+    root, rewrite = transformed_fixtures(transform_id, transform)
+    transformed_args = _rewrite_args(transform_id, list(args))
 
     want = _pristine(emerge_binary, pristine_fixtures, args)
+    assert want.returncode == case[2], (
+        f"{description}: the pristine run exited {want.returncode}, not the "
+        f"case's {case[2]}: {want.stderr[:200]!r}")
     got = _run(emerge_binary, root, transformed_args)
     assert _normalised(got, [root, pristine_fixtures], rewrite) == \
         _normalised(want, [root, pristine_fixtures], rewrite), (
