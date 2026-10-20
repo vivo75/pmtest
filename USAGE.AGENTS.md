@@ -213,3 +213,12 @@ solo). A `-n 16` il guadagno è piccolo (~76 s) e una volta su quattro una run
 è uscita con codice 1 senza che il nome del fallimento sia stato catturato:
 usare 8. Dopo la run: `sudo rm -rf /var/tmp/pytest-parallel` (un test crea file
 di root) e `git clean -fdq fixtures/`.
+
+## Registrazioni del terminale (backlog #443)
+
+`scripts/cast_cells.py [--out DIR]` esegue 8 celle `--pretend` sotto Portage e
+portuale in un pty registrato con `asciinema rec --headless` (asciicast v3) e
+scrive `report.md` (default `/var/tmp/casts`, mai `/dev/shm`).
+`scripts/cast_compare.py A.cast B.cast` confronta due registrazioni: testo,
+suddivisione in eventi di output, tempi. I tempi sono solo un rapporto, non
+un controllo. Test: `pytests-contract-suite/test_cast_tools.py`.
