@@ -5232,7 +5232,7 @@ def test_emerge_resume_prints_news_notices_like_portage(emerge_binary, tmp_path)
     exactly once; `--resume --pretend` prints it exactly once (the
     `post_emerge.py:112-117` pretend arm -- the pre notice is itself
     `--pretend`-gated); `--resume --skipfirst` merges `schedok` and
-    prints it twice, pre before `>>> Resuming...` and post after the
+    prints it twice, pre before `*** Resuming merge...` and post after the
     last `>>>` line."""
     import json
 
@@ -5264,7 +5264,7 @@ def test_emerge_resume_prints_news_notices_like_portage(emerge_binary, tmp_path)
     assert r.returncode == 0, (r.stdout, r.stderr)
     assert r.stdout.count("5 news items need reading for repository 'testrepo'.") == 2
     assert r.stdout.count("Use eselect news read to view new items.") == 2
-    assert r.stdout.index("need reading") < r.stdout.index(">>> Resuming")
+    assert r.stdout.index("need reading") < r.stdout.index("*** Resuming")
     assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
     assert not mtimedb.exists()  # resume list cleared on success
@@ -7542,7 +7542,11 @@ def test_emerge_resume_applies_interactive_packages_like_portage(emerge_binary, 
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
+    # Portage 3.0.82.2 (LLM/evidence/2026-10-19-b421/portage.txt, `resume -j2`):
+    # the resolution notice and the banner come before the interactive notice.
     assert (
+        "Calculating dependencies ... done!\nDependency resolution took .\n\n"
+        "*** Resuming merge...\n"
         ">>> Sending package output to stdio due to interactive package(s):\n\n"
         f"  dev-libs/interactivemergepkg-1.0 for {root}\n\n"
         ">>> Setting --jobs=1 due to the above interactive package(s)\n"
