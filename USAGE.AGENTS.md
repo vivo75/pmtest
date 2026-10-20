@@ -13,7 +13,7 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 
 ## Usa così
 
-1. `PMTEST_PM=<nome> python3 -m pytest pytests-contract-suite -q` — suite fixture-based.
+1. `PMTEST_PM=<nome> python3 -m pytest pytests-contract-suite -q` — suite fixture-based (seriale, ~8 min). Il comando normale è `scripts/pytest-parallel.sh` (8 worker, ~90 s).
 2. `differential-test-bed/run/l0-resolver.sh` e `differential-test-bed/run/l1-merge-from-binpkg.sh` —
    differential su albero reale (serve `localhost/test-portuale:latest`;
    poi `l0-fixture-oracle.sh`, `l2-portuale-builder.sh`,
