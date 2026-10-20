@@ -12145,3 +12145,52 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     world = (root / "var/lib/portage/world").read_text().split()
     assert "dev-libs/schedok" in world
     assert "dev-libs/schedbad" not in world and "dev-libs/schedbaddep" not in world
+
+
+def test_emerge_merges_an_idepend_dep_into_the_running_root_only_when_allowed(
+    emerge_binary, tmp_path
+):
+    """Backlog #352 (owner decision 2026-10-19: replicate Portage, bed only). Portage
+    resolves `IDEPEND` against the running root and merges that dep there
+    (`depgraph.py:4256-4288`, `EbuildMerge.py`); on a test `ROOT` that is the host
+    (`d-idep8-merge` in `LLM/evidence/2026-10-12-348-s0/d-lifecycle.md`: Portage fails with
+    `Read-only file system: /var/db/pkg`). portuale keeps merging everything into `ROOT`
+    unless `PORTUALE_ALLOW_RUNNING_ROOT_WRITES=1` is set (the bed's disposable running
+    root); then the dep lands in `PORTAGE_RUNNING_ROOT` and the package in `ROOT`.
+    Here the running root is a temp dir, never the host."""
+    import shutil
+
+    def run(name, allow):
+        root = tmp_path / f"{name}-root"
+        running = tmp_path / f"{name}-running"
+        for r in (root, running):
+            shutil.copytree(Path(FIXTURES_ROOT) / "var", r / "var")
+        env = dict(os.environ)
+        env.update(
+            PORTAGE_CONFIGROOT=FIXTURES_ROOT,
+            ROOT=str(root),
+            PORTAGE_RUNNING_ROOT=str(running),
+            DISTDIR=str(Path(FIXTURES_ROOT) / "distfiles"),
+            PORTAGE_TMPDIR=str(tmp_path / f"{name}-pt"),
+        )
+        if allow:
+            env["PORTUALE_ALLOW_RUNNING_ROOT_WRITES"] = "1"
+        r = subprocess.run(
+            [str(emerge_binary), "--oneshot", "dev-libs/topidepapp"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        assert r.returncode == 0, (r.stdout, r.stderr)
+        return root, running, r.stdout
+
+    root, running, out = run("allowed", True)
+    assert (root / "var/db/pkg/dev-libs/topidepapp-1.0/CONTENTS").is_file()
+    assert not (root / "var/db/pkg/dev-libs/topideplib-1.0").exists()
+    assert (running / "var/db/pkg/dev-libs/topideplib-1.0/CONTENTS").is_file()
+    assert not (running / "var/db/pkg/dev-libs/topidepapp-1.0").exists()
+    assert f">>> Installing (1 of 2) dev-libs/topideplib-1.0::testrepo to {running}" in out
+    assert f">>> Installing (2 of 2) dev-libs/topidepapp-1.0::testrepo to {root}" in out
+
+    root, running, out = run("default", False)
+    for pkg in ("topidepapp-1.0", "topideplib-1.0"):
+        assert (root / f"var/db/pkg/dev-libs/{pkg}/CONTENTS").is_file()
+        assert not (running / f"var/db/pkg/dev-libs/{pkg}").exists()
