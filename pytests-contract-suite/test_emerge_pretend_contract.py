@@ -10771,6 +10771,31 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     )
 
 
+@pytest.mark.parametrize(
+    "atom,needle",
+    [
+        ("dev-libs/maskneedpkg", "have been masked"),
+        ("dev-libs/maskmaskedconsumer", "have been masked"),
+        ("=dev-libs/aup0b-1", "USE changes are necessary"),
+    ],
+)
+def test_complete_graph_keeps_the_abort_of_the_first_walk(
+    emerge_binary, fixture_env, atom, needle
+):
+    """Backlog #440. `--complete-graph` must not turn an aborted first walk into a
+    success: Portage runs `_complete_graph` only after `_create_graph()` succeeded
+    (`depgraph.py`, `select_files`), so a masked dependency or a flip-only dependency
+    still ends rc 1 with its report. Live Portage 3.0.82.2 (L0 fixture oracle,
+    `differential-test-bed/atomlists/l0-fixture-oracle-440.txt`). Portuale used to print
+    one merge row and exit 0 because the complete pass re-resolved without the miss."""
+    plain = _run([str(emerge_binary)], ["-pv", atom], fixture_env)
+    complete = _run([str(emerge_binary)], ["-pv", "--complete-graph", atom], fixture_env)
+    assert plain.returncode == 1
+    assert complete.returncode == 1, complete.stdout
+    assert needle in complete.stderr
+    assert "[ebuild" not in complete.stdout
+
+
 def test_autounmask_parent_flip_with_backtrack_y_fails_without_a_restart(
     emerge_binary, fixture_env
 ):

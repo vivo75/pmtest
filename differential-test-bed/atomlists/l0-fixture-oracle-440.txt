@@ -1,0 +1,9 @@
+# #440 -- the `--complete-graph` pass after a first walk that already has an
+# unsatisfied dependency (masked / use-flip): Portage keeps reporting it.
+# `maskneedpkg` is also listed without the flag as the control: its remaining
+# finding (the package.mask comment lines) is independent of `--complete-graph`.
+--pretend dev-libs/maskneedpkg
+--pretend --complete-graph dev-libs/maskneedpkg
+--pretend --complete-graph dev-libs/maskmaskedconsumer
+--pretend --complete-graph =dev-libs/aup0b-1
+--pretend --autounmask --complete-graph =dev-libs/aup0b-1
