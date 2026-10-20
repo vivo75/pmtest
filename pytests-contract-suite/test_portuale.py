@@ -4020,7 +4020,13 @@ def test_emerge_failed_build_prints_emerging_but_no_installing_line(
     # The build died, so Portage queues no merge: neither follow-up line.
     assert ">>> Installing" not in result.stdout
     assert ">>> Completed" not in result.stdout
-    assert "merge failed" in result.stderr
+    # Portage's failure block on stdout (backlog #426); no portuale-only stderr line.
+    assert (
+        f"\n>>> Failed to emerge dev-libs/failpkg-1.0 for {root}, Log file:\n\n>>>  '"
+        in result.stdout
+    )
+    assert "temp/build.log'" in result.stdout
+    assert result.stderr == ""
 
 
 def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
@@ -6468,7 +6474,7 @@ def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
             env=env,
         )
         assert r.returncode == 1, (r.stdout, r.stderr)
-        assert "dev-libs/schedbad-1.0" in r.stderr, (r.stdout, r.stderr)
+        assert ">>> Failed to emerge dev-libs/schedbad-1.0 for" in r.stdout, (r.stdout, r.stderr)
         return r.stdout
 
     # Serial-captured split: dispatch, failed-set, running-drop -- Portage's
@@ -6672,9 +6678,9 @@ def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path)
         capture_output=True, text=True, check=False, env=env,
     )
     assert bad.returncode == 1
-    assert "last lines of" in bad.stderr
-    assert "build.log.gz" in bad.stderr
-    assert "deliberate fixture build failure" in bad.stderr
+    # The failure block names the `.gz` log (Portage: `Scheduler._failed_pkg_msg`).
+    assert ">>> Failed to emerge dev-libs/schedbad-1.0 for" in bad.stdout
+    assert "build.log.gz'" in bad.stdout
 
 
 def test_emerge_pre_cleans_a_dirty_builddir_before_rebuilding(emerge_binary, tmp_path):
@@ -6781,13 +6787,16 @@ def test_emerge_jobs_keep_going_skips_a_failed_builds_dependents(emerge_binary, 
     assert result.returncode == 1
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
     assert not (root / "var/db/pkg/dev-libs/schedbaddep-1.0").exists()
-    assert "dev-libs/schedbad-1.0" in result.stderr
-    assert "dev-libs/schedbaddep" in result.stderr
-    # The failed build's captured log tail is folded into the report so
-    # the user can see why it failed without hunting for build.log.
-    assert "last lines of" in result.stderr
-    assert "build.log" in result.stderr
-    assert "deliberate fixture build failure" in result.stderr
+    # Portage's stderr list: the failed build with its log, the dropped dependent bare
+    # (backlog #426); the failure block and the drop notice are on stdout.
+    assert "(dev-libs/schedbad-1.0:0/0::testrepo, ebuild scheduled for merge to" in result.stderr
+    assert "temp/build.log'" in result.stderr
+    assert "(dev-libs/schedbaddep-1.0:0/0::testrepo, ebuild scheduled for merge to" in result.stderr
+    assert "The following 2 packages have failed to build, install, or execute" in result.stderr
+    assert ">>> Failed to emerge dev-libs/schedbad-1.0 for" in result.stdout
+    assert "*** Resuming merge..." in result.stdout
+    assert "emerge --keep-going: dev-libs/schedbaddep-1.0 for" in result.stdout
+    assert "last lines of" not in result.stderr
 
 
 def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_path):
@@ -7456,7 +7465,7 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 1
-    assert "emerge --resume" in r.stderr
+    assert ">>> Failed to emerge dev-libs/schedbad-1.0 for" in r.stdout
     mtimedb = root / "var/cache/edb/mtimedb"
     saved = json.loads(mtimedb.read_text())
     cpvs = [x[2] for x in saved["resume"]["mergelist"]]
@@ -7596,7 +7605,7 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 1
-    assert "emerge --resume" in r.stderr
+    assert ">>> Failed to emerge dev-libs/schedbad-1.0 for" in r.stdout
 
     r = subprocess.run(
         [str(emerge_binary), "--resume", "--skipfirst"],
@@ -8207,7 +8216,7 @@ def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary
         capture_output=True, text=True, check=False, env=_env(root),
     )
     assert r.returncode == 1
-    assert "emerge --resume" in r.stderr
+    assert ">>> Failed to emerge dev-libs/schedbad-1.0 for" in r.stdout
     saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
     assert [x[2] for x in saved["resume"]["mergelist"]] == [
         "dev-libs/schedbad-1.0",
@@ -12070,3 +12079,69 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
+    """Backlog #426: a failed source build under `--keep-going`, serial and
+    foreground. Sections and order captured on Portage 3.0.82.2
+    (`LLM/evidence/2026-10-19-b423/portage.txt`, cell `kg-bad-good-top`, portuale
+    repo): the `Failed to emerge` block, `*** Resuming merge...` with the re-plan
+    notice, the `dropped because` notice, the counter restarting at `(1 of 1)`, the
+    elog `Messages for package` blocks of the failed and the dropped package, the
+    stderr list of failed packages, and a `world` that holds only what merged. Cut
+    here: timings, `Verifying ebuild manifests`, the trailing `/` on `ROOT`."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+    env["NOCOLOR"] = "yes"
+    result = subprocess.run(
+        [str(emerge_binary), "--keep-going", "dev-libs/schedbaddep", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert result.returncode == 1
+    import textwrap
+
+    out = result.stdout
+    log = tmp_path / "portage-tmpdir/portage/dev-libs/schedbad-1.0/temp/build.log"
+    # Portage wraps the notice at 75 columns (`textwrap.wrap`, Scheduler.py).
+    dropped = "".join(
+        f" * {line}\n"
+        for line in textwrap.wrap(
+            f"emerge --keep-going: dev-libs/schedbaddep-1.0 for {root} dropped because"
+            " it requires dev-libs/schedbad",
+            75,
+        )
+    )
+    sections = [
+        f"\n>>> Failed to emerge dev-libs/schedbad-1.0 for {root}, Log file:\n\n>>>  '{log}'\n",
+        "*** Resuming merge...\nCalculating dependencies ... done!\nDependency resolution took .\n\n",
+        dropped,
+        f">>> Emerging (1 of 1) dev-libs/schedok-1.0::testrepo for {root}\n",
+        f"\n * Messages for package dev-libs/schedbad-1.0 merged to {root}:\n\n"
+        " * ERROR: dev-libs/schedbad-1.0::testrepo failed (install phase):\n",
+        f"\n * Messages for package dev-libs/schedbaddep-1.0 merged to {root}:\n\n" + dropped,
+    ]
+    pos = 0
+    for section in sections:
+        at = out.find(section, pos)
+        assert at >= 0, (section, out)
+        pos = at + len(section)
+    assert result.stderr == (
+        " * \n * The following 2 packages have failed to build, install, or execute\n"
+        " * postinst:\n * \n"
+        f" *  (dev-libs/schedbad-1.0:0/0::testrepo, ebuild scheduled for merge to '{root}'), Log file:\n"
+        f" *   '{log}'\n"
+        f" *  (dev-libs/schedbaddep-1.0:0/0::testrepo, ebuild scheduled for merge to '{root}')\n"
+        " * \n"
+    )
+    for text in ("The resume list contains", "emerge: ", "last lines of"):
+        assert text not in result.stdout + result.stderr
+    world = (root / "var/lib/portage/world").read_text().split()
+    assert "dev-libs/schedok" in world
+    assert "dev-libs/schedbad" not in world and "dev-libs/schedbaddep" not in world
