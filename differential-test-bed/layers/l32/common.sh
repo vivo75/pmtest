@@ -78,6 +78,8 @@ snapshot_cell() {  # <out-prefix>
     fi
     # Recurse the fixture trees so leftover-empty-dir behaviour is visible.
     printf '%s\n' /usr/share/l32/ /etc/l32/
+    # C5 (#439): the second root an IDEPEND merge targets.
+    printf '%s\n' /stage/usr/share/l32/
     # The soname lib family + the consumer (glob expanded now: snapshot.sh
     # --paths takes literal paths, not globs).
     find /usr/lib64 /usr/lib /lib64 /lib -maxdepth 1 -name 'libl32soname*' 2>/dev/null

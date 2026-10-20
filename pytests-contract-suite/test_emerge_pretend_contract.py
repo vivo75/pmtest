@@ -10771,6 +10771,55 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     )
 
 
+@pytest.mark.parametrize(
+    "atom,needle",
+    [
+        ("dev-libs/maskneedpkg", "have been masked"),
+        ("dev-libs/maskmaskedconsumer", "have been masked"),
+        ("=dev-libs/aup0b-1", "USE changes are necessary"),
+    ],
+)
+def test_complete_graph_keeps_the_abort_of_the_first_walk(
+    emerge_binary, fixture_env, atom, needle
+):
+    """Backlog #440. `--complete-graph` must not turn an aborted first walk into a
+    success: Portage runs `_complete_graph` only after `_create_graph()` succeeded
+    (`depgraph.py`, `select_files`), so a masked dependency or a flip-only dependency
+    still ends rc 1 with its report. Live Portage 3.0.82.2 (L0 fixture oracle,
+    `differential-test-bed/atomlists/l0-fixture-oracle-440.txt`). Portuale used to print
+    one merge row and exit 0 because the complete pass re-resolved without the miss."""
+    plain = _run([str(emerge_binary)], ["-pv", atom], fixture_env)
+    complete = _run([str(emerge_binary)], ["-pv", "--complete-graph", atom], fixture_env)
+    assert plain.returncode == 1
+    assert complete.returncode == 1, complete.stdout
+    assert needle in complete.stderr
+    assert "[ebuild" not in complete.stdout
+
+
+def test_autounmask_parent_flip_with_backtrack_y_fails_without_a_restart(
+    emerge_binary, fixture_env
+):
+    """Backlog #438. `--autounmask-backtrack=y` does not change `aup0b`: Portage's
+    `_apply_parent_use_changes` (`depgraph.py:5820`, called when `_create_graph()` fails,
+    `:5677`) only turns the failed dependency's suggestions into changes, it never
+    restarts the solve with the parent flipped. Live Portage 3.0.82.2 (L0 fixture oracle,
+    `differential-test-bed/atomlists/l0-fixture-oracle-438.txt`): the merge header only, the
+    `-foo` USE block, exit 1, and no `terminated early` notice (that notice is printed
+    only when backtracking was disabled, `depgraph.py:11093`). Both solvers must agree."""
+    base = ["--pretend", "--autounmask", "--autounmask-backtrack=y", "=dev-libs/aup0b-1"]
+    for extra in ([], ["--solver=pubgrub"]):
+        result = _run([str(emerge_binary)], [*extra, *base], fixture_env)
+        assert result.returncode == 1, extra
+        _assert_abort_preamble(result.stdout)
+        assert len(result.stdout.splitlines()) == 5, result.stdout
+        assert result.stderr == (
+            "\nThe following USE changes are necessary to proceed:\n"
+            ' (see "package.use" in the portage(5) man page for more details)\n'
+            "# required by =dev-libs/aup0b-1 (argument)\n"
+            ">=dev-libs/aup0b-1 -foo\n"
+        ), extra
+
+
 def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_portage(
     emerge_binary, fixture_env
 ):
@@ -29624,6 +29673,46 @@ def test_pg359_gsblk_default_pvu_plans_new_slot_only(emerge_binary, fixture_env)
     assert _pg34_run(emerge_binary, fixture_env, ["-pvu", "dev-libs/pg359-gsblk"]) == [
         ("NS", "dev-libs/pg359-gsblk-2:2")
     ]
+
+
+@pytest.mark.parametrize(
+    "atom",
+    [
+        "dev-libs/cyc0a",
+        "dev-libs/hardcyclea",
+        "dev-libs/usecyclea",
+        "dev-libs/aub0a",
+        "dev-libs/scuseparent",
+        "dev-libs/slotconfgroup",
+        "dev-libs/slotconflictunsolvable",
+        "dev-libs/maskedpkg",
+    ],
+)
+def test_pubgrub_abort_prints_the_walks_partial_list(emerge_binary, fixture_env, atom):
+    """Backlog #434: when `--solver=pubgrub` fails, Portage's report is the walk's: every
+    package it walked before the abort, then the notice. The bridge stops at the first
+    failing branch, so when both solvers fail the walk's own result is used. The default
+    solver's output for these atoms is pinned against Portage 3.0.82.2 elsewhere
+    (cycle, slot-conflict and masked-dependency pins), so pubgrub must equal it."""
+    base = ["-pv", "--getbinpkg=n", "--usepkg=n", atom]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == 1
+    assert pubgrub.returncode == 1
+    assert pubgrub.stdout == default.stdout
+    assert pubgrub.stderr == default.stderr
+
+
+def test_pg359_gsblk_pubgrub_pvu_plans_new_slot_only(emerge_binary, fixture_env):
+    """Backlog #433: `--solver=pubgrub` ports the `_greedy_slots` blocker lookahead too.
+    gsblk-2 blocks `:1`, so the greedy `:1` upgrade is dropped and no `U` row prints.
+    Expected rows are Portage 3.0.82.2's plan from the #359 S0 capture
+    `LLM/evidence/2026-10-15-359-s0/out/s0-e-gsblk-pvu.txt` (`depgraph.py:5896-5930`)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["--solver=pubgrub", "-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg359-gsblk"],
+    ) == [("NS", "dev-libs/pg359-gsblk-2:2")]
 
 
 def test_pg34_multi_default_pv_keeps_installed_slot_out(emerge_binary, fixture_env):

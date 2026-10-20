@@ -195,13 +195,3 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
-- id: pubgrub-abort-partial-list
-  layer: l0-pubgrub
-  categories: [missing, totals, order]
-  slugs: ["gnome-base_gnome-shell", "www-servers_nginx"]
-  reason: >
-    Backlog #434: `--solver=pubgrub` now aborts like Portage on these
-    probes (#363-#365: both exit 1), but the partial merge list printed
-    before the abort is shorter than Portage's (gnome-shell 10-13 rows,
-    nginx app-misc/mime-types). The old exit entries retired with #363-#365.
-  owner: portuale-bug

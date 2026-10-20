@@ -313,7 +313,8 @@ def test_solver_backends_report_engine_native_conflicts(emerge_binary, fixture_e
     incompatible" plus the conflict chains) instead of the raw
     `Unsolvable(Conflict { clauses: ... })` debug dump, and pubgrub
     keeps rendering its own `Because ... are incompatible` derivation
-    tree. Both name the conflicted packages and exit 1."""
+    tree (until #434: now the walk's own slot-conflict report). Both name the
+    conflicted packages and exit 1."""
     resolvo = subprocess.run(
         [str(emerge_binary), "--pretend", "--solver=resolvo", "dev-libs/slotconfgroup"],
         capture_output=True,
@@ -335,8 +336,19 @@ def test_solver_backends_report_engine_native_conflicts(emerge_binary, fixture_e
         env=fixture_env,
     )
     assert pubgrub.returncode == 1
-    assert "are incompatible" in pubgrub.stderr
-    assert "dev-libs/slotconflicttarget" in pubgrub.stderr
+    # Backlog #434: when the walk fails too, its report stands in for the engine text, so
+    # `--solver=pubgrub` prints Portage's slot-conflict block and merge rows.
+    portage = subprocess.run(
+        [str(emerge_binary), "--pretend", "dev-libs/slotconfgroup"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=fixture_env,
+    )
+    assert portage.returncode == 1
+    assert "dev-libs/slotconflicttarget" in pubgrub.stdout + pubgrub.stderr
+    assert pubgrub.stdout == portage.stdout
+    assert pubgrub.stderr == portage.stderr
 
 
 def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
@@ -573,9 +585,11 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
     )
+    # Backlog #434: when both solvers fail, the walk's report (the partial list with the
+    # stuck remainder re-displayed) stands in for the bridge's legacy list.
     for solver, expected_stdout in (
         ("portage", partial_stdout),
-        ("pubgrub", legacy_stdout),
+        ("pubgrub", partial_stdout),
     ):
         result = subprocess.run(
             [str(emerge_binary), "--pretend", f"--solver={solver}", "dev-libs/hardcyclea"],
@@ -793,6 +807,7 @@ def _remote_resolve_env(fixture_env, root, config_root):
     irrelevant, but keep it sane)."""
     env = dict(fixture_env)
     env["ROOT"] = str(root)
+    env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)  # binrepo default location
     env["PORTAGE_CONFIGROOT"] = str(config_root)
     return env
 
@@ -2813,6 +2828,7 @@ def _signed_binhost_env(tmp_path, home):
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)  # binrepo default location
     env["PORTAGE_RUNNING_ROOT"] = str(root)
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
     # `PKGDIR` follows the full chain at portuale's CLI boundary
@@ -5848,6 +5864,8 @@ def _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir):
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(clientetc)
     env["ROOT"] = str(root)
+    # A binrepo without `location` downloads under `<EPREFIX>/var/cache/binhost`.
+    env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)
     env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
@@ -5915,8 +5933,8 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
         capture_output=True, text=True, check=False, env=env,
     )
     # A `binrepos.conf` section without `location` (and no PORTAGE_BINHOST) downloads
-    # under `<EPREFIX>/var/cache/binhost/<name>` (`BinRepoConfigLoader`), here the
-    # root-relative form (backlog #428); never into `$PKGDIR`.
+    # under `<EPREFIX>/var/cache/binhost/<name>` (`BinRepoConfigLoader`; backlog #428),
+    # here EPREFIX = the test root via PORTAGE_OVERRIDE_EPREFIX; never into `$PKGDIR`.
     cache = root1 / "var/cache/binhost/multiinst"
     fetched = sorted(str(f.relative_to(cache)) for f in cache.rglob("*.gpkg.tar"))
     assert fetched == ["dev-libs/packagepkg/packagepkg-1.0-2.gpkg.tar"], fetched
@@ -8311,6 +8329,19 @@ def test_emerge_elog_save_and_save_summary_write_log_files(emerge_binary, tmp_pa
     assert r.returncode == 0, r.stderr
     # Portage's elog modules print no "written to" line (backlog #427).
     assert "Elog messages for" not in r.stdout
+    # Portage `mod_echo._finalize` prints `* Log file: <PORTAGE_LOG_FILE>` under
+    # `* Messages for package <cpv>:` when `PORTAGE_LOGDIR` is set (backlog #435).
+    build_logs = [
+        p
+        for p in logdir.iterdir()
+        if re.fullmatch(r"dev-libs:elogmsgpkg-1\.0:\d{8}-\d{6}\.log", p.name)
+    ]
+    assert len(build_logs) == 1
+    assert (
+        f" * Messages for package dev-libs/elogmsgpkg-1.0 merged to {root}:\n"
+        f" * Log file: {build_logs[0]}\n\n"
+        " * this package needs manual configuration\n"
+    ) in r.stdout
 
     elog = logdir / "elog"
     per_pkg = [p for p in elog.iterdir() if re.fullmatch(
@@ -12010,12 +12041,11 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
 ):
     """Backlog #428: a remote binary is downloaded by the configured `FETCHCOMMAND`
     (`DISTDIR` = the download directory, `FILE` = `<name>.partial`, renamed once
-    verified), into `<root>/var/cache/binhost/<name>` when the `binrepos.conf` section
-    has no `location`, and the verify line names every checksum of the index record plus
+    verified), into `<EPREFIX>/var/cache/binhost/<name>` when the `binrepos.conf` section
+    has no `location` (the test sets EPREFIX to the root via PORTAGE_OVERRIDE_EPREFIX), and the verify line names every checksum of the index record plus
     `size` (`MD5 SHA1 size`). Expected values from Portage 3.0.82.2 with the same index
     (`LLM/evidence/2026-10-20-b428/` in portuale: `setup.sh`, `cells.sh`, `f-fetchcommand`);
-    the only difference is that Portage roots the default `location` at `EPREFIX`, which
-    portuale roots at `ROOT` so a test root never writes to the host."""
+    the default `location` is rooted at `EPREFIX` in both (backlog #436 (b))."""
     import hashlib
     import shutil
 
@@ -12056,6 +12086,7 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
             PORTAGE_CONFIGROOT=str(root),
             PORTAGE_TMPDIR=str(tmp_path / "tmp"),
             ROOT=str(tmp_path / "root"),
+            PORTAGE_OVERRIDE_EPREFIX=str(tmp_path / "root"),
             DISTDIR=str(tmp_path / "dist"),
             NOCOLOR="yes",
         )
@@ -12076,6 +12107,50 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
         assert not (cache / "gpkgreadpkg-1.0.gpkg.tar.partial").exists()
         assert marker.read_text() == f"{cache} gpkgreadpkg-1.0.gpkg.tar.partial\n"
         assert not (tmp_path / "pkgdir").exists() or not list((tmp_path / "pkgdir").rglob("*.gpkg.tar"))
+
+        # Backlog #436 (a)(c)(d)(e):
+        # (a) binrepos.conf per-repo `fetchcommand` overrides global FETCHCOMMAND;
+        # (d) PORTAGE_CHECKSUM_FILTER="-md5" filters MD5 out of `MD5 SHA1 size` -> `SHA1 size`;
+        # (e) cached index with equal TIMESTAMP prints `[tmpbinhost] Local copy of remote index is up-to-date and will be used.` on stderr;
+        # (c) `--quiet` suppresses the verify line on the binary merge path.
+        (cache / "gpkgreadpkg-1.0.gpkg.tar").unlink()
+        repo_marker = tmp_path / "repo_fc.log"
+        repo_script = tmp_path / "repo_fc.sh"
+        repo_script.write_text(
+            f'#!/bin/bash\necho "REPO-FC $1 $2" >> {repo_marker}\nexec wget -q -O "$1/$2" "$3"\n'
+        )
+        repo_script.chmod(0o755)
+        (root / "etc/portage/binrepos.conf").write_text(
+            f"[tmpbinhost]\nsync-uri = http://127.0.0.1:{port}\npriority = 1\n"
+            f"fetchcommand = {repo_script} ${{DISTDIR}} ${{FILE}} ${{URI}}\n"
+        )
+        env2 = {
+            **env,
+            "FETCHCOMMAND": "/bin/false ${FILE}",
+            "PORTAGE_CHECKSUM_FILTER": "-md5",
+        }
+        r2 = subprocess.run(
+            [str(emerge_binary), "-f", "--getbinpkg", "dev-libs/gpkgreadpkg"],
+            capture_output=True, text=True, check=False, env=env2, stdin=subprocess.DEVNULL,
+        )
+        assert r2.returncode == 0, (r2.stdout, r2.stderr)
+        assert repo_marker.read_text() == f"REPO-FC {cache} gpkgreadpkg-1.0.gpkg.tar.partial\n"
+        filtered_name = "gpkgreadpkg-1.0.gpkg.tar SHA1 size ;-) ..."
+        assert (
+            f" * {filtered_name}" + " " * (80 - len(filtered_name) - 3 - 7) + "[ ok ]\n"
+        ) in r2.stdout
+        assert (
+            "[tmpbinhost] Local copy of remote index is up-to-date and will be used.\n"
+            in r2.stderr
+        )
+
+        # (c) Binary merge under `--quiet` suppresses the verify line.
+        (cache / "gpkgreadpkg-1.0.gpkg.tar").unlink()
+        r3 = subprocess.run(
+            [str(emerge_binary), "-q", "--getbinpkgonly", "dev-libs/gpkgreadpkg"],
+            capture_output=True, text=True, check=False, env=env2, stdin=subprocess.DEVNULL,
+        )
+        assert ";-) ..." not in r3.stdout
     finally:
         server.shutdown()
         server.server_close()
@@ -12145,6 +12220,70 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     world = (root / "var/lib/portage/world").read_text().split()
     assert "dev-libs/schedok" in world
     assert "dev-libs/schedbad" not in world and "dev-libs/schedbaddep" not in world
+
+
+def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_path):
+    """Backlog #437 (a)(c)(d)(e). Expected values from Portage 3.0.82.2, cells of
+    `LLM/evidence/2026-10-20-b437/portage.txt` in portuale (`ok-world-order`,
+    `q-lone-failure`, `q-quiet-fail`, `q-keep-going`, `jobs-keep-going`), fixture
+    shapes `schedok`/`schedbad`/`schedbaddep` standing for good/bad/top:
+    (d) `>>> Recording <atom> in "world" favorites file...` prints between
+    `Installing` and `Completed`; (e) the `--keep-going` re-plan prints no
+    `Calculating dependencies` under `--quiet`; (a) a background run (`--quiet`)
+    whose only failure is one build shows that build's whole log before the elog
+    blocks, with no blank lines inside the `Failed to emerge` block, unless
+    `--quiet-fail`; (c) in `-jN` the elog block ends with `The complete build log is
+    located at '<build.log>'.`"""
+    import shutil
+
+    def run(name, args):
+        root = tmp_path / f"{name}-root"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"{name}-pt")
+        env["NOCOLOR"] = "yes"
+        result = subprocess.run(
+            [str(emerge_binary), *args],
+            capture_output=True, text=True, check=False, env=env, stdin=subprocess.DEVNULL,
+        )
+        return root, tmp_path / f"{name}-pt", result
+
+    # (d)
+    root, _, r = run("ok", ["dev-libs/schedok"])
+    assert r.returncode == 0, r.stderr
+    assert (
+        f">>> Installing (1 of 1) dev-libs/schedok-1.0::testrepo to {root}\n\n"
+        '>>> Recording dev-libs/schedok in "world" favorites file...\n\n'
+        f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}\n"
+    ) in r.stdout, r.stdout
+
+    # (e)
+    root, _, r = run("qkg", ["-q", "--keep-going", "dev-libs/schedbaddep", "dev-libs/schedok"])
+    assert r.returncode == 1
+    assert "*** Resuming merge...\n" in r.stdout
+    assert "Calculating dependencies" not in r.stdout
+    assert "Dependency resolution took" not in r.stdout
+
+    # (a)
+    root, pt, r = run("qlone", ["-q", "dev-libs/schedbad"])
+    assert r.returncode == 1
+    log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
+    head = f">>> Failed to emerge dev-libs/schedbad-1.0 for {root}, Log file:\n>>>  '{log}'\n"
+    assert head + log.read_text() in r.stdout, r.stdout
+    assert r.stdout.index(head) < r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}:")
+    root, pt, r = run("qfail", ["-q", "--quiet-fail", "dev-libs/schedbad"])
+    log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
+    assert r.returncode == 1
+    assert log.read_text() not in r.stdout
+
+    # (c)
+    root, pt, r = run("jkg", ["--keep-going", "--jobs=2", "dev-libs/schedbaddep", "dev-libs/schedok"])
+    log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
+    elog = r.stdout[r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}:"):]
+    assert f" * The complete build log is located at '{log}'.\n" in elog, r.stdout
 
 
 def test_emerge_merges_an_idepend_dep_into_the_running_root_only_when_allowed(
