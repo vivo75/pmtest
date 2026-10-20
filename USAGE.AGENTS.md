@@ -157,6 +157,34 @@ L'overlay `portuale-bin.<pid>` resta un bug del PM, non dell'harness: F1
 si applica anche qui, non lo si nasconde ripuntando `/tmp` altrove senza
 dirlo.
 
+## Cache delle risposte di Portage (#448)
+
+I fixture `*_harness_python` (atom, versions, use_reduce, required_use)
+non lanciano più Portage a ogni run: passano da
+`python-harness/cached_harness.py <nome> [args...]`, che rispedisce la
+risposta registrata (returncode, stdout, stderr) se esiste.
+
+- **Dove**: `python-harness/answers/<nome>.jsonl`, append-only, una riga
+  JSON per risposta, committato (un clone fresco è veloce). Per una
+  chiave vince l'ultima riga.
+- **Chiave**: sha256 di pin Portage (`git rev-parse HEAD` del checkout in
+  `3rdparty/portage`; se non è un repo, l'hash di `lib/portage/__init__.py`),
+  sha256 dell'harness e del wrapper `_pinned_portage.py`, argv, stdin
+  (letto solo in `batch`).
+- **Invalidazione**: cambia il pin Portage, o cambia il file dell'harness
+  o il wrapper. Un checkout Portage con modifiche locali ai file tracciati
+  non ha pin valido: gira sempre live e non registra nulla.
+- **Variabili**: `PMTEST_PORTAGE_CACHE=off` bypassa la cache (né lettura
+  né scrittura); `PMTEST_REFRESH_PORTAGE=1` ignora i hit, rigira live e
+  appende la risposta nuova.
+- **Mai per portuale**: la cache avvolge solo il lato riferimento
+  (Portage). I binari Rust non passano di qui. Il bench
+  (`bench/run_benchmark.py`) e `scripts/primitive_tree_differential.py`
+  restano sul percorso live.
+- **Ri-registrare** dopo un cambio di pin: un run normale basta (le
+  risposte nuove si aggiungono); per riscrivere tutto,
+  `PMTEST_REFRESH_PORTAGE=1` sulle suite che usano i fixture.
+
 ## Valuta l'efficienza così
 
 1. Esegui il comando del punto 3 sopra e leggi `out.json`:

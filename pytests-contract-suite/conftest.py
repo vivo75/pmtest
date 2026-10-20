@@ -170,6 +170,9 @@ VERSIONS_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "versions_harness.py"
 ATOM_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "atom_harness.py"
 USE_REDUCE_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "use_reduce_harness.py"
 REQUIRED_USE_PYTHON_HARNESS = REPO_ROOT / "python-harness" / "required_use_harness.py"
+# The *_harness_python fixtures go through the answer cache (backlog #448):
+# a hit replays Portage's recorded answer; PMTEST_PORTAGE_CACHE=off runs live.
+CACHED_HARNESS = REPO_ROOT / "python-harness" / "cached_harness.py"
 FIXTURES_ROOT = REPO_ROOT / "fixtures"
 
 # Config variables portuale now honours from the process environment
@@ -276,7 +279,7 @@ def versions_harness_rust() -> Path:
 
 @pytest.fixture(scope="session")
 def versions_harness_python() -> list[str]:
-    return [sys.executable, str(VERSIONS_PYTHON_HARNESS)]
+    return [sys.executable, str(CACHED_HARNESS), "versions"]
 
 
 @pytest.fixture(scope="session")
@@ -286,7 +289,7 @@ def atom_harness_rust() -> Path:
 
 @pytest.fixture(scope="session")
 def atom_harness_python() -> list[str]:
-    return [sys.executable, str(ATOM_PYTHON_HARNESS)]
+    return [sys.executable, str(CACHED_HARNESS), "atom"]
 
 
 @pytest.fixture(scope="session")
@@ -296,7 +299,7 @@ def use_reduce_harness_rust() -> Path:
 
 @pytest.fixture(scope="session")
 def use_reduce_harness_python() -> list[str]:
-    return [sys.executable, str(USE_REDUCE_PYTHON_HARNESS)]
+    return [sys.executable, str(CACHED_HARNESS), "use_reduce"]
 
 
 @pytest.fixture(scope="session")
@@ -306,7 +309,7 @@ def required_use_harness_rust() -> Path:
 
 @pytest.fixture(scope="session")
 def required_use_harness_python() -> list[str]:
-    return [sys.executable, str(REQUIRED_USE_PYTHON_HARNESS)]
+    return [sys.executable, str(CACHED_HARNESS), "required_use"]
 
 
 @pytest.fixture(scope="session")
