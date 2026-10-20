@@ -313,7 +313,8 @@ def test_solver_backends_report_engine_native_conflicts(emerge_binary, fixture_e
     incompatible" plus the conflict chains) instead of the raw
     `Unsolvable(Conflict { clauses: ... })` debug dump, and pubgrub
     keeps rendering its own `Because ... are incompatible` derivation
-    tree. Both name the conflicted packages and exit 1."""
+    tree (until #434: now the walk's own slot-conflict report). Both name the
+    conflicted packages and exit 1."""
     resolvo = subprocess.run(
         [str(emerge_binary), "--pretend", "--solver=resolvo", "dev-libs/slotconfgroup"],
         capture_output=True,
@@ -335,8 +336,19 @@ def test_solver_backends_report_engine_native_conflicts(emerge_binary, fixture_e
         env=fixture_env,
     )
     assert pubgrub.returncode == 1
-    assert "are incompatible" in pubgrub.stderr
-    assert "dev-libs/slotconflicttarget" in pubgrub.stderr
+    # Backlog #434: when the walk fails too, its report stands in for the engine text, so
+    # `--solver=pubgrub` prints Portage's slot-conflict block and merge rows.
+    portage = subprocess.run(
+        [str(emerge_binary), "--pretend", "dev-libs/slotconfgroup"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=fixture_env,
+    )
+    assert portage.returncode == 1
+    assert "dev-libs/slotconflicttarget" in pubgrub.stdout + pubgrub.stderr
+    assert pubgrub.stdout == portage.stdout
+    assert pubgrub.stderr == portage.stderr
 
 
 def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
@@ -573,9 +585,11 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
     )
+    # Backlog #434: when both solvers fail, the walk's report (the partial list with the
+    # stuck remainder re-displayed) stands in for the bridge's legacy list.
     for solver, expected_stdout in (
         ("portage", partial_stdout),
-        ("pubgrub", legacy_stdout),
+        ("pubgrub", partial_stdout),
     ):
         result = subprocess.run(
             [str(emerge_binary), "--pretend", f"--solver={solver}", "dev-libs/hardcyclea"],

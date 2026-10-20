@@ -29675,6 +29675,34 @@ def test_pg359_gsblk_default_pvu_plans_new_slot_only(emerge_binary, fixture_env)
     ]
 
 
+@pytest.mark.parametrize(
+    "atom",
+    [
+        "dev-libs/cyc0a",
+        "dev-libs/hardcyclea",
+        "dev-libs/usecyclea",
+        "dev-libs/aub0a",
+        "dev-libs/scuseparent",
+        "dev-libs/slotconfgroup",
+        "dev-libs/slotconflictunsolvable",
+        "dev-libs/maskedpkg",
+    ],
+)
+def test_pubgrub_abort_prints_the_walks_partial_list(emerge_binary, fixture_env, atom):
+    """Backlog #434: when `--solver=pubgrub` fails, Portage's report is the walk's: every
+    package it walked before the abort, then the notice. The bridge stops at the first
+    failing branch, so when both solvers fail the walk's own result is used. The default
+    solver's output for these atoms is pinned against Portage 3.0.82.2 elsewhere
+    (cycle, slot-conflict and masked-dependency pins), so pubgrub must equal it."""
+    base = ["-pv", "--getbinpkg=n", "--usepkg=n", atom]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == 1
+    assert pubgrub.returncode == 1
+    assert pubgrub.stdout == default.stdout
+    assert pubgrub.stderr == default.stderr
+
+
 def test_pg359_gsblk_pubgrub_pvu_plans_new_slot_only(emerge_binary, fixture_env):
     """Backlog #433: `--solver=pubgrub` ports the `_greedy_slots` blocker lookahead too.
     gsblk-2 blocks `:1`, so the greedy `:1` upgrade is dropped and no `U` row prints.
