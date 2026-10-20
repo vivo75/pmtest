@@ -8311,6 +8311,19 @@ def test_emerge_elog_save_and_save_summary_write_log_files(emerge_binary, tmp_pa
     assert r.returncode == 0, r.stderr
     # Portage's elog modules print no "written to" line (backlog #427).
     assert "Elog messages for" not in r.stdout
+    # Portage `mod_echo._finalize` prints `* Log file: <PORTAGE_LOG_FILE>` under
+    # `* Messages for package <cpv>:` when `PORTAGE_LOGDIR` is set (backlog #435).
+    build_logs = [
+        p
+        for p in logdir.iterdir()
+        if re.fullmatch(r"dev-libs:elogmsgpkg-1\.0:\d{8}-\d{6}\.log", p.name)
+    ]
+    assert len(build_logs) == 1
+    assert (
+        f" * Messages for package dev-libs/elogmsgpkg-1.0 merged to {root}:\n"
+        f" * Log file: {build_logs[0]}\n\n"
+        " * this package needs manual configuration\n"
+    ) in r.stdout
 
     elog = logdir / "elog"
     per_pkg = [p for p in elog.iterdir() if re.fullmatch(
@@ -12076,6 +12089,50 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
         assert not (cache / "gpkgreadpkg-1.0.gpkg.tar.partial").exists()
         assert marker.read_text() == f"{cache} gpkgreadpkg-1.0.gpkg.tar.partial\n"
         assert not (tmp_path / "pkgdir").exists() or not list((tmp_path / "pkgdir").rglob("*.gpkg.tar"))
+
+        # Backlog #436 (a)(c)(d)(e):
+        # (a) binrepos.conf per-repo `fetchcommand` overrides global FETCHCOMMAND;
+        # (d) PORTAGE_CHECKSUM_FILTER="-md5" filters MD5 out of `MD5 SHA1 size` -> `SHA1 size`;
+        # (e) cached index with equal TIMESTAMP prints `[tmpbinhost] Local copy of remote index is up-to-date and will be used.` on stderr;
+        # (c) `--quiet` suppresses the verify line on the binary merge path.
+        (cache / "gpkgreadpkg-1.0.gpkg.tar").unlink()
+        repo_marker = tmp_path / "repo_fc.log"
+        repo_script = tmp_path / "repo_fc.sh"
+        repo_script.write_text(
+            f'#!/bin/bash\necho "REPO-FC $1 $2" >> {repo_marker}\nexec wget -q -O "$1/$2" "$3"\n'
+        )
+        repo_script.chmod(0o755)
+        (root / "etc/portage/binrepos.conf").write_text(
+            f"[tmpbinhost]\nsync-uri = http://127.0.0.1:{port}\npriority = 1\n"
+            f"fetchcommand = {repo_script} ${{DISTDIR}} ${{FILE}} ${{URI}}\n"
+        )
+        env2 = {
+            **env,
+            "FETCHCOMMAND": "/bin/false ${FILE}",
+            "PORTAGE_CHECKSUM_FILTER": "-md5",
+        }
+        r2 = subprocess.run(
+            [str(emerge_binary), "-f", "--getbinpkg", "dev-libs/gpkgreadpkg"],
+            capture_output=True, text=True, check=False, env=env2, stdin=subprocess.DEVNULL,
+        )
+        assert r2.returncode == 0, (r2.stdout, r2.stderr)
+        assert repo_marker.read_text() == f"REPO-FC {cache} gpkgreadpkg-1.0.gpkg.tar.partial\n"
+        filtered_name = "gpkgreadpkg-1.0.gpkg.tar SHA1 size ;-) ..."
+        assert (
+            f" * {filtered_name}" + " " * (80 - len(filtered_name) - 3 - 7) + "[ ok ]\n"
+        ) in r2.stdout
+        assert (
+            "[tmpbinhost] Local copy of remote index is up-to-date and will be used.\n"
+            in r2.stderr
+        )
+
+        # (c) Binary merge under `--quiet` suppresses the verify line.
+        (cache / "gpkgreadpkg-1.0.gpkg.tar").unlink()
+        r3 = subprocess.run(
+            [str(emerge_binary), "-q", "--getbinpkgonly", "dev-libs/gpkgreadpkg"],
+            capture_output=True, text=True, check=False, env=env2, stdin=subprocess.DEVNULL,
+        )
+        assert ";-) ..." not in r3.stdout
     finally:
         server.shutdown()
         server.server_close()
