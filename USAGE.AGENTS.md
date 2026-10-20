@@ -203,3 +203,13 @@ risposta registrata (returncode, stdout, stderr) se esiste.
     - voce registry + `version` risolta
     - `ops`, `seed`, `repeat`, `dataset`
     - macchina (CPU, RAM, host OS) + per i run VM: guest fs (`VM_FS`)
+
+## Suite in parallelo (backlog #449)
+
+`scripts/pytest-parallel.sh [args]` esegue tutta la suite con pytest-xdist
+(8 worker; `JOBS=16` per cambiare): ~90 s invece di ~630 s seriale, stessi
+4206 test passati. Il venv con xdist sta in `/var/tmp/pxvenv` (si ricrea da
+solo). A `-n 16` il guadagno è piccolo (~76 s) e una volta su quattro una run
+è uscita con codice 1 senza che il nome del fallimento sia stato catturato:
+usare 8. Dopo la run: `sudo rm -rf /var/tmp/pytest-parallel` (un test crea file
+di root) e `git clean -fdq fixtures/`.
