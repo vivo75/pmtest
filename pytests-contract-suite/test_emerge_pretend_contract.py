@@ -4423,9 +4423,33 @@ def test_abort_debug_digraph_dump_order_matches(
     (never a bare "None" in a cpv-shaped label). Unmarked in Slice 5 --
     the only divergence ever observed here was the label formatting,
     fixed on the Python side to match Rust's `unwrap_or("")`."""
-    for args in (["--pretend", "--debug", atom],):
-        rust = _run([str(emerge_binary)], args, fixture_env)
-        assert rust.returncode == 1
+    missing_dep, abort_message = {
+        "dev-libs/abort-masked-mid": (
+            "dev-libs/maskeddep",
+            '!!! All ebuilds that could satisfy "dev-libs/maskeddep" have been masked.',
+        ),
+        "dev-libs/abort-unsat-mid": (
+            "dev-libs/abort-nonexistent",
+            'emerge: there are no ebuilds to satisfy "dev-libs/abort-nonexistent".',
+        ),
+    }[atom]
+    rust = _run([str(emerge_binary)], ["--pretend", "--debug", atom], fixture_env)
+    assert rust.returncode == 1
+    assert abort_message in rust.stderr.splitlines()
+    # The first digraph dump lists the parent's children in admission
+    # order: leaf-a, the unresolvable dep, leaf-b. Portuale's own order
+    # (the dump says so itself), pinned so a reorder is a visible change.
+    lines = rust.stderr.splitlines()
+    parent = next(
+        i for i, ln in enumerate(lines)
+        if ln.startswith(f"({atom}-1.0:0/0::testrepo") and ln.endswith("depends on")
+    )
+    children = []
+    for ln in lines[parent + 1:]:
+        if not ln.startswith("  ("):
+            break
+        children.append(ln.strip().split(":0/0")[0].lstrip("("))
+    assert children == ["dev-libs/abort-leaf-a-1.0", f"{missing_dep}-", "dev-libs/abort-leaf-b-1.0"]
 
 
 @pytest.mark.parametrize(
@@ -13284,6 +13308,8 @@ def test_unrelated_masked_by_keywords_package_is_still_hidden(emerge_binary, fix
     must not accidentally make dev-libs/maskedpkg visible too."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/maskedpkg"], fixture_env)
     assert result.returncode == 1
+    assert '!!! All ebuilds that could satisfy "dev-libs/maskedpkg" have been masked.' in result.stderr
+    assert "- dev-libs/maskedpkg-1.0::testrepo (masked by: ~amd64 keyword)" in result.stderr
 
 
 def test_package_use_wildcard_entry_enables_a_flag_and_pulls_in_a_dependency(
@@ -22996,6 +23022,11 @@ def test_backtracking_good_version_first_aborts_below_the_oracle_minimum(
             fixture_env,
         )
         assert r.returncode == 1, (n, r.stdout, r.stderr)
+        # The conflict stands: the slot-conflict block for btgc:0 and the
+        # larger-`--backtrack` hint, not some unrelated failure.
+        assert "resulting in a slot conflict:" in r.stdout, (n, r.stdout)
+        assert "\ndev-libs/btgc:0\n" in r.stdout, (n, r.stdout)
+        assert "such as --backtrack=30" in r.stdout, (n, r.stdout)
 
 
 def test_or_choice_avoids_downgrade_into_the_graphed_update(
@@ -32255,3 +32286,72 @@ def test_pubgrub_bounded_deep_matches_the_default_solver(emerge_binary, fixture_
     assert default.stdout == pubgrub.stdout
     root = fixture_env["ROOT"]
     assert default.stdout.splitlines() == [f"{row} to {root}" for row in rows]
+
+
+# Negative pins ("this prints nothing") only mean something if the package
+# they query would print a line when the option under test is not isolating
+# it. Each row names an empty-output test above and a control invocation of
+# the same package that must print: if the fixture or the product ever
+# turned every run silent, the negative pins would keep passing alone.
+_EMPTY_OUTPUT_CONTROLS = [
+    ("test_newrepo_off_by_default_stays_already_installed",
+     ["--pretend", "--selective", "--newrepo", "dev-libs/newrepopkg"]),
+    ("test_newrepo_does_not_fire_when_the_recorded_repository_matches",
+     ["--pretend", "dev-libs/samerepopkg"]),
+    ("test_rebuilt_binaries_off_by_default_stays_already_installed",
+     ["--pretend", "--usepkg", "dev-libs/rebuiltbinarypkg"]),
+    ("test_multiple_top_level_atoms_all_already_installed",
+     ["--pretend", "dev-libs/samepkg"]),
+    ("test_without_newuse_a_use_changed_package_stays_already_installed",
+     ["--pretend", "--noreplace", "--newuse", "dev-libs/reinstallpkg"]),
+    ("test_newuse_is_a_noop_when_use_has_not_changed",
+     ["--pretend", "dev-libs/samepkg"]),
+    ("test_newuse_forced_flags_suppresses_a_spurious_reinstall",
+     ["--pretend", "dev-libs/usemaskreinstallpkg"]),
+    ("test_changed_use_short_alias_bundled_with_pretend",
+     ["-p", "dev-libs/changedusepkg"]),
+    # libcnoisepkg cannot print on its own (its musl dependency is not
+    # resolvable here); the control is the same option on the sibling whose
+    # dependency change is not libc-only.
+    ("test_changed_deps_ignores_a_libc_only_dependency_change",
+     ["--pretend", "--changed-deps", "dev-libs/changeddepspkg"]),
+    ("test_changed_deps_ignores_a_built_slot_operators_resolved_slot",
+     ["--pretend", "dev-libs/slotopdepspkg"]),
+    ("test_without_changed_deps_a_dependency_change_is_never_detected",
+     ["--pretend", "--noreplace", "--changed-deps", "dev-libs/changeddepspkg"]),
+    ("test_without_changed_slot_a_slot_change_is_never_detected",
+     ["--pretend", "--noreplace", "--changed-slot", "dev-libs/changedslotpkg"]),
+    ("test_onlydeps_on_an_already_installed_atom_prints_nothing",
+     ["--pretend", "dev-libs/samepkg"]),
+    ("test_noreplace_restores_the_portage_avoid_update_shortcut",
+     ["--pretend", "dev-libs/upgradepkg"]),
+    ("test_without_deep_an_already_installed_packages_own_deps_stay_unwalked",
+     ["--pretend", "--noreplace", "--deep", "dev-libs/deeppkg"]),
+    ("test_deep_equals_zero_matches_not_passing_deep_at_all",
+     ["--pretend", "--noreplace", "--deep", "dev-libs/deeppkg"]),
+    ("test_deep_is_ignored_when_nodeps_disables_the_dependency_walk_entirely",
+     ["--pretend", "--noreplace", "--deep", "dev-libs/deeppkg"]),
+    ("test_exclude_leaves_an_already_installed_package_alone_even_with_update",
+     ["--pretend", "--update", "dev-libs/upgradepkg"]),
+    ("test_exclude_matches_via_a_wildcard_atom_too",
+     ["--pretend", "--update", "dev-libs/upgradepkg"]),
+    ("test_exclude_short_alias_bundled_with_pretend",
+     ["--pretend", "--update", "dev-libs/upgradepkg"]),
+    ("test_exclude_prevents_a_not_yet_installed_package_from_being_offered",
+     ["--pretend", "dev-libs/newpkg"]),
+    ("test_exclude_repeated_occurrences_and_space_separated_values_both_accumulate",
+     ["--pretend", "--update", "dev-libs/upgradepkg"]),
+]
+
+
+@pytest.mark.parametrize(
+    "negative_test,control_args", _EMPTY_OUTPUT_CONTROLS,
+    ids=[n for n, _ in _EMPTY_OUTPUT_CONTROLS],
+)
+def test_empty_output_pins_have_a_control_that_prints(
+    negative_test, control_args, emerge_binary, fixture_env
+):
+    assert negative_test in globals(), f"{negative_test} was renamed or removed"
+    result = _run([str(emerge_binary)], control_args, fixture_env)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    assert result.stdout.strip() != "", f"control for {negative_test} printed nothing"
