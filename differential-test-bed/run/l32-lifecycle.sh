@@ -6,6 +6,7 @@
 #   C2  soname bump -> preserved-libs (S0 group 2)
 #   C3  CONFIG_PROTECT over a user-modified config (S0 group 3)
 #   C4  --resume after SIGKILL mid-merge (S0 group 4)
+#   C5  IDEPEND dep merged into the running root, consumer into ROOT=/stage (#439)
 #
 # S2 fault injection:
 #   F1  disk-full / ENOSPC on a small dedicated tmpfs (S0 group 5a/5a2)
@@ -26,7 +27,7 @@
 # shape: same lib.sh helpers, same compare/ invocations, no new diff
 # semantics.
 #
-#   differential-test-bed/run/l32-lifecycle.sh [C1|C2|C3|C4|F1|F2|F3|all]
+#   differential-test-bed/run/l32-lifecycle.sh [C1|C2|C3|C4|C5|F1|F2|F3|all]
 #
 # Env: PORTTEST_IMAGE, PORTTEST_PODMAN,
 #      L32_MODE=control|candidate    (default control),
@@ -48,8 +49,8 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 CELL=${1:-all}
 case $CELL in
-  all|C1|C2|C3|C4|F1|F2|F3) ;;
-  *) echo "usage: l32-lifecycle.sh [C1|C2|C3|C4|F1|F2|F3|all]" >&2; exit 2 ;;
+  all|C1|C2|C3|C4|C5|F1|F2|F3) ;;
+  *) echo "usage: l32-lifecycle.sh [C1|C2|C3|C4|C5|F1|F2|F3|all]" >&2; exit 2 ;;
 esac
 case ${L32_MODE:-control} in
   control|candidate) MODE=${L32_MODE:-control} ;;
@@ -176,7 +177,7 @@ check_f3_rc() {  # <report> <prefix-a> <prefix-b>
   return "$bad"
 }
 
-CELLS=(C1 C2 C3 C4 F1 F2 F3)
+CELLS=(C1 C2 C3 C4 C5 F1 F2 F3)
 if [ "$CELL" != all ]; then CELLS=("$CELL"); fi
 
 ROWS=()

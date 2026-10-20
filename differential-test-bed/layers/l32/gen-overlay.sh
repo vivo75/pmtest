@@ -8,7 +8,7 @@ mkdir -p "$ROOT"/{metadata,profiles,l32}
 printf 'masters = gentoo\nthin-manifests = true\nsign-manifests = false\nprofile-formats = portage-2\n' > "$ROOT/metadata/layout.conf"
 printf 'l32\n' > "$ROOT/profiles/repo_name"
 printf 'l32\n' > "$ROOT/profiles/categories"
-for d in l32/dep-a l32/dep-b l32/dep-c l32/sonamelib l32/sonameuser l32/protect l32/slow-a l32/slow-b l32/slow-c l32/bigpkg l32/faultpkg; do
+for d in l32/dep-a l32/dep-b l32/dep-c l32/sonamelib l32/sonameuser l32/protect l32/slow-a l32/slow-b l32/slow-c l32/bigpkg l32/faultpkg l32/idep-dep l32/idep-app; do
   mkdir -p "$ROOT/$d"
 done
 
@@ -60,6 +60,36 @@ src_install() {
 EOF
 
 # soname v1/v2: install a shared object + its soname symlink chain by hand
+# C5 (#439): an IDEPEND dep merges into the RUNNING root, its consumer into ROOT.
+mk l32/idep-dep/idep-dep-1.0.ebuild <<'EOF'
+EAPI=8
+DESCRIPTION="L32 fixture: IDEPEND leaf (lands in the running root)"
+HOMEPAGE="https://example.invalid/l32"
+SLOT="0"
+KEYWORDS="amd64"
+LICENSE="GPL-2"
+S="${WORKDIR}"
+src_install() {
+	dodir /usr/share/l32
+	echo "idep-dep-1.0" > "${ED}"/usr/share/l32/idep-dep
+}
+EOF
+
+mk l32/idep-app/idep-app-1.0.ebuild <<'EOF'
+EAPI=8
+DESCRIPTION="L32 fixture: IDEPEND consumer (lands in ROOT)"
+HOMEPAGE="https://example.invalid/l32"
+SLOT="0"
+KEYWORDS="amd64"
+LICENSE="GPL-2"
+S="${WORKDIR}"
+IDEPEND="l32/idep-dep"
+src_install() {
+	dodir /usr/share/l32
+	echo "idep-app-1.0" > "${ED}"/usr/share/l32/idep-app
+}
+EOF
+
 mk l32/sonamelib/sonamelib-1.0.ebuild <<'EOF'
 EAPI=8
 DESCRIPTION="L32 fixture: lib with soname .so.1"

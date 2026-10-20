@@ -8,7 +8,7 @@
 #
 # Usage (from the host orchestrator):
 #   podman run ... IMAGE /TEST/layers/l32/run-cell.sh <portage|portuale> \
-#       <C1|C2|C3|C4|F1|F2|F3> /TEST/logs/<run>/<cell>/<mode>/<side>
+#       <C1|C2|C3|C4|C5|F1|F2|F3> /TEST/logs/<run>/<cell>/<mode>/<side>
 #
 # The cell command sequences mirror the S0 captures verbatim
 # (logs/l32-s0-*/scripts/g1..g5*.sh); run-cell.sh only picks the binary
@@ -26,7 +26,7 @@ HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$HERE/common.sh"
 
 L32_PM=${1:?portage|portuale}
-L32_CELL=${2:?C1|C2|C3|C4}
+L32_CELL=${2:?C1|C2|C3|C4|C5}
 OUT=${3:?out prefix}
 export L32_PM L32_CELL
 
@@ -388,11 +388,32 @@ EOF
   export PKGDIR="$pkg"
 }
 
+# ---------------------------------------------------------------------------
+# C5 -- IDEPEND merges into the running root (#439)
+# ---------------------------------------------------------------------------
+# `ROOT=/stage emerge --oneshot l32/idep-app`: Portage resolves the IDEPEND dep
+# against the running root (`depgraph.py:4256-4288`), so `idep-dep` lands in `/`
+# and `idep-app` in `/stage`. portuale does the same only with the bed-only
+# opt-in `PORTUALE_ALLOW_RUNNING_ROOT_WRITES=1` (the container `/` is disposable).
+cell_c5() {
+  mkdir -p /stage
+  PORTUALE_ALLOW_RUNNING_ROOT_WRITES=1 ROOT=/stage PORTAGE_RUNNING_ROOT=/ \
+    $EM -q --oneshot --usepkg=n --color=n l32/idep-app >"$G/install.log" 2>&1
+  rc_of install
+  {
+    echo "== running-root vdb (l32) =="; ls /var/db/pkg/l32 2>&1
+    echo "== stage vdb (l32) =="; ls /stage/var/db/pkg/l32 2>&1
+    echo "== running-root files =="; ls /usr/share/l32 2>&1
+    echo "== stage files =="; ls /stage/usr/share/l32 2>&1
+  } > "$G/idepend-state.txt" 2>&1
+}
+
 case $L32_CELL in
   C1) cell_c1 ;;
   C2) cell_c2 ;;
   C3) cell_c3 ;;
   C4) cell_c4 ;;
+  C5) cell_c5 ;;
   F1) cell_f1 ;;
   F2) cell_f2 ;;
   F3) cell_f3 ;;
