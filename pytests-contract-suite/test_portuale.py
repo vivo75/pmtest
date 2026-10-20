@@ -8291,6 +8291,8 @@ def test_emerge_elog_save_and_save_summary_write_log_files(emerge_binary, tmp_pa
         capture_output=True, text=True, check=False, env=env,
     )
     assert r.returncode == 0, r.stderr
+    # Portage's elog modules print no "written to" line (backlog #427).
+    assert "Elog messages for" not in r.stdout
 
     elog = logdir / "elog"
     per_pkg = [p for p in elog.iterdir() if re.fullmatch(
@@ -11670,7 +11672,7 @@ def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
         ROOT=str(tmp_path / "root"),
         DISTDIR=str(tmp_path / "dist"),
         NOCOLOR="yes",
-        # Only the echo module: portuale's `save_summary` line and file are not under test.
+        # Only the echo module: the default `save_summary` would write under <root>/var/log.
         PORTAGE_ELOG_SYSTEM="echo",
     )
     if features:
