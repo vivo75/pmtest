@@ -222,3 +222,10 @@ scrive `report.md` (default `/var/tmp/casts`, mai `/dev/shm`).
 `scripts/cast_compare.py A.cast B.cast` confronta due registrazioni: testo,
 suddivisione in eventi di output, tempi. I tempi sono solo un rapporto, non
 un controllo. Test: `pytests-contract-suite/test_cast_tools.py`.
+`--cells long|all` (backlog #452) registra anche merge reali dei pacchetti
+`sched*` (keep-going, stop, dipendente rotto, multi, `--resume`, `--ask` con
+risposta `n`/`y`) sotto `sudo --preserve-env`, con output limitato da
+`--cap-bytes` (default 20000, 0 = off) e una tabella di tempi per
+«landmark» (solo report). `--ask` richiede un tty: usa
+`cast_record.record_with_answers`. Nel bed `PMTEST_CAST=1` monta
+l'`asciinema` dell'host nel guest.

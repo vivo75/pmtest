@@ -28,6 +28,19 @@ from pathlib import Path
 DEFAULT_TOLERANCE = 5.0
 MIN_EVENT_S = 0.05
 DIFF_CONTEXT = 120
+DEFAULT_CAP_BYTES = 20000
+
+# Landmarks for the long-cell timeline (K3): label + regex. Searched in the
+# full output text so a landmark split across two writes still matches; the
+# reported time is the event completing the match (first fully visible).
+LANDMARKS: list[tuple[str, str]] = [
+    (">>> Emerging", r">>> Emerging"),
+    (">>> Install", r">>> Install "),
+    ("Failed to emerge", r"Failed to emerge"),
+    (">>> Completed", r">>> Completed"),
+    ("*** Resuming", r"\*\*\* Resuming"),
+    ("failed-to-build summary", r" \* The following .* failed to build"),
+]
 
 
 @dataclass
@@ -170,6 +183,72 @@ def compare(a: Cast, b: Cast, tolerance: float = DEFAULT_TOLERANCE,
         max_ratio=max([t.ratio for t in timings] or [1.0]),
         n_flagged=len(flagged),
     )
+
+
+def cap_cast(cast: Cast, budget: int = DEFAULT_CAP_BYTES
+            ) -> tuple[Cast, dict]:
+    """Cap output volume: keep head+tail "o" events within budget bytes.
+
+    Middle output events collapse into one "m" marker event reading
+    `[... N bytes / M events capped ...]`; other kinds ("x", "r", ...)
+    pass through untouched, so compare() works on the capped cast.
+    `budget=0` disables (returns the cast unchanged). Best effort at the
+    edges: the first and last output events are always kept.
+    """
+    out = [(i, e) for i, e in enumerate(cast.events) if e.kind == "o"]
+    total = sum(len(e.data) for _, e in out)
+    info = {"original_bytes": total, "capped_bytes": total,
+            "dropped_bytes": 0, "dropped_events": 0}
+    if budget == 0 or total <= budget or len(out) <= 2:
+        return cast, info
+    # Head takes from the front, tail from the back; at least one event
+    # in the middle is always dropped (total > budget guarantees room).
+    head_n, acc = 0, 0
+    for _, e in out:
+        if head_n > 0 and acc + len(e.data) > budget // 2:
+            break
+        acc += len(e.data)
+        head_n += 1
+    tail_n, tacc = 0, 0
+    for _, e in reversed(out):
+        if tail_n > 0 and tacc + len(e.data) > budget - budget // 2:
+            break
+        tacc += len(e.data)
+        tail_n += 1
+    tail_n = min(tail_n, len(out) - head_n - 1)
+    if tail_n < 0:  # giant first event ate the budget: still keep first+last
+        head_n, tail_n = 1, 1
+        acc = len(out[0].data)
+    tacc = sum(len(e.data) for _, e in out[len(out) - tail_n:]) if tail_n else 0
+    drop_idx = {i for i, _ in out[head_n:len(out) - tail_n if tail_n else None]}
+    dropped = [e for _, e in out[head_n:len(out) - tail_n if tail_n else None]]
+    dropped_bytes = sum(len(e.data) for e in dropped)
+    marker = Event(dropped[0].t, "m",
+                   f"[... {dropped_bytes} bytes / {len(dropped)} events capped ...]")
+    events = [ev for i, ev in enumerate(cast.events) if i not in drop_idx]
+    events.insert(sorted(drop_idx)[0], marker)
+    info.update(capped_bytes=acc + tacc, dropped_bytes=dropped_bytes,
+                dropped_events=len(dropped))
+    return Cast(cast.header, events), info
+
+
+def landmark_times(cast: Cast) -> dict[str, float | None]:
+    """First-seen seconds-since-start per LANDMARKS label; None when absent."""
+    full = cast.text
+    ends: list[tuple[int, float]] = []  # (end offset, event time) over "o" events
+    offset = 0
+    for e in cast.events:
+        if e.kind == "o":
+            offset += len(e.data)
+            ends.append((offset, e.t))
+    result: dict[str, float | None] = {}
+    for label, pattern in LANDMARKS:
+        match = re.search(pattern, full)
+        if match is None:
+            result[label] = None
+            continue
+        result[label] = next(t for end, t in ends if end >= match.end())
+    return result
 
 
 def main() -> int:

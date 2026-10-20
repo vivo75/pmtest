@@ -157,3 +157,123 @@ def test_ignore_lines_drops_only_matching_lines(tmp_path):
     c = write_cast(tmp_path / "c.cast", [(0.0, "!!! noise 1\r\nother\r\n")])
     assert not cast_compare.compare(
         cast_compare.parse_cast(c), cb, ignore_lines=("!!! noise",)).text_equal
+
+
+def _big_cast(tmp_path, name="big.cast", n=10, size=1000):
+    """n output events of `size` bytes each: 10000 bytes total."""
+    return write_cast(tmp_path / name,
+                      [(0.1, f"{i:04d}".ljust(size, "x")) for i in range(n)])
+
+
+def test_cap_respects_budget(tmp_path):
+    """Over-budget output collapses to head + marker + tail (backlog #452 K2)."""
+    cast = cast_compare.parse_cast(_big_cast(tmp_path))
+    capped, info = cast_compare.cap_cast(cast, 4000)
+    out = [e.data for e in capped.events if e.kind == "o"]
+    assert sum(map(len, out)) <= 4000
+    assert info["original_bytes"] == 10000
+    assert info["capped_bytes"] == sum(map(len, out))
+    assert info["dropped_bytes"] == 10000 - info["capped_bytes"]
+    assert info["dropped_events"] > 0
+    markers = [e for e in capped.events if e.kind == "m"]
+    assert len(markers) == 1
+    assert f"{info['dropped_bytes']} bytes" in markers[0].data
+    assert f"{info['dropped_events']} events" in markers[0].data
+
+
+def test_cap_keeps_head_and_tail(tmp_path):
+    cast = cast_compare.parse_cast(_big_cast(tmp_path))
+    capped, _ = cast_compare.cap_cast(cast, 4000)
+    out = [e.data for e in capped.events if e.kind == "o"]
+    assert out[0].startswith("0000")  # head: first event kept
+    assert out[-1].startswith("0009")  # tail: last event kept
+    assert not any(d.startswith("0005") for d in out)  # middle dropped
+
+
+def test_cap_off_when_zero(tmp_path):
+    """budget=0 disables capping: identical events, no marker (backlog #452 K2)."""
+    path = _big_cast(tmp_path)
+    cast = cast_compare.parse_cast(path)
+    capped, info = cast_compare.cap_cast(cast, 0)
+    assert [e.data for e in capped.events] == [e.data for e in cast.events]
+    assert not [e for e in capped.events if e.kind == "m"]
+    assert info["dropped_events"] == 0
+
+
+def test_cap_under_budget_unchanged(tmp_path):
+    cast = cast_compare.parse_cast(_big_cast(tmp_path))
+    capped, info = cast_compare.cap_cast(cast, 10000)
+    assert [e.data for e in capped.events] == [e.data for e in cast.events]
+    assert info["capped_bytes"] == info["original_bytes"] == 10000
+
+
+def test_capped_casts_compare(tmp_path):
+    """compare() works on capped casts: same content still equal (backlog #452 K2)."""
+    a = cast_compare.parse_cast(_big_cast(tmp_path, "a.cast"))
+    b = cast_compare.parse_cast(_big_cast(tmp_path, "b.cast"))
+    ca, _ = cast_compare.cap_cast(a, 4000)
+    cb, _ = cast_compare.cap_cast(b, 4000)
+    report = cast_compare.compare(ca, cb)
+    assert report.text_equal
+    assert report.chunk_equal
+
+
+def test_landmarks_found_in_order(tmp_path):
+    """Each landmark reports its event's seconds-since-start (backlog #452 K3)."""
+    chunks = [(1.0, ">>> Emerging (1 of 2) dev-libs/schedok\r\n"),
+              (2.0, "noise\r\n"),
+              (3.0, ">>> Install schedok into /root\r\n"),
+              (4.0, ">>> Completed\r\n")]
+    cast = cast_compare.parse_cast(write_cast(tmp_path / "lm.cast", chunks))
+    times = cast_compare.landmark_times(cast)
+    assert times[">>> Emerging"] == pytest.approx(1.0)
+    assert times[">>> Install"] == pytest.approx(1.0 + 2.0 + 3.0)
+    assert times[">>> Completed"] == pytest.approx(1.0 + 2.0 + 3.0 + 4.0)
+    assert times[">>> Emerging"] < times[">>> Install"] < times[">>> Completed"]
+    assert times["Failed to emerge"] is None
+    assert times["*** Resuming"] is None
+    assert times["failed-to-build summary"] is None
+
+
+def test_landmarks_split_write_still_match(tmp_path):
+    """A landmark split across two writes matches at the second event's time."""
+    chunks = [(1.0, ">>> Emerg"), (2.0, "ing dev-libs/schedok\r\n")]
+    cast = cast_compare.parse_cast(write_cast(tmp_path / "sp.cast", chunks))
+    assert cast_compare.landmark_times(cast)[">>> Emerging"] == pytest.approx(3.0)
+
+
+def test_landmarks_absent_is_none(tmp_path):
+    cast = cast_compare.parse_cast(
+        write_cast(tmp_path / "plain.cast", [(0.5, "just some output\r\n")]))
+    assert all(v is None for v in cast_compare.landmark_times(cast).values())
+
+
+def test_landmark_failure_summary(tmp_path):
+    chunks = [(1.0, "*** Resuming merge...\r\n"),
+              (1.0, "Failed to emerge dev-libs/schedbad\r\n"),
+              (1.0, " * The following 1 package has failed to build\r\n")]
+    times = cast_compare.landmark_times(
+        cast_compare.parse_cast(write_cast(tmp_path / "fail.cast", chunks)))
+    assert times["*** Resuming"] == pytest.approx(1.0)
+    assert times["Failed to emerge"] == pytest.approx(2.0)
+    assert times["failed-to-build summary"] == pytest.approx(3.0)
+
+
+@NEEDS_ASCIINEMA
+def test_record_with_answers_types_the_reply_at_the_prompt(tmp_path):
+    """K4 (#452): the reply reaches the child's stdin and shows in the cast."""
+    rec = _load("cast_record")
+    cast = tmp_path / "ask.cast"
+    _, rc = rec.record_with_answers(
+        ["sh", "-c", "printf 'Q? '; read x; echo got-$x; exit 3"],
+        cast, [(r"Q\? ", "hi")], timeout=20)
+    assert rc == 3
+    assert "got-hi" in _load("cast_compare").parse_cast(cast).text
+
+
+@NEEDS_ASCIINEMA
+def test_record_with_answers_times_out_when_the_prompt_never_comes(tmp_path):
+    rec = _load("cast_record")
+    with pytest.raises(TimeoutError):
+        rec.record_with_answers(["sh", "-c", "sleep 30"], tmp_path / "t.cast",
+                                [(r"never", "x")], timeout=2)

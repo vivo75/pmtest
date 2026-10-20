@@ -96,6 +96,15 @@ pm_mounts() {
     PM_MOUNTS+=(-v "$PM_REPO:$PM_REPO:ro")
   fi
   PM_MOUNTS+=(-v "$TEST_DIR:/TEST:ro" -v "$LOGS_DIR:/TEST/logs")
+  # PMTEST_CAST=1: put the host's asciinema in the guest (backlog #452). The
+  # image has none, but the host's glibc build runs unchanged there (checked
+  # 2026-10-20), so a read-only bind mount replaces an image rebuild. Record
+  # a cell with `asciinema rec --headless -c '<cmd>' /TEST/logs/<cell>.cast`.
+  if [ "${PMTEST_CAST:-0}" = 1 ]; then
+    local cast_bin
+    cast_bin=$(command -v asciinema) || { echo "!!! PMTEST_CAST=1 but no asciinema on the host" >&2; exit 2; }
+    PM_MOUNTS+=(-v "$cast_bin:/usr/local/bin/asciinema:ro")
+  fi
 }
 
 # Resolve the PM now (paths only: sourcing this file must never build).
