@@ -29675,6 +29675,18 @@ def test_pg359_gsblk_default_pvu_plans_new_slot_only(emerge_binary, fixture_env)
     ]
 
 
+def test_pg359_gsblk_pubgrub_pvu_plans_new_slot_only(emerge_binary, fixture_env):
+    """Backlog #433: `--solver=pubgrub` ports the `_greedy_slots` blocker lookahead too.
+    gsblk-2 blocks `:1`, so the greedy `:1` upgrade is dropped and no `U` row prints.
+    Expected rows are Portage 3.0.82.2's plan from the #359 S0 capture
+    `LLM/evidence/2026-10-15-359-s0/out/s0-e-gsblk-pvu.txt` (`depgraph.py:5896-5930`)."""
+    assert _pg34_run(
+        emerge_binary,
+        fixture_env,
+        ["--solver=pubgrub", "-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg359-gsblk"],
+    ) == [("NS", "dev-libs/pg359-gsblk-2:2")]
+
+
 def test_pg34_multi_default_pv_keeps_installed_slot_out(emerge_binary, fixture_env):
     """#34 S1 default-solver lock: a single `NS` row for slot 2, the
     Portage 3.0.82.2 container plan (same shape as
