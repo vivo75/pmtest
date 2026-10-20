@@ -181,7 +181,16 @@ portuale_phase_helpers_preflight() {
 # remembered to update.
 pm_stamp() {  # <run-dir>
   [ -d "$1" ] || return 0
-  PM_STAMP_DIR="$1" python3 - <<'PY'
+  # The gentoo/buildovl trees are part of the numbers too (no .git on the
+  # gentoo repo): record what is on disk and whether it still equals
+  # differential-test-bed/repo-pins.txt. A drift warns, it never aborts.
+  local pins pins_ok=true
+  pins=$("$REPO_ROOT/scripts/repo-pins.sh" --write-stdout 2>/dev/null) || pins=""
+  "$REPO_ROOT/scripts/repo-pins.sh" --check >/dev/null 2>&1 || {
+    pins_ok=false
+    echo "!!! repo drift: /.gentoo/repos differs from differential-test-bed/repo-pins.txt (run scripts/repo-pins.sh --check)" >&2
+  }
+  PM_STAMP_DIR="$1" PM_REPO_PINS="$pins" PM_REPO_PINS_OK="$pins_ok" python3 - <<'PY'
 import json, os, datetime
 out = {
     "pm": os.environ["PM_NAME"],
@@ -189,6 +198,8 @@ out = {
     "profile": os.environ["PM_PROFILE"],
     "binary": os.environ["PM_EMERGE"],
     "repo": os.environ["PM_REPO"],
+    "repo_pins": dict(l.split("=", 1) for l in os.environ["PM_REPO_PINS"].splitlines() if "=" in l),
+    "repo_pins_match_file": os.environ["PM_REPO_PINS_OK"] == "true",
     "stamped_at": datetime.datetime.now(datetime.timezone.utc)
         .strftime("%Y-%m-%dT%H:%M:%SZ"),
 }

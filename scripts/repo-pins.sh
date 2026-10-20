@@ -15,6 +15,7 @@ case "${1:---check}" in
   --check)
     grep -qxF "gentoo_timestamp_chk=$ts" "$pin" && grep -qxF "buildovl_head=$head" "$pin" \
       || { echo "repo drift: gentoo=$ts buildovl=$head (pin: $pin)" >&2; exit 1; } ;;
-  *) echo "usage: $0 [--check|--write]" >&2; exit 2 ;;
+  --write-stdout) ;;
+  *) echo "usage: $0 [--check|--write|--write-stdout]" >&2; exit 2 ;;
 esac
 echo "gentoo_timestamp_chk=$ts"; echo "buildovl_head=$head"
