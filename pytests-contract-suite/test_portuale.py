@@ -12208,6 +12208,70 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     assert "dev-libs/schedbad" not in world and "dev-libs/schedbaddep" not in world
 
 
+def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_path):
+    """Backlog #437 (a)(c)(d)(e). Expected values from Portage 3.0.82.2, cells of
+    `LLM/evidence/2026-10-20-b437/portage.txt` in portuale (`ok-world-order`,
+    `q-lone-failure`, `q-quiet-fail`, `q-keep-going`, `jobs-keep-going`), fixture
+    shapes `schedok`/`schedbad`/`schedbaddep` standing for good/bad/top:
+    (d) `>>> Recording <atom> in "world" favorites file...` prints between
+    `Installing` and `Completed`; (e) the `--keep-going` re-plan prints no
+    `Calculating dependencies` under `--quiet`; (a) a background run (`--quiet`)
+    whose only failure is one build shows that build's whole log before the elog
+    blocks, with no blank lines inside the `Failed to emerge` block, unless
+    `--quiet-fail`; (c) in `-jN` the elog block ends with `The complete build log is
+    located at '<build.log>'.`"""
+    import shutil
+
+    def run(name, args):
+        root = tmp_path / f"{name}-root"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"{name}-pt")
+        env["NOCOLOR"] = "yes"
+        result = subprocess.run(
+            [str(emerge_binary), *args],
+            capture_output=True, text=True, check=False, env=env, stdin=subprocess.DEVNULL,
+        )
+        return root, tmp_path / f"{name}-pt", result
+
+    # (d)
+    root, _, r = run("ok", ["dev-libs/schedok"])
+    assert r.returncode == 0, r.stderr
+    assert (
+        f">>> Installing (1 of 1) dev-libs/schedok-1.0::testrepo to {root}\n\n"
+        '>>> Recording dev-libs/schedok in "world" favorites file...\n\n'
+        f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}\n"
+    ) in r.stdout, r.stdout
+
+    # (e)
+    root, _, r = run("qkg", ["-q", "--keep-going", "dev-libs/schedbaddep", "dev-libs/schedok"])
+    assert r.returncode == 1
+    assert "*** Resuming merge...\n" in r.stdout
+    assert "Calculating dependencies" not in r.stdout
+    assert "Dependency resolution took" not in r.stdout
+
+    # (a)
+    root, pt, r = run("qlone", ["-q", "dev-libs/schedbad"])
+    assert r.returncode == 1
+    log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
+    head = f">>> Failed to emerge dev-libs/schedbad-1.0 for {root}, Log file:\n>>>  '{log}'\n"
+    assert head + log.read_text() in r.stdout, r.stdout
+    assert r.stdout.index(head) < r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}:")
+    root, pt, r = run("qfail", ["-q", "--quiet-fail", "dev-libs/schedbad"])
+    log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
+    assert r.returncode == 1
+    assert log.read_text() not in r.stdout
+
+    # (c)
+    root, pt, r = run("jkg", ["--keep-going", "--jobs=2", "dev-libs/schedbaddep", "dev-libs/schedok"])
+    log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
+    elog = r.stdout[r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}:"):]
+    assert f" * The complete build log is located at '{log}'.\n" in elog, r.stdout
+
+
 def test_emerge_merges_an_idepend_dep_into_the_running_root_only_when_allowed(
     emerge_binary, tmp_path
 ):
