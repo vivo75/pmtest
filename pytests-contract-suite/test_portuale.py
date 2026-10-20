@@ -793,6 +793,7 @@ def _remote_resolve_env(fixture_env, root, config_root):
     irrelevant, but keep it sane)."""
     env = dict(fixture_env)
     env["ROOT"] = str(root)
+    env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)  # binrepo default location
     env["PORTAGE_CONFIGROOT"] = str(config_root)
     return env
 
@@ -2813,6 +2814,7 @@ def _signed_binhost_env(tmp_path, home):
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)  # binrepo default location
     env["PORTAGE_RUNNING_ROOT"] = str(root)
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
     # `PKGDIR` follows the full chain at portuale's CLI boundary
@@ -5848,6 +5850,8 @@ def _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir):
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(clientetc)
     env["ROOT"] = str(root)
+    # A binrepo without `location` downloads under `<EPREFIX>/var/cache/binhost`.
+    env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)
     env["PORTAGE_RUNNING_ROOT"] = FIXTURES_ROOT
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
@@ -5915,8 +5919,8 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
         capture_output=True, text=True, check=False, env=env,
     )
     # A `binrepos.conf` section without `location` (and no PORTAGE_BINHOST) downloads
-    # under `<EPREFIX>/var/cache/binhost/<name>` (`BinRepoConfigLoader`), here the
-    # root-relative form (backlog #428); never into `$PKGDIR`.
+    # under `<EPREFIX>/var/cache/binhost/<name>` (`BinRepoConfigLoader`; backlog #428),
+    # here EPREFIX = the test root via PORTAGE_OVERRIDE_EPREFIX; never into `$PKGDIR`.
     cache = root1 / "var/cache/binhost/multiinst"
     fetched = sorted(str(f.relative_to(cache)) for f in cache.rglob("*.gpkg.tar"))
     assert fetched == ["dev-libs/packagepkg/packagepkg-1.0-2.gpkg.tar"], fetched
@@ -12023,12 +12027,11 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
 ):
     """Backlog #428: a remote binary is downloaded by the configured `FETCHCOMMAND`
     (`DISTDIR` = the download directory, `FILE` = `<name>.partial`, renamed once
-    verified), into `<root>/var/cache/binhost/<name>` when the `binrepos.conf` section
-    has no `location`, and the verify line names every checksum of the index record plus
+    verified), into `<EPREFIX>/var/cache/binhost/<name>` when the `binrepos.conf` section
+    has no `location` (the test sets EPREFIX to the root via PORTAGE_OVERRIDE_EPREFIX), and the verify line names every checksum of the index record plus
     `size` (`MD5 SHA1 size`). Expected values from Portage 3.0.82.2 with the same index
     (`LLM/evidence/2026-10-20-b428/` in portuale: `setup.sh`, `cells.sh`, `f-fetchcommand`);
-    the only difference is that Portage roots the default `location` at `EPREFIX`, which
-    portuale roots at `ROOT` so a test root never writes to the host."""
+    the default `location` is rooted at `EPREFIX` in both (backlog #436 (b))."""
     import hashlib
     import shutil
 
@@ -12069,6 +12072,7 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
             PORTAGE_CONFIGROOT=str(root),
             PORTAGE_TMPDIR=str(tmp_path / "tmp"),
             ROOT=str(tmp_path / "root"),
+            PORTAGE_OVERRIDE_EPREFIX=str(tmp_path / "root"),
             DISTDIR=str(tmp_path / "dist"),
             NOCOLOR="yes",
         )
