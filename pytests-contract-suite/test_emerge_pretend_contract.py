@@ -32043,6 +32043,8 @@ def test_similar_names_search_reads_the_databases_portage_reads(
         ("dev-libs/requiredusebadpkg", "REQUIRED_USE flag constraints are unsatisfied"),
         ("dev-libs/requiredusebadparentpkg", "REQUIRED_USE flag constraints are unsatisfied"),
         ("dev-libs/pg34-napp", "USE changes are necessary"),
+        ("=dev-libs/aup0b-1", "USE changes are necessary"),
+        ("dev-libs/useeqparentoffpkg", "USE changes are necessary"),
     ],
 )
 def test_pubgrub_aborts_like_the_default_solver(emerge_binary, fixture_env, atom, needle):
@@ -32058,8 +32060,7 @@ def test_pubgrub_aborts_like_the_default_solver(emerge_binary, fixture_env, atom
     assert needle in default.stderr
     assert pubgrub.returncode == 1
     assert pubgrub.stderr == default.stderr
-    if atom != "dev-libs/pg34-napp":  # its merge-list rows differ: backlog #429
-        assert pubgrub.stdout == default.stdout
+    assert pubgrub.stdout == default.stdout
 
 
 _BCDEP_PKG_ROW = (
