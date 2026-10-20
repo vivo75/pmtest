@@ -1,0 +1,6 @@
+# #438 -- `--autounmask-backtrack=y` with a dependency only a PARENT's USE flip
+# can satisfy (upstream test_autounmask_parent.py `aup0b`): Portage folds the
+# flip into the config and re-solves (`_needed_use_config_changes`), so the
+# merge list keeps the dependency and the parent shows the flipped USE.
+--pretend --autounmask --autounmask-backtrack=y =dev-libs/aup0b-1
+--pretend --autounmask =dev-libs/aup0b-1

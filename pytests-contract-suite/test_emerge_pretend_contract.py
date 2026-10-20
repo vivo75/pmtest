@@ -10771,6 +10771,30 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     )
 
 
+def test_autounmask_parent_flip_with_backtrack_y_fails_without_a_restart(
+    emerge_binary, fixture_env
+):
+    """Backlog #438. `--autounmask-backtrack=y` does not change `aup0b`: Portage's
+    `_apply_parent_use_changes` (`depgraph.py:5820`, called when `_create_graph()` fails,
+    `:5677`) only turns the failed dependency's suggestions into changes, it never
+    restarts the solve with the parent flipped. Live Portage 3.0.82.2 (L0 fixture oracle,
+    `differential-test-bed/atomlists/l0-fixture-oracle-438.txt`): the merge header only, the
+    `-foo` USE block, exit 1, and no `terminated early` notice (that notice is printed
+    only when backtracking was disabled, `depgraph.py:11093`). Both solvers must agree."""
+    base = ["--pretend", "--autounmask", "--autounmask-backtrack=y", "=dev-libs/aup0b-1"]
+    for extra in ([], ["--solver=pubgrub"]):
+        result = _run([str(emerge_binary)], [*extra, *base], fixture_env)
+        assert result.returncode == 1, extra
+        _assert_abort_preamble(result.stdout)
+        assert len(result.stdout.splitlines()) == 5, result.stdout
+        assert result.stderr == (
+            "\nThe following USE changes are necessary to proceed:\n"
+            ' (see "package.use" in the portage(5) man page for more details)\n'
+            "# required by =dev-libs/aup0b-1 (argument)\n"
+            ">=dev-libs/aup0b-1 -foo\n"
+        ), extra
+
+
 def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_portage(
     emerge_binary, fixture_env
 ):
