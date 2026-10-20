@@ -295,8 +295,12 @@ def write_harvest() -> None:
     entries that went stale. A stored key no call matched is an orphan
     (its parametrize id or args changed, so it silently checks nothing) and
     is dropped; the calls of the test functions that had orphans and found
-    no entry are recorded afresh from the current Rust output. Entries that
-    were matched, and calls of every other test, are left as they are. The
+    no entry are recorded afresh from the current Rust output. So is a call
+    that follows a rename: its test has no stored entry at all and its
+    args+env equal those of a dropped orphan. Entries that were matched,
+    and calls of every other test (including tests added after the
+    harvest, which pin their output in the test body), are left as they
+    are. The
     result is a snapshot of Rust, not an agreement with the Python
     reference."""
     if not HARVEST:
@@ -304,12 +308,22 @@ def write_harvest() -> None:
     cases = dict(_contract())
     orphans = [k for k in cases if k not in matched_keys]
     stale_tests = {_base_test(k) for k in orphans}
+    orphan_idents = {
+        json.dumps({"args": cases[k]["args"], "env": cases[k]["env"]}, sort_keys=True)
+        for k in orphans
+    }
     for k in orphans:
         del cases[k]
+    stored_nodeids = {_nodekey(k.rsplit("#", 1)[0]) for k in cases}
     ordinals: dict[str, int] = {}
     added = 0
     for nodeid, record in unmatched_calls:
-        if _base_test(nodeid + "#0") not in stale_tests:
+        renamed = (
+            _nodekey(nodeid) not in stored_nodeids
+            and json.dumps({"args": record["args"], "env": record["env"]}, sort_keys=True)
+            in orphan_idents
+        )
+        if _base_test(nodeid + "#0") not in stale_tests and not renamed:
             continue
         n = ordinals.get(nodeid, 0)
         ordinals[nodeid] = n + 1

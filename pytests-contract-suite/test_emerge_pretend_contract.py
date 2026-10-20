@@ -3263,7 +3263,9 @@ def _assert_slot_collision_block(stdout, slot_atom, instances, backtrack_hint=Tr
     assert hint == backtrack_hint
 
 
-@pytest.mark.parametrize("description,args,expected_exit", CASES)
+@pytest.mark.parametrize(
+    "description,args,expected_exit", CASES, ids=[d for d, _, _ in CASES]
+)
 def test_pretend_case_exit_code(
     description, args, expected_exit, emerge_binary, fixture_env
 ):

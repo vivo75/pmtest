@@ -39,3 +39,30 @@ def test_expanded_corpus_replays(emerge_binary):
         message = corpus.compare(f"expanded: {key}", stored, args, env, result)
         if message:
             corpus.flag(key, message, stored, args, env, result, corpus.blessed_expanded)
+
+
+def test_harvest_records_a_renamed_test_and_drops_its_old_entries(tmp_path, monkeypatch):
+    """`write_harvest` after renaming a test function: the old keys are
+    orphans and are dropped; the renamed test's call (no stored entry, same
+    args+env as the orphan) is recorded; a new test with different args and
+    a matched entry stay as they are."""
+    ident = {"args": ["--pretend", "a/b"], "env": {}}
+    rec = {"rc": 0, "stdout": "out\n", "stderr": ""}
+    other = {"args": ["--pretend", "c/d"], "env": {}, **rec}
+    stored = {
+        "tests/t.py::test_old#0": {**ident, **rec},
+        "tests/t.py::test_kept#0": other,
+    }
+    path = tmp_path / "contract.json.xz"
+    corpus.save(path, stored)
+    monkeypatch.setattr(corpus, "CONTRACT_CORPUS", path)
+    monkeypatch.setattr(corpus, "HARVEST", True)
+    monkeypatch.setattr(corpus, "_contract_cases", corpus.load(path))
+    monkeypatch.setattr(corpus, "matched_keys", {"tests/t.py::test_kept#0"})
+    monkeypatch.setattr(corpus, "unmatched_calls", [
+        ("suite/t.py::test_renamed", {**ident, **rec}),
+        ("suite/t.py::test_brand_new", {"args": ["--pretend", "x/y"], "env": {}, **rec}),
+    ])
+    corpus.write_harvest()
+    keys = set(corpus.load(path))
+    assert keys == {"tests/t.py::test_kept#0", "suite/t.py::test_renamed#0"}
