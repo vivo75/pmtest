@@ -5857,7 +5857,7 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
     builds of `dev-libs/packagepkg-1.0` -- BUILD_ID 1 (BUILD_TIME 100)
     first, BUILD_ID 2 (BUILD_TIME 200) second, like the live `seed-desk`
     index -- each with its own `PATH`. Portage fetches the instance the
-    resolver planned (the newest, `-2`) into `$PKGDIR`. Portuale used to
+    resolver planned (the newest, `-2`) into the binrepo's download directory. Portuale used to
     look the record up by `CPV` alone and take the *first* entry, so the
     plan said `-2` but `-1` was downloaded -- and, sitting in `$PKGDIR`,
     that stale build then shadowed the newer remote one on every later run
@@ -5908,8 +5908,13 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
         [str(emerge_binary), "-k", "--getbinpkgonly", "--oneshot", "dev-libs/packagepkg"],
         capture_output=True, text=True, check=False, env=env,
     )
-    fetched = sorted(str(f.relative_to(pkgdir)) for f in pkgdir.rglob("*.gpkg.tar"))
+    # A `binrepos.conf` section without `location` (and no PORTAGE_BINHOST) downloads
+    # under `<EPREFIX>/var/cache/binhost/<name>` (`BinRepoConfigLoader`), here the
+    # root-relative form (backlog #428); never into `$PKGDIR`.
+    cache = root1 / "var/cache/binhost/multiinst"
+    fetched = sorted(str(f.relative_to(cache)) for f in cache.rglob("*.gpkg.tar"))
     assert fetched == ["dev-libs/packagepkg/packagepkg-1.0-2.gpkg.tar"], fetched
+    assert not list(pkgdir.rglob("*.gpkg.tar"))
 
 
 def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_path):
@@ -11986,6 +11991,82 @@ def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_p
         result = run("-pf", "--getbinpkg")
         assert result.returncode == 0, result.stderr
         assert result.stdout == listing[:-1]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
+    emerge_binary, tmp_path
+):
+    """Backlog #428: a remote binary is downloaded by the configured `FETCHCOMMAND`
+    (`DISTDIR` = the download directory, `FILE` = `<name>.partial`, renamed once
+    verified), into `<root>/var/cache/binhost/<name>` when the `binrepos.conf` section
+    has no `location`, and the verify line names every checksum of the index record plus
+    `size` (`MD5 SHA1 size`). Expected values from Portage 3.0.82.2 with the same index
+    (`LLM/evidence/2026-10-20-b428/` in portuale: `setup.sh`, `cells.sh`, `f-fetchcommand`);
+    the only difference is that Portage roots the default `location` at `EPREFIX`, which
+    portuale roots at `ROOT` so a test root never writes to the host."""
+    import hashlib
+    import shutil
+
+    root = _fetchonly_root(tmp_path)
+    (root / "repo/profiles/categories").write_text("dev-util\ndev-libs\n")
+    binhost = tmp_path / "binhost"
+    (binhost / "dev-libs").mkdir(parents=True)
+    binary = binhost / "dev-libs/gpkgreadpkg-1.0.gpkg.tar"
+    shutil.copy(Path(FIXTURES_ROOT) / "pkgdir/dev-libs/gpkgreadpkg-1.0.gpkg.tar", binary)
+    data = binary.read_bytes()
+    (binhost / "Packages").write_text(
+        "TIMESTAMP: 1\nVERSION: 0\nPACKAGES: 1\n\nBUILD_ID: 1\n"
+        "CPV: dev-libs/gpkgreadpkg-1.0\nDEFINED_PHASES: -\nEAPI: 8\nKEYWORDS: amd64\n"
+        "MTIME: 1000\nBUILD_TIME: 1000\nPATH: dev-libs/gpkgreadpkg-1.0.gpkg.tar\n"
+        f"REPO: fetchrepo\nSIZE: {len(data)}\nMD5: {hashlib.md5(data).hexdigest()}\n"
+        f"SHA1: {hashlib.sha1(data).hexdigest()}\nSLOT: 0\nUSE:\n"
+    )
+    marker = tmp_path / "fetchcommand.log"
+    script = tmp_path / "fc.sh"
+    script.write_text(
+        f'#!/bin/bash\necho "$1 $2" >> {marker}\nexec wget -q -O "$1/$2" "$3"\n'
+    )
+    script.chmod(0o755)
+    server, port = _serve_dir(binhost)
+    try:
+        (root / "etc/portage/binrepos.conf").write_text(
+            f"[tmpbinhost]\nsync-uri = http://127.0.0.1:{port}\npriority = 1\n"
+        )
+        with (root / "etc/portage/make.conf").open("a") as conf:
+            conf.write(
+                f'PKGDIR="{tmp_path / "pkgdir"}"\nPORTAGE_TRUST_HELPER="/bin/true"\n'
+                'FEATURES="${FEATURES} binpkg-ignore-signature -binpkg-request-signature"\n'
+            )
+        env = dict(os.environ)
+        env.update(
+            FETCHCOMMAND=f"{script} ${{DISTDIR}} ${{FILE}} ${{URI}}",
+            RESUMECOMMAND=f"{script} ${{DISTDIR}} ${{FILE}} ${{URI}}",
+            PORTAGE_CONFIGROOT=str(root),
+            PORTAGE_TMPDIR=str(tmp_path / "tmp"),
+            ROOT=str(tmp_path / "root"),
+            DISTDIR=str(tmp_path / "dist"),
+            NOCOLOR="yes",
+        )
+        result = subprocess.run(
+            [str(emerge_binary), "-f", "--getbinpkg", "dev-libs/gpkgreadpkg"],
+            capture_output=True, text=True, check=False, env=env, stdin=subprocess.DEVNULL,
+        )
+        assert result.returncode == 0, result.stderr
+        name = "gpkgreadpkg-1.0.gpkg.tar MD5 SHA1 size ;-) ..."
+        assert result.stdout == (
+            "Calculating dependencies ... done!\n"
+            "Dependency resolution took (backtrack: 0/20).\n\n\n"
+            f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}\n"
+            f" * {name}" + " " * (80 - len(name) - 3 - 7) + "[ ok ]\n"
+        )
+        cache = tmp_path / "root/var/cache/binhost/tmpbinhost/dev-libs"
+        assert (cache / "gpkgreadpkg-1.0.gpkg.tar").read_bytes() == data
+        assert not (cache / "gpkgreadpkg-1.0.gpkg.tar.partial").exists()
+        assert marker.read_text() == f"{cache} gpkgreadpkg-1.0.gpkg.tar.partial\n"
+        assert not (tmp_path / "pkgdir").exists() or not list((tmp_path / "pkgdir").rglob("*.gpkg.tar"))
     finally:
         server.shutdown()
         server.server_close()
