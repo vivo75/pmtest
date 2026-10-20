@@ -149,11 +149,12 @@ def main() -> int:
                 stages[pm] = stage
                 cast_path = out / f"{cell}.{pm}.cast"
                 env = fixture_env(stage, color=args.color)
-                # Unrecorded warm-up: Portage's first run in a tree prints the
-                # one-off global-updates pass, which is not the cell's output.
-                subprocess.run([argv0, "--pretend", "--version"], env=env,
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                _, rc = cast_record.record([argv0, *cell_args], cast_path, env=env)
+                # NOCOLOR does not decolour Portage under ROOT != / (its `/`
+                # config is built from a filtered environment), so pass the
+                # option to both. Portage's global-updates lines come from the
+                # staged fixtures' updates file and are filtered by SETUP_NOISE.
+                colour_arg = [] if args.color else ["--color=n"]
+                _, rc = cast_record.record([argv0, *colour_arg, *cell_args], cast_path, env=env)
                 results[pm] = (cast_path, rc)
             report = cast_compare.compare(
                 cast_compare.parse_cast(results["portage"][0]),

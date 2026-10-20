@@ -3050,23 +3050,30 @@ CASES = [
     ("#402: --binpkg-respect-use on the shared root misses like Portage (no t341 repo)", ["--pretend", "--usepkgonly", "--binpkg-respect-use=y", "dev-libs/t341-dep"], 1),
     ("#391: moves-on never rewrites ebuild deps (movedepconsumer -pv --deep aborts)", ["-pv", "--deep", "dev-libs/movedepconsumer"], 1),
     ("#391: moves-on never rewrites ebuild deps (movedepconsumer --pretend aborts)", ["--pretend", "dev-libs/movedepconsumer"], 1),
+    ("#453 B: --nospinner is a recognized no-op (Portage _emerge/main.py:37, rc 0 like Portage)", ["--pretend", "--nospinner", "dev-libs/newpkg"], 0),
+    ("#453 A: --color=y colours the abort preamble, timing and masked block (maskedpkg, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/maskedpkg"], 1),
+    ("#453 A: --color=y colours the missing-dependency block (missingdep, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/missingdep"], 1),
 ]
 
 
 def _assert_abort_preamble(stdout: str) -> None:
-    """#135 (c): an aborted resolve prints Portage's merge-list preamble on
-    stdout before the abort block on stderr -- the header, the blank,
+    """#135 (c) + #453 D: an aborted resolve prints Portage's merge-list preamble on
+    stdout before the abort block on stderr -- the leading blank, the header, the blank,
     `Calculating dependencies ... done!`, and the timing line (whose
     seconds are wall time, so only the `backtrack: N/M` suffix is
-    asserted)."""
+    asserted). Portage 3.0.82.2 `_start_resolution_display`
+    (`lib/_emerge/depgraph.py:12122`) opens the banner with `\n`; the
+    non-tty capture of `--pretend dev-libs/missingdep` (staged fixtures)
+    shows `b"\\nThese are the packages that would be merged, in order:\\n\\n..."`."""
     # Determinism cut: the wall-clock seconds Portage prints are omitted
     # (byte-identical repeated runs are a jointly-owned gate); the line
     # carries the `backtrack: N/M` signal only.
     lines = stdout.splitlines()
-    assert lines[0] == "These are the packages that would be merged, in order:"
-    assert lines[1] == ""
-    assert lines[2] == "Calculating dependencies ... done!"
-    assert lines[3].startswith("Dependency resolution took (backtrack: ") and lines[3].endswith(").")
+    assert lines[0] == ""
+    assert lines[1] == "These are the packages that would be merged, in order:"
+    assert lines[2] == ""
+    assert lines[3] == "Calculating dependencies ... done!"
+    assert lines[4].startswith("Dependency resolution took (backtrack: ") and lines[4].endswith(").")
 
 
 # ` for <root>` suffix of the last `_run` call's unsatisfied-dependency
@@ -10640,7 +10647,7 @@ def test_autounmask_use_parent_flip_fails_like_portage_when_the_child_flag_is_ma
     assert rust.returncode == 1
     # No merge list: the header/preamble only, like every Slice-4 abort.
     _assert_abort_preamble(rust.stdout)
-    assert len(rust.stdout.splitlines()) == 5
+    assert len(rust.stdout.splitlines()) == 6
     assert rust.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds to satisfy "dev-libs/parentflipchildpkg[feat=]".',
@@ -10707,7 +10714,7 @@ def test_autounmask_parent_suggests_disabling_foo_and_still_fails(
     assert result.returncode == 1
     # No merge list: the header/preamble only, like every Slice-4 abort.
     _assert_abort_preamble(result.stdout)
-    assert len(result.stdout.splitlines()) == 5
+    assert len(result.stdout.splitlines()) == 6
     assert result.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
@@ -10756,7 +10763,7 @@ def test_autounmask_parent_flip_with_backtrack_y_fails_without_a_restart(
         result = _run([str(emerge_binary)], [*extra, *base], fixture_env)
         assert result.returncode == 1, extra
         _assert_abort_preamble(result.stdout)
-        assert len(result.stdout.splitlines()) == 5, result.stdout
+        assert len(result.stdout.splitlines()) == 6, result.stdout
         assert result.stderr == (
             "\nThe following USE changes are necessary to proceed:\n"
             ' (see "package.use" in the portage(5) man page for more details)\n'
@@ -10820,7 +10827,7 @@ def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_portage(
     assert rust.returncode == 1
     # No merge list: the header/preamble only, like every Slice-4 abort.
     _assert_abort_preamble(rust.stdout)
-    assert len(rust.stdout.splitlines()) == 5
+    assert len(rust.stdout.splitlines()) == 6
     assert rust.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".',
@@ -10835,7 +10842,7 @@ def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_portage(
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
     assert rust_ab.returncode == 1
     _assert_abort_preamble(rust_ab.stdout)
-    assert len(rust_ab.stdout.splitlines()) == 5
+    assert len(rust_ab.stdout.splitlines()) == 6
     assert rust_ab.stderr.splitlines() == [
         "",
         'emerge: there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".',
@@ -10854,7 +10861,7 @@ def test_autounmask_use_parent_flip_pfgraph_reports_the_bare_miss_like_portage(
     )
     assert n.returncode == 1
     _assert_abort_preamble(n.stdout)
-    assert len(n.stdout.splitlines()) == 5
+    assert len(n.stdout.splitlines()) == 6
     assert "pfgraphextra" not in n.stdout
     assert 'there are no ebuilds to satisfy "dev-libs/pfgraphchild[pf=]".' in n.stderr
 
@@ -21180,6 +21187,241 @@ def test_sync_points_at_emaint(emerge_binary, fixture_env):
         assert rust.stderr.strip() == "Functionality has moved to `emaint sync`."
 
 
+def test_nospinner_is_a_recognized_noop(emerge_binary, fixture_env):
+    """Portage 3.0.82.2 capture (staged fixtures, piped,
+    `--ignore-default-opts --pretend --nospinner dev-libs/newpkg`): rc 0,
+    stdout the plain merge row, stderr empty of option errors -- the flag
+    only downgrades the spinner to STATIC (`_emerge/main.py:37`,
+    `actions.py:3936-3941`), and portuale never animates, so the run is
+    byte-identical to the same argv without the flag."""
+    plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
+    assert plain.returncode == 0
+    spinner = _run(
+        [str(emerge_binary)], ["--pretend", "--nospinner", "dev-libs/newpkg"], fixture_env
+    )
+    assert spinner.returncode == 0
+    assert spinner.stdout == plain.stdout
+    assert spinner.stderr == plain.stderr
+
+
+def test_colored_abort_preamble_and_masked_block(emerge_binary, fixture_env):
+    """Portage 3.0.82.2 capture (staged fixtures, piped,
+    `--ignore-default-opts --color=y --pretend dev-libs/maskedpkg`, rc 1):
+
+        stdout: b"\\n\\x1b[32mThese are the packages that would be merged, in order:\\x1b[39;49;00m\\n\\nCalculating dependencies ... done!\\nDependency resolution took \\x1b[32m1.33\\x1b[39;49;00m s (backtrack: 0/20).\\n\\n"
+        stderr tail: b"\\n!!! \\x1b[31;01mAll ebuilds that could satisfy \\x1b[39;49;00m\\x1b[32m\\"dev-libs/maskedpkg\\" for <root>/\\x1b[39;49;00m\\x1b[31;01m have been masked.\\x1b[39;49;00m\\n!!! One of the following masked packages is required to complete your request:\\n- dev-libs/maskedpkg-1.0::testrepo (masked by: ~amd64 keyword)\\n\\nFor more information, see the MASKED PACKAGES section in the emerge\\nman page or refer to the Gentoo Handbook.\\n\\n"
+
+    (`darkgreen` = `\\x1b[32m` wraps the banner and the timing seconds,
+    `BAD` = `\\x1b[31;01m` / `INFORM` = `\\x1b[32m` the masked header spans;
+    `lib/_emerge/depgraph.py:12122-12127`, `:12143`, `:6993-6999`.)
+    The suite runs with ROOT == running root, so Portage's ` for <root>/`
+    suffix (a recorded cut) is absent from both sides here; the wall-clock
+    seconds are portuale's determinism cut (`took` + the empty escape
+    pair, see the `timing_line` doc comment)."""
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--color=y", "dev-libs/maskedpkg"], fixture_env
+    )
+    assert result.returncode == 1
+    assert result.stdout == (
+        "\n\x1b[32mThese are the packages that would be merged, in order:\x1b[39;49;00m\n\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 0/20).\n\n"
+    )
+    assert result.stderr == (
+        '\n!!! \x1b[31;01mAll ebuilds that could satisfy \x1b[39;49;00m'
+        '\x1b[32m"dev-libs/maskedpkg"\x1b[39;49;00m'
+        '\x1b[31;01m have been masked.\x1b[39;49;00m\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        "- dev-libs/maskedpkg-1.0::testrepo (masked by: ~amd64 keyword)\n"
+        "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook.\n"
+        "\n"
+    )
+
+
+def test_colored_missing_dependency_block(emerge_binary, fixture_env):
+    """Portage 3.0.82.2 capture (staged fixtures, piped,
+    `--ignore-default-opts --color=y --pretend dev-libs/missingdep`, rc 1):
+
+        stdout: like the masked cell (banner + `done!` coloured, `took
+        \\x1b[32m1.33\\x1b[39;49;00m s (backtrack: 1/20)`), with the leading
+        `\\n` before the banner (`lib/_emerge/depgraph.py:12122`).
+        stderr tail: b"\\nemerge: there are no ebuilds to satisfy \\x1b[32;01m\\"dev-libs/doesnotexist-anywhere\\" for <root>/\\x1b[39;49;00m.\\n(dependency required by \\"\\x1b[32mdev-libs/missingdep-1.0::testrepo\\x1b[39;49;00m\\" [ebuild])\\n(dependency required by \\"\\x1b[32mdev-libs/missingdep\\x1b[39;49;00m\\" [argument])\\n"
+
+    (`green` = `\\x1b[32;01m` wraps the missed atom, `INFORM` the chain
+    nodes; `lib/_emerge/depgraph.py:7040-7043`, `:7074`.) Same two cuts as
+    the masked cell (` for <root>/`, wall-clock seconds); portuale also
+    reports its own backtrack restarts here (0/20, not Portage's 1/20 --
+    the deterministic pass count, out of scope for this slice)."""
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--color=y", "dev-libs/missingdep"], fixture_env
+    )
+    assert result.returncode == 1
+    assert result.stdout == (
+        "\n\x1b[32mThese are the packages that would be merged, in order:\x1b[39;49;00m\n\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 0/20).\n\n"
+    )
+    assert result.stderr == (
+        '\nemerge: there are no ebuilds to satisfy \x1b[32;01m"dev-libs/doesnotexist-anywhere"\x1b[39;49;00m.\n'
+        '(dependency required by "\x1b[32mdev-libs/missingdep-1.0::testrepo\x1b[39;49;00m" [ebuild])\n'
+        '(dependency required by "\x1b[32mdev-libs/missingdep\x1b[39;49;00m" [argument])\n'
+    )
+
+
+def test_colored_mid_resolve_masked_dependency_block(emerge_binary, fixture_env):
+    """The mid-resolve masked-dependency disclosure (`dev-libs/maskneedpkg`,
+    masked dep of a merge-bound parent) colours the same `BAD`/`INFORM`
+    spans as the top-level all-masked block, plus `INFORM` chain nodes --
+    Portage `_show_unsatisfied_dep`'s masked branch
+    (`lib/_emerge/depgraph.py:6993-6999`, `:7074`), reached here through
+    the structured `MaskedDepReport` render instead of the top-level
+    report string. Uncoloured bytes are unchanged (the ` for <root>/`
+    suffix stays a recorded cut)."""
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--color=y", "dev-libs/maskneedpkg"], fixture_env
+    )
+    assert result.returncode == 1
+    assert result.stdout == (
+        "\n\x1b[32mThese are the packages that would be merged, in order:\x1b[39;49;00m\n\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 0/20).\n\n"
+    )
+    assert result.stderr == (
+        '\n!!! \x1b[31;01mAll ebuilds that could satisfy \x1b[39;49;00m'
+        '\x1b[32m"dev-libs/maskeddep"\x1b[39;49;00m'
+        '\x1b[31;01m have been masked.\x1b[39;49;00m\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        "- dev-libs/maskeddep-1.0::testrepo (masked by: package.mask)\n"
+        "\n"
+        '(dependency required by "\x1b[32mdev-libs/maskneedpkg-1.0::testrepo\x1b[39;49;00m" [ebuild])\n'
+        '(dependency required by "\x1b[32mdev-libs/maskneedpkg\x1b[39;49;00m" [argument])\n'
+        "For more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook.\n"
+    )
+
+
+def test_colored_top_level_miss_block(emerge_binary, fixture_env):
+    """The top-level miss (`>=dev-libs/newpkg-9.0`: no version satisfies)
+    colours the missed atom `green` at the resolve-phases print site --
+    Portage `_show_unsatisfied_dep`'s plain branch
+    (`lib/_emerge/depgraph.py:7040-7043`); the resolver-built string
+    itself stays plain (the resolver library is ANSI-free, see
+    `colorize_abort_report`). Uncoloured bytes are unchanged."""
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--color=y", ">=dev-libs/newpkg-9.0"], fixture_env
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr == (
+        'emerge: there are no ebuilds to satisfy \x1b[32;01m">=dev-libs/newpkg-9.0"\x1b[39;49;00m.\n'
+    )
+
+
+def _run_on_pty(argv, env, err_path=None, timeout=120):
+    """Run argv with stdin/stdout on a pty slave (stderr too, unless
+    err_path takes it to a file); return (rc, pty_output, err_bytes)."""
+    import pty as _pty
+    import select as _select
+    import time as _time
+
+    master, slave = _pty.openpty()
+    err_file = open(err_path, "wb") if err_path is not None else slave
+    try:
+        proc = subprocess.Popen(argv, env=env, stdin=slave, stdout=slave, stderr=err_file)
+    finally:
+        os.close(slave)
+        if err_file is not slave:
+            err_file.close()
+    out = b""
+    deadline = _time.time() + timeout
+    while _time.time() < deadline:
+        ready, _, _ = _select.select([master], [], [], 5)
+        if ready:
+            try:
+                chunk = os.read(master, 65536)
+            except OSError:
+                break
+            if not chunk:
+                if proc.poll() is not None:
+                    break
+            else:
+                out += chunk
+        if proc.poll() is not None and not ready:
+            break
+    if proc.poll() is None:
+        proc.kill()
+        raise AssertionError(f"pty child timed out; got so far: {out!r}")
+    proc.wait()
+    os.close(master)
+    err_bytes = Path(err_path).read_bytes() if err_path is not None else None
+    return proc.returncode, out, err_bytes
+
+
+def _title_env(fixture_env):
+    """Controlled host state for the title tests: fixed TERM, LOGNAME,
+    HOSTNAME, HOME and PWD; no PROMPT_COMMAND; colour left on (a pty is
+    a tty, so Portage colours there too)."""
+    env = dict(fixture_env)
+    env["TERM"] = "xterm-256color"
+    env["LOGNAME"] = "testuser"
+    env["HOSTNAME"] = "testhost.example.com"
+    env["HOME"] = "/home/testuser"
+    env["PWD"] = "/home/testuser/work"
+    for var in ("PROMPT_COMMAND", "NOCOLOR", "NO_COLOR"):
+        env.pop(var, None)
+    return env
+
+
+def test_terminal_title_set_and_reset_on_a_pty(emerge_binary, fixture_env):
+    """Portage 3.0.82.2 writes `\\x1b]0;<hostname>: emerge\\x07` to stderr
+    at the start and the reset title at the exit, only when stderr is a
+    tty, `$TERM` matches `portage/output.py:254-256` and `FEATURES`
+    lacks `notitles` (`output.py:261-288`, `actions.py:3694-3696`,
+    `main.py:1377-1382`, reset shape `output.py:291-332`). Captured live
+    on this host (staged fixtures, 120x40 pty): Portage prints
+    `\\x1b]0;portuale: emerge\\x07` then
+    `\\x1b]0;vivo@:~/repo/PORTUALE/pmtest\\x07`; portuale prints the
+    same two escapes (hostname from `gethostname(2)`, reset from the
+    test's own LOGNAME/HOSTNAME/HOME/PWD)."""
+    import socket
+
+    env = _title_env(fixture_env)
+    rc, out, _ = _run_on_pty([str(emerge_binary), "--pretend", "dev-libs/newpkg"], env)
+    assert rc == 0
+    assert b"\x1b]0;" + socket.gethostname().encode() + b": emerge\x07" in out
+    assert b"\x1b]0;testuser@testhost:~/work\x07" in out
+
+
+def test_terminal_title_absent_without_a_tty_gates(emerge_binary, fixture_env, tmp_path):
+    """The title gates, one by one: piped stderr/stdout (no tty at all),
+    a pty with `TERM=dumb`, a pty with `FEATURES=notitles`, and a pty
+    stdout with stderr to a file -- none emits `\\x1b]0;` (Portage
+    `output.py:261-288`, verified against Portage on the same cells).
+    The run itself is unaffected (rc 0, merge row intact)."""
+    # Piped: the contract suite's normal shape -- nothing on either stream.
+    piped = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
+    assert piped.returncode == 0
+    assert "\x1b]0;" not in piped.stdout
+    assert "\x1b]0;" not in piped.stderr
+
+    base = _title_env(fixture_env)
+    argv = [str(emerge_binary), "--pretend", "dev-libs/newpkg"]
+    dumb = dict(base, TERM="dumb")
+    rc, out, _ = _run_on_pty(argv, dumb)
+    assert rc == 0
+    assert b"\x1b]0;" not in out
+    notitles = dict(base, FEATURES="notitles")
+    rc, out, _ = _run_on_pty(argv, notitles)
+    assert rc == 0
+    assert b"\x1b]0;" not in out
+    err_path = tmp_path / "stderr.txt"
+    rc, out, err_bytes = _run_on_pty(argv, base, err_path=err_path)
+    assert rc == 0
+    assert b"\x1b]0;" not in out
+    assert b"\x1b]0;" not in err_bytes
+
+
 def test_portage_action_not_implemented_message_says_action_not_option(emerge_binary, fixture_env):
     """--moo is a Portage emerge action (see main.py's actions frozenset),
     not an option -- the error must say "action". (--search/--depclean/
@@ -27732,12 +27974,12 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
 # ROOT value is recomputed here -- identical to the fixture's
 # (`conftest.FIXTURES_ROOT`, the committed fixtures tree).
 _AUB0_ROOT = str(Path(__file__).resolve().parent.parent / "fixtures")
-_AUB0_TEXT_0 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 0/20).\n\n'
+_AUB0_TEXT_0 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 0/20).\n\n'
 _AUB0_TEXT_1 = '\nemerge: there are no ebuilds built with USE flags to satisfy "dev-libs/aub0d[-foo]".\n!!! One of the following packages is required to complete your request:\n- dev-libs/aub0d-0::testrepo (Change USE: -foo)\n(dependency required by "dev-libs/aub0a-0::testrepo" [ebuild])\n(dependency required by "dev-libs/aub0a" [argument])\n'
-_AUB0_TEXT_2 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n'
-_AUB0_TEXT_3 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_4 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_5 = 'These are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 1/20).\n\n'
+_AUB0_TEXT_2 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n'
+_AUB0_TEXT_3 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_4 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_5 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 1/20).\n\n'
 _AUB0_TEXT_6 = f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_7 = '\nThe following USE changes are necessary to proceed:\n (see "package.use" in the portage(5) man page for more details)\n# required by dev-libs/aub0a-0::testrepo\n# required by dev-libs/aub0a (argument)\n=dev-libs/aub0d-0 -foo\n\n * In order to avoid wasting time, backtracking has terminated early\n * due to the above autounmask change(s). The --autounmask-backtrack=y\n * option can be used to force further backtracking, but there is no\n * guarantee that it will produce a solution.\n'
 _AUB0_TEXT_8 = f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
