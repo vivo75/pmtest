@@ -197,6 +197,12 @@ def test_repos_conf_section_order_does_not_change_output(emerge_binary, fixture_
     def one(item):
         args, rc = item
         runs = [_run(emerge_binary, args, fixture_env), _run(emerge_binary, args, env)]
+        # Backlog #462: the unmask block names the masking file by absolute
+        # configroot path (`# <configroot>/etc/portage/package.mask:`), so
+        # the copy's path is normalized before comparing -- section order,
+        # not the configroot location, is what this test varies.
+        runs[1].stdout = runs[1].stdout.replace(str(configroot), fixture_env["PORTAGE_CONFIGROOT"])
+        runs[1].stderr = runs[1].stderr.replace(str(configroot), fixture_env["PORTAGE_CONFIGROOT"])
         problem = _same_and_sane(runs, rc)
         return " ".join(args), None if problem is None else [
             "output differs with repos.conf sections reversed"
