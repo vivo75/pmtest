@@ -7843,6 +7843,48 @@ def test_emerge_resume_skipfirst_on_a_one_item_list_matches_portage(emerge_binar
     assert json.loads(mtimedb.read_text())["resume"]["mergelist"] == []
 
 
+def test_emerge_binary_merge_uses_the_entrys_package_env_portage_tmpdir(
+    emerge_binary, tmp_path
+):
+    """Backlog #467 (Portage `_emerge/Binpkg.py::_start`: the build dir is
+    `settings["PORTAGE_TMPDIR"]/portage/<cat>/<pf>` after `setcpv`, which
+    applies `package.env`; oracle `LLM/evidence/2026-10-21-r463/` -- host
+    `emerge` 3.0.82.2 on the f459 binpkg root): a `--usepkgonly` merge whose
+    `pkg_postinst` dies keeps its build dir, and names its log, under the
+    entry's own `PORTAGE_TMPDIR`, not the run-wide one. The matched
+    directory need not exist (Portage creates it; `_check_temp_dir` is an
+    `EbuildBuild`-only step). The calling environment carries no
+    `PORTAGE_TMPDIR`: it would beat `package.env` on both sides."""
+    import shutil
+
+    cfg = tmp_path / "cfg467"
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    run_tmp = tmp_path / "run-tmp"
+    entry_tmp = tmp_path / "entry-tmp"
+    (cfg / "etc/portage/env/penv-tmp467").write_text(f'PORTAGE_TMPDIR="{entry_tmp}"\n')
+    with (cfg / "etc/portage/package.env").open("a") as fh:
+        fh.write("dev-util/f459-postinstfail penv-tmp467\n")
+    with (cfg / "etc/portage/make.conf").open("a") as fh:
+        fh.write(f'PORTAGE_TMPDIR="{run_tmp}"\n')
+    root = tmp_path / "root467"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env.pop("PORTAGE_TMPDIR", None)
+
+    r = subprocess.run(
+        [str(emerge_binary), "-q", "--usepkgonly", "dev-util/f459-postinstfail"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, r.stderr
+    log = entry_tmp / "portage/dev-util/f459-postinstfail-1/temp/build.log"
+    assert f">>>  '{log}'\n" in r.stdout, r.stdout
+    assert log.parent.is_dir()
+    assert not (run_tmp / "portage").exists()
+
+
 def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     """Backlog #179: Portage `_emerge/actions.py` returns from the
     `--pretend` branch (`display(...)`, `return os.EX_OK`) before
