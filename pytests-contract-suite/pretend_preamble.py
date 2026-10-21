@@ -40,3 +40,20 @@ def strip_pretend_preamble(text: str) -> str:
             return text
         i += 3
     return "\n".join(lines[i:])
+
+
+_ZERO_SIZE_ROW = re.compile(r"^\[(ebuild|binary)")
+
+
+def strip_zero_size_suffix(text: str) -> str:
+    """Backlog #469: under `-v` every merge row ends with the download size, `0 KiB`
+    when nothing is fetched (Portage `output.py::verbose_size`). The older `-pv`
+    pins describe the rows without it; this removes a trailing `0 KiB` from them."""
+    out = []
+    for line in text.split("\n"):
+        if _ZERO_SIZE_ROW.match(_ANSI.sub("", line)) and line.endswith(" 0 KiB"):
+            line = line[: -len("0 KiB")]
+            if not line.rstrip(" ").endswith('"'):
+                line = line.rstrip(" ")
+        out.append(line)
+    return "\n".join(out)

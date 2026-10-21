@@ -43,7 +43,7 @@ from pathlib import Path
 import pytest
 
 import corpus
-from pretend_preamble import strip_pretend_preamble
+from pretend_preamble import strip_pretend_preamble, strip_zero_size_suffix
 
 # (description, args, expected_exit_code) -- exit codes: 0 success,
 # 1 resolution/parse error OR autounmask config change still needed
@@ -3114,8 +3114,19 @@ def _root_suffix(env: dict[str, str]) -> str:
 # (rc != 0) and `--autounmask-only` keep the raw text: their pins show the preamble.
 def _rows_view(args: list[str], result: subprocess.CompletedProcess) -> subprocess.CompletedProcess:
     result.full_stdout = result.stdout
+    result.full_stderr = result.stderr
     if result.returncode == 0 and "--autounmask-only" not in args:
-        result.stdout = strip_pretend_preamble(result.stdout)
+        result.stdout = strip_zero_size_suffix(strip_pretend_preamble(result.stdout))
+    elif (
+        result.returncode != 0
+        and re.search(r"there are no (ebuilds|binary packages) to satisfy", result.stderr)
+        and "(dependency required by" not in result.stderr
+    ):
+        # Backlog #470: a top-level plain miss prints the preamble and a blank line before
+        # the `emerge:` line; its older pins describe the error line itself.
+        result.stdout = strip_zero_size_suffix(strip_pretend_preamble(result.stdout))
+        if result.stderr.startswith("\nemerge: there are no"):
+            result.stderr = result.stderr[1:]
     return result
 
 
@@ -4827,6 +4838,46 @@ def test_pretend_success_prints_the_resolution_preamble_like_portage(emerge_bina
         "\nThese are the packages that would be merged, in reverse order:\n\n" + calc
     )
     assert run("--autounmask-only", "dev-libs/newpkg") == ""
+
+
+def test_pv_rows_end_with_the_download_size_like_portage(emerge_binary, fixture_env):
+    """Backlog #469 (Portage `resolver/output.py::verbose_size`; oracle: host
+    `emerge` 3.0.82.2 `-pv --oneshot --nodeps app-misc/mc dev-vcs/git`, rows ending
+    `2368 KiB` / `48250 KiB`, and `LLM/evidence/2026-10-21-r468/` on a no-distfile
+    root, rows ending `0 KiB`): under `-v` every merge row ends with the bytes still
+    to fetch, `0 KiB` when there are none; plain `-p` rows carry no size."""
+    def rows(*args):
+        r = subprocess.run([str(emerge_binary), "--pretend", *args], capture_output=True,
+                           text=True, env=fixture_env, check=False)
+        assert r.returncode == 0, r.stderr
+        return [l for l in r.stdout.splitlines() if l.startswith("[ebuild")]
+
+    assert rows("-v", "dev-libs/newpkg")[0].endswith(f'{fixture_env["ROOT"]} 0 KiB')
+    assert rows("dev-libs/newpkg")[0].endswith(fixture_env["ROOT"])
+
+
+def test_top_level_miss_prints_the_preamble_and_similar_names_like_portage(emerge_binary, fixture_env):
+    """Backlog #470 (oracle: host `emerge` 3.0.82.2, `LLM/evidence/2026-10-21-r468/`):
+    a top-level atom nothing carries prints the resolution preamble on stdout, then
+    a blank line and `emerge: there are no ebuilds to satisfy ...` on stderr, then
+    `emerge: searching for similar names...`; a bare name gets the same treatment
+    (its close matches are package names). `--quiet` drops the preamble, `--nodeps`
+    the calculation lines; `--misspell-suggestions=n` drops the similar names."""
+    def run(*args):
+        return subprocess.run([str(emerge_binary), "--pretend", *args], capture_output=True,
+                              text=True, env=fixture_env, check=False)
+
+    banner = "\nThese are the packages that would be merged, in order:\n\n"
+    calc = "Calculating dependencies ... done!\nDependency resolution took (backtrack: 0/20).\n\n"
+    for atom in ("dev-libs/nosuchpkg", "nosuchpkg"):
+        r = run(atom)
+        assert r.returncode == 1
+        assert r.stdout == banner + calc
+        assert r.stderr.startswith(f'\nemerge: there are no ebuilds to satisfy "{atom}"')
+        assert "\n\nemerge: searching for similar names..." in r.stderr
+    assert run("--quiet", "nosuchpkg").stdout == ""
+    assert run("--nodeps", "nosuchpkg").stdout == banner
+    assert "similar names" not in run("--misspell-suggestions=n", "nosuchpkg").stderr
 
 
 def test_diamond_dependency_is_deduped_and_ordered(emerge_binary, fixture_env):
@@ -9356,11 +9407,11 @@ def test_autounmask_flip_revealed_disjunction_defers_to_the_drained_graph(
         "Calculating dependencies ... done!",
         "Dependency resolution took (backtrack: 0/20).",
         "",
-        f'[ebuild  N     ] dev-libs/pg398-y-1::testrepo to {fixture_env["ROOT"]}',
-        f'[ebuild  N     ] dev-libs/pg398-a-1::testrepo to {fixture_env["ROOT"]} USE="flip" ',
-        f'[ebuild  N     ] dev-libs/pg398-b-1::testrepo to {fixture_env["ROOT"]}',
-        f'[ebuild  N     ] dev-libs/pg398-c-1::testrepo to {fixture_env["ROOT"]}',
-        f'[ebuild  N     ] dev-libs/pg398-t-1::testrepo to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/pg398-y-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
+        f'[ebuild  N     ] dev-libs/pg398-a-1::testrepo to {fixture_env["ROOT"]} USE="flip" 0 KiB',
+        f'[ebuild  N     ] dev-libs/pg398-b-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
+        f'[ebuild  N     ] dev-libs/pg398-c-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
+        f'[ebuild  N     ] dev-libs/pg398-t-1::testrepo to {fixture_env["ROOT"]} 0 KiB',
         "",
         "Total: 5 packages (5 new), Size of downloads: 0 KiB",
     ]
@@ -17029,7 +17080,7 @@ def test_bundled_verbose_never_consumes_the_next_token_as_its_value(
     (Portage dep_expand), not by "n" silently disabling verbose."""
     result = _run([str(emerge_binary)], ["-pv", "n"], fixture_env)
     assert result.returncode == 1
-    assert result.stderr.strip() == 'emerge: there are no ebuilds to satisfy "n".'
+    assert result.stderr.strip().splitlines()[0] == 'emerge: there are no ebuilds to satisfy "n".'
 
 
 def test_help_prints_a_pilot_specific_summary_not_portage_emerges_own(
@@ -21985,7 +22036,7 @@ def test_bare_name_with_no_match_reports_no_ebuilds(
     with the message)."""
     r = _run([str(emerge_binary)], ["--pretend", "nosuchpkgname"], fixture_env)
     assert r.returncode == 1
-    assert r.stderr.strip() == 'emerge: there are no ebuilds to satisfy "nosuchpkgname".'
+    assert r.stderr.strip().splitlines()[0] == 'emerge: there are no ebuilds to satisfy "nosuchpkgname".'
 
 
 def _check_news_isolated_root(fixture_env, tmp_path, name="root"):
@@ -26387,7 +26438,7 @@ def test_oracle_80_unresolved_scan_collected_row_has_a_trailing_home(
         env,
     )
     assert verbose.returncode == 1
-    assert strip_pretend_preamble(verbose.stdout).splitlines() == [
+    assert strip_zero_size_suffix(strip_pretend_preamble(verbose.stdout)).splitlines() == [
         f'[ebuild     U  ] dev-libs/nomtarget-1.5::testrepo [1.0::testrepo] to {root}',
         '[blocks B      ] <dev-libs/nomtarget-2.0 ("<dev-libs/nomtarget-2.0" is '
         "soft blocking dev-libs/nomowner-1.0)",
@@ -26916,7 +26967,7 @@ def test_oracle_b2c_uninstall_resolved_block_sees_the_complete_mode_sets(
         _b1_env(fixture_env, root),
     )
     assert result.returncode == 1
-    assert strip_pretend_preamble(result.stdout).splitlines() == [
+    assert strip_zero_size_suffix(strip_pretend_preamble(result.stdout)).splitlines() == [
         f'[ebuild  N     ] dev-libs/bparent-1.0::testrepo to {root}',
         '[blocks B      ] <dev-libs/blocked-2.0 ("<dev-libs/blocked-2.0" is soft '
         "blocking dev-libs/bparent-1.0)",

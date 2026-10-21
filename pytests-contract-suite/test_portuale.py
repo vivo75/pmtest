@@ -27,7 +27,7 @@ from pathlib import Path
 
 import pytest
 
-from pretend_preamble import strip_pretend_preamble
+from pretend_preamble import strip_pretend_preamble, strip_zero_size_suffix
 
 FIXTURES_ROOT = str(Path(__file__).resolve().parents[1] / "fixtures")
 
@@ -544,7 +544,7 @@ def test_solver_backends_render_forced_flag_markers(emerge_binary, fixture_env):
             env=fixture_env,
         )
         assert result.returncode == 0, solver
-        assert strip_pretend_preamble(result.stdout) == expected, solver
+        assert strip_zero_size_suffix(strip_pretend_preamble(result.stdout)) == expected, solver
 
 
 def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, fixture_env):
@@ -7836,6 +7836,11 @@ def test_emerge_resume_skipfirst_on_a_one_item_list_matches_portage(emerge_binar
     assert r.stdout.rstrip().endswith(nothing)
     assert len(json.loads(mtimedb.read_text())["resume"]["mergelist"]) == 1
 
+    # #471: the `--quiet` row column is one space narrower, resume or not.
+    r = emerge("--pretend", "--quiet", "--resume")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.startswith("[ebuild  N    ] dev-libs/schedbad-1.0 to"), r.stdout
+
     r = emerge("--pretend", "--quiet", "--resume", "--skipfirst")
     assert (r.returncode, r.stdout.strip(), r.stderr) == (0, nothing, "")
 
@@ -12677,6 +12682,11 @@ def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
         in out
     )
     assert "Failed to emerge" not in out
+    # #468: the die block ends with the build-log line and the red
+    # ` * FAILED postinst: 1` bullet has no stray space (host `emerge`
+    # 3.0.82.2, `LLM/evidence/2026-10-21-r468/`).
+    assert f"The complete build log is located at '{ptdir}/portage/dev-util/f459-postinstfail-1/temp/build.log'." in out
+    assert "\x1b[31;01m * \x1b[39;49;00mFAILED postinst: 1" in out
     assert "FAILED postinst: 1" in out
     # The follow-up fix in this slice: binary hooks export
     # `PORTAGE_REPO_NAME`, so the `die` handler names the repo (was an
@@ -12685,7 +12695,7 @@ def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
     # The binary hooks run with the binpkg record's repo, like real's
     # `doebuild_environment` (`PORTAGE_REPO_NAME`), so the `die` handler
     # names it (`isolated-functions.sh`).
-    assert "::testrepo failed (postinst phase)" in r.stderr
+    assert "::testrepo failed (postinst phase)" in out
     assert out.count("Messages for package dev-util/f459-postinstfail-1") == 1
     assert "Recording dev-util/f459-postinstfail" not in out
     assert "dev-util/f459-postinstfail" not in (
