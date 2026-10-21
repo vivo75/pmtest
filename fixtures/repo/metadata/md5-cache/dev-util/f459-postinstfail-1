@@ -1,0 +1,6 @@
+DEFINED_PHASES=install postinst
+DESCRIPTION=fixture package: failing binary pkg_postinst endgame (f459-postinstfail)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=7cfd07472ded0e43c1422f58f6881bf0

@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: independent binary merge (f459-good)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=0335c70e61dc708be459e1fbb376e28d
