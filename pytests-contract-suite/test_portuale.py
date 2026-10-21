@@ -7784,6 +7784,65 @@ def test_emerge_resume_stays_quiet_after_a_quiet_run_like_portage(emerge_binary,
     assert ">>> Completed (1 of 1) dev-libs/schedok-1.0" in r.stdout
 
 
+def test_emerge_resume_skipfirst_on_a_one_item_list_matches_portage(emerge_binary, tmp_path):
+    """Backlog #464 (+ the no-list case found while probing it; Portage
+    `_emerge/actions.py::action_build`; oracle `LLM/evidence/2026-10-21-r463/`
+    -- host `emerge` 3.0.82.2 on a one-entry resume list):
+    `--resume --skipfirst` empties the list and Portage still re-resolves it.
+    A merge run prints `Calculating dependencies`, `*** Resuming merge...`,
+    exits 0 and re-saves the EMPTY list; `--pretend` prints the banner, the
+    calculation and `emerge: It seems we have nothing to resume...`, leaving
+    the saved list alone; `--pretend --quiet` prints only that message. With
+    no resume list at all, `--resume` prints the same message on stdout and
+    exits 0 (portuale used to exit 1 with an stderr line)."""
+    import json
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
+    (root / "var/lib/portage/world").write_text("")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
+    mtimedb = root / "var/cache/edb/mtimedb"
+    nothing = "emerge: It seems we have nothing to resume..."
+
+    def emerge(*args):
+        return subprocess.run(
+            [str(emerge_binary), *args],
+            capture_output=True, text=True, check=False, env=env,
+        )
+
+    r = emerge("--resume")
+    assert (r.returncode, r.stdout.strip(), r.stderr) == (0, nothing, "")
+
+    r = emerge("--oneshot", "dev-libs/schedbad")
+    assert r.returncode == 1
+    assert [x[2] for x in json.loads(mtimedb.read_text())["resume"]["mergelist"]] == [
+        "dev-libs/schedbad-1.0"
+    ]
+
+    r = emerge("--pretend", "--resume", "--skipfirst")
+    assert r.returncode == 0, r.stderr
+    assert "These are the packages that would be merged, in order:" in r.stdout
+    assert "Calculating dependencies ... done!" in r.stdout
+    assert r.stdout.rstrip().endswith(nothing)
+    assert len(json.loads(mtimedb.read_text())["resume"]["mergelist"]) == 1
+
+    r = emerge("--pretend", "--quiet", "--resume", "--skipfirst")
+    assert (r.returncode, r.stdout.strip(), r.stderr) == (0, nothing, "")
+
+    r = emerge("--resume", "--skipfirst")
+    assert r.returncode == 0, r.stderr
+    assert "Calculating dependencies ... done!" in r.stdout
+    assert r.stdout.rstrip().endswith("*** Resuming merge...")
+    assert nothing not in r.stdout
+    assert json.loads(mtimedb.read_text())["resume"]["mergelist"] == []
+
+
 def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     """Backlog #179: Portage `_emerge/actions.py` returns from the
     `--pretend` branch (`display(...)`, `return os.EX_OK`) before
