@@ -43,6 +43,7 @@ from pathlib import Path
 import pytest
 
 import corpus
+from pretend_preamble import strip_pretend_preamble
 
 # (description, args, expected_exit_code) -- exit codes: 0 success,
 # 1 resolution/parse error OR autounmask config change still needed
@@ -3106,6 +3107,18 @@ def _root_suffix(env: dict[str, str]) -> str:
     return "" if root == running else f" for {root}/"
 
 
+# Backlog #466: a completed `--pretend` resolve prints Portage's resolution preamble
+# before the merge rows (`pretend_preamble.py`). The hundreds of older pins below
+# describe the ROWS, so `_run` hands them the stdout of an exit-0 call with that
+# preamble removed and keeps the raw text on `result.full_stdout`. A failing resolve
+# (rc != 0) and `--autounmask-only` keep the raw text: their pins show the preamble.
+def _rows_view(args: list[str], result: subprocess.CompletedProcess) -> subprocess.CompletedProcess:
+    result.full_stdout = result.stdout
+    if result.returncode == 0 and "--autounmask-only" not in args:
+        result.stdout = strip_pretend_preamble(result.stdout)
+    return result
+
+
 def _run(cmd: list[str], args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
     global _LAST_ROOT_SUFFIX
     _LAST_ROOT_SUFFIX = _root_suffix(env)
@@ -3115,7 +3128,7 @@ def _run(cmd: list[str], args: list[str], env: dict[str, str]) -> subprocess.Com
     # Every call is replayed against the corpus harvested before the
     # Python reference was removed (pytests-contract-suite/corpus.py): drift is a warning.
     result.corpus_key, result.corpus_drift = corpus.check_contract_call(args, env, result)
-    return result
+    return _rows_view(args, result)
 
 
 def _assert_harvested(result: subprocess.CompletedProcess) -> None:
@@ -4790,6 +4803,30 @@ def test_root_deps_recursion_reports_an_unbuildable_build_dep(
     _assert_abort_preamble(rust.stdout)
     assert 'there are no ebuilds to satisfy "dev-libs/rdrnothere"' in rust.stderr
     assert "no visible ebuild" not in rust.stderr
+
+
+def test_pretend_success_prints_the_resolution_preamble_like_portage(emerge_binary, fixture_env):
+    """Backlog #466 (oracle: host `emerge` 3.0.82.2, `LLM/evidence/2026-10-21-r463/`):
+    a completed `--pretend` resolve prints the banner, `Calculating dependencies ...
+    done!` and the timing line before the rows -- the last two absent under
+    `--nodeps`, all three under `--quiet`; `--tree` says `in reverse order`, and
+    `--buildpkgonly` says `built`. `--autounmask-only` with nothing to report stays silent."""
+    def run(*args):
+        r = subprocess.run([str(emerge_binary), "--pretend", *args], capture_output=True,
+                           text=True, env=fixture_env, check=False)
+        assert r.returncode == 0, r.stderr
+        return r.stdout
+
+    banner = "\nThese are the packages that would be merged, in order:\n\n"
+    calc = "Calculating dependencies ... done!\nDependency resolution took (backtrack: 0/20).\n\n"
+    row = f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}\n'
+    assert run("dev-libs/newpkg") == banner + calc + row
+    assert run("--nodeps", "dev-libs/newpkg") == banner + row
+    assert run("--quiet", "dev-libs/newpkg") == row.replace("N     ]", "N    ]")
+    assert run("--tree", "dev-libs/newpkg").startswith(
+        "\nThese are the packages that would be merged, in reverse order:\n\n" + calc
+    )
+    assert run("--autounmask-only", "dev-libs/newpkg") == ""
 
 
 def test_diamond_dependency_is_deduped_and_ordered(emerge_binary, fixture_env):
@@ -14844,7 +14881,7 @@ def test_upstream_blocker_pg1_buildpkgonly_gate(emerge_binary, fixture_env):
     for pkg in ("dev-libs/blk1a", "dev-libs/blk1b"):
         run = _run([str(emerge_binary)], ["--pretend", "--buildpkgonly", pkg], env)
         assert run.returncode == 1
-        assert run.stdout.splitlines() == [
+        assert strip_pretend_preamble(run.stdout).splitlines() == [
             f"[ebuild  N     ] {pkg}-1 to {fixture_env['ROOT']}",
             f'[uninstall     ] dev-libs/blk1x-1 to {fixture_env["ROOT"]}',
             f'[blocks b      ] dev-libs/blk1x ("dev-libs/blk1x" is hard blocking {pkg}-1)',
@@ -14872,7 +14909,7 @@ def test_weak_blocker_matches_another_new_package_in_the_same_graph(emerge_binar
         [str(emerge_binary)], ["--pretend", "dev-libs/graphblockerparent"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines() == [
+    assert strip_pretend_preamble(result.stdout).splitlines() == [
         f'[ebuild  N     ] dev-libs/blockerpartnerpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/weakblockerpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/graphblockerparent-1.0 to {fixture_env["ROOT"]}',
@@ -14990,7 +15027,7 @@ def test_oracle_b4_satisfied_blocker_prints_after_the_uninstall_row(
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines() == [
+    assert strip_pretend_preamble(result.stdout).splitlines() == [
         f'[ebuild  N     ] dev-libs/blockerpartnerpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/weakblockerpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/graphblockerparent-1.0 to {fixture_env["ROOT"]}',
@@ -15569,7 +15606,7 @@ def test_buildpkgonly_reports_the_merge_list_then_the_portage_error(
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines() == [
+    assert strip_pretend_preamble(result.stdout).splitlines() == [
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/dualdep-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -16069,7 +16106,7 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         fixture_env,
     )
     assert r0.returncode == 1
-    assert r0.stdout.splitlines()[:5] == [
+    assert strip_pretend_preamble(r0.stdout).splitlines()[:5] == [
         f'[ebuild  N     ] dev-libs/bttarget-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/bttarget-2.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/btconsumer-2.0 to {fixture_env["ROOT"]}',
@@ -16113,7 +16150,7 @@ def test_unsolvable_slot_conflict_survives_backtracking_and_is_reported(
         [str(emerge_binary)], ["--pretend", "dev-libs/slotconflictunsolvable"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines()[:5] == [
+    assert strip_pretend_preamble(result.stdout).splitlines()[:5] == [
         f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/slotconflicttarget-2.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 to {fixture_env["ROOT"]}',
@@ -16280,7 +16317,7 @@ def test_slot_conflict_use_reason_keys_unconditional_before_violated(
     assert rust.returncode == 1
     assert rust.stderr == ''
     out = rust.stdout
-    assert out.splitlines()[:6] == [
+    assert strip_pretend_preamble(out).splitlines()[:6] == [
         f'[ebuild  N     ] dev-libs/slotusetarget-1.0 to {fixture_env["ROOT"]} USE="x y" ',
         f'[ebuild  N     ] dev-libs/slotusetarget-2.0 to {fixture_env["ROOT"]} USE="(-x)" ',
         f'[ebuild  N     ] dev-libs/slotuseplain-1.0 to {fixture_env["ROOT"]}',
@@ -16581,7 +16618,7 @@ def test_multiple_top_level_atoms_report_an_unsolvable_slot_conflict_between_tar
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines()[:4] == [
+    assert strip_pretend_preamble(result.stdout).splitlines()[:4] == [
         f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/slotconflicttarget-2.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/slotconflictnewpin-1.0 to {fixture_env["ROOT"]}',
@@ -20270,7 +20307,7 @@ def test_keeper_reachable_pin_breaks_an_explicit_upgrade_and_reports_it(
     args = ["--pretend", "=dev-libs/paired-2.0"]
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines()[:1] == [
+    assert strip_pretend_preamble(rust.stdout).splitlines()[:1] == [
         f'[ebuild     U  ] dev-libs/paired-2.0 [1.0] to {env["ROOT"]}',
     ]
     _assert_residual_slot_conflict_block(
@@ -20297,7 +20334,7 @@ def test_keeper_reachable_pin_breaks_a_hard_dependency_requirement_and_reports_i
     args = ["--pretend", "dev-libs/needer"]
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines()[:2] == [
+    assert strip_pretend_preamble(rust.stdout).splitlines()[:2] == [
         f'[ebuild     U  ] dev-libs/paired-2.0 [1.0] to {env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/needer-1.0 to {env["ROOT"]}',
     ]
@@ -20326,7 +20363,7 @@ def test_keeper_reachable_needer_triangle_reports_the_installed_instance_with_bo
     args = ["--pretend", "dev-libs/needer", "dev-libs/othermod"]
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines()[:3] == [
+    assert strip_pretend_preamble(rust.stdout).splitlines()[:3] == [
         f'[ebuild     U  ] dev-libs/paired-2.0 [1.0] to {env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/needer-1.0 to {env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/othermod-1.0 to {env["ROOT"]}',
@@ -26337,7 +26374,7 @@ def test_oracle_80_unresolved_scan_collected_row_has_a_trailing_home(
         env,
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines() == [
+    assert strip_pretend_preamble(result.stdout).splitlines() == [
         f'[ebuild     U  ] dev-libs/nomtarget-1.5 [1.0] to {root}',
         '[blocks B      ] <dev-libs/nomtarget-2.0 ("<dev-libs/nomtarget-2.0" is '
         "soft blocking dev-libs/nomowner-1.0)",
@@ -26350,7 +26387,7 @@ def test_oracle_80_unresolved_scan_collected_row_has_a_trailing_home(
         env,
     )
     assert verbose.returncode == 1
-    assert verbose.stdout.splitlines() == [
+    assert strip_pretend_preamble(verbose.stdout).splitlines() == [
         f'[ebuild     U  ] dev-libs/nomtarget-1.5::testrepo [1.0::testrepo] to {root}',
         '[blocks B      ] <dev-libs/nomtarget-2.0 ("<dev-libs/nomtarget-2.0" is '
         "soft blocking dev-libs/nomowner-1.0)",
@@ -26544,7 +26581,7 @@ def test_oracle_150_tree_shared_child_nests_without_a_nomerge_ancestor(
     assert result.returncode == 1
     # The six merge rows come first (the slot-conflict notice follows;
     # its bytes are #148's standing pin, not this one's).
-    assert result.stdout.splitlines()[:6] == [
+    assert strip_pretend_preamble(result.stdout).splitlines()[:6] == [
         f'[ebuild  N     ] dev-libs/slotusegroup-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]  dev-libs/slotuseplain-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ]   dev-libs/slotusetarget-2.0 to {fixture_env["ROOT"]} USE="(-x)" ',
@@ -26879,7 +26916,7 @@ def test_oracle_b2c_uninstall_resolved_block_sees_the_complete_mode_sets(
         _b1_env(fixture_env, root),
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines() == [
+    assert strip_pretend_preamble(result.stdout).splitlines() == [
         f'[ebuild  N     ] dev-libs/bparent-1.0::testrepo to {root}',
         '[blocks B      ] <dev-libs/blocked-2.0 ("<dev-libs/blocked-2.0" is soft '
         "blocking dev-libs/bparent-1.0)",
@@ -27715,7 +27752,7 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
     ]
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
-    assert rust.stdout.splitlines()[:1] == [
+    assert strip_pretend_preamble(rust.stdout).splitlines()[:1] == [
         f'[ebuild     U  ] dev-libs/r25lib-2.0 [1.0] to {env["ROOT"]}',
     ]
     _assert_residual_slot_conflict_block(
