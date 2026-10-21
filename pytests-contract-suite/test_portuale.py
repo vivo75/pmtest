@@ -12392,3 +12392,84 @@ def test_emerge_merges_an_idepend_dep_into_the_running_root_only_when_allowed(
     for pkg in ("topidepapp-1.0", "topideplib-1.0"):
         assert (root / f"var/db/pkg/dev-libs/{pkg}/CONTENTS").is_file()
         assert not (running / f"var/db/pkg/dev-libs/{pkg}").exists()
+
+
+def test_emerge_buildpkgonly_skips_noop_source_phases_like_portage(emerge_binary, tmp_path):
+    """Backlog #458 (Portage `_emerge/EbuildBuild.py` -> `EbuildExecuter._can_skip_source_phases`;
+    oracle `LLM/evidence/2026-10-21-f458/` -- host `emerge` 3.0.82.2
+    `--buildpkgonly dev-libs/schedparent`, default / `--quiet-build=n` cells):
+    Portage's scheduler-driven `--buildpkgonly` goes through `EbuildExecuter`,
+    so it skips unpack/prepare/configure/compile/test for a sourceless package
+    exactly like a merge does (#456) -- the `>>> Unpacking source...`,
+    `>>> Source unpacked/prepared/configured/compiled` and
+    `>>> Test phase [not enabled]` lines never print (on default and on
+    explicit `--quiet-build=n`; both oracle cells are byte-identical there).
+    `>>> Emerging`, `>>> Install ... into`, `>>> Completed installing ...`,
+    the `Final size` lines and `>>> Creating binpkg` / `>>> Done.` stay, and
+    the binpkg still lands in PKGDIR. Under `--buildpkgonly` without `--deep`
+    Portage drops RDEPEND, so only `schedparent` itself builds (1 of 1)."""
+    skipped_markers = (
+        ">>> Unpacking source...",
+        ">>> Source unpacked in ",
+        ">>> Preparing source",
+        ">>> Source prepared.",
+        ">>> Configuring source",
+        ">>> Source configured.",
+        ">>> Compiling source",
+        ">>> Source compiled.",
+        ">>> Test phase [not enabled]",
+    )
+
+    for n, args in enumerate(([], ["--quiet-build=n"])):
+        basedir = tmp_path / f"skip{n}"
+        basedir.mkdir(parents=True, exist_ok=True)
+        env = _real_build_env(basedir)
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--buildpkgonly", "dev-libs/schedparent"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, (args, r.stdout, r.stderr)
+        out = r.stdout
+        for marker in skipped_markers:
+            assert marker not in out, f"{args}: {marker!r} printed"
+        assert ">>> Emerging (1 of 1) dev-libs/schedparent-1.0" in out, args
+        assert ">>> Install dev-libs/schedparent-1.0 into " in out, args
+        assert ">>> Completed installing dev-libs/schedparent-1.0 into " in out, args
+        # `>>> Creating binpkg` / `>>> Done.` come from `__dyn_package`'s
+        # `__vecho` (stderr), where Portage prints them on stdout --
+        # a pre-existing stream split, out of scope for #458, so pinned
+        # on the combined stream.
+        assert ">>> Creating binpkg" in r.stdout + r.stderr, args
+        assert ">>> Done." in r.stdout + r.stderr, args
+        pkgdir = Path(env["PKGDIR"])
+        assert (pkgdir / "dev-libs/schedparent-1.0.gpkg.tar").is_file() or any(
+            pkgdir.rglob("schedparent-1.0.*")
+        ), f"{args}: no binpkg for schedparent in {pkgdir}"
+
+
+def test_emerge_buildpkgonly_quiet_build_n_still_shows_phases_for_source_packages(
+    emerge_binary, tmp_path
+):
+    """Backlog #458 guard (same oracle + Portage
+    `_emerge/EbuildExecuter.py::_can_skip_source_phases`): like the #456
+    merge guard, a package that defines one of the skippable phases
+    (`dev-libs/unsetcflagspkg` defines `src_compile`) still runs the full
+    chain under `--buildpkgonly` -- `>>> Compiling source` prints on default
+    and on explicit `--quiet-build=n`."""
+    for n, args in enumerate(([], ["--quiet-build=n"])):
+        basedir = tmp_path / f"guard{n}"
+        basedir.mkdir(parents=True, exist_ok=True)
+        env = _real_build_env(basedir)
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--buildpkgonly", "dev-libs/unsetcflagspkg"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, (args, r.stdout, r.stderr)
+        assert ">>> Compiling source" in r.stdout, args
+        assert ">>> Source compiled." in r.stdout, args
