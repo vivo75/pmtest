@@ -12405,7 +12405,7 @@ def test_emerge_buildpkgonly_skips_noop_source_phases_like_portage(emerge_binary
     `>>> Test phase [not enabled]` lines never print (on default and on
     explicit `--quiet-build=n`; both oracle cells are byte-identical there).
     `>>> Emerging`, `>>> Install ... into`, `>>> Completed installing ...`,
-    the `Final size` lines and `>>> Creating binpkg` / `>>> Done.` stay, and
+    the `Final size` lines and `>>> Creating binpkg` / `>>> Done.` (stdout, #463) stay, and
     the binpkg still lands in PKGDIR. Under `--buildpkgonly` without `--deep`
     Portage drops RDEPEND, so only `schedparent` itself builds (1 of 1)."""
     skipped_markers = (
@@ -12438,12 +12438,13 @@ def test_emerge_buildpkgonly_skips_noop_source_phases_like_portage(emerge_binary
         assert ">>> Emerging (1 of 1) dev-libs/schedparent-1.0" in out, args
         assert ">>> Install dev-libs/schedparent-1.0 into " in out, args
         assert ">>> Completed installing dev-libs/schedparent-1.0 into " in out, args
-        # `>>> Creating binpkg` / `>>> Done.` come from `__dyn_package`'s
-        # `__vecho` (stderr), where Portage prints them on stdout --
-        # a pre-existing stream split, out of scope for #458, so pinned
-        # on the combined stream.
-        assert ">>> Creating binpkg" in r.stdout + r.stderr, args
-        assert ">>> Done." in r.stdout + r.stderr, args
+        # `__dyn_package`'s `__vecho` writes these to stderr, but Portage's
+        # phase logging pipe merges the child's streams, so they land on
+        # stdout there (oracle `LLM/evidence/2026-10-21-f458/portage.txt`;
+        # backlog #463).
+        assert ">>> Creating binpkg" in r.stdout, args
+        assert ">>> Done." in r.stdout, args
+        assert ">>> Creating binpkg" not in r.stderr, args
         pkgdir = Path(env["PKGDIR"])
         assert (pkgdir / "dev-libs/schedparent-1.0.gpkg.tar").is_file() or any(
             pkgdir.rglob("schedparent-1.0.*")
