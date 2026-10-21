@@ -3068,6 +3068,7 @@ CASES = [
     ("#453 B: --nospinner is a recognized no-op (Portage _emerge/main.py:37, rc 0 like Portage)", ["--pretend", "--nospinner", "dev-libs/newpkg"], 0),
     ("#453 A: --color=y colours the abort preamble, timing and masked block (maskedpkg, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/maskedpkg"], 1),
     ("#453 A: --color=y colours the missing-dependency block (missingdep, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/missingdep"], 1),
+    ("#462: --quiet --pretend --autounmask on a masked-only dep proposes the unmask with no header (maskneedpkg, rc 1 like Portage)", ["--quiet", "--pretend", "--autounmask", "dev-libs/maskneedpkg"], 1),
 ]
 
 
@@ -5211,6 +5212,12 @@ def test_or_group_resolves_a_use_unsatisfiable_but_unmasked_alternative(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/unsatusealt-1.0 to {fixture_env["ROOT"]} USE="unsatuseorflag" ',
         f'[ebuild  N     ] dev-libs/unsatuseor-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -5284,6 +5291,12 @@ def test_deep_walk_dispatches_or_group_through_the_same_unsat_use_bins_as_the_ma
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/unsatusealt-1.0 to {fixture_env["ROOT"]} USE="unsatuseorflag" ',
         f'[ebuild  N     ] dev-libs/unsatuseinstconsumer-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -5499,6 +5512,12 @@ def test_or_group_unsat_use_installed_bin_keys_on_the_targeted_slot_not_just_cp(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild   R    ] dev-libs/unsatuseslotother-1.0 to {fixture_env["ROOT"]} USE="unsatuseorflag*" ',
         f'[ebuild  N     ] dev-libs/unsatuseslot-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -5549,6 +5568,12 @@ def test_or_group_use_mask_violation_demotes_to_other_never_selected(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/unsatuseordertarget-1.0 to {fixture_env["ROOT"]} USE="unsatuseorflag unsatuseotherflag" ',
         f'[ebuild  N     ] dev-libs/unsatusemasked-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -6479,6 +6504,12 @@ def test_s4_eapi7_allows_use_dep_defaults(emerge_binary, tmp_path, fixtures_root
     result = _run([str(emerge_binary)], ["--pretend", "app-misc/t341-eapi7"], env)
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
         f'[ebuild  N     ] app-misc/t341-eapi7-1 to {env["ROOT"]}',
     ]
@@ -9032,6 +9063,12 @@ def test_s8_named_set_prints_validation_failed_after_merge_list(
     result = _run([str(emerge_binary)], ["--pretend", "@s341"], env)
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
     ]
     R = "<ROOT>"
@@ -9067,6 +9104,12 @@ def test_s8_selected_drops_bad_world_lines_silently(
     result = _run([str(emerge_binary)], ["--pretend", "@selected"], env)
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/t341-dep-1 to {env["ROOT"]} USE="x" ',
     ]
     R = "<ROOT>"
@@ -9120,6 +9163,12 @@ def test_autounmask_use_resolves_a_dependency_use_dep_mismatch(
     )
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
                                              f'[ebuild  N     ] dev-libs/useflagpkg-1.0 to {fixture_env["ROOT"]} USE="-foo -missingflag" ',
                                              f'[ebuild  N     ] dev-libs/usedeprejectedpkg-1.0 to {fixture_env["ROOT"]}',
                                          ]
@@ -9160,6 +9209,12 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/aucascleaf-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/aucascmid-1.0 to {fixture_env["ROOT"]} USE="cascade" ',
         f'[ebuild  N     ] dev-libs/aucasclate-1.0 to {fixture_env["ROOT"]}',
@@ -9179,6 +9234,12 @@ def test_autounmask_backward_cascade_re_resolves_an_already_resolved_slot(
     ab = ["--pretend", "--autounmask-backtrack=y", "dev-libs/aucasctop"]
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
     assert rust_ab.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 1/20).",
+        "",
         f'[ebuild  N     ] dev-libs/aucascleaf-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/aucascmid-1.0 to {fixture_env["ROOT"]} USE="cascade" ',
         f'[ebuild  N     ] dev-libs/aucasclate-1.0 to {fixture_env["ROOT"]}',
@@ -9252,6 +9313,12 @@ def test_autounmask_flip_revealed_disjunction_defers_to_the_drained_graph(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/pg398-y-1::testrepo to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/pg398-a-1::testrepo to {fixture_env["ROOT"]} USE="flip" ',
         f'[ebuild  N     ] dev-libs/pg398-b-1::testrepo to {fixture_env["ROOT"]}',
@@ -9276,7 +9343,18 @@ def test_autounmask_flip_revealed_disjunction_defers_to_the_drained_graph(
     ab = ["--pretend", "-v", "--autounmask-use=y", "--autounmask-backtrack=y", "dev-libs/pg398-t"]
     rust_ab = _run([str(emerge_binary)], ab, fixture_env)
     assert rust_ab.returncode == 1
-    assert rust_ab.stdout.splitlines() == rust.stdout.splitlines()
+    # Same five rows; only the timing line differs (the re-drive
+    # backtracked once, `backtrack: 1/20`, vs `0/20` without it).
+    ab_lines = rust_ab.stdout.splitlines()
+    assert ab_lines[:6] == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 1/20).",
+        "",
+    ]
+    assert ab_lines[6:] == rust.stdout.splitlines()[6:]
     assert rust_ab.stderr == (
         "\nThe following USE changes are necessary to proceed:\n"
         ' (see "package.use" in the portage(5) man page for more details)\n'
@@ -9322,6 +9400,12 @@ def test_autounmask_breakage_abandons_autounmask_when_a_flag_is_wanted_both_ways
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/aubreaksub-1.0 to {fixture_env["ROOT"]} USE="brk" ',
         f'[ebuild  N     ] dev-libs/aubreakwant-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/aubreakunwant-1.0 to {fixture_env["ROOT"]}',
@@ -9388,6 +9472,12 @@ def test_autounmask_keyword_backward_cascade_re_resolves_a_slot_to_a_masked_vers
     rust = _run([str(emerge_binary)], a, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N    ~] dev-libs/kwbackmid-2.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/kwbacktop-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -9420,6 +9510,12 @@ def test_autounmask_levels_unmask_two_categories_at_once_on_the_same_version(
     rust = _run([str(emerge_binary)], a, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N    ~] dev-libs/multimaskdep-2.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/multimaskconsumer-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -9460,6 +9556,12 @@ def test_autounmask_levels_prefer_license_over_a_higher_keyword_masked_version(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N     ] dev-libs/levelpkg-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/levelconsumer-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -9530,6 +9632,12 @@ def test_autounmask_keep_keywords_n_takes_the_newest_via_unstable_keywords(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild  N    ~] dev-libs/akk0b-1 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/akk0a-2 to {fixture_env["ROOT"]}',
     ]
@@ -9590,6 +9698,12 @@ def test_autounmask_use_backtrack_pristine_world_keeps_the_newest(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/2).",
+        "",
         f'[ebuild   R    ] dev-libs/abk0c-1 [1] to {fixture_env["ROOT"]} USE=\"x*\" ',
         f'[ebuild     U  ] dev-libs/abk0a-3 [1] to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/abk0d-1 to {fixture_env["ROOT"]}',
@@ -9642,6 +9756,12 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
     rust = _run([str(emerge_binary)], args, env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 2/2).",
+        "",
         f'[ebuild   R    ] dev-libs/abk0c-1 [1] to {env["ROOT"]} USE=\"x* y*\" ',
         f'[ebuild     U  ] dev-libs/abk0a-2 [1] to {env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/abk0d-1 to {env["ROOT"]}',
@@ -9752,7 +9872,7 @@ def test_autounmask_use_resolves_a_top_level_use_dep_mismatch(emerge_binary, fix
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout.splitlines()[0].startswith(
+    assert result.stdout.splitlines()[6].startswith(
         "[ebuild  N     ] dev-libs/useflagpkg-1.0"
     )
     assert 'USE="-foo' in result.stdout
@@ -10151,7 +10271,14 @@ def test_autounmask_suggests_a_keyword_once_explicitly_enabled(emerge_binary, fi
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout == f'[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 to {fixture_env["ROOT"]}\n'
+    assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
+        f'[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 to {fixture_env["ROOT"]}\n'
+    )
     assert result.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
         ' (see "package.accept_keywords" in the portage(5) man page for more details)\n'
@@ -10210,15 +10337,23 @@ def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
     only-run stdout is byte-identical to its control stdout (modulo the
     timing line and the first-run Global Updates noise), stderr
     byte-identical, rc 0 vs 1. Portuale omits Portage's staging `to <root>`
-    row suffix, the preamble/timing lines and the news notice (standing
-    pretend-shape cuts). Replaces
+    row suffix and the news notice (standing pretend-shape cuts); the
+    resolution header and timing lines print on the changes path like
+    Portage since backlog #462. Replaces
     `test_autounmask_only_suppresses_the_merge_list`, which asserted the
     old suppressing bytes (`stdout == ""`)."""
     args = ["--pretend", "--autounmask", "--autounmask-only", "dev-libs/autounmaskkeywordpkg"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
-    # The merge list is re-shown: the same row as the control below.
-    assert rust.stdout == f'[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 to {fixture_env["ROOT"]}\n'
+    # The merge list is re-shown: the header plus the same row as the control below.
+    assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
+        f'[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 to {fixture_env["ROOT"]}\n'
+    )
     # The changes block still goes to stderr.
     assert rust.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
@@ -10243,6 +10378,11 @@ def test_autounmask_only_reshows_the_merge_list(emerge_binary, fixture_env):
     use = _run([str(emerge_binary)], use_args, fixture_env)
     assert use.returncode == 0
     assert use.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
         f'[ebuild  N     ] dev-libs/newpkg-1.0 to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ] dev-libs/hiddendep-1.0 to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ] dev-libs/useflagpkg-1.0 to {fixture_env["ROOT"]} USE="foo missingflag" \n'
@@ -10322,10 +10462,13 @@ def test_autounmask_dependency_gets_a_keyword_suggestion_once_enabled(emerge_bin
     )
     assert result.returncode == 1
     assert result.stdout == (
-        (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
         f'[ebuild  N    ~] dev-libs/autounmaskkeywordpkg-1.0 to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ] dev-libs/autounmaskdepconsumer-1.0 to {fixture_env["ROOT"]}\n'
-        )
     )
     assert result.stderr == (
         "\nThe following keyword changes are necessary to proceed:\n"
@@ -10402,6 +10545,11 @@ def test_autounmask_license_resolves_a_eula_masked_dependency(emerge_binary, fix
     )
     assert result.returncode == 1
     assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
         f'[ebuild  N     ] dev-libs/licensemaskedpkg-1.0 to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ] dev-libs/licensemaskedconsumer-1.0 to {fixture_env["ROOT"]}\n'
     )
@@ -10484,14 +10632,27 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
     )
     assert result.returncode == 1
     assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
         f'[ebuild  N    #] dev-libs/hardmaskedpkg-1.0 to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ] dev-libs/maskmaskedconsumer-1.0 to {fixture_env["ROOT"]}\n'
     )
+    mask_file = f'{fixture_env["PORTAGE_CONFIGROOT"]}/etc/portage/package.mask'
     assert result.stderr == (
         "\nThe following mask changes are necessary to proceed:\n"
         ' (see "package.unmask" in the portage(5) man page for more details)\n'
         "# required by dev-libs/maskmaskedconsumer-1.0::testrepo\n"
         "# required by dev-libs/maskmaskedconsumer (argument)\n"
+        f"# {mask_file}:\n"
+        "# fixture package.mask: two atoms stay masked, one is added then removed\n"
+        '# again via "-atom" to exercise removal within this same source, and a\n'
+        '# fourth "-atom" line removes an entry the repo-level\n'
+        "# repo/profiles/package.mask added, not this file -- proving -atom\n"
+        "# removal now applies across all three real sources (repo, profile\n"
+        "# chain, user), not just within the user-level file alone.\n"
         "=dev-libs/hardmaskedpkg-1.0\n"
         "\n"
         "NOTE: The --autounmask-keep-masks option will prevent emerge\n"
@@ -10525,9 +10686,13 @@ def test_autounmask_proposes_unmask_for_masked_dep(emerge_binary, fixture_env):
     `package.unmask` changes block with the `# required by` chain, and
     the `--autounmask-keep-masks` NOTE. `--autounmask=n` and
     `--autounmask-keep-masks=y` (alone or with `--autounmask`) keep the
-    plain masked block with no rows. The merge-list header stays absent
-    on the proposal path (the standing autounmask-changes display shape,
-    shared with the `--autounmask-keep-masks=n` pin above)."""
+    plain masked block with no rows. Backlog #462: the header
+    (`These are the packages…` / `Calculating…` / `Dependency resolution
+    took…`, wall-clock seconds cut per the determinism convention) prints
+    before the rows, and the unmask block carries Portage's
+    `getmaskingreason` lines (`# <file>:` + the file's comment block).
+    Oracle: `LLM/evidence/2026-10-21-f462/portage.txt` cells c1 (this pin)
+    and c7 (the quiet leg: no header, file lines still print, NOTE gone)."""
     result = _run(
         [str(emerge_binary)],
         ["--pretend", "--autounmask", "dev-libs/maskneedpkg"],
@@ -10535,14 +10700,30 @@ def test_autounmask_proposes_unmask_for_masked_dep(emerge_binary, fixture_env):
     )
     assert result.returncode == 1
     assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\n"
+        "Calculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
         f'[ebuild  N    #] dev-libs/maskeddep-1.0 to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ] dev-libs/maskneedpkg-1.0 to {fixture_env["ROOT"]}\n'
     )
+    mask_file = f'{fixture_env["PORTAGE_CONFIGROOT"]}/etc/portage/package.mask'
     assert result.stderr == (
         "\nThe following mask changes are necessary to proceed:\n"
         ' (see "package.unmask" in the portage(5) man page for more details)\n'
         "# required by dev-libs/maskneedpkg-1.0::testrepo\n"
         "# required by dev-libs/maskneedpkg (argument)\n"
+        f"# {mask_file}:\n"
+        "# fixture package.mask: two atoms stay masked, one is added then removed\n"
+        '# again via "-atom" to exercise removal within this same source, and a\n'
+        '# fourth "-atom" line removes an entry the repo-level\n'
+        "# repo/profiles/package.mask added, not this file -- proving -atom\n"
+        "# removal now applies across all three real sources (repo, profile\n"
+        "# chain, user), not just within the user-level file alone.\n"
+        "# fixture package.mask for the masked-dependency disclosure slice:\n"
+        "# dev-libs/maskeddep stays masked so a dependency on it reports the\n"
+        '# "All ebuilds ... have been masked" block (never unmasked anywhere).\n'
         "=dev-libs/maskeddep-1.0\n"
         "\n"
         "NOTE: The --autounmask-keep-masks option will prevent emerge\n"
@@ -10559,6 +10740,34 @@ def test_autounmask_proposes_unmask_for_masked_dep(emerge_binary, fixture_env):
         assert "[ebuild" not in neg.stdout, args
         assert "have been masked" in neg.stderr, args
         assert "mask changes are necessary" not in neg.stderr, args
+
+    quiet = _run(
+        [str(emerge_binary)],
+        ["--quiet", "--pretend", "--autounmask", "dev-libs/maskneedpkg"],
+        fixture_env,
+    )
+    assert quiet.returncode == 1
+    assert quiet.stdout == (
+        f'[ebuild  N    ] dev-libs/maskeddep-1.0 to {fixture_env["ROOT"]}\n'
+        f'[ebuild  N    ] dev-libs/maskneedpkg-1.0 to {fixture_env["ROOT"]}\n'
+    )
+    assert quiet.stderr == (
+        "\nThe following mask changes are necessary to proceed:\n"
+        ' (see "package.unmask" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/maskneedpkg-1.0::testrepo\n"
+        "# required by dev-libs/maskneedpkg (argument)\n"
+        f"# {mask_file}:\n"
+        "# fixture package.mask: two atoms stay masked, one is added then removed\n"
+        '# again via "-atom" to exercise removal within this same source, and a\n'
+        '# fourth "-atom" line removes an entry the repo-level\n'
+        "# repo/profiles/package.mask added, not this file -- proving -atom\n"
+        "# removal now applies across all three real sources (repo, profile\n"
+        "# chain, user), not just within the user-level file alone.\n"
+        "# fixture package.mask for the masked-dependency disclosure slice:\n"
+        "# dev-libs/maskeddep stays masked so a dependency on it reports the\n"
+        '# "All ebuilds ... have been masked" block (never unmasked anywhere).\n'
+        "=dev-libs/maskeddep-1.0\n"
+    )
 
 
 def test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n(
@@ -20334,6 +20543,12 @@ def test_deep_walk_evaluates_conditional_use_deps_against_the_installed_vdb_use(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
         f'[ebuild   R    ] dev-libs/deepusedepchild-1.0 to {fixture_env["ROOT"]} USE="-flip*" ',
         f'[ebuild  N     ] dev-libs/deepusedepconsumer-1.0 to {fixture_env["ROOT"]}',
     ]
@@ -28041,17 +28256,18 @@ def test_or_pick_direct_target_backtrack0_reports_the_self_cycle(
 # ROOT value is recomputed here -- identical to the fixture's
 # (`conftest.FIXTURES_ROOT`, the committed fixtures tree).
 _AUB0_ROOT = str(Path(__file__).resolve().parent.parent / "fixtures")
+_AUB0_HDR = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 0/20).\n\n'
 _AUB0_TEXT_0 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 0/20).\n\n'
 _AUB0_TEXT_1 = '\nemerge: there are no ebuilds built with USE flags to satisfy "dev-libs/aub0d[-foo]".\n!!! One of the following packages is required to complete your request:\n- dev-libs/aub0d-0::testrepo (Change USE: -foo)\n(dependency required by "dev-libs/aub0a-0::testrepo" [ebuild])\n(dependency required by "dev-libs/aub0a" [argument])\n'
 _AUB0_TEXT_2 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n'
 _AUB0_TEXT_3 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 2/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_4 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 3/20).\n\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously. You may want to try a larger value of\nthe --backtrack option, such as --backtrack=30, in order to see if\nthat will solve this conflict automatically.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_5 = '\nThese are the packages that would be merged, in order:\n\nCalculating dependencies ... done!\nDependency resolution took (backtrack: 1/20).\n\n'
-_AUB0_TEXT_6 = f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_6 = _AUB0_HDR + f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
 _AUB0_TEXT_7 = '\nThe following USE changes are necessary to proceed:\n (see "package.use" in the portage(5) man page for more details)\n# required by dev-libs/aub0a-0::testrepo\n# required by dev-libs/aub0a (argument)\n=dev-libs/aub0d-0 -foo\n\n * In order to avoid wasting time, backtracking has terminated early\n * due to the above autounmask change(s). The --autounmask-backtrack=y\n * option can be used to force further backtracking, but there is no\n * guarantee that it will produce a solution.\n'
-_AUB0_TEXT_8 = f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_9 = f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
-_AUB0_TEXT_10 = f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n'
+_AUB0_TEXT_8 = _AUB0_HDR + f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_9 = _AUB0_HDR + f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0d-1 to {_AUB0_ROOT} USE="-bar" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0c-0 to {_AUB0_ROOT}\n\n!!! Multiple package instances within a single package slot have been pulled\n!!! into the dependency graph, resulting in a slot conflict:\n\ndev-libs/aub0d:0\n\n  (dev-libs/aub0d-1:0/0::testrepo, ebuild scheduled for merge) USE="-bar" ELIBC="glibc" pulled in by\n    >=dev-libs/aub0d-1 required by (dev-libs/aub0c-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n    ^^               ^                                                                                               \n\n  (dev-libs/aub0d-0:0/0::testrepo, ebuild scheduled for merge) USE="-foo" ELIBC="glibc" pulled in by\n    dev-libs/aub0d[foo] required by (dev-libs/aub0b-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^                                                                                                \n    dev-libs/aub0d[-foo] required by (dev-libs/aub0a-0:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"\n                   ^^^^                                                                                                \n\nIt may be possible to solve this problem by using package.mask to\nprevent one of those packages from being selected. However, it is also\npossible that conflicting dependencies exist such that they are\nimpossible to satisfy simultaneously.  If such a conflict exists in\nthe dependencies of two different packages, then those packages can\nnot be installed simultaneously.\n\nFor more information, see MASKED PACKAGES section in the emerge man\npage or refer to the Gentoo Handbook.\n\n'
+_AUB0_TEXT_10 = _AUB0_HDR + f'[ebuild  N     ] dev-libs/aub0d-0 to {_AUB0_ROOT} USE="-foo" \n[ebuild  N     ] dev-libs/aub0a-0 to {_AUB0_ROOT}\n[ebuild  N     ] dev-libs/aub0b-0 to {_AUB0_ROOT}\n'
 _AUB0_CELLS = [
     ('y', 'c b a', 1, _AUB0_TEXT_0, _AUB0_TEXT_1),
     ('y', 'c a b', 1, _AUB0_TEXT_2, _AUB0_TEXT_1),
@@ -28253,7 +28469,17 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
     # Profile B: fixture defaults -- the pair must NOT collapse.
     rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/r266mid"], fixture_env)
     assert rust.returncode == 1
-    assert sorted(rust.stdout.splitlines()) == [
+    # The header is fixed text; only the rows are order-unstable (the
+    # standing #17 class), so the sorted comparison covers the rows alone.
+    assert rust.stdout.splitlines()[:6] == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 0/20).",
+        "",
+    ]
+    assert sorted(rust.stdout.splitlines()[6:]) == [
         f'[ebuild  N     ] dev-libs/r266lib-2.0 to {fixture_env["ROOT"]} USE=\"-bar\" ',
         f'[ebuild  N     ] dev-libs/r266lib-3.0 to {fixture_env["ROOT"]} USE=\"bar\" ',
         f'[ebuild  N     ] dev-libs/r266mid-1.0 to {fixture_env["ROOT"]}',
