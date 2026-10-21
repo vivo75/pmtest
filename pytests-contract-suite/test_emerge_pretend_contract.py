@@ -1569,7 +1569,22 @@ CASES = [
         1,
     ),
     (
-        "--autounmask alone does NOT unmask package.mask (masks kept by default)",
+        "--autounmask proposes the package.unmask for a masked-only dep (#445)",
+        ["--pretend", "--autounmask", "dev-libs/maskneedpkg"],
+        1,
+    ),
+    (
+        "--autounmask keeps the plain masked block with --autounmask-keep-masks=y (#445)",
+        ["--pretend", "--autounmask", "--autounmask-keep-masks=y", "dev-libs/maskneedpkg"],
+        1,
+    ),
+    (
+        "--autounmask=n keeps the plain masked block on a masked-only dep (#445)",
+        ["--pretend", "--autounmask=n", "dev-libs/maskneedpkg"],
+        1,
+    ),
+    (
+        "--autounmask proposes the package.unmask for a masked top-level target too (#445)",
         ["--pretend", "--autounmask", "dev-libs/hardmaskedpkg"],
         1,
     ),
@@ -10437,14 +10452,18 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
     """--autounmask-keep-masks=n (Portage `_display_autounmask`'s
     `p_mask_change_msg`): dev-libs/hardmaskedpkg is package.mask'd (via
     the fixture repo/profile/user package.mask chain), everything else
-    visible. Portage KEEPS masks by default -- even `--autounmask`
-    alone doesn't unmask -- so only `--autounmask-keep-masks=n` resolves
-    it. The `The following mask changes are necessary to proceed:` block
-    has the `#required by` dep chain + a bare `=<cpv>` line (no token --
-    a mask unmask has no keyword/flag). The `[ebuild N #]` bracket marker
-    reflects the still-`package.mask`'d state. Backlog #217: no
-    "terminated early" trailer -- a lone mask change reaches Portage's
-    `_success_without_autounmask` tail (depgraph.py:5793)."""
+    visible. Portage keeps masks by default and on an explicit
+    `--autounmask-keep-masks=y`/`--autounmask=n`, but an explicit
+    `--autounmask` clears the default and proposes the unmask (backlog
+    #445 -- the old "even `--autounmask` alone doesn't unmask" claim was
+    wrong against Portage 3.0.82.2). The `The following mask changes are
+    necessary to proceed:` block has the `#required by` dep chain + a
+    bare `=<cpv>` line (no token -- a mask unmask has no
+    keyword/flag), followed by the `--autounmask-keep-masks` NOTE. The
+    `[ebuild N #]` bracket marker reflects the still-`package.mask`'d
+    state. Backlog #217: no "terminated early" trailer -- a lone mask
+    change reaches Portage's `_success_without_autounmask` tail
+    (depgraph.py:5793)."""
     assert (
         _run([str(emerge_binary)], ["--pretend", "dev-libs/hardmaskedpkg"], fixture_env).returncode
         == 1
@@ -10474,6 +10493,9 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
         "# required by dev-libs/maskmaskedconsumer-1.0::testrepo\n"
         "# required by dev-libs/maskmaskedconsumer (argument)\n"
         "=dev-libs/hardmaskedpkg-1.0\n"
+        "\n"
+        "NOTE: The --autounmask-keep-masks option will prevent emerge\n"
+        "      from creating package.unmask or ** keyword changes.\n"
     )
 
     j = _run(
@@ -10492,6 +10514,51 @@ def test_autounmask_keep_masks_n_unmasks_a_package_mask(emerge_binary, fixture_e
             ],
         }
     ]
+
+
+def test_autounmask_proposes_unmask_for_masked_dep(emerge_binary, fixture_env):
+    """Backlog #445: `--pretend --autounmask dev-libs/maskneedpkg` proposes
+    the unmask for the package.mask'd dependency instead of the plain
+    masked block. Portage 3.0.82.2 (host staged-fixture probe,
+    `PORTAGE_CONFIGROOT`/`ROOT` at the staged fixtures,
+    `PYTHONHASHSEED=0`): rc 1, one `[ebuild N #]` row per package, the
+    `package.unmask` changes block with the `# required by` chain, and
+    the `--autounmask-keep-masks` NOTE. `--autounmask=n` and
+    `--autounmask-keep-masks=y` (alone or with `--autounmask`) keep the
+    plain masked block with no rows. The merge-list header stays absent
+    on the proposal path (the standing autounmask-changes display shape,
+    shared with the `--autounmask-keep-masks=n` pin above)."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--autounmask", "dev-libs/maskneedpkg"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == (
+        f'[ebuild  N    #] dev-libs/maskeddep-1.0 to {fixture_env["ROOT"]}\n'
+        f'[ebuild  N     ] dev-libs/maskneedpkg-1.0 to {fixture_env["ROOT"]}\n'
+    )
+    assert result.stderr == (
+        "\nThe following mask changes are necessary to proceed:\n"
+        ' (see "package.unmask" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/maskneedpkg-1.0::testrepo\n"
+        "# required by dev-libs/maskneedpkg (argument)\n"
+        "=dev-libs/maskeddep-1.0\n"
+        "\n"
+        "NOTE: The --autounmask-keep-masks option will prevent emerge\n"
+        "      from creating package.unmask or ** keyword changes.\n"
+    )
+
+    for args in (
+        ["--pretend", "--autounmask=n", "dev-libs/maskneedpkg"],
+        ["--pretend", "--autounmask-keep-masks=y", "dev-libs/maskneedpkg"],
+        ["--pretend", "--autounmask", "--autounmask-keep-masks=y", "dev-libs/maskneedpkg"],
+    ):
+        neg = _run([str(emerge_binary)], args, fixture_env)
+        assert neg.returncode == 1, args
+        assert "[ebuild" not in neg.stdout, args
+        assert "have been masked" in neg.stderr, args
+        assert "mask changes are necessary" not in neg.stderr, args
 
 
 def test_autounmask_use_dependency_suggestion_is_suppressed_by_autounmask_use_n(
