@@ -7741,6 +7741,49 @@ def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
     assert (root / "var/lib/portage/world").read_text() == ""
 
 
+def test_emerge_resume_stays_quiet_after_a_quiet_run_like_portage(emerge_binary, tmp_path):
+    """Backlog #465 (Portage `_emerge/actions.py::action_build`: the saved
+    `myopts` seed a resume and the command line overrides them; oracle
+    `LLM/evidence/2026-10-21-r463/` -- host `emerge` 3.0.82.2, a resume list
+    carrying `"--quiet": true`): a failed `emerge -q` records `--quiet`, and
+    `emerge --resume` replays quietly -- no `Calculating dependencies`, no
+    per-phase `>>> Install ... into` lines -- while the `>>> Emerging`,
+    `>>> Installing` and `>>> Completed` lines stay. The info-dir notice
+    still prints: Portage's resume never re-applies the saved `--quiet` to
+    the settings that check reads."""
+    import json
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
+    (root / "var/lib/portage/world").write_text("")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
+
+    r = subprocess.run(
+        [str(emerge_binary), "-q", "--oneshot", "dev-libs/schedbad", "dev-libs/schedok"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1
+    saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
+    assert saved["resume"]["myopts"] == {"--oneshot": True, "--quiet": True}
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--skipfirst"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert "Calculating dependencies" not in r.stdout
+    assert "*** Resuming merge..." in r.stdout
+    assert ">>> Emerging (1 of 1) dev-libs/schedok-1.0" in r.stdout
+    assert ">>> Install dev-libs/schedok-1.0 into" not in r.stdout
+    assert ">>> Completed (1 of 1) dev-libs/schedok-1.0" in r.stdout
+
+
 def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     """Backlog #179: Portage `_emerge/actions.py` returns from the
     `--pretend` branch (`display(...)`, `return os.EX_OK`) before
