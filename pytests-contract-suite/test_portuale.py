@@ -12628,6 +12628,63 @@ def test_emerge_buildpkgonly_quiet_build_n_still_shows_phases_for_source_package
         assert ">>> Compiling source" in r.stdout, args
         assert ">>> Source compiled." in r.stdout, args
 
+def test_emerge_binary_merge_prints_the_extract_lines_like_portage(emerge_binary, tmp_path):
+    """Backlog #472 (Portage `BinpkgVerifier._display_success`,
+    `Binpkg._unpack_metadata` / `_setup_exit`, `EbuildPhase._async_start`,
+    `post_emerge`; oracle `LLM/evidence/2026-10-21-r472/` -- host `emerge`
+    3.0.82.2 on the #459 root, byte-identical in all six cells): a
+    foreground binary merge prints the verifier line, `>>> Extracting info`
+    and `>>> Extracting <cpv>` between `Emerging binary` and `Installing`;
+    under `-q` none of them reach the terminal, but the build log holds the
+    extract steps with the setup phase's `Package:`/`Repository:`/`USE:`
+    header, so a failing merge replays them after `Failed to install`; and
+    a foreground merge whose `pkg_postinst` died still ends with the
+    blank line and ` * GNU info directory index is up-to-date.`."""
+    import shutil
+
+    def _run(tag, *args):
+        root = tmp_path / f"root{tag}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{tag}")
+        r = subprocess.run(
+            [str(emerge_binary), "--usepkgonly", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        return r.stdout.splitlines()
+
+    for flavour, pkg in (("ok", "f459-good"), ("fail", "f459-postinstfail")):
+        out = _run(f"{flavour}-fg", f"dev-util/{pkg}")
+        i = next(k for k, l in enumerate(out) if l.startswith(">>> Emerging binary"))
+        assert out[i + 1].startswith(f" * {pkg}-1.tbz2 MD5 SHA1 size ;-) ...")
+        assert out[i + 1].endswith("[ ok ]")
+        assert out[i + 2] == ">>> Extracting info"
+        assert out[i + 3] == f">>> Extracting dev-util/{pkg}-1"
+        assert out[i + 4] == ""
+        assert out[i + 5].startswith(">>> Installing")
+        assert out[-2:] == ["", " * GNU info directory index is up-to-date."], out[-4:]
+
+        quiet = _run(f"{flavour}-q", "-q", f"dev-util/{pkg}")
+        if flavour == "ok":
+            assert not any("Extracting" in l or "MD5 SHA1" in l for l in quiet), quiet
+        else:
+            j = next(k for k, l in enumerate(quiet) if l.startswith(">>> Failed to install"))
+            tail = quiet[j + 2 :]
+            assert tail[0] == ">>> Extracting info"
+            assert tail[1].endswith("Package:    dev-util/f459-postinstfail-1:0")
+            assert tail[2].endswith("Repository: testrepo")
+            assert tail[3].endswith("USE:        ")
+            assert "FEATURES:   " in tail[4]
+            assert tail[5] == ">>> Extracting dev-util/f459-postinstfail-1"
+            assert "\x1b[32m * \x1b[39;49;00mPackage:" in tail[1]
+
+
 def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
     """Backlog #459 (Portage `vartree.py::dblink.merge` `_postinst_failure`
     + `EbuildMerge._merge_exit`, `PackageMerge._install_exit`,
