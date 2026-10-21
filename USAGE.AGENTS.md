@@ -203,6 +203,14 @@ risposta registrata (returncode, stdout, stderr) se esiste.
     - voce registry + `version` risolta
     - `ops`, `seed`, `repeat`, `dataset`
     - macchina (CPU, RAM, host OS) + per i run VM: guest fs (`VM_FS`)
+5. Benchmark resolver `@world`-shaped (backlog #461, pmtest-side):
+   `python3 bench/world_shaped_benchmark.py` — genera l'input
+   deterministico (`bench/gen_world_shaped.py`, seed 461), verifica il
+   fingerprint, fa un warmup + 3 run di
+   `PORTUALE_PROFILE=1 <pm> emerge -puDN @world` e stampa le mediane
+   delle fasi (stesso metodo di
+   `portuale:LLM/evidence/2026-10-21-world-profile/`). Dettagli e tagli
+   vs il benchmark su host live: `bench/WORLD_SHAPED.md`.
 
 ## Suite in parallelo (backlog #449)
 
