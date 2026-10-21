@@ -6254,6 +6254,107 @@ def test_emerge_serial_merge_status_lines_carry_portages_leading_blank(
     assert lines[first - 3] != "", repr(lines[max(0, first - 3) : first + 1])
 
 
+def test_emerge_skips_noop_source_phases_like_portage(emerge_binary, tmp_path):
+    """Backlog #456 (Portage `_emerge/EbuildExecuter.py::_can_skip_source_phases`;
+    oracle `LLM/evidence/2026-10-21-b456/` -- host `emerge` 3.0.82.2 on the
+    long-clean-multi `schedparent` root, default / `--quiet-build=n` /
+    `--quiet-build=y` / `-j2` / `--verbose` / `--quiet` cells):
+    a package with empty `A` (no `SRC_URI`) that defines none of
+    `unpack`/`prepare`/`configure`/`compile`/`test` runs `pkg_setup` then
+    straight to `src_install`. The `>>> Unpacking source...`,
+    `>>> Source unpacked/prepared/configured/compiled` and
+    `>>> Test phase [not enabled]` lines never print -- on default (this
+    pin) and on explicit `--quiet-build=n` (the cut is flag-independent,
+    both oracle cells are byte-identical there). `>>> Emerging`,
+    `>>> Install ... into`, `>>> Completed installing ...`, the `Final
+    size` lines and `>>> Installing`/`>>> Completed` stay, and the merge
+    still lands (vdb `CONTENTS`). The `schedparent` set is the
+    long-clean-multi shape the #452 long-cell recordings caught
+    diverging."""
+    import shutil
+
+    skipped_markers = (
+        ">>> Unpacking source...",
+        ">>> Source unpacked in ",
+        ">>> Preparing source",
+        ">>> Source prepared.",
+        ">>> Configuring source",
+        ">>> Source configured.",
+        ">>> Compiling source",
+        ">>> Source compiled.",
+        ">>> Test phase [not enabled]",
+    )
+
+    for n, args in enumerate(([], ["--quiet-build=n"])):
+        root = tmp_path / f"root{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{n}")
+
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", "dev-libs/schedparent"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr
+        out = r.stdout
+        for marker in skipped_markers:
+            assert marker not in out, f"{args}: {marker!r} printed"
+        for pkg in ("schedleaf-a-1.0", "schedleaf-b-1.0", "schedparent-1.0"):
+            assert f">>> Emerging (" in out
+            assert (
+                f">>> Install dev-libs/{pkg} into "
+                in out
+            ), f"{args}: install line for {pkg} missing"
+            assert (
+                f">>> Completed installing dev-libs/{pkg} into "
+                in out
+            ), f"{args}: completed-install line for {pkg} missing"
+            assert (
+                root / f"var/db/pkg/dev-libs/{pkg}/CONTENTS"
+            ).is_file(), f"{args}: {pkg} did not merge"
+
+
+def test_emerge_quiet_build_n_still_shows_phases_for_source_packages(
+    emerge_binary, tmp_path
+):
+    """Backlog #456 guard (same oracle + Portage
+    `_emerge/EbuildExecuter.py::_can_skip_source_phases`): a package that
+    defines one of the skippable phases (`dev-libs/unsetcflagspkg` defines
+    `src_compile`) still runs the full chain -- `>>> Compiling source`
+    prints on default and on explicit `--quiet-build=n`. The skip fires
+    only when `DEFINED_PHASES` misses every skippable phase, so the
+    `--quiet-build=n` / `--verbose` restores-lines review line holds for
+    packages with something to build (the #437 `dev-util/good` oracle
+    cell is the default-flag precedent for a defining package)."""
+    import shutil
+
+    for n, args in enumerate(([], ["--quiet-build=n"])):
+        root = tmp_path / f"root{n}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(tmp_path / f"pt{n}")
+
+        r = subprocess.run(
+            [str(emerge_binary), *args, "--oneshot", "dev-libs/unsetcflagspkg"],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        assert r.returncode == 0, r.stderr
+        assert ">>> Compiling source" in r.stdout, args
+        assert ">>> Source compiled." in r.stdout, args
+
+
 def test_emerge_quiet_verbose_shows_jobs_lines_without_blanks(
     emerge_binary, tmp_path
 ):
