@@ -12580,3 +12580,51 @@ def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
         f"'{root}'), Log file:"
     )
     assert row in r.stderr, r.stderr
+
+def test_emerge_resume_pretend_marks_installed_entry_reinstall(emerge_binary, tmp_path):
+    """Backlog #460 (Portage `_emerge/depgraph.py::_loadResumeCommand`
+    re-resolution; oracle `LLM/evidence/2026-10-21-f460/` -- host `emerge`
+    3.0.82.2 on the b444-shape root): after a run whose `pkg_postinst`
+    died, the landed entry IS installed, so `emerge --resume --pretend`
+    shows it as `[ebuild R]` and the never-merged entry as `[ebuild N]`.
+    The plain `emerge --resume` still retries the failed entry and fails
+    again (rc 1) -- Portage does the same, contradicting the entry's
+    "nothing to resume" premise."""
+    import json
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
+
+    r = subprocess.run(
+        [str(emerge_binary), "dev-util/postinstfail", "dev-util/postinstgood"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, r.stderr
+    assert (root / "var/db/pkg/dev-util/postinstfail-1/CONTENTS").is_file()
+    assert not (root / "var/db/pkg/dev-util/postinstgood-1.0").exists()
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume", "--pretend"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert f"[ebuild   R    ] dev-util/postinstfail-1 to {root}" in r.stdout
+    assert f"[ebuild  N     ] dev-util/postinstgood-1 to {root}" in r.stdout
+    saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
+    assert [x[2] for x in saved["resume"]["mergelist"]] == [
+        "dev-util/postinstfail-1",
+        "dev-util/postinstgood-1",
+    ]
+
+    r = subprocess.run(
+        [str(emerge_binary), "--resume"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 1, r.stderr
+    assert ">>> Failed to install dev-util/postinstfail-1" in r.stdout
