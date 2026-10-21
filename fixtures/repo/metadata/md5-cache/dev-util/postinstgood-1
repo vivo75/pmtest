@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: failing pkg_postinst endgame (postinstgood)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=541108ebbbcdb417cb83184cdb4a1b6a
