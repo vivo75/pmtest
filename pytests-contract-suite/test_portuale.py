@@ -12473,3 +12473,110 @@ def test_emerge_buildpkgonly_quiet_build_n_still_shows_phases_for_source_package
         assert r.returncode == 0, (args, r.stdout, r.stderr)
         assert ">>> Compiling source" in r.stdout, args
         assert ">>> Source compiled." in r.stdout, args
+
+def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
+    """Backlog #459 (Portage `vartree.py::dblink.merge` `_postinst_failure`
+    + `EbuildMerge._merge_exit`, `PackageMerge._install_exit`,
+    `Scheduler._do_merge_exit`; oracle `LLM/evidence/2026-10-21-f459/` --
+    host `emerge` 3.0.82.2 on a hermetic root whose three `f459-*` binpkgs
+    were built with real `emerge --buildpkgonly`, merged here with
+    `--usepkgonly`): a binary merge whose `pkg_postinst` dies behaves like
+    the source shape of #444 -- the merge lands (files and vdb entry) and
+    prints `>>> Completed`, then reports `>>> Failed to install <cpv> to
+    <root>, Log file:` (never `Failed to emerge`), replays the die log
+    with `FAILED postinst: 1`, and flushes a single end-of-run `Messages`
+    block with `FAILED postinst` first. Nothing is recorded in the world
+    file, the builddir is kept, the summary row carries no `(postinst
+    failed)` suffix (that suffix is the returncode-OK arm, which never
+    fires for a postinst failure in 3.0.82.2) and names the entry `binary
+    scheduled for merge`, and under `--keep-going` the dependents
+    (`f459-top`) merge in a resumed pass instead of being dropped."""
+    import shutil
+
+    n = [0]
+
+    def _run(*args):
+        tag = n[0]
+        n[0] += 1
+        root = tmp_path / f"root{tag}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        ptdir = tmp_path / f"pt{tag}"
+        env = dict(os.environ)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["ROOT"] = str(root)
+        env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+        env["PORTAGE_TMPDIR"] = str(ptdir)
+        r = subprocess.run(
+            [str(emerge_binary), "--usepkgonly", *args],
+            capture_output=True,
+            text=True,
+            check=False,
+            env=env,
+        )
+        return r, root, ptdir
+
+    # Lone serial failure: the merge lands but nothing is world-recorded.
+    r, root, ptdir = _run("dev-util/f459-postinstfail")
+    assert r.returncode == 1, r.stderr
+    out = r.stdout
+    assert (
+        f">>> Completed (1 of 1) dev-util/f459-postinstfail-1::testrepo to {root}"
+        in out
+    )
+    assert (
+        f">>> Failed to install dev-util/f459-postinstfail-1 to {root}, Log file:"
+        in out
+    )
+    assert "Failed to emerge" not in out
+    assert "FAILED postinst: 1" in out
+    # The follow-up fix in this slice: binary hooks export
+    # `PORTAGE_REPO_NAME`, so the `die` handler names the repo (was an
+    # empty `::`).
+    assert "=dev-util/f459-postinstfail-1::testrepo" in out
+    # The binary hooks run with the binpkg record's repo, like real's
+    # `doebuild_environment` (`PORTAGE_REPO_NAME`), so the `die` handler
+    # names it (`isolated-functions.sh`).
+    assert "::testrepo failed (postinst phase)" in r.stderr
+    assert out.count("Messages for package dev-util/f459-postinstfail-1") == 1
+    assert "Recording dev-util/f459-postinstfail" not in out
+    assert "dev-util/f459-postinstfail" not in (
+        root / "var/lib/portage/world"
+    ).read_text().split()
+    assert (
+        root / "var/db/pkg/dev-util/f459-postinstfail-1/CONTENTS"
+    ).is_file(), "the vdb entry must land"
+    assert list(ptdir.rglob("f459-postinstfail-1")), "the builddir must be kept"
+
+    # `--keep-going`: the good and dependent packages still merge, the
+    # dependent is not dropped, and the summary names only the failed one.
+    r, root, ptdir = _run(
+        "--keep-going",
+        "dev-util/f459-postinstfail",
+        "dev-util/f459-good",
+        "dev-util/f459-top",
+    )
+    assert r.returncode == 1, r.stderr
+    out = r.stdout
+    assert "*** Resuming merge..." in out
+    assert "dropped because" not in out
+    assert (
+        f">>> Completed (1 of 3) dev-util/f459-postinstfail-1::testrepo to {root}"
+        in out
+    )
+    assert (
+        f">>> Failed to install dev-util/f459-postinstfail-1 to {root}, Log file:"
+        in out
+    )
+    assert (
+        root / "var/db/pkg/dev-util/f459-top-1/CONTENTS"
+    ).is_file(), "the dependent must merge, not be dropped"
+    world = (root / "var/lib/portage/world").read_text().split()
+    assert "dev-util/f459-good" in world
+    assert "dev-util/f459-top" in world
+    assert "dev-util/f459-postinstfail" not in world
+    assert "(postinst failed)" not in (out + r.stderr)
+    row = (
+        f"(dev-util/f459-postinstfail-1:0/0::testrepo, binary scheduled for merge to "
+        f"'{root}'), Log file:"
+    )
+    assert row in r.stderr, r.stderr

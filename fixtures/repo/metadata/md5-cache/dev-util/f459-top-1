@@ -1,0 +1,7 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: needs f459-postinstfail (f459-top)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-util/f459-postinstfail
+SLOT=0
+_md5_=6bbb0fdedb312ae82191274d7c4371a7
