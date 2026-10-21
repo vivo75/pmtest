@@ -14,6 +14,7 @@ import json
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -274,6 +275,9 @@ def test_record_with_answers_types_the_reply_at_the_prompt(tmp_path):
 @NEEDS_ASCIINEMA
 def test_record_with_answers_times_out_when_the_prompt_never_comes(tmp_path):
     rec = _load("cast_record")
+    started = time.monotonic()
     with pytest.raises(TimeoutError):
         rec.record_with_answers(["sh", "-c", "sleep 30"], tmp_path / "t.cast",
                                 [(r"never", "x")], timeout=2)
+    # The child must be killed at the deadline, not waited for (it sleeps 30 s).
+    assert time.monotonic() - started < 10

@@ -19,6 +19,7 @@ import re
 import select
 import shlex
 import shutil
+import signal
 import struct
 import subprocess
 import termios
@@ -84,12 +85,58 @@ def record_with_answers(argv: list[str], out: Path, answers: list[tuple[str, str
                 pending.pop(0)
                 seen = ""
         else:
-            os.kill(pid, 15)
+            _kill_tree(pid)
             raise TimeoutError(f"{cmd}: timed out after {timeout}s, {len(pending)} prompt(s) unanswered")
     finally:
         os.close(fd)
         os.waitpid(pid, 0)
     return out, exit_code(out)
+
+
+def _descendants(pid: int) -> list[int]:
+    """All live descendants of pid, found by scanning /proc parent links."""
+    parent = {}
+    for entry in os.listdir("/proc"):
+        if entry.isdigit():
+            try:
+                stat = Path(f"/proc/{entry}/stat").read_text()
+                parent[int(entry)] = int(stat.rsplit(")", 1)[1].split()[1])
+            except (OSError, ValueError, IndexError):
+                pass
+    found, todo = [], [pid]
+    while todo:
+        cur = todo.pop()
+        for child, ppid in parent.items():
+            if ppid == cur and child not in found:
+                found.append(child)
+                todo.append(child)
+    return found
+
+
+def _alive(pid: int) -> bool:
+    """True for a running process; a zombie waiting to be reaped counts as gone."""
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+    except OSError:
+        return False
+
+
+def _kill_tree(pid: int, grace: float = 1.0) -> None:
+    """SIGTERM pid and its descendants, SIGKILL whatever is left after grace seconds.
+
+    asciinema runs the recorded command in its own session, so signalling
+    asciinema alone can leave it waiting for a child that never ends.
+    """
+    victims = [pid] + _descendants(pid)
+    for sig, wait in ((signal.SIGTERM, grace), (signal.SIGKILL, 0.0)):
+        for victim in victims:
+            try:
+                os.kill(victim, sig)
+            except ProcessLookupError:
+                pass
+        end = time.monotonic() + wait
+        while time.monotonic() < end and any(_alive(v) for v in victims):
+            time.sleep(0.05)
 
 
 def exit_code(path: Path) -> int:
