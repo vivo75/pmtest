@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #483 W 2.0: upgrade of installed W-1.0 that blocks T (soft block), as plasma-workspace-6.8.0 blocks plasma-login-sessions.
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=!dev-libs/f483-t
+SLOT=0
+_md5_=dd4e025b95b9264b073be02f5ac3f108

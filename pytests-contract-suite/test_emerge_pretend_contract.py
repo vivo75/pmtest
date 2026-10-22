@@ -3078,6 +3078,7 @@ CASES = [
     ("#477 S2: --usepkg --update --deep mbabicons: the built := binary is masked, installed mbabilib upgraded (Portage 3.0.82.2 rows)", ["--pretend", "--verbose", "--update", "--deep", "--usepkg", "dev-libs/mbabicons"], 0),
     ("#484 A: -pvuDN --usepkg=y --binpkg-respect-use=y drops the newuse binary in the slot conflict, only f484-ng upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "--usepkg=y", "--binpkg-respect-use=y", "www-servers/f484-ng", "dev-lang/f484-py"], 0),
     ("#484 B: -pvuDN keeps installed f484b-x-1.0, only f484b-q upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "dev-lang/f484b-q", "www-servers/f484b-p"], 0),
+    ("#483: -pvuD uninstalls f483-t, whose only parent f483-p is replaced, to resolve f483-w's soft block (Portage 3.0.82.2 rows)", ["-pvuD", "dev-lang/f483-p", "www-servers/f483-w"], 0),
 ]
 
 
@@ -33184,5 +33185,39 @@ def test_f484b_or_choice_reuses_the_pinned_installed_node_like_portage(
         f"[ebuild     U  ] dev-lang/f484b-q-2.0::testrepo [1.0::testrepo] to {fixture_env['ROOT']}",
         "",
         "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
+    ]
+    assert result.stderr == ""
+
+
+def test_f483_soft_block_uninstalls_a_target_whose_parent_is_replaced_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #483: `www-servers/f483-w-2.0` soft-blocks `dev-libs/f483-t-1.0`,
+    which installed `dev-lang/f483-p-1.0` depends on. Upgrading `f483-p` to
+    2.0 (no dependency on `f483-t`) takes that parent out of the graph, so
+    `_validate_blockers` (`depgraph.py` ~9216-9224, "don't unmerge any
+    package that has been pulled into the graph") finds no parent node and
+    schedules `[uninstall] f483-t-1.0`; the block is resolved (`b`).
+
+    Expected rows are host Portage 3.0.82.2's on a scratch copy of this
+    tree (`-pvuD dev-lang/f483-p www-servers/f483-w`, rc 0, `Conflict: 1
+    block (all satisfied)`). The pre-fix portuale kept the replaced parent's
+    installed edge in the required-set closure and printed `[blocks B]`
+    with `1 unsatisfied` and an error."""
+    result = _run(
+        [str(emerge_binary)],
+        ["-pvuD", "dev-lang/f483-p", "www-servers/f483-w"],
+        fixture_env,
+    )
+    assert result.returncode == 0, result.stderr
+    root = fixture_env["ROOT"]
+    assert result.stdout.splitlines() == [
+        f"[ebuild     U  ] dev-lang/f483-p-2.0::testrepo [1.0::testrepo] to {root}",
+        f"[ebuild     U  ] www-servers/f483-w-2.0::testrepo [1.0::testrepo] to {root}",
+        f"[uninstall     ] dev-libs/f483-t-1.0::testrepo to {root}",
+        '[blocks b      ] dev-libs/f483-t ("dev-libs/f483-t" is soft blocking www-servers/f483-w-2.0)',
+        "",
+        "Total: 2 packages (2 upgrades, 1 uninstall), Size of downloads: 0 KiB",
+        "Conflict: 1 block (all satisfied)",
     ]
     assert result.stderr == ""

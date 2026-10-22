@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #483 P 2.0: upgrade of installed P-1.0 (RDEPEND on T); the new version no longer needs T, so T has no parent left once P is replaced.
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=27112ed5a0804e05eefca15e7ac5a81d
