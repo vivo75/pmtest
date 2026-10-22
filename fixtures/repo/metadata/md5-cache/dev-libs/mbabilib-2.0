@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=mbabi fixture: library upgraded to slot 0/2 (installed 1.0 sits in 0/1)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=47f4868b72511990fcc413b4b4650980

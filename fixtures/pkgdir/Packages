@@ -140,3 +140,17 @@ SHA1: f2c49da3b9f628a570faade4d55693ed140102cb
 SIZE: 4280
 MTIME: 1792580991
 REPO: testrepo
+
+CPV: dev-libs/mbabicons-1.0
+BUILD_TIME: 1000
+DEFINED_PHASES: -
+DESCRIPTION: mbabi fixture: binary consumer built against mbabilib:0/1
+EAPI: 8
+IUSE:
+KEYWORDS: amd64
+PATH: dev-libs/mbabicons-1.0.tbz2
+RDEPEND: dev-libs/mbabilib:0/1=
+REPO: testrepo
+SIZE: 4096
+SLOT: 0
+USE:

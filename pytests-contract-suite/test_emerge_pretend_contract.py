@@ -3075,6 +3075,7 @@ CASES = [
     ("#453 A: --color=y colours the abort preamble, timing and masked block (maskedpkg, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/maskedpkg"], 1),
     ("#453 A: --color=y colours the missing-dependency block (missingdep, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/missingdep"], 1),
     ("#462: --quiet --pretend --autounmask on a masked-only dep proposes the unmask with no header (maskneedpkg, rc 1 like Portage)", ["--quiet", "--pretend", "--autounmask", "dev-libs/maskneedpkg"], 1),
+    ("#477 S2: --usepkg --update --deep mbabicons: the built := binary is masked, installed mbabilib upgraded (Portage 3.0.82.2 rows)", ["--pretend", "--verbose", "--update", "--deep", "--usepkg", "dev-libs/mbabicons"], 0),
 ]
 
 
@@ -33006,3 +33007,58 @@ def test_empty_output_pins_have_a_control_that_prints(
     result = _run([str(emerge_binary)], control_args, fixture_env)
     assert result.returncode == 0, (result.stdout, result.stderr)
     assert result.stdout.strip() != "", f"control for {negative_test} printed nothing"
+
+
+_MBABI_ARGS = ["--pretend", "--verbose", "--update", "--deep", "--usepkg", "dev-libs/mbabicons"]
+
+
+def _mbabi_rows(emerge_binary, fixture_env):
+    r = subprocess.run([str(emerge_binary), *_MBABI_ARGS], capture_output=True,
+                       text=True, env=fixture_env, check=False)
+    assert r.returncode == 0, r.stderr
+    return r.stdout
+
+
+def test_built_parent_update_masks_the_binary_and_upgrades_the_child_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #477 S2 (oracle: host `emerge` 3.0.82.2 on the same fixture tree, the
+    command `emerge --pretend --verbose --update --deep --usepkg dev-libs/mbabicons`,
+    `backtrack: 1/20`; Portage's `--debug` names `_slot_operator_update_backtrack`).
+    The fixture's `dev-libs/mbabicons-1.0` binary is built against `mbabilib:0/1` and
+    the installed mbabilib-1.0 sits in 0/1, while the tree has mbabilib-2.0 in 0/2
+    that the ebuild's `dev-libs/mbabilib:=` accepts. Portage masks the binary and
+    upgrades the child; portuale must do the same in one restart, not keep the
+    binary. Portage also renders the upgraded child with an `r` marker (the
+    replace-set argument); portuale does not yet (see the strict xfail below)."""
+    out = _mbabi_rows(emerge_binary, fixture_env)
+    rows = [l for l in out.splitlines() if l.startswith("[")]
+    assert not any(l.startswith("[binary") for l in rows), rows
+    assert "(backtrack: 1/20)" in out, out
+    upgrade = [l for l in rows if "dev-libs/mbabilib-2.0:0/2" in l]
+    new = [l for l in rows if "dev-libs/mbabicons-1.0" in l]
+    assert len(upgrade) == 1 and upgrade[0].startswith("[ebuild     U  ]"), rows
+    assert upgrade[0].endswith(f"[1.0:0/1::testrepo] to {fixture_env['ROOT']} 0 KiB"), upgrade
+    assert len(new) == 1 and new[0].startswith("[ebuild  N     ]"), rows
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="the replace-set `r` marker on a slot-operator-replaced child is not rendered yet",
+)
+def test_built_parent_update_renders_the_replaced_child_with_r_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #477 S2 residue. Oracle: host `emerge` 3.0.82.2 `--pretend --verbose
+    --update --deep --usepkg dev-libs/mbabicons` on the same fixture tree prints exactly
+    `[ebuild  r  U  ] dev-libs/mbabilib-2.0:0/2::testrepo [1.0:0/1::testrepo] to <ROOT>`
+    and `[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo to <ROOT>`. Portage marks the
+    child `r` because `_slot_operator_update_backtrack` adds it to
+    `slot_operator_replace_installed`, which becomes the `__auto_slot_operator_replace_installed__`
+    force-reinstall argument (depgraph.py `_iter_atoms_for_pkg`; resolver/output.py `force_reinstall`)."""
+    out = _mbabi_rows(emerge_binary, fixture_env)
+    root = fixture_env["ROOT"]
+    assert [l for l in out.splitlines() if l.startswith("[")] == [
+        f"[ebuild  r  U  ] dev-libs/mbabilib-2.0:0/2::testrepo [1.0:0/1::testrepo] to {root} 0 KiB",
+        f"[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo to {root} 0 KiB",
+    ]

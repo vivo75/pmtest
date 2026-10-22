@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=mbabi fixture: consumer with a := dep, binary built against mbabilib:0/1
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/mbabilib:=
+SLOT=0
+_md5_=6f5553a295f9e87d6f0df4068ff839c8
