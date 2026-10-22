@@ -27043,7 +27043,7 @@ def test_oracle_b2c_uninstall_resolved_block_sees_the_complete_mode_sets(
     assert control.returncode == 0
     assert control.stdout.splitlines() == [
         f'[ebuild  N     ] dev-libs/bparent-1.0::testrepo to {control_root}',
-        f'[uninstall     ] dev-libs/blocked-1.0::testrepo to {control_root}',
+        f'[uninstall     ] dev-libs/blocked-1.0::testrepo to {control_root} USE="flip" ',
         '[blocks b      ] <dev-libs/blocked-2.0 ("<dev-libs/blocked-2.0" is soft '
         "blocking dev-libs/bparent-1.0)",
         "",
@@ -33214,7 +33214,7 @@ def test_f483_soft_block_uninstalls_a_target_whose_parent_is_replaced_like_porta
     assert result.stdout.splitlines() == [
         f"[ebuild     U  ] dev-lang/f483-p-2.0::testrepo [1.0::testrepo] to {root}",
         f"[ebuild     U  ] www-servers/f483-w-2.0::testrepo [1.0::testrepo] to {root}",
-        f"[uninstall     ] dev-libs/f483-t-1.0::testrepo to {root}",
+        f'[uninstall     ] dev-libs/f483-t-1.0::testrepo to {root} USE="foo -bar" ',
         '[blocks b      ] dev-libs/f483-t ("dev-libs/f483-t" is soft blocking www-servers/f483-w-2.0)',
         "",
         "Total: 2 packages (2 upgrades, 1 uninstall), Size of downloads: 0 KiB",
