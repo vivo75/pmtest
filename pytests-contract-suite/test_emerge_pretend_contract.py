@@ -3079,6 +3079,7 @@ CASES = [
     ("#484 A: -pvuDN --usepkg=y --binpkg-respect-use=y drops the newuse binary in the slot conflict, only f484-ng upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "--usepkg=y", "--binpkg-respect-use=y", "www-servers/f484-ng", "dev-lang/f484-py"], 0),
     ("#484 B: -pvuDN keeps installed f484b-x-1.0, only f484b-q upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "dev-lang/f484b-q", "www-servers/f484b-p"], 0),
     ("#483: -pvuD uninstalls f483-t, whose only parent f483-p is replaced, to resolve f483-w's soft block (Portage 3.0.82.2 rows)", ["-pvuD", "dev-lang/f483-p", "www-servers/f483-w"], 0),
+    ("#490: -pvuD upgrades f490-top and f490-lib with no slot conflict: top-2.0 drops cons, releasing its =lib-1.0* pin (Portage 3.0.82.2 rows)", ["-pvuD", "dev-libs/f490-top", "dev-libs/f490-lib"], 0),
 ]
 
 
@@ -33032,22 +33033,18 @@ def test_built_parent_update_masks_the_binary_and_upgrades_the_child_like_portag
     that the ebuild's `dev-libs/mbabilib:=` accepts. Portage masks the binary and
     upgrades the child; portuale must do the same in one restart, not keep the
     binary. Portage also renders the upgraded child with an `r` marker (the
-    replace-set argument); portuale does not yet (see the strict xfail below)."""
+    replace-set argument), pinned by the next test (#481)."""
     out = _mbabi_rows(emerge_binary, fixture_env)
     rows = [l for l in out.splitlines() if l.startswith("[")]
     assert not any(l.startswith("[binary") for l in rows), rows
     assert "(backtrack: 1/20)" in out, out
     upgrade = [l for l in rows if "dev-libs/mbabilib-2.0:0/2" in l]
     new = [l for l in rows if "dev-libs/mbabicons-1.0" in l]
-    assert len(upgrade) == 1 and upgrade[0].startswith("[ebuild     U  ]"), rows
+    assert len(upgrade) == 1 and upgrade[0].startswith("[ebuild  r  U  ]"), rows
     assert upgrade[0].endswith(f"[1.0:0/1::testrepo] to {fixture_env['ROOT']} 0 KiB"), upgrade
     assert len(new) == 1 and new[0].startswith("[ebuild  N     ]"), rows
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason="the replace-set `r` marker on a slot-operator-replaced child is not rendered yet",
-)
 def test_built_parent_update_renders_the_replaced_child_with_r_like_portage(
     emerge_binary, fixture_env
 ):
@@ -33153,7 +33150,7 @@ def test_f484_old_build_warns_the_skipped_binary_update_like_portage(
         "",
         f"  (app-misc/f484-mime-1.0-1:0/0::testrepo, binary scheduled for merge to '{root}') USE=\"-nginx\" ELIBC=\"glibc\" conflicts with",
         f"    app-misc/f484-mime[nginx] required by (www-servers/f484-ng-2.0:0/0::testrepo, ebuild scheduled for merge to '{root}') USE=\"\" ELIBC=\"glibc\"",
-        "    ",
+        "    " + " " * 19 + "^^^^^ ",  # Portage marks the violated [nginx] token (format_unmatched_atom)
         "",
     ]
     assert result.stderr == ""
@@ -33219,5 +33216,41 @@ def test_f483_soft_block_uninstalls_a_target_whose_parent_is_replaced_like_porta
         "",
         "Total: 2 packages (2 upgrades, 1 uninstall), Size of downloads: 0 KiB",
         "Conflict: 1 block (all satisfied)",
+    ]
+    assert result.stderr == ""
+
+
+def test_f490_orphaned_version_pin_does_not_block_the_upgrade_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #490: installed `dev-libs/f490-cons-1.0` pins
+    `=dev-libs/f490-lib-1.0*`, and its only parent, installed
+    `dev-libs/f490-top-1.0`, is replaced by `f490-top-2.0` (which depends
+    on `f490-lib` directly and drops `f490-cons`). The orphaned pin must
+    not bind the `f490-lib-1.0` -> `2.0` upgrade: host Portage 3.0.82.2
+    on a scratch copy of this tree (`-pvuD dev-libs/f490-top
+    dev-libs/f490-lib`) exits 0 with both upgrades, no `slot conflict`
+    text and no `[uninstall]` row (there is no block to resolve, unlike
+    #483, so the orphaned cons is simply left installed).
+
+    The pin is load-bearing, not vacuous: with `f490-top-2.0` removed
+    from a scratch repo copy (so `f490-cons` keeps its parent), the same
+    request upgrades nothing (`Total: 0 packages`) -- the pin holds
+    `f490-lib` at 1.0. A regressed PM keeps the replaced parent's
+    installed edge in the required-set closure, keeps the
+    `=f490-lib-1.0*` pin live, and reports a slot conflict (rc != 0)
+    instead of the two upgrades."""
+    result = _run(
+        [str(emerge_binary)],
+        ["-pvuD", "dev-libs/f490-top", "dev-libs/f490-lib"],
+        fixture_env,
+    )
+    assert result.returncode == 0, result.stderr
+    root = fixture_env["ROOT"]
+    assert result.stdout.splitlines() == [
+        f"[ebuild     U  ] dev-libs/f490-lib-2.0::testrepo [1.0::testrepo] to {root}",
+        f"[ebuild     U  ] dev-libs/f490-top-2.0::testrepo [1.0::testrepo] to {root}",
+        "",
+        "Total: 2 packages (2 upgrades), Size of downloads: 0 KiB",
     ]
     assert result.stderr == ""

@@ -177,3 +177,7 @@ dev-libs/condanyof
 # an installed dep satisfying a USE-dep ([iflag]) that the same version in
 # the tree lacks (mime-types[nginx] shape): Portage keeps the installed one
 -pu --deep=1 dev-libs/instusedepconsumer
+# #481: the replace-set child of a built parent update renders `r` (mbabi shape)
+-pv --update --deep --usepkg dev-libs/mbabicons
+# #490: an installed version pin whose only parent is replaced is not a consumer
+-pvuD dev-libs/f490-top dev-libs/f490-lib

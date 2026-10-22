@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #490 top 1.0: installed, RDEPEND on cons; the repo also ships 2.0, which depends on lib directly and drops cons.
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/f490-cons
+SLOT=0
+_md5_=30b78cb80120839fa93b877b8c5fa748
