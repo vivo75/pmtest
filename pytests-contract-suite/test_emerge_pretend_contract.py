@@ -3076,6 +3076,8 @@ CASES = [
     ("#453 A: --color=y colours the missing-dependency block (missingdep, rc 1 like Portage)", ["--pretend", "--color=y", "dev-libs/missingdep"], 1),
     ("#462: --quiet --pretend --autounmask on a masked-only dep proposes the unmask with no header (maskneedpkg, rc 1 like Portage)", ["--quiet", "--pretend", "--autounmask", "dev-libs/maskneedpkg"], 1),
     ("#477 S2: --usepkg --update --deep mbabicons: the built := binary is masked, installed mbabilib upgraded (Portage 3.0.82.2 rows)", ["--pretend", "--verbose", "--update", "--deep", "--usepkg", "dev-libs/mbabicons"], 0),
+    ("#484 A: -pvuDN --usepkg=y --binpkg-respect-use=y drops the newuse binary in the slot conflict, only f484-ng upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "--usepkg=y", "--binpkg-respect-use=y", "www-servers/f484-ng", "dev-lang/f484-py"], 0),
+    ("#484 B: -pvuDN keeps installed f484b-x-1.0, only f484b-q upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "dev-lang/f484b-q", "www-servers/f484b-p"], 0),
 ]
 
 
@@ -23315,11 +23317,11 @@ def test_oracle_no_aggressive_downgrade(
     `ffmpeg` lines at all). MATCHES Portage. (The `conflict_downgrade` guards
     that police finer variants of this live in backlog #35, not #23.)
 
-    Backlog #205: the skipped `libvpx-1.8.0` names both of installed
-    firefox's rejecting atoms -- the built `=1.7*:0=` binding and the
-    `[postproc]` USE pin -- exactly like Portage's "Record missed updates"
-    tail (`depgraph.py:2085-2106` records every kept-instance parent
-    atom the removed version fails)."""
+    Backlog #484 (supersedes the #205 assertions): host Portage 3.0.82.2
+    prints NO missed-update notice here. Installed firefox's `=1.7*:0=`
+    pin puts the installed libvpx node in the graph first, and ffmpeg's
+    bare `libvpx:=` then reuses it (`find_existing_node`), so `libvpx-1.8.0`
+    is never selected and never skipped. portuale now reuses the node too."""
     root = _b1_root(
         tmp_path,
         ["media-video/ffmpeg", "www-client/firefox"],
@@ -23356,9 +23358,8 @@ def test_oracle_no_aggressive_downgrade(
     )
     merges = _b1_merges(rust.stdout)
     assert not [ln for ln in merges if "firefox" in ln or "libvpx" in ln or "ffmpeg" in ln]
-    assert "media-libs/libvpx:0" in rust.stdout
-    assert "=media-libs/libvpx-1.7*:0= required by (www-client/firefox-69.0" in rust.stdout
-    assert "=media-libs/libvpx-1.7*:0=[postproc] required by (www-client/firefox-69.0" in rust.stdout
+    assert "skipped due to a dependency conflict" not in rust.stdout
+    assert "libvpx" not in rust.stdout
 
 
 def test_oracle_non_slot_operator_update_selects_new_slot(
@@ -33062,3 +33063,126 @@ def test_built_parent_update_renders_the_replaced_child_with_r_like_portage(
         f"[ebuild  r  U  ] dev-libs/mbabilib-2.0:0/2::testrepo [1.0:0/1::testrepo] to {root} 0 KiB",
         f"[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo to {root} 0 KiB",
     ]
+
+
+_F484_ARGS = [
+    "-pvuDN", "--usepkg=y", "--binpkg-respect-use=y",
+    "www-servers/f484-ng", "dev-lang/f484-py",
+]
+
+
+def test_f484_slot_conflict_drops_the_newuse_binary_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #484 shape A: installed `app-misc/f484-mime-1.0` is binary
+    build 2 (`USE=+nginx`, `BUILD_TIME` 2000) while the binhost offers build
+    1 of the same cpv (baked `USE` empty). Under `-pvuDN --usepkg=y
+    --binpkg-respect-use=y` the first graph schedules the `-nginx` binary
+    for `dev-lang/f484-py-1.0`'s plain dep (newuse reinstall, binary
+    preferred by `--usepkg`); `www-servers/f484-ng-2.0`'s
+    `f484-mime[nginx]` pin then slot-conflicts it away, leaving only the
+    ng upgrade merged.
+
+    Expected rows are host Portage 3.0.82.2's on this fixture tree (rc 0,
+    merge list `[ebuild U] www-servers/f484-ng-2.0`, no `f484-mime` line,
+    no skipped-update warning): with `BUILD_TIME` 2000 > 100 the installed
+    build wins `Package.__gt__`'s built-vs-built comparison, so
+    `depgraph.py::_get_missed_updates` reports nothing. The pre-fix
+    portuale merged `[binary R] app-misc/f484-mime-1.0-1 ... USE="-nginx*"`
+    instead."""
+    result = _run([str(emerge_binary)], _F484_ARGS, fixture_env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        f"[ebuild     U  ] www-servers/f484-ng-2.0::testrepo [1.0::testrepo] to {fixture_env['ROOT']}",
+        "",
+        "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
+    ]
+    assert result.stderr == ""
+
+
+def _f484_old_build_root(fixture_env, fixtures_root, tmp_path):
+    """A test-local ROOT copying the fixture vardb with installed
+    `app-misc/f484-mime-1.0`'s `BUILD_TIME` rewound to 50 (older than the
+    binary build 1's 100); `PORTAGE_CONFIGROOT` stays at the shared
+    fixtures."""
+    root = tmp_path / "f484old"
+    shutil.copytree(fixtures_root / "var", root / "var", symlinks=True)
+    (root / "var/db/pkg/app-misc/f484-mime-1.0/BUILD_TIME").write_text("50\n")
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    return env
+
+
+def test_f484_old_build_warns_the_skipped_binary_update_like_portage(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """Backlog #484 shape A, `BUILD_TIME`-flipped twin: the installed
+    `f484-mime-1.0` build 2 is now older (`BUILD_TIME` 50) than the binary
+    build 1 (100), so the dropped binary counts as a missed update and
+    Portage warns about it. Host Portage 3.0.82.2 on this variant (rc 0,
+    same one-row merge list) prints on stderr:
+
+        WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:
+        app-misc/f484-mime:0 for <root>/
+          (app-misc/f484-mime-1.0-1:0/0::testrepo, binary scheduled for merge to '<root>/') USE="-nginx" conflicts with
+            app-misc/f484-mime[nginx] required by (www-servers/f484-ng-2.0:0/0::testrepo, ebuild scheduled for merge to '<root>/') USE="" ELIBC="glibc"
+                               ^^^^^
+
+    (the binary now beats the installed build in `Package.__gt__`'s
+    built-vs-built `BUILD_TIME` comparison, so
+    `depgraph.py::_get_missed_updates` flags it). Portuale renders
+    missed-update notices on stdout after the merge rows (the `akk0a`
+    precedent), `to '<root>'` without Portage's trailing slash, no
+    `for <root>` slot-line suffix, `ELIBC="glibc"` on the binary line as
+    on every portuale conflict-selected line, and its usual blank-line
+    layout instead of Portage's `^^^^^` marker. The pre-fix portuale
+    printed no warning at all (it merged the binary with `[binary R]`)."""
+    env = _f484_old_build_root(fixture_env, fixtures_root, tmp_path)
+    root = env["ROOT"]
+    result = _run([str(emerge_binary)], _F484_ARGS, env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        f"[ebuild     U  ] www-servers/f484-ng-2.0::testrepo [1.0::testrepo] to {root}",
+        "",
+        "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "app-misc/f484-mime:0",
+        "",
+        f"  (app-misc/f484-mime-1.0-1:0/0::testrepo, binary scheduled for merge to '{root}') USE=\"-nginx\" ELIBC=\"glibc\" conflicts with",
+        f"    app-misc/f484-mime[nginx] required by (www-servers/f484-ng-2.0:0/0::testrepo, ebuild scheduled for merge to '{root}') USE=\"\" ELIBC=\"glibc\"",
+        "    ",
+        "",
+    ]
+    assert result.stderr == ""
+
+
+def test_f484b_or_choice_reuses_the_pinned_installed_node_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #484 shape B: `dev-lang/f484b-q-2.0` (upgrading installed
+    `f484b-q-1.0`) pins `~dev-libs/f484b-x-1.0`, which puts the installed
+    `f484b-x-1.0` node in the graph before `www-servers/f484b-p-1.0`'s
+    `|| ( dev-lang/f484b-y dev-libs/f484b-x )` dep resolves
+    (`depgraph.py` `find_existing_node`, ~line 8190:
+    `package_tracker.match` includes in-graph installed nodes), so the
+    `||` reuses installed X-1.0 and neither X-2.0 (tree) nor Y-1.0
+    (tree-only, never preferred over the installed alternative) merges.
+
+    Expected rows are host Portage 3.0.82.2's on this fixture tree
+    (`-pvuDN dev-lang/f484b-q www-servers/f484b-p`, rc 0, merge list only
+    `[ebuild U] dev-lang/f484b-q-2.0`). The pre-fix portuale re-resolved
+    the `||` fresh and merged `[ebuild U] dev-libs/f484b-x-2.0` too."""
+    result = _run(
+        [str(emerge_binary)],
+        ["-pvuDN", "dev-lang/f484b-q", "www-servers/f484b-p"],
+        fixture_env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        f"[ebuild     U  ] dev-lang/f484b-q-2.0::testrepo [1.0::testrepo] to {fixture_env['ROOT']}",
+        "",
+        "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
+    ]
+    assert result.stderr == ""

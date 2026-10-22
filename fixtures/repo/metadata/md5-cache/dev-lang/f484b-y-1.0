@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #484b Y 1.0: tree-only alternative in P's || ( f484b-y f484b-x ); never installed and never preferred over the installed f484b-x. Must stay unmerged. A regressed PM either merges it or upgrades f484b-x.
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f14c5b3cb8a35ff365fca90ec2c8d4f9

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #484b X 1.0: installed instance; the tree also carries 2.0. Exercises the find-existing-node branch: Q-2.0's ~f484b-x-1.0 pin puts this installed node in the graph before P's || dep resolves, so Portage keeps 1.0. A regressed PM re-resolves the || fresh and upgrades to 2.0.
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=945f68b7f99d80068d76ac0c9a9b4e9e

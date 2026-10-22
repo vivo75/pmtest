@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #484b Q 2.0: upgrade target (installed 1.0); RDEPEND pins ~f484b-x-1.0, which puts the installed X-1.0 node in the graph before P's || dep is resolved. A regressed PM upgrades X to 2.0 anyway.
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=~dev-libs/f484b-x-1.0
+SLOT=0
+_md5_=6e3d8af3e8d11f0e593d087941943337

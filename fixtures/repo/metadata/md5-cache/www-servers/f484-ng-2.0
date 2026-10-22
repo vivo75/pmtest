@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture #484 N: upgrade target (installed 1.0, tree 2.0); RDEPEND on app-misc/f484-mime[nginx] pins the installed +nginx build 2, which is what the binary build 1 conflicts against.
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-misc/f484-mime[nginx]
+SLOT=0
+_md5_=7c18b580d539fd5eca3b7e2a2dc58c79

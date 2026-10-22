@@ -1,0 +1,5 @@
+EAPI=8
+DESCRIPTION="fixture #484 M: IUSE nginx, default off. The installed instance is binary build 2 (USE=nginx) while the binhost offers build 1 of the same cpv (USE empty). Exercises the slot-conflict-then-remove branch: the first graph schedules binary build 1 for P's plain dep, the conflict against installed build 2 (wanted with [nginx] by N) must drop the binary, leaving M unmerged. A regressed PM merges [binary Rg] f484-mime-1 with -nginx instead."
+SLOT="0"
+KEYWORDS="amd64"
+IUSE="nginx"
