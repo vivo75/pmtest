@@ -174,3 +174,6 @@ dev-libs/slcirc
 # the EAPI-6 C-1 shape (empty group dropped, bare merge) is not
 # re-fixtured -- all fixture ebuilds are EAPI 8 since #220.
 dev-libs/condanyof
+# an installed dep satisfying a USE-dep ([iflag]) that the same version in
+# the tree lacks (mime-types[nginx] shape): Portage keeps the installed one
+-pu --deep=1 dev-libs/instusedepconsumer

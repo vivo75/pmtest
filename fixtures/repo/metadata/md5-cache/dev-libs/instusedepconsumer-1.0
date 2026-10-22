@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+RDEPEND=dev-libs/instusedep[iflag]
+DESCRIPTION=fixture package: New, RDEPENDs instusedep[iflag]; only the installed instusedep has iflag enabled
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=38f20c1a5aa30091fb36e3a5f2e13057

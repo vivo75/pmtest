@@ -1731,6 +1731,11 @@ CASES = [
         0,
     ),
     (
+        "avoid_update: an installed dependency satisfying a USE-dep the newer tree candidate lacks is kept, not updated",
+        ["--pretend", "--update", "--deep=1", "dev-libs/instusedepconsumer"],
+        0,
+    ),
+    (
         "the same [divergedflag] atom as a TOP-LEVEL target still needs a visible ebuild",
         ["--pretend", "dev-libs/builtusedivergedep[divergedflag]"],
         1,
@@ -12773,6 +12778,29 @@ def test_installed_dependency_use_dep_flag_only_in_built_use_is_kept(
         "!!! One of the following packages is required to complete your request:",
         "- dev-libs/builtusedivergedep-1.0::testrepo (Missing IUSE: divergedflag)",
     ]
+
+
+def test_update_keeps_installed_dependency_when_newer_tree_candidate_lacks_the_use_dep_flag(
+    emerge_binary, fixture_env
+):
+    """dev-libs/instusedepconsumer (New) RDEPENDs on
+    dev-libs/instusedep[iflag]. The installed 1.0 has vdb USE="iflag"; the
+    only tree candidate, 2.0, knows `iflag` in IUSE but has it off, so it
+    cannot satisfy the atom. With `--update --deep=1` Portage keeps the
+    installed 1.0 (no `U` row for instusedep) instead of failing -- the
+    www-servers/nginx / mime-types[nginx] shape from `emerge -uDpvN @world`.
+
+    Expected value: Portage 3.0.82.2 (`PMTEST_PM=portage`), same cell."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "--deep=1", "dev-libs/instusedepconsumer"],
+        fixture_env,
+    )
+    assert result.returncode == 0
+    assert result.stdout.splitlines() == [
+        f'[ebuild  N     ] dev-libs/instusedepconsumer-1.0 to {fixture_env["ROOT"]}',
+    ]
+    assert result.stderr == ""
 
 
 def test_any_of_group_falls_back_to_every_alternative_when_none_satisfiable(

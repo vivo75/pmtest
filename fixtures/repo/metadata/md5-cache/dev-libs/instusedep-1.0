@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: installed 1.0 was built with iflag; the same version in the tree has iflag in IUSE but off by default (the mime-types[nginx] shape)
+EAPI=8
+IUSE=iflag
+KEYWORDS=amd64
+SLOT=0
+_md5_=44cb1fc61c8360059ab312724d77bf72
