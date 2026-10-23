@@ -394,3 +394,7 @@ podman run --rm --cgroups=enabled --cgroupns=private \
   `43-…` — earlier-slice reproducers.
 
 Inside the container you are `root` (user namespaces; uid 1000 outside).
+
+A slice that adds or changes dependency grammar (slot, sub-slot, `:=`, `[use]`, `::repo`, blockers)
+adds a row to `pytests-contract-suite/grammar_registry.py`: a resolvable and an unsatisfiable CASES
+entry, both reached through a fixture ebuild's dependency string, plus Portage's wording and its depgraph.py line.
