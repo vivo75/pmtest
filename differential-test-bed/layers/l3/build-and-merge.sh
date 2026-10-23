@@ -10,7 +10,7 @@
 #       /TEST/atomlists/l3-smoke.txt /TEST/logs/<run>/<pm>
 #
 # Env:
-#   L3_PORTAGE_PIN=3.0.82.2
+#   L3_PORTAGE_PIN=3.0.83-r1
 #   L3_SKIP_PORTAGE_UPGRADE=0
 #   L3_BUILD_ARGS              effective build args: env wins when SET
 #                              (even to a value equal to the default),
@@ -30,7 +30,7 @@ set -u
 PM=${1:?portage|portuale}
 ATOMLIST=${2:?atom list}
 OUT=${3:?output prefix}
-PIN=${L3_PORTAGE_PIN:-3.0.82.2}
+PIN=${L3_PORTAGE_PIN:-3.0.83-r1}
 SKIP_UPGRADE=${L3_SKIP_PORTAGE_UPGRADE:-0}
 # #280: effective build args resolve below (after log() exists), as env
 # L3_BUILD_ARGS when SET (even to a value equal to the default) -> else
@@ -94,7 +94,7 @@ rm -f /etc/portage/binrepos.conf/gentoo.conf
 # --- same base on both sides -------------------------------------------
 if [ "$SKIP_UPGRADE" != 1 ]; then
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" != "$PIN" ]; then
+  if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
     log "upgrading portage $cur -> $PIN"
     FEATURES="-cgroup" ACCEPT_KEYWORDS="~amd64" /usr/sbin/emerge -q -1 --usepkg=n "=sys-apps/portage-$PIN" \
       || { log "!!! portage upgrade failed"; exit 1; }

@@ -38,7 +38,7 @@ podman_run_pm "porttest-l0-$$" \
   -e "L0_SKIP_INVARIANTS=${L0_SKIP_INVARIANTS:-0}" \
   -e "L0_EMERGE_OPTS=${L0_EMERGE_OPTS:--pv}" \
   -e "L0_PORTUALE_OPTS=${L0_PORTUALE_OPTS:-}" \
-  -e "L0_PORTAGE_PIN=${L0_PORTAGE_PIN:-3.0.82.2}" \
+  -e "L0_PORTAGE_PIN=${L0_PORTAGE_PIN:-3.0.83-r1}" \
   --entrypoint /bin/bash "$IMAGE" \
   /TEST/layers/l0/in-container.sh "$REL_ATOMLIST" "/TEST/logs/$RUN"
 

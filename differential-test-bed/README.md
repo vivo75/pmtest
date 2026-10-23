@@ -55,7 +55,7 @@ Output: `differential-test-bed/logs/l0-<timestamp>/` (raw `emerge` outputs, `met
 `fingerprint.tsv`, `l0-report.txt`, `l0-report.json`);
 `differential-test-bed/logs/l0-report.txt` symlinks the latest.
 
-Env: `L0_SKIP_PORTAGE_UPGRADE=1` (skip the `=sys-apps/portage-3.0.82.2`
+Env: `L0_SKIP_PORTAGE_UPGRADE=1` (skip the `=sys-apps/portage-3.0.83-r1`
 step), `L0_SKIP_MULTI=1` (skip the `@system`/`@world` whole-graph runs),
 `L0_SKIP_INVARIANTS=1` (skip the extra portuale mode runs),
 `L0_EMERGE_OPTS`, `PORTTEST_IMAGE`, `PORTTEST_PODMAN`.
@@ -130,7 +130,7 @@ one PM deletes and the other keeps is in neither post-merge `CONTENTS`.
 > **Do not pass `L1_SKIP_PORTAGE_UPGRADE=1` for L1.** The image's base
 > portage (`3.0.81.3`) predates the VDB **consolidated `metadata` file**
 > (`_consolidate_to_metadata_file`, `vartree.py`), which portuale mirrors
-> because it targets `3.0.82.2` (the version the run upgrades to). Skip
+> because it targets `3.0.83` (the version the run upgrades to). Skip
 > the upgrade and every merged package shows a spurious
 > `[VDB] …/metadata  present for portuale, absent for portage` finding —
 > a reference-version artefact, not a portuale bug. (L0 is `--pretend`
@@ -205,7 +205,7 @@ smoke list carries `# l3-build-args: --oneshot --usepkg=n --color=n`
 `/var/tmp/portage` (`L3_TMPFS=1`, size `L3_TMPFS_SIZE`, default `8g`:
 measured peaks 3.1 GiB for `l3-core`, 0.9 GiB for the smoke; `L3_TMPFS=0` = disk); the mount needs `exec` because podman's
 `--tmpfs` defaults to `noexec` and builds run configure scripts there
-(#282). The image now ships Portage 3.0.82.2 baked in
+(#282). The image now ships Portage 3.0.83-r1 baked in
 (`create-container.bash`, #281), so the layers' portage-upgrade blocks
 are no-ops.
 
@@ -388,7 +388,7 @@ podman run --rm --cgroups=enabled --cgroupns=private \
 
 - `/TEST/scripts` — executables run in lexicographic order by `/init`.
 - `00-install-portage.sh` — upgrades the image's stable portage to
-  `~amd64 =sys-apps/portage-3.0.82.2` (the version portuale mirrors).
+  `~amd64 =sys-apps/portage-3.0.83-r1` (the version portuale mirrors).
   Must stay lexicographically first.
 - `10-config-dump.sh`, `20-real-compare.sh`, `31-…`, `40-…`, `42-…`,
   `43-…` — earlier-slice reproducers.

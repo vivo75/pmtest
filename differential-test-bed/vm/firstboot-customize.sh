@@ -100,7 +100,7 @@ cd /
 
 # -- portage PIN (same step layers/l0/in-container.sh runs per container)
 cur=$(emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-if [ "$cur" != "$PIN" ]; then
+if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
   log "upgrading portage $cur -> $PIN"
   ACCEPT_KEYWORDS=~amd64 emerge --quiet "=sys-apps/portage-$PIN"
 else

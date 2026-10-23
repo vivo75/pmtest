@@ -33,7 +33,7 @@
 set -u
 ATOMLIST=${1:?atom list path}
 OUT=${2:?output prefix}
-PIN=${L1_PORTAGE_PIN:-3.0.82.2}
+PIN=${L1_PORTAGE_PIN:-3.0.83-r1}
 JOBS=${Z326_JOBS:-1}
 : "${PKGDIR:?PKGDIR must be set (a rw mount)}"
 
@@ -68,7 +68,7 @@ fi
 # this prints the version and moves on).
 if [ "${L1_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" != "$PIN" ]; then
+  if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
     log "upgrading portage $cur -> $PIN (oneshot, ~amd64 for that one atom only)"
     ACCEPT_KEYWORDS="~amd64" /usr/sbin/emerge -q -1 --usepkg=n "=sys-apps/portage-$PIN" \
       || { log "!!! portage upgrade failed"; exit 1; }

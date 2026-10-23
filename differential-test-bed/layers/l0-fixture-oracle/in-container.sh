@@ -37,9 +37,9 @@ log() { printf '%s\n' "$*" | tee -a "$OUTDIR/run.log" ; }
 # and Portage's --pretend output differs between patch releases, so a stale
 # image must be upgraded before the cases run (the image's own config is
 # still in place here; PORTAGE_REPOSITORIES comes after).
-PIN=${L0_PORTAGE_PIN:-3.0.82.2}
+PIN=${L0_PORTAGE_PIN:-3.0.83-r1}
 cur=$("$PORTAGE_EMERGE" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-if [ "$cur" != "$PIN" ]; then
+if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
   log "upgrading portage $cur -> $PIN"
   ACCEPT_KEYWORDS=~amd64 "$PORTAGE_EMERGE" -q "=sys-apps/portage-$PIN" >> "$OUTDIR/run.log" 2>&1 \
     && log "portage now $("$PORTAGE_EMERGE" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')" \
@@ -55,7 +55,7 @@ FX="$STAGE/fixtures"
 # packages are masked" check reads; replace the image's gentoo set with the
 # fixture vdb so both roots agree even for a case with no BDEPEND (belt
 # and braces alongside the PORTAGE_RUNNING_ROOT pin below). The portage
-# upgrade above already installed 3.0.82.2's code on disk; only its vdb
+# upgrade above already installed 3.0.83-r1's code on disk; only its vdb
 # entry disappears, which --pretend does not need.
 rm -rf /var/db/pkg
 cp -r "$FX/var/db/pkg" /var/db/pkg

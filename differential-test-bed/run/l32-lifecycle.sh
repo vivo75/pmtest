@@ -91,7 +91,7 @@ fi
   echo "image	$IMAGE"
   echo "nice	nice -n 19"
   echo "makeopts	${MAKEOPTS:--j2}"
-  echo "portage_pin	${L32_PORTAGE_PIN:-3.0.82.2}"
+  echo "portage_pin	${L32_PORTAGE_PIN:-3.0.83-r1}"
   echo "host_date_utc	$(date -u +%FT%TZ)"
   echo "## df -h /home"
   df -h /home

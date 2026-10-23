@@ -20,7 +20,7 @@ export MAKEOPTS="${MAKEOPTS:--j2}"
 # (and the two values 3.0.82.2 still warns about). FEATURES is incremental.
 export FEATURES="${FEATURES:-} -cgroup -observability -ipc-sandbox -network-sandbox -pid-sandbox"
 
-PIN=${L32_PORTAGE_PIN:-3.0.82.2}
+PIN=${L32_PORTAGE_PIN:-3.0.83-r1}
 
 log() { printf '[l32-cell] %s\n' "$*"; }
 
@@ -32,7 +32,7 @@ upgrade_portage() {
   fi
   local cur
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" != "$PIN" ]; then
+  if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
     log "upgrading portage $cur -> $PIN"
     ACCEPT_KEYWORDS="~amd64" /usr/sbin/emerge -q --oneshot --usepkg=n "=sys-apps/portage-$PIN" \
       || { log "!!! portage upgrade failed"; return 1; }

@@ -25,7 +25,7 @@ STAGEID=stage3-amd64-systemd
 # #281: portage version baked into the image below (single source of
 # truth; passed into the `buildah unshare` heredoc via the environment,
 # since the heredoc is quoted 'EOF' and sees no shell expansion).
-PORTAGE_PIN=3.0.82.2
+PORTAGE_PIN=3.0.83-r1
 STAGETS=${DATESTART//-/}
 STAGETS=${STAGETS//:/}
 

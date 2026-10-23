@@ -10,14 +10,14 @@
 #
 # Env:
 #   PKGDIR                     (required) the shared binpkg dir, ro mount
-#   L1_PORTAGE_PIN=3.0.82.2
+#   L1_PORTAGE_PIN=3.0.83-r1
 #   L1_SKIP_PORTAGE_UPGRADE=0  (portage consumer only)
 
 set -u
 PM=${1:?portage|portuale}
 ATOMLIST=${2:?atom list}
 OUT=${3:?output prefix}
-PIN=${L1_PORTAGE_PIN:-3.0.82.2}
+PIN=${L1_PORTAGE_PIN:-3.0.83-r1}
 : "${PKGDIR:?PKGDIR must be set}"
 
 case $PM in
@@ -85,7 +85,7 @@ fi
 # `world` / `COUNTER` are not perturbed.
 if [ "${L1_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" != "$PIN" ]; then
+  if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
     log "upgrading portage $cur -> $PIN (oneshot, ~amd64 for that one atom only)"
     ACCEPT_KEYWORDS="~amd64" /usr/sbin/emerge -q -1 --usepkg=n "=sys-apps/portage-$PIN" \
       || { log "!!! upgrade failed"; exit 1; }

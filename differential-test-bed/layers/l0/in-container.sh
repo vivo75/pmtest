@@ -12,7 +12,7 @@
 #
 # Env:
 #   L0_SKIP_PORTAGE_UPGRADE=1   skip the `=sys-apps/portage-<PIN>` step
-#   L0_PORTAGE_PIN=3.0.82.2     the portage version portuale mirrors
+#   L0_PORTAGE_PIN=3.0.83-r1    the portage version portuale mirrors
 #   L0_EMERGE_OPTS="-pv"        emerge flags for every probe
 #   L0_PORTUALE_OPTS=""         extra flags for portuale's argv only
 #                               (e.g. `--solver=pubgrub` for the #34 pubgrub
@@ -25,7 +25,7 @@
 set -u
 ATOMLIST=${1:?atom list path}
 OUTDIR=${2:?output dir}
-PIN=${L0_PORTAGE_PIN:-3.0.82.2}
+PIN=${L0_PORTAGE_PIN:-3.0.83-r1}
 EOPTS=${L0_EMERGE_OPTS:--pv}
 POPTS=${L0_PORTUALE_OPTS:-}
 
@@ -73,7 +73,7 @@ log "fingerprint:"; sed 's/^/  /' "$OUTDIR/fingerprint.tsv" | tee -a "$OUTDIR/ru
 # -- portage version pin ------------------------------------------------
 if [ "${L0_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
   cur=$("$PORTAGE_EMERGE" --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" = "$PIN" ]; then
+  if [ "$cur" = "${PIN%-r[0-9]*}" ]; then
     log "portage already $PIN"
   else
     log "upgrading portage $cur -> $PIN (ACCEPT_KEYWORDS=~amd64)"

@@ -25,7 +25,7 @@ VM_REPO_URL_buildovl=https://github.com/vivo75/buildovl.git
 
 # The portage version portuale mirrors (baked into the golden image;
 # in-container.sh still honours L0_SKIP_PORTAGE_UPGRADE per run).
-VM_PORTAGE_PIN=3.0.82.2
+VM_PORTAGE_PIN=3.0.83-r1
 
 # Throwaway VM shape (slice 2 runs one domain per PM; L3 pairs run two).
 VM_VCPUS=4

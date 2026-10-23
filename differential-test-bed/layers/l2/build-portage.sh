@@ -8,7 +8,7 @@
 # Env:
 #   PKGDIR                     (required) binpkg output dir, rw mount
 #   DISTDIR                    (required) shared distfile cache, rw mount
-#   L2_PORTAGE_PIN=3.0.82.2    portage version portuale mirrors
+#   L2_PORTAGE_PIN=3.0.83-r1    portage version portuale mirrors
 #   L2_JOBS=1                  MAKEOPTS -j / --jobs
 #   L2_SKIP_PORTAGE_UPGRADE=0
 #   L2_BINPKG_FORMAT=gpkg|xpak  (default gpkg; exported as BINPKG_FORMAT)
@@ -22,7 +22,7 @@
 #                 dependencies to be merged"). G0.1 revisited at S5.
 set -u
 ATOMLIST=${1:?atom list path}
-PIN=${L2_PORTAGE_PIN:-3.0.82.2}
+PIN=${L2_PORTAGE_PIN:-3.0.83-r1}
 JOBS=${L2_JOBS:-1}
 : "${PKGDIR:?PKGDIR must be set (a rw mount)}"
 : "${DISTDIR:?DISTDIR must be set (a rw mount)}"
@@ -83,7 +83,7 @@ fi
 
 if [ "${L2_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" != "$PIN" ]; then
+  if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
     log "upgrading portage $cur -> $PIN (~amd64 for that one atom only)"
     ACCEPT_KEYWORDS="~amd64" /usr/sbin/emerge -q --usepkg=n "=sys-apps/portage-$PIN" \
       || { log "!!! portage upgrade failed"; exit 1; }

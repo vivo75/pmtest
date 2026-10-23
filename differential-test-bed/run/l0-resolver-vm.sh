@@ -61,7 +61,7 @@ vm_ssh "$IP" \
   "L0_SKIP_MULTI=${L0_SKIP_MULTI:-0}" \
   "L0_SKIP_INVARIANTS=${L0_SKIP_INVARIANTS:-0}" \
   "L0_EMERGE_OPTS=${L0_EMERGE_OPTS:--pv}" \
-  "L0_PORTAGE_PIN=${L0_PORTAGE_PIN:-3.0.82.2}" \
+  "L0_PORTAGE_PIN=${L0_PORTAGE_PIN:-3.0.83-r1}" \
   /TEST/layers/l0/in-container.sh "$REL_ATOMLIST" "/TEST/logs/$RUN"
 
 echo ">>> pulling $OUT"

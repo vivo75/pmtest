@@ -47,9 +47,9 @@ cat > /etc/portage/repos.conf/porttest.conf <<-EOF
 
 # same base on both sides (Portage's behaviour is the pin's)
 if [ "${L2_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
-  PIN=${L2_PORTAGE_PIN:-3.0.82.2}
+  PIN=${L2_PORTAGE_PIN:-3.0.83-r1}
   cur=$(/usr/sbin/emerge --version 2>/dev/null | sed -n 's/^Portage \([0-9.]*\).*/\1/p')
-  if [ "$cur" != "$PIN" ]; then
+  if [ "$cur" != "${PIN%-r[0-9]*}" ]; then
     log "upgrading portage $cur -> $PIN"
     FEATURES="-cgroup" ACCEPT_KEYWORDS="~amd64" /usr/sbin/emerge -q --usepkg=n "=sys-apps/portage-$PIN" \
       || { log "!!! portage upgrade failed"; exit 1; }

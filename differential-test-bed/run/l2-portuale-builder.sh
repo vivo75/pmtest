@@ -119,7 +119,7 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "L2_JOBS=${L2_JOBS:-1}" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
-    -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \
+    -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.83-r1}" \
     -e "L2_BUILD_MODE=${L2_BUILD_MODE:-bpkgonly}" \
     -e "L2_BINPKG_FORMAT=$FORMAT" \
     -e "L2_CACHELESS=${L2_CACHELESS:-0}" \
@@ -135,7 +135,7 @@ if [ "${L2_SKIP_BUILD:-0}" != 1 ]; then
     ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
     -e "L2_JOBS=${L2_JOBS:-1}" \
     -e "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
-    -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \
+    -e "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.83-r1}" \
     -e "L2_BUILD_MODE=${L2_BUILD_MODE:-bpkgonly}" \
     -e "L2_BINPKG_FORMAT=$FORMAT" \
     -e "L2_CACHELESS=${L2_CACHELESS:-0}" \

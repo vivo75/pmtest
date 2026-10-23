@@ -129,7 +129,7 @@ build_one() {  # <label> <build-portage.sh|build-portuale.sh> <host-pkgcache>
     "PKGDIR=/pkgs" "DISTDIR=/distfiles" \
     "L2_JOBS=${L2_JOBS:-1}" \
     "L2_SKIP_PORTAGE_UPGRADE=${L2_SKIP_PORTAGE_UPGRADE:-0}" \
-    "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.82.2}" \
+    "L2_PORTAGE_PIN=${L2_PORTAGE_PIN:-3.0.83-r1}" \
     "L2_BUILD_MODE=${L2_BUILD_MODE:-bpkgonly}" \
     "L2_CACHELESS=${L2_CACHELESS:-0}" \
     "L2_STALECACHE=${L2_STALECACHE:-0}" \
