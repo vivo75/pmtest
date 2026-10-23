@@ -49,7 +49,7 @@ are "explained"; the run is green iff none are unexplained **and**
 `compare/check-invariants.py` finds no violation in portuale's own output
 (the expectation-free checks from `pytests-contract-suite/output_invariants.py`, over each
 probe's extra `--json`/`--tree`/`--quiet` runs, plus a zero
-unparsed-dependency-token count; report in `invariants.txt`).
+unparsed-dependency-token count, whose failure message also names the per-site counts (`site=n`) when portuale prints them; report in `invariants.txt`).
 
 Output: `differential-test-bed/logs/l0-<timestamp>/` (raw `emerge` outputs, `meta.tsv`,
 `fingerprint.tsv`, `l0-report.txt`, `l0-report.json`);

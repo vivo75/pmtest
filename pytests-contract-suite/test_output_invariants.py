@@ -373,3 +373,10 @@ def test_checker_flags_a_merge_row_printed_twice_in_tree_mode():
 def test_checker_parses_binary_build_ids():
     assert inv.split_cpv("dev-libs/foo-1.0-3") == ("dev-libs", "foo", "1.0")
     assert inv.split_cpv("dev-libs/foo-1.0-r3:0::repo") == ("dev-libs", "foo", "1.0-r3")
+
+
+def test_unparsed_report_names_sites_on_nonzero():
+    stderr = ("portuale: unparsed dependency tokens: 2\n"
+              "portuale: unparsed dependency sites: graph_lookup=2\n")
+    problems = inv.check_unparsed_dep_tokens(stderr)
+    assert problems and "graph_lookup=2" in problems[0]

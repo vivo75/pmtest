@@ -336,7 +336,14 @@ def check_unparsed_dep_tokens(stderr: str) -> list[str]:
     m = re.search(r"^portuale: unparsed dependency tokens: (\d+)$", stderr, re.M)
     if m is None:
         return ["no unparsed-dependency-token report on stderr"]
-    return [] if m.group(1) == "0" else [f"{m.group(1)} dependency token(s) dropped as unparseable"]
+    if m.group(1) == "0":
+        return []
+    msg = f"{m.group(1)} dependency token(s) dropped as unparseable"
+    # The per-site line is optional (older binaries omit it); name the sites when present.
+    sites = re.search(r"^portuale: unparsed dependency sites: (.*)$", stderr, re.M)
+    if sites is not None and sites.group(1).strip():
+        msg += f" (sites: {sites.group(1).strip()})"
+    return [msg]
 
 
 def check_plain_use(stdout: str) -> list[str]:
