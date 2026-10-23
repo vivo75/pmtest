@@ -3202,14 +3202,17 @@ _TOP_LEVEL_ABORT_STDOUT = (
 )
 
 
-def _all_masked(atom: str, cpv_repo: str, reason: str) -> str:
+def _all_masked(atom: str, cpv_repo: str, reason: str, binary: bool = False) -> str:
     """Portage `_show_unsatisfied_dep`'s "All ebuilds that could satisfy
     <atom> have been masked" report, stripped (as the assertions below
     compare `.stderr.strip()`). Emitted for a top-level atom whose only
     matching ebuilds are all masked -- what portuale prints instead of
-    the bare "there are no ebuilds to satisfy" line."""
+    the bare "there are no ebuilds to satisfy" line. `binary=True` selects
+    Portage's `--usepkgonly` binary-pool header ("All binary packages
+    that could satisfy", backlog #509 oracle shape 03)."""
+    what = "binary packages" if binary else "ebuilds"
     return (
-        f'!!! All ebuilds that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
+        f'!!! All {what} that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
         "!!! One of the following masked packages is required to complete your request:\n"
         f"- {cpv_repo} (masked by: {reason})\n"
         "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
@@ -6700,6 +6703,7 @@ def test_s4_binary_rewritten_rdepend_masks_invalid(
         "app-misc/t341-good",
         "app-misc/t341-good-1::t341",
         "invalid: RDEPEND: Invalid atom (dev-libs/t341-dep::gentoo), token 1",
+        binary=True,
     )
 
 
@@ -7514,6 +7518,7 @@ def test_s9_build_id_atom_masked_reports_the_masked_instance(
         "=dev-libs/t341-dep-1-2",
         "dev-libs/t341-dep-1::t341",
         "package.mask",
+        binary=True,
     )
 
 
@@ -17254,7 +17259,7 @@ Binary packages:
       --getbinpkg-exclude ATOMS, --getbinpkg-include ATOMS  filter remote binhost entries like --exclude; binrepos.conf keys fold in
       --usepkg-exclude ATOMS, --usepkg-include ATOMS  narrow which packages may come from a binary
       --binpkg-respect-use[=y|n]  reject a binary package built with the wrong USE
-      --binpkg-respect-user-patches[=y|n]  accepted; inert until user patches are compared (backlog 509)
+      --binpkg-respect-user-patches[=y|n]  reject a binary built with different user patches
       --binpkg-changed-deps[=y|n]  reject a binary whose recorded deps differ from the ebuild (auto unless -K)
       --use-ebuild-visibility[=y|n]  apply ebuild visibility checks to built packages even under -K
       --rebuilt-binaries[=y|n], --rebuilt-binaries-timestamp N  prefer / bound rebuilt binary packages
@@ -29587,14 +29592,15 @@ def _t348_configroot(tmp_path, fixtures_root):
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
-def _all_masked_eapi(atom: str, cpv: str, reason: str) -> str:
+def _all_masked_eapi(atom: str, cpv: str, reason: str, binary: bool = False) -> str:
     """`_all_masked` plus Portage's EAPI-masked upgrade paragraph: after the
     masked rows, `The current version of portage supports EAPI '9'. ...`
     (Portage wraps `portage.const.EAPI` at 75 columns; the two lines below
     are that wrap, byte for byte), then the shared `MASKED PACKAGES`
     footer. Compared `.strip()`ed like `_all_masked`."""
+    what = "binary packages" if binary else "ebuilds"
     return (
-        f'!!! All ebuilds that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
+        f'!!! All {what} that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
         "!!! One of the following masked packages is required to complete your request:\n"
         f"- {cpv} (masked by: {reason})\n"
         "\nThe current version of portage supports EAPI '9'. You must upgrade to a\n"
@@ -29846,7 +29852,7 @@ def test_t348_s5_binpkg_with_unsupported_eapi_is_masked(
         "",
     ]  # #346 S7: Portage prints the notice before the masked block
     assert result.stderr.strip() == _all_masked_eapi(
-        "=app-misc/t348-s5-bineapi-1", "app-misc/t348-s5-bineapi-1", "EAPI 99"
+        "=app-misc/t348-s5-bineapi-1", "app-misc/t348-s5-bineapi-1", "EAPI 99", binary=True
     )
     assert not (Path(env["ROOT"]) / "var/db/pkg/app-misc").exists()
 
@@ -33023,6 +33029,7 @@ def test_s3_bid_package_use_respect_use_reports_the_mask_block(
         "dev-libs/t341-dep",
         "dev-libs/t341-dep-1::t341",
         "use flag configuration mismatch",
+        binary=True,
     )
 
 
@@ -33160,7 +33167,7 @@ def test_changed_deps_top_level_binary_reports_the_mask_block(
     assert result.returncode == 1
     assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     assert result.stderr.strip() == _all_masked(
-        "dev-libs/bcdeppkg", "dev-libs/bcdeppkg-1.0::testrepo", "changed deps"
+        "dev-libs/bcdeppkg", "dev-libs/bcdeppkg-1.0::testrepo", "changed deps", binary=True
     )
 
 
@@ -34416,3 +34423,303 @@ def test_511_request_signature_filters_every_repo_highest_priority_first(
     sig_at = result.stderr.index("[mixsig] Remote XPAK binpkgs in")
     assert plain_at < sig_at
     assert 'no ebuilds to satisfy "app-misc/s511-g"' in result.stderr
+
+
+def _user_patches_env(fixture_env, tmp_path):
+    """A hermetic config for the backlog #509 user-patches pins: a scratch
+    `up509` repo (up-a..up-e ebuilds with hand-written md5-cache entries,
+    SLOT 0 except up-e SLOT 1), a `$PKGDIR` whose `Packages` index carries
+    the oracle `USER_PATCHES` digests for a/b/c/e (built under patches) and
+    no key for up-d (built without patches), and local patch sets for
+    a/b/c/e. Mirrors the oracle setup
+    (`LLM/evidence/2026-10-23-509/probe.sh`); scratch-built at test time
+    like the #511 env above, so no committed fixture carries patch state."""
+
+    def patch_bytes(who):
+        return f"--- /dev/null\n+++ b/hello.txt\n@@ -0,0 +1 @@\n+hello-{who}\n".encode()
+
+    digests = {
+        # Oracle `LLM/evidence/2026-10-23-509/captures/`: host
+        # `userPatchDigest` values for the patch bodies above (the real
+        # --buildpkgonly index entries, byte-identical patch content).
+        "up-a": "15c988a7961873a2f508b42b89382eca0cac5ec297fcccfcf1994040068038cb",
+        "up-b": "cde13ecb6a2121eb26426b2b110402d4f4185ae3896f5a2ce83de3b415777151",
+        "up-c": "9d7f264f957a69d8dcff262506684e5fc5ce5e1ce97dbc65392be9961944a1ab",
+        "up-e": "1173be9e62c07c1b253bc862e0ce180cdc5b057f65496c267285114aa9f5cd69",
+    }
+
+    fx = Path(fixture_env["PORTAGE_CONFIGROOT"])
+    cfg = tmp_path / "cfg"
+    (cfg / "etc" / "portage" / "repos.conf").mkdir(parents=True)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "parent").write_text(
+        f"{fx}/repo/profiles/base\n{fx}/repo/profiles/arch/amd64\n"
+    )
+    (cfg / "etc" / "portage" / "make.profile").symlink_to(profile)
+    repo = tmp_path / "up509"
+    (repo / "profiles").mkdir(parents=True)
+    (repo / "metadata").mkdir(parents=True)
+    (repo / "profiles" / "repo_name").write_text("up509\n")
+    (repo / "profiles" / "categories").write_text("app-misc\n")
+    (repo / "metadata" / "layout.conf").write_text("masters = testrepo\n")
+    (cfg / "etc" / "portage" / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n\n"
+        f"[up509]\nlocation = {repo}\npriority = 70\n"
+    )
+    pkgdir = cfg / "pkgdir"
+    pkgdir.mkdir(parents=True)
+    (cfg / "etc" / "portage" / "make.conf").write_text(
+        f'PKGDIR="{pkgdir}"\nFEATURES="-news"\nACCEPT_LICENSE="*"\n'
+    )
+    stanzas = []
+    for p in ["up-a", "up-b", "up-c", "up-d", "up-e"]:
+        slot = "1" if p == "up-e" else "0"
+        ebuild = (
+            f"EAPI=8\n"
+            f'DESCRIPTION="backlog #509 pin: user patches {p}"\n'
+            f'HOMEPAGE="https://example.com"\n'
+            f'SLOT="{slot}"\n'
+            f'KEYWORDS="amd64"\n'
+        )
+        ebuild_path = repo / "app-misc" / p / f"{p}-1.0.ebuild"
+        ebuild_path.parent.mkdir(parents=True, exist_ok=True)
+        ebuild_path.write_text(ebuild)
+        md5 = hashlib.md5(ebuild.encode()).hexdigest()
+        cache_dir = repo / "metadata" / "md5-cache" / "app-misc"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        (cache_dir / f"{p}-1.0").write_text(
+            f'DESCRIPTION=backlog #509 pin: user patches {p}\n'
+            f"EAPI=8\n"
+            f"KEYWORDS=amd64\n"
+            f"SLOT={slot}\n"
+            f"_md5_={md5}\n"
+        )
+        stanza = (
+            f"CPV: app-misc/{p}-1.0\nDEFINED_PHASES: -\n"
+            f"DESCRIPTION: backlog #509 pin\nEAPI: 8\nKEYWORDS: amd64\n"
+            f"LICENSE: MIT\nPATH: app-misc/{p}/{p}-1.0-1.gpkg.tar\n"
+            f"BUILD_ID: 1\nBUILD_TIME: 1000\nSLOT: {slot}\n"
+            f"USE:\n"
+        )
+        if p in digests:
+            stanza += f"USER_PATCHES: {digests[p]}\n"
+        stanza += "REPO: up509\n"
+        stanzas.append(stanza)
+        if p != "up-d":
+            patch_dir = cfg / "etc" / "portage" / "patches" / "app-misc" / p
+            patch_dir.mkdir(parents=True, exist_ok=True)
+            (patch_dir / "user.patch").write_bytes(patch_bytes(p))
+    (pkgdir / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 5\n\n" + "\n".join(stanzas) + "\n"
+    )
+    root = tmp_path / "root"
+    root.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env
+
+
+def _s509_run(emerge_binary, env, *args):
+    return _run([str(emerge_binary)], ["-p", "--color=n", *args], env)
+
+
+def _all_binary_masked(atom: str, cpv_repo: str, reason: str, root: str) -> str:
+    """Portage `_show_unsatisfied_dep`'s "All binary packages that could
+    satisfy <atom> have been masked" report under `--usepkgonly` (backlog
+    #509 oracle shape 03): the ebuild-side `_all_masked` twin for the
+    binary pool."""
+    return (
+        f'!!! All binary packages that could satisfy "{atom}" for {root}/ have been masked.\n'
+        "!!! One of the following masked packages is required to complete your request:\n"
+        f"- {cpv_repo} (masked by: {reason})\n"
+        "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
+        "man page or refer to the Gentoo Handbook."
+    )
+
+
+def _s509_block(cpv_row: str, root: str) -> str:
+    """The ignored-due-to-user-patches block (backlog #509 oracle shape 02),
+    without the leading blank line."""
+    return (
+        "!!! The following binary packages have been ignored due to user patches:\n"
+        "\n"
+        f"     {cpv_row} for {root}/\n"
+        "\n"
+        "NOTE: The --binpkg-respect-user-patches=n option will prevent\n"
+        "      emerge from ignoring these binary packages.\n"
+        "      Using --binpkg-respect-user-patches=y will silence this\n"
+        "      warning.\n"
+    )
+
+
+def _s509_change_up_b_patches(env) -> None:
+    """Make the local up-b patch set disagree with its index digest (the
+    oracle shapes 02/03 setup: `hello-up-b-CHANGED`)."""
+    patch = (
+        Path(env["PORTAGE_CONFIGROOT"])
+        / "etc/portage/patches/app-misc/up-b/user.patch"
+    )
+    patch.write_bytes(
+        b"--- /dev/null\n+++ b/hello.txt\n@@ -0,0 +1 @@\n+hello-up-b-CHANGED\n"
+    )
+
+
+def test_509_match_selects_binary(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509 (bug 917047): local patches matching the index digest
+    select the binary, rc 0, no ignored block. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/01-match-k.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    result = _s509_run(emerge_binary, env, "-k", "app-misc/up-a")
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N     ] app-misc/up-a-1.0-1 to {env['ROOT']}" in result.stdout
+    assert "ignored due to user patches" not in result.stderr
+
+
+def test_509_differ_merges_ebuild_and_reports_block(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: a differing local set merges the ebuild and reports
+    the ignored block on stderr, rc 0. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/02-differ-k.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    _s509_change_up_b_patches(env)
+    result = _s509_run(emerge_binary, env, "-k", "app-misc/up-b")
+    assert result.returncode == 0, result.stderr
+    assert f"[ebuild  N     ] app-misc/up-b-1.0 to {env['ROOT']}" in result.stdout
+    assert _s509_block("app-misc/up-b-1.0-1", env["ROOT"]) in result.stderr
+
+
+def test_509_differ_usewpkgonly_aborts_with_mask_reason(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: under `-K` the differing binary is masked (`user
+    patches`), the ignore block precedes the abort, rc 1. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/03-differ-K.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    _s509_change_up_b_patches(env)
+    result = _s509_run(emerge_binary, env, "-K", "app-misc/up-b")
+    assert result.returncode == 1
+    assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
+    assert result.stderr == (
+        "\n"
+        + _s509_block("app-misc/up-b-1.0-1", env["ROOT"])
+        + "\n"
+        + _all_binary_masked("app-misc/up-b", "app-misc/up-b-1.0::up509", "user patches", env["ROOT"])
+        + "\n\n"
+    )
+
+
+def test_509_missing_key_with_local_patches_masks(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: an index entry without the key counts as `""` (the
+    `-r1` empty default, bug 984255), so with local patches present the
+    binary is dropped. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/04-lack-k.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    packages = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir" / "Packages"
+    lines = packages.read_text().split("\n")
+    in_c, out = False, []
+    for line in lines:
+        if line == "CPV: app-misc/up-c-1.0":
+            in_c = True
+        elif line.startswith("CPV: "):
+            in_c = False
+        if in_c and line.startswith("USER_PATCHES:"):
+            continue
+        out.append(line)
+    packages.write_text("\n".join(out))
+    result = _s509_run(emerge_binary, env, "-k", "app-misc/up-c")
+    assert result.returncode == 0, result.stderr
+    assert f"[ebuild  N     ] app-misc/up-c-1.0 to {env['ROOT']}" in result.stdout
+    assert _s509_block("app-misc/up-c-1.0-1", env["ROOT"]) in result.stderr
+
+
+def test_509_missing_key_without_local_patches_is_trusted(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509 (bug 984255): an index entry without the key and no
+    local patches means `"" == ""`: the binary is trusted, no extraction,
+    no mask, under both `-k` and `-K`. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/06-trusted-k.*`,
+    `07-trusted-K.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    for flag in ("-k", "-K"):
+        result = _s509_run(emerge_binary, env, flag, "app-misc/up-d")
+        assert result.returncode == 0, result.stderr
+        assert f"[binary  N     ] app-misc/up-d-1.0-1 to {env['ROOT']}" in result.stdout
+        assert "ignored due to user patches" not in result.stderr
+
+
+def test_509_explicit_n_disables(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: `--binpkg-respect-user-patches=n` skips the comparison
+    (also with `--usepkgonly`), so the differing binary merges. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/08-disablen-k.*`,
+    `09-disablen-K.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    _s509_change_up_b_patches(env)
+    for flag in ("-k", "-K"):
+        result = _s509_run(
+            emerge_binary, env, flag, "--binpkg-respect-user-patches=n", "app-misc/up-b"
+        )
+        assert result.returncode == 0, result.stderr
+        assert f"[binary  N     ] app-misc/up-b-1.0-1 to {env['ROOT']}" in result.stdout
+        assert "ignored due to user patches" not in result.stderr
+
+
+def test_509_explicit_y_silences_block(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: an explicit `=y` keeps the filter but silences the
+    block (like `--binpkg-respect-use=y`). Oracle:
+    `LLM/evidence/2026-10-23-509/captures/10-explicit-y-k.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    _s509_change_up_b_patches(env)
+    result = _s509_run(
+        emerge_binary, env, "-k", "--binpkg-respect-user-patches=y", "app-misc/up-b"
+    )
+    assert result.returncode == 0, result.stderr
+    assert f"[ebuild  N     ] app-misc/up-b-1.0 to {env['ROOT']}" in result.stdout
+    assert "ignored due to user patches" not in result.stderr
+
+
+def test_509_verbose_names_triggering_files(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: `--verbose` appends the triggering patch files to the
+    block. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/11-verbose-k.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    _s509_change_up_b_patches(env)
+    result = _s509_run(emerge_binary, env, "-k", "--verbose", "app-misc/up-b")
+    assert result.returncode == 0, result.stderr
+    head, tail = result.stderr.split(
+        "!!! These user patches are triggering this warning:\n", 1
+    )
+    assert head.endswith(
+        "!!! The following binary packages have been ignored due to user patches:\n"
+        "\n"
+        f"     app-misc/up-b-1.0-1 for {env['ROOT']}/\n"
+        "\n"
+    )
+    assert tail.startswith(
+        "\n    app-misc/up-b/user.patch\n\nNOTE: The --binpkg-respect-user-patches=n"
+    )
+
+
+def test_509_slot_qualified_binary_row(emerge_binary, fixture_env, tmp_path):
+    """Backlog #509: the block row carries `:slot` and `-build_id`
+    (`cpv:slot-build_id`); the mask row stays bare. Oracle:
+    `LLM/evidence/2026-10-23-509/captures/13-slot-K.*`."""
+    env = _user_patches_env(fixture_env, tmp_path)
+    packages = Path(env["PORTAGE_CONFIGROOT"]) / "pkgdir" / "Packages"
+    lines = packages.read_text().split("\n")
+    in_e, out = False, []
+    for line in lines:
+        if line == "CPV: app-misc/up-e-1.0":
+            in_e = True
+        elif line.startswith("CPV: "):
+            in_e = False
+        if in_e and line.startswith("USER_PATCHES:"):
+            line = "USER_PATCHES: " + "0" * 64
+        out.append(line)
+    packages.write_text("\n".join(out))
+    result = _s509_run(emerge_binary, env, "-K", "app-misc/up-e")
+    assert result.returncode == 1
+    assert (
+        "\n"
+        + _s509_block("app-misc/up-e-1.0:1-1", env["ROOT"])
+        + "\n"
+        + _all_binary_masked("app-misc/up-e", "app-misc/up-e-1.0::up509", "user patches", env["ROOT"])
+        + "\n\n"
+    ) in result.stderr
