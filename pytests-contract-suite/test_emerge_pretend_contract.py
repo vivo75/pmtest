@@ -11814,7 +11814,7 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     ), legacy.stdout
 
 
-def test_pkgdir_scan_skips_portage_invalid_class_and_aborts_the_rest(
+def test_pkgdir_scan_skips_portage_invalid_class(
     emerge_binary, tmp_path, fixtures_root
 ):
     """Backlog #60: Portage `bintree._populate_local` catches
@@ -11822,13 +11822,13 @@ def test_pkgdir_scan_skips_portage_invalid_class_and_aborts_the_rest(
     metadata read, prints Portage's own
     `!!! Invalid binary package: '<path>', <msg>` and skips that file
     (`bintree.py:1185-1199`); anything else propagates (S0 live capture:
-    cell i8's inner `other/KEY` is InvalidBinaryPackageFormat, cell i1's
-    inner symlink to `/etc/hostname` is `KeyError`). Portuale used to
+    cell i8's inner `other/KEY` is InvalidBinaryPackageFormat; cell i1's
+    inner symlink to `/etc/hostname` was `KeyError` on 3.0.82.2 and is
+    InvalidBinaryPackageFormat on 3.0.83-r1, backlog #500). Portuale used to
     abort the whole `$PKGDIR` scan on either -- one crafted file hid
     every valid candidate. Now the invalid class is skipped with Portage's
-    message (path once, then the reader's own reason) while the fatal
-    class still aborts, so the warning shape and both exit codes are
-    pinned here.
+    message (path once, then the reader's own reason), so the warning
+    shape and the exit code are pinned here.
 
     The crafted archives are the #58 S0 cells
     (`scripts/gpkg_crafted_members.py --mode build`: Portage-writer-shaped
@@ -11893,17 +11893,24 @@ def test_pkgdir_scan_skips_portage_invalid_class_and_aborts_the_rest(
         'inner metadata member "other/KEY" is outside metadata/'
     ) in skipped.stderr
 
-    # i1 (inner symlink to a host path): Portage's abort class -> the scan
-    # still stops (rc 1), and no candidate is resolved.
+    # i1 (inner symlink to a host path): on Portage 3.0.82.2 this was the abort
+    # class (`KeyError`); 3.0.83-r1's `_check_metadata_files` refuses every
+    # non-regular metadata member as InvalidBinaryPackageFormat, so it is now
+    # the skip class too (backlog #500, `LLM/evidence/2026-10-23-500-501/`,
+    # row `meta-symlink-abs`). Every former abort cell is skip-class now; the
+    # scan's abort path stays covered by the Rust unit test
+    # `populate_local_pkgdir_aborts_on_fatal_files`.
     invalid.unlink()
     (i1,) = cells.glob("i1-*.gpkg.tar")
-    fatal = pkgdir / "dev-libs/invalidfatalpkg-1.0.gpkg.tar"
-    shutil.copy(i1, fatal)
-    aborted = _run([str(emerge_binary)], args, env)
-    assert aborted.returncode == 1
-    assert aborted.stdout.splitlines() == []
-    assert f"emerge: scanning {pkgdir}:" in aborted.stderr
-    assert "not in the archive" in aborted.stderr
+    hostile = pkgdir / "dev-libs/invalidlinkpkg-1.0.gpkg.tar"
+    shutil.copy(i1, hostile)
+    skipped = _run([str(emerge_binary)], args, env)
+    assert skipped.returncode == 0, skipped.stderr
+    assert skipped.stdout.splitlines() == expected
+    assert (
+        f"!!! Invalid binary package: '{hostile}', "
+        "Metadata member is not a regular file: metadata/DESCRIPTION"
+    ) in skipped.stderr
 
 
 def test_getbinpkg_makes_a_remote_binhost_binary_eligible(

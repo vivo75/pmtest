@@ -5902,6 +5902,199 @@ def test_getbinpkgonly_refuses_a_remote_binary_without_size_and_checksum(
     assert "Digest verification failed" not in r.stdout
 
 
+def _hostile_gpkg(base_gpkg, dest, image_members=None, metadata_members=None):
+    """Rewrite a built gpkg's image and/or metadata tar with crafted members.
+
+    Members are `(name, type, linkname, data)`; python's tarfile writes `..` and
+    absolute names as given. Both inner tars are written uncompressed, the Manifest
+    is recomputed (BLAKE2B + SHA512 like `gpkg-helper.py`)."""
+    import hashlib
+    import io
+
+    def pack(members):
+        buf = io.BytesIO()
+        with tarfile.open(mode="w", fileobj=buf, format=tarfile.GNU_FORMAT) as tf:
+            for name, typ, link, data in members:
+                ti = tarfile.TarInfo(name)
+                ti.type, ti.linkname, ti.mtime = typ, link, 1700000000
+                ti.mode = 0o755 if typ == tarfile.DIRTYPE else 0o644
+                if typ == tarfile.CHRTYPE:
+                    ti.devmajor, ti.devminor = 1, 3
+                ti.size = len(data) if typ == tarfile.REGTYPE else 0
+                tf.addfile(ti, io.BytesIO(data) if typ == tarfile.REGTYPE else None)
+        return buf.getvalue()
+
+    parts = {}
+    with tarfile.open(base_gpkg) as outer:
+        for m in outer.getmembers():
+            base, _, name = m.name.partition("/")
+            if name and name != "Manifest" and not name.endswith(".sig"):
+                parts[name] = outer.extractfile(m).read()
+    prefix = base
+    if metadata_members is not None:
+        old = next(n for n in parts if n.startswith("metadata.tar"))
+        keep = []
+        data = parts.pop(old)
+        if old.endswith(".zst"):
+            data = subprocess.run(["zstd", "-dc"], input=data, capture_output=True, check=True).stdout
+        with tarfile.open(fileobj=__import__("io").BytesIO(data)) as inner:
+            for m in inner.getmembers():
+                if m.isreg():
+                    keep.append((m.name, tarfile.REGTYPE, "", inner.extractfile(m).read()))
+        parts["metadata.tar"] = pack(keep + metadata_members(keep))
+    if image_members is not None:
+        for n in [n for n in parts if n.startswith("image.tar")]:
+            del parts[n]
+        parts["image.tar"] = pack(image_members)
+    manifest = "".join(
+        f"DATA {n} {len(d)} BLAKE2B {hashlib.blake2b(d).hexdigest()} SHA512 {hashlib.sha512(d).hexdigest()}\n"
+        for n, d in parts.items()
+        if n != "gpkg-1"
+    ) + f"DATA gpkg-1 0 BLAKE2B {hashlib.blake2b(b'').hexdigest()} SHA512 {hashlib.sha512(b'').hexdigest()}\n"
+    with tarfile.open(dest, "w", format=tarfile.USTAR_FORMAT) as out:
+        for n, d in [*parts.items(), ("Manifest", manifest.encode())]:
+            ti = tarfile.TarInfo(f"{prefix}/{n}")
+            ti.size, ti.mode, ti.mtime = len(d), 0o644, 1700000000
+            out.addfile(ti, io.BytesIO(d))
+
+
+_HOSTILE_D, _HOSTILE_S, _HOSTILE_L, _HOSTILE_F = (
+    tarfile.DIRTYPE, tarfile.SYMTYPE, tarfile.LNKTYPE, tarfile.REGTYPE,
+)
+# id -> (extra image members, the Danger line Portage 3.0.83-r1 prints)
+_HOSTILE_SHAPES = {
+    "dotdot-sub": ([("image/opt/..", _HOSTILE_D, "", b"")], "path traversal detected: image/opt/.."),
+    "dotdot-bare": ([("..", _HOSTILE_D, "", b"")], "path traversal detected: .."),
+    "dotdot-leading": ([("image/../outside", _HOSTILE_F, "", b"x")], "path traversal detected: image/../outside"),
+    "dotdot-dotslash": ([("./../evil", _HOSTILE_F, "", b"x")], "path traversal detected: ./../evil"),
+    "abs-path": ([("/etc/evil", _HOSTILE_F, "", b"x")], "absolute path detected: /etc/evil"),
+    "duplicate": (
+        [("image/usr/share/packagepkg/hello.txt", _HOSTILE_F, "", b"d")],
+        "duplicate files detected: image/usr/share/packagepkg/hello.txt",
+    ),
+    "device": ([("image/hda", tarfile.BLKTYPE, "", b"")], "device file detected: image/hda"),
+    "hardlink-outside-archive": ([("image/shadow", _HOSTILE_L, "/etc/shadow", b"")], "hardlink escape detected: image/shadow"),
+    "symlink-parent-abs": (
+        [("image/link", _HOSTILE_S, "/nonexistent-outside", b""), ("image/link/marker", _HOSTILE_F, "", b"x")],
+        "symlink escape detected: image/link",
+    ),
+    "symlink-parent-rel": (
+        [("image/link", _HOSTILE_S, "../../../outside", b""), ("image/link/marker", _HOSTILE_F, "", b"x")],
+        "symlink escape detected: image/link",
+    ),
+    "symlink-root": (
+        [("image/x", _HOSTILE_S, "/", b""), ("image/x/etc/evil", _HOSTILE_F, "", b"x")],
+        "symlink escape detected: image/x/etc",
+    ),
+    "dir-through-symlink": (
+        [("image/link", _HOSTILE_S, "/nonexistent-outside", b""), ("image/./link", _HOSTILE_D, "", b"")],
+        "symlink escape detected: image/./link",
+    ),
+    "hardlink-to-escaping-symlink": (
+        [("image/link", _HOSTILE_S, "/nonexistent-outside", b""), ("image/hardlink", _HOSTILE_L, "image/link", b"")],
+        "symlink escape detected: image/link",
+    ),
+    "hardlink-relocated-rel": (
+        [
+            ("marker", _HOSTILE_F, "", b"staging"),
+            ("image/deep/link", _HOSTILE_S, "../../marker", b""),
+            ("image/hard", _HOSTILE_L, "image/deep/link", b""),
+        ],
+        "symlink escape detected: image/",
+    ),
+}
+_HOSTILE_META_SHAPES = {
+    "meta-symlink": lambda keep: [("metadata/EAPI", _HOSTILE_S, "SLOT", b"")],
+    "meta-symlink-abs": lambda keep: [("metadata/EAPI", _HOSTILE_S, "/etc/hostname", b"")],
+    "meta-hardlink": lambda keep: [("metadata/EAPI", _HOSTILE_L, "metadata/SLOT", b"")],
+    "meta-chardev": lambda keep: [("metadata/EAPI", tarfile.CHRTYPE, "", b"")],
+    "meta-dir": lambda keep: [("metadata/EAPI", _HOSTILE_D, "", b"")],
+    "meta-extra-symlink": lambda keep: [("metadata/EXTRA", _HOSTILE_S, "SLOT", b"")],
+    "meta-extra-dir": lambda keep: [("metadata/subdir", _HOSTILE_D, "", b"")],
+}
+
+
+@pytest.mark.parametrize(
+    "shape", [*_HOSTILE_SHAPES, *_HOSTILE_META_SHAPES, "control-contained-symlink-parent"]
+)
+def test_usepkgonly_refuses_hostile_gpkg_archives_like_portage(emerge_binary, tmp_path, shape):
+    """Backlog #500 (plan 02.442 S1). Portage 3.0.83-r1 refuses a gpkg whose image
+    carries a `..` component (also `a/..` and a bare `..`), an absolute name, a duplicate,
+    a device, a hard link to a non-member, a member whose parent or itself resolves outside
+    the image through a symlink, or a hard link of a symlink that escapes (also once
+    relocated), and a gpkg whose metadata tar has any member that is not a regular file
+    (`gpkg.tar_safe_extract._check_member`, `_check_metadata_files`). rc 1, nothing
+    installed, the image directory left empty. A file under a symlink parent that stays
+    inside the image is accepted (upstream `test_contained_symlink_parent`). Shapes and
+    verdicts captured on Portage 3.0.83-r1 (`LLM/evidence/2026-10-23-500-501/` in
+    portuale: `build-hostile.py`, `harness/runpm.sh`, casts `*.portage.cast`). Message text
+    is not compared byte for byte (portuale prefixes the archive path); the `Danger:`
+    line and the metadata member name are."""
+    root0 = tmp_path / "root0"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    env0 = _getbinpkg_500_env(tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir")
+    env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env0,
+    )
+    base = root0 / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar"
+
+    image = [
+        ("image", _HOSTILE_D, "", b""),
+        ("image/usr", _HOSTILE_D, "", b""),
+        ("image/usr/share", _HOSTILE_D, "", b""),
+        ("image/usr/share/packagepkg", _HOSTILE_D, "", b""),
+        ("image/usr/share/packagepkg/hello.txt", _HOSTILE_F, "", b"hello\n"),
+    ]
+    metadata_members = None
+    if shape in _HOSTILE_SHAPES:
+        image += _HOSTILE_SHAPES[shape][0]
+        needle = "Danger: " + _HOSTILE_SHAPES[shape][1]
+    elif shape in _HOSTILE_META_SHAPES:
+        needle = "Metadata member is not a regular file: metadata/"
+
+        def metadata_members(keep, make=_HOSTILE_META_SHAPES[shape]):
+            replaced = {m[0] for m in make(keep)}
+            keep[:] = [k for k in keep if k[0] not in replaced]
+            return make(keep)
+    else:
+        image += [
+            ("image/usr/share/packagepkg/real", _HOSTILE_D, "", b""),
+            ("image/usr/share/packagepkg/bin", _HOSTILE_S, "real", b""),
+            ("image/usr/share/packagepkg/bin/tool", _HOSTILE_F, "", b"t\n"),
+        ]
+        needle = None
+    pkgdir = tmp_path / "pkgdir-hostile"
+    (pkgdir / "dev-libs").mkdir(parents=True)
+    _hostile_gpkg(base, pkgdir / "dev-libs/packagepkg-1.0.gpkg.tar", image, metadata_members)
+
+    root = tmp_path / "root-hostile"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    env = _getbinpkg_500_env(tmp_path, root, Path(FIXTURES_ROOT), pkgdir)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["NOCOLOR"] = "true"
+    r = subprocess.run(
+        [str(emerge_binary), "-1", "--usepkgonly", "--nodeps", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    out = r.stdout + r.stderr
+    if needle is None:
+        assert r.returncode == 0, out
+        assert (root / "usr/share/packagepkg/real/tool").read_bytes() == b"t\n"
+        return
+    assert r.returncode == 1, out
+    assert needle in out, out
+    assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists()
+    assert not (root / "usr/share/packagepkg/hello.txt").exists()
+    for stray in ("etc/evil", "outside", "evil", "marker"):
+        assert not (root / stray).exists() and not (tmp_path / stray).exists(), stray
+    # No image directory ever holds a member: the refusal comes before any unpack.
+    for image_dir in (tmp_path / "portage-tmpdir").rglob("image"):
+        assert not any(image_dir.iterdir()), (image_dir, list(image_dir.iterdir()))
+
+
 def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_path):
     """Backlog #175 case (b): the only binhost 500s every index fetch and
     PKGDIR is empty. Real (`bintree._populate_remote`'s `except OSError`,
