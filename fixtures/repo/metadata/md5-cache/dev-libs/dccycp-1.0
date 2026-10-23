@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: protected package outside the cycle that requires dccyca, for --depclean with a cycle argument (#508)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/dccyca
+SLOT=0
+_md5_=06cbbe7ff29ab80d4507ada742a90525

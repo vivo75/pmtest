@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: three-member cycle X -> Y -> Z -> X (last member), for --depclean with a cycle argument (#508)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/dccycx
+SLOT=0
+_md5_=b127264d74267dff2e881413f682797e

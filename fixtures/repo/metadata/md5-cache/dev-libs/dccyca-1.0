@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: cycle pair A (A and B require each other; B is the only other member), for --depclean with a cycle argument (#508)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/dccycb
+SLOT=0
+_md5_=3fb4c27b0348764a708556e91abd3d13

@@ -17755,6 +17755,212 @@ def test_depclean_pretend_nothing_to_remove(emerge_binary, fixture_env, tmp_path
     assert result.stdout.splitlines()[-1] == "Number to remove:     0"
 
 
+def _cycle_depclean_env(fixture_env, tmp_path, installed, world):
+    """A ROOT for the #508 cycle notice: `installed` maps each dev-libs
+    package to its RDEPEND (the vdb is hand-written, as `_depclean_root`
+    does), `world` lists the @world atoms. Fixture ebuilds dccyca...dccycz
+    (`fixtures/repo/dev-libs/`) carry the same RDEPEND for the oracle
+    capture (LLM/evidence/2026-10-23-508/probe.sh)."""
+    root = tmp_path / "root"
+    portage_dir = root / "var" / "lib" / "portage"
+    portage_dir.mkdir(parents=True)
+    (portage_dir / "world").write_text("".join(f"dev-libs/{p}\n" for p in world))
+    for name, rdepend in installed.items():
+        d = root / "var" / "db" / "pkg" / "dev-libs" / f"{name}-1.0"
+        d.mkdir(parents=True)
+        (d / "CATEGORY").write_text("dev-libs\n")
+        (d / "SLOT").write_text("0\n")
+        (d / "EAPI").write_text("8\n")
+        (d / "KEYWORDS").write_text("amd64\n")
+        (d / "USE").write_text("\n")
+        (d / "IUSE").write_text("\n")
+        if rdepend:
+            (d / "RDEPEND").write_text(f"{rdepend}\n")
+    # The config is the one the oracle captures used (probe.sh in
+    # LLM/evidence/2026-10-23-508): the fixture profile tree is not one host
+    # Portage can parse, so the base and amd64 profiles are chained here.
+    fx = Path(fixture_env["PORTAGE_CONFIGROOT"])
+    cfg = tmp_path / "cfg"
+    (cfg / "etc" / "portage" / "repos.conf").mkdir(parents=True)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "parent").write_text(
+        f"{fx}/repo/profiles/base\n{fx}/repo/profiles/arch/amd64\n"
+    )
+    (cfg / "etc" / "portage" / "make.profile").symlink_to(profile)
+    (cfg / "etc" / "portage" / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n"
+    )
+    (cfg / "etc" / "portage" / "make.conf").write_text(
+        'FEATURES="-news"\nACCEPT_LICENSE="*"\n'
+    )
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env
+
+
+_CYCLE_PAIR = {"dccyca": "dev-libs/dccycb", "dccycb": "dev-libs/dccyca"}
+_CYCLE_NOTICE_A = [
+    "  dev-libs/dccyca-1.0 is only required by packages that it requires",
+    "  itself. Pass all of them at once in order to remove them:",
+    "    emerge --depclean =dev-libs/dccyca-1.0 =dev-libs/dccycb-1.0",
+    "",
+]
+
+
+def test_508_depclean_names_the_whole_cycle_in_a_notice(emerge_binary, fixture_env, tmp_path):
+    """#508 (Portage 3.0.83-r1 `_calc_depclean`, `show_cycle_suggestion`,
+    bug 346351): `--depclean -p dev-libs/dccyca` where dccyca and dccycb
+    require each other and dccycw is world. dccyca is kept (only its
+    cycle partner needs it, and the partner is protected), so the notice
+    names both members in cpv order, then the nothing-selected message, the
+    summary, rc 0. Oracle: LLM/evidence/2026-10-23-508/captures/01-pair-a.*."""
+    env = _cycle_depclean_env(
+        fixture_env, tmp_path, {**_CYCLE_PAIR, "dccycw": ""}, ["dccycw"]
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == _CYCLE_NOTICE_A + [
+        ">>> No packages selected for removal by depclean",
+        ">>> To see reverse dependencies, use --verbose",
+        "Packages installed:   3",
+        "Packages in world:    1",
+        "Packages in system:   2",
+        "Required packages:    3",
+        "Number to remove:     0",
+    ]
+
+
+def test_508_notice_follows_the_pulled_in_block_under_verbose(emerge_binary, fixture_env, tmp_path):
+    """#508: with `--verbose` Portage calls `show_parents` and then
+    `show_cycle_suggestion` for the same package, so the `pulled in by`
+    block comes first and the notice after it. Oracle: `05-pair-verbose`."""
+    env = _cycle_depclean_env(
+        fixture_env, tmp_path, {**_CYCLE_PAIR, "dccycw": ""}, ["dccycw"]
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--depclean", "--verbose", "dev-libs/dccyca"],
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[:6] == [
+        "  dev-libs/dccyca-1.0 pulled in by:",
+        "    dev-libs/dccycb-1.0 requires dev-libs/dccyca",
+        "",
+    ] + _CYCLE_NOTICE_A[:3]
+    assert ">>> No packages selected for removal by depclean" in result.stdout
+    assert ">>> To see reverse dependencies" not in result.stdout
+
+
+def test_508_each_argument_in_a_three_cycle_gets_its_own_notice(emerge_binary, fixture_env, tmp_path):
+    """#508: two cycle members named as arguments give two notices, and each
+    lists all three members (the same `=cpv` list, sorted). Oracle:
+    `09-three-cycle-two-args`; `08-three-cycle` is the single-argument form."""
+    env = _cycle_depclean_env(
+        fixture_env,
+        tmp_path,
+        {"dccycx": "dev-libs/dccycy", "dccycy": "dev-libs/dccycz", "dccycz": "dev-libs/dccycx", "dccycw": ""},
+        ["dccycw"],
+    )
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--depclean", "dev-libs/dccycx", "dev-libs/dccycy"],
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    members = "    emerge --depclean =dev-libs/dccycx-1.0 =dev-libs/dccycy-1.0 =dev-libs/dccycz-1.0"
+    lines = result.stdout.splitlines()
+    assert lines.count(members) == 2
+    assert lines[0] == "  dev-libs/dccycx-1.0 is only required by packages that it requires"
+    assert lines[4] == "  dev-libs/dccycy-1.0 is only required by packages that it requires"
+
+
+def test_508_parent_outside_the_cycle_silences_the_notice(emerge_binary, fixture_env, tmp_path):
+    """#508: a protected package outside the cycle (dccycp, not named) that
+    requires dccyca is a reverse dependency from outside, so Portage prints
+    the plain reverse-dependency block and no notice. Oracle:
+    `07-pair-protected-parent`."""
+    env = _cycle_depclean_env(
+        fixture_env,
+        tmp_path,
+        {**_CYCLE_PAIR, "dccycp": "dev-libs/dccyca", "dccycw": ""},
+        ["dccycw"],
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert "is only required by packages" not in result.stdout
+    assert result.stdout.splitlines()[0] == ">>> No packages selected for removal by depclean"
+
+
+def test_508_world_listed_member_still_gets_the_notice(emerge_binary, fixture_env, tmp_path):
+    """#508 (Portage quirk, LLM/portage-quirks.md Q7): dccyca is also in
+    @world. The notice still says it is "only required by packages that it
+    requires itself" and the suggested command removes it with its partner,
+    because `_parent_atoms` never records the world set in `args` mode
+    (`deselect` empties `@selected`). Oracle: `06-pair-world-parent`."""
+    env = _cycle_depclean_env(
+        fixture_env, tmp_path, {**_CYCLE_PAIR, "dccycw": ""}, ["dccycw", "dccyca"]
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines()[:4] == _CYCLE_NOTICE_A[:3] + [""]
+    # The suggested pair removes both, the world-listed one included.
+    both = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--depclean", "dev-libs/dccyca", "dev-libs/dccycb"],
+        env,
+    )
+    assert "Number to remove:     2" in both.stdout.splitlines()
+
+
+def test_508_no_arguments_gives_no_notice(emerge_binary, fixture_env, tmp_path):
+    """#508: the notice is an `args`-mode message. Without arguments the cycle
+    is simply part of the removal list. Oracle: `04-pair-noargs`."""
+    env = _cycle_depclean_env(
+        fixture_env, tmp_path, {**_CYCLE_PAIR, "dccycw": ""}, ["dccycw"]
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean"], env)
+    assert result.returncode == 0, result.stderr
+    assert "is only required by packages" not in result.stdout
+    assert "Number to remove:     2" in result.stdout.splitlines()
+
+
+def test_508_a_system_member_in_the_cycle_silences_the_notice(emerge_binary, fixture_env, tmp_path):
+    """#508: `systempkg` (an @system member of the fixture profile) requires
+    dccyca and dccyca requires systempkg. The `@system` set is a parent
+    outside the cycle, so no notice. Oracle: `12-system-cycle`."""
+    env = _cycle_depclean_env(
+        fixture_env,
+        tmp_path,
+        {"systempkg": "dev-libs/dccyca", "dccyca": "dev-libs/systempkg", "dccycw": ""},
+        ["dccycw"],
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert "is only required by packages" not in result.stdout
+    assert "Number to remove:     0" in result.stdout.splitlines()
+
+
+def test_508_no_pretend_with_arguments_and_nothing_selected_fails(emerge_binary, fixture_env, tmp_path):
+    """#508 (found while pinning the notice; not cycle-specific): without
+    `--pretend`, `--depclean ARG` that selects nothing returns rc 1
+    (`_calc_depclean`: `if args_set and "--pretend" not in myopts`), after
+    the notice and the nothing-selected lines and before the summary.
+    Oracle: `11-pair-a-no-pretend` (rc 1 on both managers)."""
+    env = _cycle_depclean_env(
+        fixture_env, tmp_path, {**_CYCLE_PAIR, "dccycw": ""}, ["dccycw"]
+    )
+    result = _run([str(emerge_binary)], ["--depclean", "dev-libs/dccyca"], env)
+    assert result.returncode == 1
+    assert result.stdout.splitlines()[-2:] == [
+        ">>> No packages selected for removal by depclean",
+        ">>> To see reverse dependencies, use --verbose",
+    ]
+    assert "Number removed" not in result.stdout
+
+
 def _depclean_pprovided_root(tmp_path):
     """A ROOT exercising `package.provided` during `--depclean`: the
     shared `fixtures/repo/profiles/default/package.provided` lists
