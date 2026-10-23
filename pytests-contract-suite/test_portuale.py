@@ -874,6 +874,9 @@ def _write_tmp_clientetc(tmp_path, binhost, name="clientetc"):
         "[tmpbinhost]\n"
         f"sync-uri = file://{binhost}\n"
         "priority = 1\n"
+        # Unsigned test binhost (backlog #511): opt out of the verifying
+        # default so the `.tbz2` entry is served.
+        "verify-signature = false\n"
     )
     repos_conf = clientetc / "etc/portage/repos.conf"
     for conf in repos_conf.iterdir():

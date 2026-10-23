@@ -11733,9 +11733,10 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     )
     (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "empty-pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
-    # Fragment 1: the shared fixture binhost (has dev-libs/remotebinpkg).
+    # Fragment 1: the shared fixture binhost (has dev-libs/remotebinpkg;
+    # unsigned, so opt out of the verifying default — backlog #511).
     (cfg / "etc/portage/binrepos.conf/10-a.conf").write_text(
-        f"[a]\nsync-uri = file://{fixtures_root / 'binhost'}\npriority = 1\n"
+        f"[a]\nsync-uri = file://{fixtures_root / 'binhost'}\npriority = 1\nverify-signature = false\n"
     )
     # Fragment 2: a second binhost, only reachable if the directory's
     # other files are read too.
@@ -11747,7 +11748,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
         "EAPI: 8\nIUSE:\nKEYWORDS: amd64\nREPO: gentoo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
     )
     (cfg / "etc/portage/binrepos.conf/20-b.conf").write_text(
-        f"[b]\nsync-uri = file://{bh2}\npriority = 2\n"
+        f"[b]\nsync-uri = file://{bh2}\npriority = 2\nverify-signature = false\n"
     )
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
@@ -34221,3 +34222,197 @@ def test_507_json_report_is_not_printed_when_nothing_cycles(emerge_binary, fixtu
     assert result.returncode == 0
     assert result.stdout == base.stdout
     assert result.stderr == base.stderr
+
+
+def _mixed_binhost_env(fixture_env, tmp_path):
+    """A hermetic config for the backlog #511 mixed-binhost pins: a scratch
+    `s511` repo (profiles only, NO ebuilds — every package exists only as a
+    remote binary, like the #347 S9 cells) plus two `file://` binhosts with
+    no shared CPV: `[mixsig]` (`verify-signature = true`, so Portage 3.0.83
+    serves only gpkg there) holds a gpkg and an xpak entry with `BUILD_ID`,
+    a gpkg entry without one, an xpak entry without one, an unknown
+    extension and a missing `PATH`; `[mixplain]`
+    (`verify-signature = false`) holds the xpak, gpkg-no-`BUILD_ID`,
+    unknown-extension and missing-`PATH` counterparts under other atoms.
+    Mirrors the oracle setup (`LLM/evidence/2026-10-23-511/probe.sh`)."""
+
+    def idx(cpv, rest):
+        return (
+            f"CPV: {cpv}\nDEFINED_PHASES: -\nDESCRIPTION: backlog #511 pin\n"
+            f"EAPI: 8\nIUSE:\nKEYWORDS: amd64\nSLOT: 0\nUSE:\nREPO: s511\n"
+            f"SIZE: 100\n{rest}\n"
+        )
+
+    fx = Path(fixture_env["PORTAGE_CONFIGROOT"])
+    cfg = tmp_path / "cfg"
+    (cfg / "etc" / "portage" / "repos.conf").mkdir(parents=True)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "parent").write_text(
+        f"{fx}/repo/profiles/base\n{fx}/repo/profiles/arch/amd64\n"
+    )
+    (cfg / "etc" / "portage" / "make.profile").symlink_to(profile)
+    repo = tmp_path / "s511"
+    (repo / "profiles").mkdir(parents=True)
+    (repo / "metadata").mkdir(parents=True)
+    (repo / "profiles" / "repo_name").write_text("s511\n")
+    (repo / "profiles" / "categories").write_text("app-misc\n")
+    (repo / "metadata" / "layout.conf").write_text("masters = testrepo\n")
+    (cfg / "etc" / "portage" / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n\n"
+        f"[s511]\nlocation = {repo}\npriority = 70\n"
+    )
+    (cfg / "etc" / "portage" / "make.conf").write_text(
+        f'PKGDIR="{cfg / "pkgdir"}"\nFEATURES="-news"\nACCEPT_LICENSE="*"\n'
+    )
+    sig = tmp_path / "binhost-sig"
+    plain = tmp_path / "binhost-plain"
+    sig.mkdir()
+    plain.mkdir()
+    (sig / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 6\n\n"
+        + idx("app-misc/s511-a-1", "PATH: app-misc/s511-a-1.gpkg.tar\nBUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-b-1", "PATH: app-misc/s511-b-1.tbz2\nBUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-c-1", "PATH: app-misc/s511-c-1.gpkg.tar\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-d-1", "PATH: app-misc/s511-d-1.tbz2\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-e-1", "PATH: app-misc/s511-e-1.weird\nBUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-f-1", "BUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+    )
+    (plain / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 4\n\n"
+        + idx("app-misc/s511-g-1", "PATH: app-misc/s511-g-1.xpak\nBUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-h-1", "PATH: app-misc/s511-h-1.gpkg.tar\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-i-1", "PATH: app-misc/s511-i-1.weird\nBUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+        + idx("app-misc/s511-j-1", "BUILD_ID: 1\nBUILD_TIME: 1000")
+        + "\n"
+    )
+    (cfg / "etc" / "portage" / "binrepos.conf").write_text(
+        f"[mixsig]\nsync-uri = file://{sig}\npriority = 1\nverify-signature = true\n\n"
+        f"[mixplain]\nsync-uri = file://{plain}\npriority = 2\nverify-signature = false\n"
+    )
+    root = tmp_path / "root"
+    root.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env
+
+
+def _s511_run(emerge_binary, env, *args):
+    return _run([str(emerge_binary)], ["-p", "--color=n", "--getbinpkg", *args], env)
+
+
+def test_511_sig_gpkg_merges_from_the_index(emerge_binary, fixture_env, tmp_path):
+    """Backlog #511 (Portage 3.0.83-r1 `bintree._populate_remote`): a gpkg
+    entry in the verifying repo resolves to a `[binary]` row, rc 0. Oracle:
+    `LLM/evidence/2026-10-23-511/captures/01-sig-gpkg.*` (the `to <root>/`
+    trailing slash there is portuale's standing pretend convention, #425:
+    portuale prints `to <root>`)."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    result = _s511_run(emerge_binary, env, "app-misc/s511-a")
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N g   ] app-misc/s511-a-1-1 to {env['ROOT']}" in result.stdout
+
+
+def test_511_sig_xpak_is_ignored_with_the_new_warning(emerge_binary, fixture_env, tmp_path):
+    """Backlog #511 (`78607215e`, `7e2dcd0bd`): an xpak entry in the
+    verifying repo is ignored with the 3.0.83 warning naming the repo and
+    the index URI, so the atom has no candidate (rc 1, the plain
+    no-ebuilds abort). Oracle:
+    `LLM/evidence/2026-10-23-511/captures/02-sig-xpak.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    result = _s511_run(emerge_binary, env, "app-misc/s511-b")
+    assert result.returncode == 1
+    assert (
+        f"[mixsig] Remote XPAK binpkgs in 'file://{tmp_path}/binhost-sig' ignored: "
+        "signatures are missing (FEATURES=binpkg-request-signature or "
+        "verify-signature in binrepos.conf).\n" in result.stderr
+    )
+    assert 'no ebuilds to satisfy "app-misc/s511-b"' in result.stderr
+
+
+def test_511_sig_gpkg_without_build_id_merges(emerge_binary, fixture_env, tmp_path):
+    """Backlog #511 (`b6071d4d1`, bug 970606): a gpkg entry without
+    `BUILD_ID` in the verifying repo still resolves (the remote `PATH` is
+    authoritative, no build id is required), rc 0. Oracle:
+    `LLM/evidence/2026-10-23-511/captures/03-sig-gpkg-nobuildid.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    result = _s511_run(emerge_binary, env, "app-misc/s511-c")
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N g   ] app-misc/s511-c-1 to {env['ROOT']}" in result.stdout
+
+
+def test_511_sig_xpak_without_build_id_is_ignored(emerge_binary, fixture_env, tmp_path):
+    """Backlog #511: the xpak side of `b6071d4d1` — an xpak entry without
+    `BUILD_ID` is still an xpak entry, so the verifying repo ignores it
+    (rc 1). Oracle:
+    `LLM/evidence/2026-10-23-511/captures/04-sig-xpak-nobuildid.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    result = _s511_run(emerge_binary, env, "app-misc/s511-d")
+    assert result.returncode == 1
+    assert "Remote XPAK binpkgs in" in result.stderr
+    assert 'no ebuilds to satisfy "app-misc/s511-d"' in result.stderr
+
+
+def test_511_sig_unknown_and_missing_paths_are_ignored_per_entry(emerge_binary, fixture_env, tmp_path):
+    """Backlog #511 (`get_binpkg_format` remote error): under `gpkg_only`
+    an unknown `PATH` extension — or a missing `PATH` — drops the entry
+    with its own `Unsupported binary package format` line each (no
+    once-per-repo gate, unlike the xpak warning). Oracle:
+    `LLM/evidence/2026-10-23-511/captures/05-sig-badext.*` and
+    `06-sig-nopath.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    bad = _s511_run(emerge_binary, env, "app-misc/s511-e")
+    assert bad.returncode == 1
+    assert "Unsupported binary package format from 'app-misc/s511-e-1.weird'\n" in bad.stderr
+    missing = _s511_run(emerge_binary, env, "app-misc/s511-f")
+    assert missing.returncode == 1
+    assert "Unsupported binary package format from ''\n" in missing.stderr
+
+
+def test_511_plain_repo_serves_xpak_and_gpkg_without_build_id(emerge_binary, fixture_env, tmp_path):
+    """Backlog #511: without `verify-signature` there is no `gpkg_only`,
+    so the xpak entry, the gpkg entry without `BUILD_ID`, the unknown
+    extension and the missing `PATH` all resolve (no per-entry format
+    check at all); only the verifying repo warns. Oracle:
+    `LLM/evidence/2026-10-23-511/captures/07-plain-xpak.*`,
+    `08-plain-gpkg-nobuildid.*`, `11-plain-badext.*`, `12-plain-nopath.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    for atom, row in [
+        ("app-misc/s511-g", f"[binary  N g   ] app-misc/s511-g-1-1 to {env['ROOT']}"),
+        ("app-misc/s511-h", f"[binary  N g   ] app-misc/s511-h-1 to {env['ROOT']}"),
+        ("app-misc/s511-i", f"[binary  N g   ] app-misc/s511-i-1-1 to {env['ROOT']}"),
+        ("app-misc/s511-j", f"[binary  N g   ] app-misc/s511-j-1-1 to {env['ROOT']}"),
+    ]:
+        result = _s511_run(emerge_binary, env, atom)
+        assert result.returncode == 0, result.stderr
+        assert row in result.stdout
+        assert "[mixplain] Remote XPAK binpkgs in" not in result.stderr
+
+
+def test_511_request_signature_filters_every_repo_highest_priority_first(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #511 (`7e2dcd0bd` + `78607215e` order): with
+    `FEATURES=binpkg-request-signature` every repo is `gpkg_only`, so the
+    plain repo's xpak entry is ignored too; per-repo warnings print in
+    Portage's descending-priority processing order (`mixplain` before
+    `mixsig`). Oracle:
+    `LLM/evidence/2026-10-23-511/captures/10-plain-reqsig.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path)
+    env["FEATURES"] = "-news binpkg-request-signature"
+    result = _s511_run(emerge_binary, env, "app-misc/s511-g")
+    assert result.returncode == 1
+    plain_at = result.stderr.index("[mixplain] Remote XPAK binpkgs in")
+    sig_at = result.stderr.index("[mixsig] Remote XPAK binpkgs in")
+    assert plain_at < sig_at
+    assert 'no ebuilds to satisfy "app-misc/s511-g"' in result.stderr
