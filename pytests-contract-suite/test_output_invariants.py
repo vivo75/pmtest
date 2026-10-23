@@ -48,6 +48,12 @@ def _run(emerge, args, env):
 
 
 def _cross_mode_applies(args: list[str]) -> bool:
+    # `--circular-deps-report=json` replaces the cycle's merge list with the
+    # report document (#507), so there are no rows to compare across modes.
+    if any(a.startswith("--circular-deps-report") for a in args) and (
+        "--circular-deps-report=json" in args or "json" in args
+    ):
+        return False
     for a in args:
         if a in MODE_FLAGS or "color" in a or "columns" in a:
             return False

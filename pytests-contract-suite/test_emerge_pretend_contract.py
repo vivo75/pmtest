@@ -3104,6 +3104,13 @@ CASES = [
     ("#506: a -amd64 bootstrap reads as a missing keyword and is listed (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgok"], 1),
     ("#506: a package.mask'd bootstrap is listed as a masked alternative (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgop"], 1),
     ("#506: the USE-change search gives up past PORTAGE_CIRCULAR_MAX_USE_FLAGS=10 (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddtrna"], 1),
+    ("#507: --circular-deps-report=json prints the cycle and its USE solution as JSON (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-libs/usecyclea"], 1),
+    ("#507: the json report names a FEATURES=test parent (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-libs/cddtsta"], 1),
+    ("#507: the json report lists a masked bootstrap alternative of a self cycle (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-lang/cddgo"], 1),
+    ("#507: the json report of a four-member ring lists all four rotations (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-libs/cyc4a"], 1),
+    ("#507: the json report under --tree (Portage 3.0.83-r1, rc 1)", ["--pretend", "--tree", "--circular-deps-report=json", "dev-libs/gpcyclec"], 1),
+    ("#507: --circular-deps-report json (space form) prints the json report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report", "json", "dev-libs/usecyclea"], 1),
+    ("#507: --circular-deps-report=text keeps the text report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=text", "dev-libs/usecyclea"], 1),
 ]
 
 
@@ -33510,7 +33517,7 @@ def test_new_3_0_83_options_are_accepted_and_inert(emerge_binary, fixture_env, e
     """Backlog #503. Portage 3.0.83-r1 accepts the three new options (probe cells
     01-03, 06, 08-10, 12, 14-17, 20) and a plain `--pretend` merge list has no
     cycle, binary or build, so the output is the baseline's: the options change
-    nothing until #507 (json report), #509 (user patches), #512 (merge-wait)."""
+    nothing without a cycle (#507 json report, tested separately), until #509 (user patches) and #512 (merge-wait)."""
     base = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
     result = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/newpkg"], fixture_env)
     assert base.returncode == 0
@@ -33715,3 +33722,296 @@ def test_506_circular_report_colours_the_edge_flags_and_the_nomerge_row(
     assert rows[0].startswith(f"[\x1b[36mnomerge      {reset} ] \x1b[36mdev-libs/cddtsta-1::testrepo{reset}")
     assert rows[2].startswith(f"[\x1b[32mebuild{reset}  ")
     assert f"\x1b[32mdev-libs/cddtsta-1::testrepo{reset}" in rows[2]
+
+
+# Backlog #507 (portuale plan 02.442 S8): `--circular-deps-report=json`. Expected
+# values are the Portage 3.0.83-r1 host captures of portuale
+# `LLM/evidence/2026-10-23-507/captures/*.portage.out` (the fixture repo through a
+# staged config root); stdout is the resolution preamble (wall-clock seconds cut)
+# and one `json.dumps(report, indent=2)` document, stderr stays empty, rc 1.
+# Portage orders the keys of a `use_changes` object by hash (portuale
+# `LLM/portage-quirks.md` Q6); portuale sorts them, so the multi-flag shapes
+# compare the parsed document.
+def _cdr(
+    cycles,
+    edges,
+    solutions=(),
+    test=(),
+    masked=(),
+    truncated=(),
+    max_use=10,
+    cat="dev-libs",
+):
+    def q(name):
+        return name if "/" in name else f"{cat}/{name}"
+
+    return {
+        "cycles": [[q(n) for n in cycle] for cycle in cycles],
+        "shortest_cycle": [
+            {
+                "parent": q(parent),
+                "child": q(child),
+                "priority": "buildtime",
+                "affecting_use": list(flags),
+            }
+            for parent, child, flags in edges
+        ],
+        "solutions": [
+            {"package": q(pkg), "use_changes": [dict(c) for c in changes]}
+            for pkg, changes in solutions
+        ],
+        "test_dep_parents": [q(n) for n in test],
+        "masked_alternatives": [
+            {"package": q(pkg), "alternatives": [q(a) for a in alts]}
+            for pkg, alts in masked
+        ],
+        "search_truncated": [q(n) for n in truncated],
+        "max_affecting_use": max_use,
+    }
+
+
+_CDR_SHAPES = {
+    "use": (
+        ["--pretend", "dev-libs/usecyclea"],
+        _cdr(
+            [["usecycleb-1.0", "usecyclea-1.0"], ["usecyclea-1.0", "usecycleb-1.0"]],
+            [("usecyclea-1.0", "usecycleb-1.0", ["x"]), ("usecycleb-1.0", "usecyclea-1.0", [])],
+            solutions=[("usecyclea-1.0", [{"x": False}])],
+        ),
+    ),
+    "neg": (
+        ["--pretend", "--autounmask-use=n", "dev-libs/cddnega"],
+        _cdr(
+            [["cddnegb-1", "cddnega-1"], ["cddnega-1", "cddnegb-1"]],
+            [("cddnega-1", "cddnegb-1", ["system-b"]), ("cddnegb-1", "cddnega-1", [])],
+            solutions=[("cddnega-1", [{"system-b": True}])],
+        ),
+    ),
+    "unrelated": (
+        ["--pretend", "dev-libs/cddunra"],
+        _cdr(
+            [["cddunrb-1", "cddunra-1"], ["cddunra-1", "cddunrb-1"]],
+            [("cddunra-1", "cddunrb-1", []), ("cddunrb-1", "cddunra-1", [])],
+        ),
+    ),
+    "several": (
+        ["--pretend", "--autounmask-use=n", "dev-libs/cddseva"],
+        _cdr(
+            [["cddsevb-1", "cddseva-1"], ["cddseva-1", "cddsevb-1"]],
+            [("cddseva-1", "cddsevb-1", ["doc", "nls"]), ("cddsevb-1", "cddseva-1", [])],
+            solutions=[("cddseva-1", [{"doc": False, "nls": False}])],
+        ),
+    ),
+    "test": (
+        ["--pretend", "dev-libs/cddtsta"],
+        _cdr(
+            [["cddtstb-1", "cddtsta-1"], ["cddtsta-1", "cddtstb-1"]],
+            [("cddtsta-1", "cddtstb-1", ["test"]), ("cddtstb-1", "cddtsta-1", [])],
+            solutions=[("cddtsta-1", [{"test": False}])],
+            test=["cddtsta-1"],
+        ),
+    ),
+    "go": (
+        ["--pretend", "dev-lang/cddgo"],
+        _cdr(
+            [["cddgo-2"]],
+            [("cddgo-2", "cddgo-2", [])],
+            masked=[("cddgo-2", ["cddgo-bootstrap-1"])],
+            cat="dev-lang",
+        ),
+    ),
+    "gou": (
+        ["--pretend", "dev-lang/cddgou"],
+        _cdr(
+            [["cddgou-2"]],
+            [("cddgou-2", "cddgou-2", [])],
+            masked=[("cddgou-2", ["cddgou-bootstrap-1"])],
+            cat="dev-lang",
+        ),
+    ),
+    "trunc": (
+        ["--pretend", "--autounmask-use=n", "dev-libs/cddtrna"],
+        _cdr(
+            [["cddtrnb-1", "cddtrna-1"], ["cddtrna-1", "cddtrnb-1"]],
+            [
+                ("cddtrna-1", "cddtrnb-1", sorted(f"flag{i}" for i in range(12))),
+                ("cddtrnb-1", "cddtrna-1", []),
+            ],
+            truncated=["cddtrna-1"],
+        ),
+    ),
+    "hard": (
+        ["--pretend", "dev-libs/hardcyclea"],
+        _cdr(
+            [["hardcycleb-1.0", "hardcyclea-1.0"], ["hardcyclea-1.0", "hardcycleb-1.0"]],
+            [("hardcyclea-1.0", "hardcycleb-1.0", []), ("hardcycleb-1.0", "hardcyclea-1.0", [])],
+        ),
+    ),
+    "tree": (
+        ["--pretend", "--tree", "dev-libs/gpcyclec"],
+        _cdr(
+            [["gpcycleb-1.0", "gpcyclea-1.0"], ["gpcyclea-1.0", "gpcycleb-1.0"]],
+            [("gpcyclea-1.0", "gpcycleb-1.0", ["x"]), ("gpcycleb-1.0", "gpcyclea-1.0", [])],
+        ),
+    ),
+    "ring4": (
+        ["--pretend", "dev-libs/cyc4a"],
+        _cdr(
+            [
+                ["cyc4b-1.0", "cyc4c-1.0", "cyc4d-1.0", "cyc4a-1.0"],
+                ["cyc4c-1.0", "cyc4d-1.0", "cyc4a-1.0", "cyc4b-1.0"],
+                ["cyc4d-1.0", "cyc4a-1.0", "cyc4b-1.0", "cyc4c-1.0"],
+                ["cyc4a-1.0", "cyc4b-1.0", "cyc4c-1.0", "cyc4d-1.0"],
+            ],
+            [
+                ("cyc4a-1.0", "cyc4b-1.0", ["x"]),
+                ("cyc4b-1.0", "cyc4c-1.0", []),
+                ("cyc4c-1.0", "cyc4d-1.0", []),
+                ("cyc4d-1.0", "cyc4a-1.0", []),
+            ],
+            solutions=[("cyc4a-1.0", [{"x": False}])],
+        ),
+    ),
+    "self": (
+        ["--pretend", "--backtrack=0", "dev-libs/slcirc"],
+        _cdr(
+            [["slcirc-2.0"]],
+            [("slcirc-2.0", "slcirc-2.0", [])],
+        ),
+    ),
+}
+
+_CDR_PREAMBLE = (
+    "\nThese are the packages that would be merged, in order:\n\n"
+    "Calculating dependencies ... done!\nDependency resolution took (backtrack: {bt}).\n\n"
+)
+
+
+def _cdr_split(stdout: str):
+    """The stdout split into its preamble and the JSON text."""
+    i = stdout.index("{\n")
+    return stdout[:i], stdout[i:]
+
+
+@pytest.mark.parametrize("key", list(_CDR_SHAPES))
+def test_507_circular_report_json_matches_portage_3_0_83(emerge_binary, fixture_env, key):
+    """Backlog #507: `--circular-deps-report=json` prints the data of the
+    cycle report (`_show_circular_deps_json`) instead of the text report: every
+    cycle `get_cycles` finds (one rotation per member), the shortest one as
+    edges with their `priority` and the sorted `affecting_use`, the USE-change
+    solutions per package, the FEATURES=test parents, the masked alternatives,
+    the packages whose search was given up and the limit. Whole document
+    compared as parsed JSON (Portage's `use_changes` key order is hash order,
+    Q6); the single-flag shapes below also pin the text byte for byte."""
+    args, expected = _CDR_SHAPES[key]
+    flag = "--circular-deps-report=json"
+    result = _run([str(emerge_binary)], [args[0], flag, *args[1:]], fixture_env)
+    assert result.returncode == 1
+    assert result.stderr == ""
+    _, body = _cdr_split(result.stdout)
+    assert json.loads(body) == expected
+    if key != "several":
+        assert body == json.dumps(expected, indent=2) + "\n"
+
+
+def test_507_json_report_replaces_the_merge_list_and_keeps_the_preamble(
+    emerge_binary, fixture_env
+):
+    """Backlog #507: with `json` the cycle's merge rows (the `[nomerge]` row,
+    the `Total:` line) are not printed, only the resolution preamble
+    (`--tree` says `in reverse order`) and the document (Portage 3.0.83-r1 host
+    shapes 01, 22; the seconds of the timing line are cut)."""
+    for args, banner in [
+        (["dev-libs/usecyclea"], "in order"),
+        (["--tree", "dev-libs/gpcyclec"], "in reverse order"),
+    ]:
+        result = _run(
+            [str(emerge_binary)], ["--pretend", "--circular-deps-report=json", *args], fixture_env
+        )
+        head, body = _cdr_split(result.stdout)
+        assert head == (
+            f"\nThese are the packages that would be merged, {banner}:\n\n"
+            "Calculating dependencies ... done!\nDependency resolution took (backtrack: 1/20).\n\n"
+        )
+        assert "Total:" not in result.stdout and "[nomerge" not in result.stdout
+        assert body.endswith("}\n")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["--circular-deps-report=text"], ["--circular-deps-report=True"], ["--circular-deps-report"]],
+    ids=["text", "True", "bare"],
+)
+def test_507_text_and_bare_formats_keep_the_text_report(emerge_binary, fixture_env, extra):
+    """Backlog #507 (`parse_opts`: bare `--circular-deps-report` is `True`,
+    which `_show_circular_deps` treats like `text`): the report is the S7 text
+    one on stderr and stdout carries no JSON (Portage 3.0.83-r1 host shapes
+    45, 46 and 52)."""
+    base = _run([str(emerge_binary)], ["--pretend", "dev-libs/usecyclea"], fixture_env)
+    result = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/usecyclea"], fixture_env)
+    assert result.returncode == 1
+    assert result.stdout == base.stdout
+    assert result.stderr == base.stderr
+    assert "Error: circular dependencies:" in result.stderr
+    assert '"cycles"' not in result.stdout
+
+
+def test_507_json_report_ignores_colour_and_keeps_the_limit_warning(
+    emerge_binary, fixture_env
+):
+    """Backlog #507: the document is never coloured (`--color y`, host shape
+    02); the invalid-limit warning of `_get_max_affecting_use` still goes to
+    stderr and the limit reads 10 (host shape 17); a limit of 16 appears in
+    `max_affecting_use` and lets the search run (shape 16); `--quiet` drops the
+    preamble only (shape 49)."""
+    expected = _CDR_SHAPES["use"][1]
+    coloured = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--color", "y", "--circular-deps-report=json", "dev-libs/usecyclea"],
+        fixture_env,
+    )
+    assert "\x1b" not in _cdr_split(coloured.stdout)[1]
+    assert json.loads(_cdr_split(coloured.stdout)[1]) == expected
+    env = dict(fixture_env)
+    env["PORTAGE_CIRCULAR_MAX_USE_FLAGS"] = "abc"
+    bad = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--circular-deps-report=json", "--autounmask-use=n", "dev-libs/cddtrna"],
+        env,
+    )
+    assert bad.stderr == (
+        "!!! Invalid PORTAGE_CIRCULAR_MAX_USE_FLAGS: abc\n"
+        "!!! Expected an integer greater than zero, using 10 instead.\n"
+    )
+    assert json.loads(_cdr_split(bad.stdout)[1])["max_affecting_use"] == 10
+    env["PORTAGE_CIRCULAR_MAX_USE_FLAGS"] = "16"
+    raised = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--circular-deps-report=json", "--autounmask-use=n", "dev-libs/cddtrna"],
+        env,
+    )
+    doc = json.loads(_cdr_split(raised.stdout)[1])
+    assert doc["max_affecting_use"] == 16
+    assert doc["search_truncated"] == []
+    (solution,) = doc["solutions"]
+    assert solution["package"] == "dev-libs/cddtrna-1"
+    assert solution["use_changes"] == [{f"flag{i}": False for i in range(12)}]
+    quiet = _run(
+        [str(emerge_binary)],
+        ["-pq", "--circular-deps-report=json", "dev-libs/usecyclea"],
+        fixture_env,
+    )
+    assert quiet.stdout.startswith("{\n")
+    assert json.loads(quiet.stdout) == expected
+
+
+def test_507_json_report_is_not_printed_when_nothing_cycles(emerge_binary, fixture_env):
+    """Backlog #507: a resolve without a cycle is unchanged by the option
+    (Portage 3.0.83-r1 host shape 27)."""
+    base = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--circular-deps-report=json", "dev-libs/newpkg"], fixture_env
+    )
+    assert result.returncode == 0
+    assert result.stdout == base.stdout
+    assert result.stderr == base.stderr
