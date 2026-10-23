@@ -3084,6 +3084,15 @@ CASES = [
     ("#494: a slot-only (:9) dependency atom no ebuild satisfies aborts with `no ebuilds to satisfy` (rc 1, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxslotonlybad"], 1),
     ("#495: a slot-operator (:9=) dependency atom no ebuild satisfies aborts with `no ebuilds to satisfy` (rc 1, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxslotopbad"], 1),
     ("#496: a [flag(-)] USE-dep on a target without flag in IUSE fails to match (rc 1, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxuddbad"], 1),
+    ("#503: bare --binpkg-respect-user-patches is accepted (Portage 3.0.83-r1, rc 0)", ["--pretend", "--binpkg-respect-user-patches", "dev-libs/newpkg"], 0),
+    ("#503: --binpkg-respect-user-patches=n is accepted (Portage 3.0.83-r1, rc 0)", ["--pretend", "--binpkg-respect-user-patches=n", "dev-libs/newpkg"], 0),
+    ("#503: --binpkg-respect-user-patches=maybe is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--binpkg-respect-user-patches=maybe", "dev-libs/newpkg"], 2),
+    ("#503: --circular-deps-report json (space form) is accepted (Portage 3.0.83-r1, rc 0)", ["--pretend", "--circular-deps-report", "json", "dev-libs/newpkg"], 0),
+    ("#503: --circular-deps-report=xml is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--circular-deps-report=xml", "dev-libs/newpkg"], 2),
+    ("#503: --merge-wait-scope=none is accepted (Portage 3.0.83-r1, rc 0)", ["--pretend", "--merge-wait-scope=none", "dev-libs/newpkg"], 0),
+    ("#503: --merge-wait-scope=all is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--merge-wait-scope=all", "dev-libs/newpkg"], 2),
+    ("#503: a trailing bare --merge-wait-scope expects one argument (Portage 3.0.83-r1, rc 2)", ["--pretend", "dev-libs/newpkg", "--merge-wait-scope"], 2),
+    ("#503: --cycle-break stays unrecognised (Portage 3.0.83-r1 also rejects it, rc 2)", ["--pretend", "--cycle-break", "dev-libs/newpkg"], 2),
 ]
 
 
@@ -17218,6 +17227,7 @@ Binary packages:
       --getbinpkg-exclude ATOMS, --getbinpkg-include ATOMS  filter remote binhost entries like --exclude; binrepos.conf keys fold in
       --usepkg-exclude ATOMS, --usepkg-include ATOMS  narrow which packages may come from a binary
       --binpkg-respect-use[=y|n]  reject a binary package built with the wrong USE
+      --binpkg-respect-user-patches[=y|n]  accepted; inert until user patches are compared (backlog 509)
       --binpkg-changed-deps[=y|n]  reject a binary whose recorded deps differ from the ebuild (auto unless -K)
       --use-ebuild-visibility[=y|n]  apply ebuild visibility checks to built packages even under -K
       --rebuilt-binaries[=y|n], --rebuilt-binaries-timestamp N  prefer / bound rebuilt binary packages
@@ -17232,6 +17242,7 @@ Build scheduling:
       --read-news[=y|n]      with --ask: offer to read unread news via eselect
       --ignore-default-opts  ignore the EMERGE_DEFAULT_OPTS variable for this run
       --keep-going           on a build failure, drop that package's dependents and carry on
+      --merge-wait-scope <deep|system|toolchain|none>  accepted; inert until merge-wait scheduling lands (backlog 512)
       --quiet-build[=y|n]    redirect a build's phase output to ${T}/build.log (implied by -j >1 and -q)
 
 Output:
@@ -17243,6 +17254,7 @@ Output:
       --unordered-display, --alphabetical  merge-list ordering variants
       --color <y|n>         force colour output on or off
       --verbose-slot-rebuilds[=y|n]  show the atoms forcing a slot-operator rebuild
+      --circular-deps-report[=text|json]  accepted; the json format is inert until backlog 507
       --verbose-conflicts   list every parent of a slot conflict, not one per collision reason
       --ignore-built-slot-operator-deps[=y|n]  ignore recorded := slot-operator dependencies
       --depclean-lib-check[=y|n]  with --depclean/--prune: scan for soname breakage (default y)
@@ -33328,3 +33340,74 @@ def test_use_dep_default_minus_makes_an_absent_flag_fail_the_match(emerge_binary
     (the unrelated 1284 shape), would differ in rc or wording."""
     result = _run([str(emerge_binary)], ["--pretend", "dev-libs/gxuddbad"], fixture_env)
     _gx_unsat_abort(result, "dev-libs/gxuddtarget[flag(-)]", "gxuddbad")
+
+
+@pytest.mark.parametrize(
+    "args,stderr",
+    [
+        (
+            ["--pretend", "--binpkg-respect-user-patches=true", "dev-libs/newpkg"],
+            "emerge: error: argument --binpkg-respect-user-patches: invalid choice: "
+            "'true' (choose from 'True', 'y', 'n')\n",
+        ),
+        (
+            ["--pretend", "--circular-deps-report=xml", "dev-libs/newpkg"],
+            "emerge: error: argument --circular-deps-report: invalid choice: "
+            "'xml' (choose from 'True', 'text', 'json')\n",
+        ),
+        (
+            ["--pretend", "--circular-deps-report=", "dev-libs/newpkg"],
+            "emerge: error: argument --circular-deps-report: invalid choice: "
+            "'' (choose from 'True', 'text', 'json')\n",
+        ),
+        (
+            ["--pretend", "--merge-wait-scope=all", "dev-libs/newpkg"],
+            "emerge: error: argument --merge-wait-scope: invalid choice: "
+            "'all' (choose from 'deep', 'system', 'toolchain', 'none')\n",
+        ),
+        (
+            ["--pretend", "dev-libs/newpkg", "--merge-wait-scope"],
+            "emerge: error: argument --merge-wait-scope: expected one argument\n",
+        ),
+        (
+            ["--pretend", "--cycle-break", "dev-libs/newpkg"],
+            "emerge: error: unrecognized arguments: --cycle-break\n",
+        ),
+    ],
+    ids=["respect-user-patches", "circular-xml", "circular-empty", "scope-all", "scope-bare", "cycle-break"],
+)
+def test_new_3_0_83_options_report_argparse_errors(emerge_binary, fixture_env, args, stderr):
+    """Backlog #503. Portage 3.0.83-r1 (host probe, `LLM/evidence/2026-10-23-503/`
+    cells 04, 05, 11, 13, 18, 19, 21): the three options added in 3.0.83 are
+    `choices`-checked by argparse, and `--cycle-break` is not an option. The
+    `usage:` block Portage prints above each line is the documented 347-USG cut."""
+    result = _run([str(emerge_binary)], args, fixture_env)
+    assert result.returncode == 2
+    assert result.stdout == ""
+    assert result.stderr == stderr
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--binpkg-respect-user-patches"],
+        ["--binpkg-respect-user-patches=n"],
+        ["--circular-deps-report"],
+        ["--circular-deps-report=json"],
+        ["--circular-deps-report", "json"],
+        ["--merge-wait-scope=none"],
+        ["--merge-wait-scope", "toolchain"],
+    ],
+    ids=["respect-bare", "respect-n", "report-bare", "report-json", "report-json-space", "scope-none", "scope-toolchain"],
+)
+def test_new_3_0_83_options_are_accepted_and_inert(emerge_binary, fixture_env, extra):
+    """Backlog #503. Portage 3.0.83-r1 accepts the three new options (probe cells
+    01-03, 06, 08-10, 12, 14-17, 20) and a plain `--pretend` merge list has no
+    cycle, binary or build, so the output is the baseline's: the options change
+    nothing until #507 (json report), #509 (user patches), #512 (merge-wait)."""
+    base = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
+    result = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/newpkg"], fixture_env)
+    assert base.returncode == 0
+    assert result.returncode == 0
+    assert result.stdout == base.stdout
+    assert result.stderr == base.stderr
