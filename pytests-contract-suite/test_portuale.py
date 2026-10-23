@@ -821,6 +821,7 @@ def _write_tmp_binhost(tmp_path):
     a minimal `Packages` index (mirrors the on-disk format the
     `refresh_binhost_indexes` test serves over HTTP). Returns
     (binhost_dir, size)."""
+    import hashlib
     import shutil as _shutil
 
     binhost = tmp_path / "binhost"
@@ -844,6 +845,8 @@ def _write_tmp_binhost(tmp_path):
         "PATH: dev-libs/binpkgrmpkg-1.0.tbz2\n"
         "REPO: testrepo\n"
         f"SIZE: {size}\n"
+        # Portage 3.0.83-r1 refuses a remote binary without size and checksum (#501).
+        f"MD5: {hashlib.md5((binhost / 'dev-libs/binpkgrmpkg-1.0.tbz2').read_bytes()).hexdigest()}\n"
         "SLOT: 0\n"
         "USE:\n"
     )
@@ -1061,6 +1064,7 @@ def _write_tmp_keep_binhost(tmp_path):
     `fixtures/pkgdir`): B's record carries `RDEPEND: dev-libs/rmkga`,
     and A's record carries a forged SIZE (+100) so its download fails.
     Returns (binhost_dir, sizes) with real sizes for B and C."""
+    import hashlib
     import shutil as _shutil
 
     binhost = tmp_path / "binhost"
@@ -1089,6 +1093,7 @@ def _write_tmp_keep_binhost(tmp_path):
         record += (
             "REPO: testrepo\n"
             f"SIZE: {size}\n"
+            f"MD5: {hashlib.md5((binhost / f'dev-libs/{pkg}-1.0.tbz2').read_bytes()).hexdigest()}\n"
             "SLOT: 0\n"
             "USE:\n"
         )
@@ -5753,6 +5758,7 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
     same gpkg bytes (built once below, BUILD_ID 1 inside), which Portage rejects at extraction time for the renamed `-2` copy -- the file it
     fetched is still `-2`, confirmed on Portage 3.0.x. So only the
     resulting `$PKGDIR` listing is asserted."""
+    import hashlib
     import shutil
 
     # One real gpkg to serve under both build ids.
@@ -5777,7 +5783,8 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
             f"BUILD_ID: {bid}\nBUILD_TIME: {bt}\nCPV: dev-libs/packagepkg-1.0\n"
             "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
             f"PATH: dev-libs/packagepkg/packagepkg-1.0-{bid}.gpkg.tar\n"
-            f"REPO: testrepo\nSIZE: {gpkg.stat().st_size}\nSLOT: 0\nUSE:\n\n"
+            f"REPO: testrepo\nSIZE: {gpkg.stat().st_size}\n"
+            f"MD5: {hashlib.md5(gpkg.read_bytes()).hexdigest()}\nSLOT: 0\nUSE:\n\n"
         )
     (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 2\n\n{entries}")
 
@@ -5801,6 +5808,98 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
     fetched = sorted(str(f.relative_to(cache)) for f in cache.rglob("*.gpkg.tar"))
     assert fetched == ["dev-libs/packagepkg/packagepkg-1.0-2.gpkg.tar"], fetched
     assert not list(pkgdir.rglob("*.gpkg.tar"))
+
+
+@pytest.mark.parametrize(
+    "digests",
+    [(), ("size",), ("md5",)],
+    ids=["no-size-no-checksum", "size-only", "checksum-only"],
+)
+def test_getbinpkgonly_refuses_a_remote_binary_without_size_and_checksum(
+    emerge_binary, tmp_path, digests
+):
+    """Backlog #501 (plan 02.442 S2). Portage 3.0.83-r1 `BinpkgVerifier._start` refuses a
+    remote binary unless the binhost index gives BOTH a `SIZE` and a checksum, and it does
+    so after the download: the file is fetched (to `.partial`, left behind), the block
+    below goes to stdout and the build log, nothing is installed, rc 1. SIZE alone and a
+    checksum alone get the same text. Expected bytes captured on Portage 3.0.83-r1 with a
+    fault-injection binhost (`LLM/evidence/2026-10-23-500-501/` in portuale: casts `s2-hb-*`,
+    `harness/bhrun.sh`). The control row keeps both fields and merges."""
+    import hashlib
+    import shutil
+
+    root0 = tmp_path / "root0"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    env0 = _getbinpkg_500_env(
+        tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir"
+    )
+    env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env0,
+    )
+    gpkg = root0 / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar"
+    data = gpkg.read_bytes()
+
+    def serve_and_run(fields):
+        binhost = tmp_path / ("binhost-" + "-".join(sorted(fields)))
+        (binhost / "dev-libs/packagepkg").mkdir(parents=True)
+        shutil.copy(gpkg, binhost / "dev-libs/packagepkg/packagepkg-1.0-1.gpkg.tar")
+        extra = ""
+        if "size" in fields:
+            extra += f"SIZE: {len(data)}\n"
+        if "md5" in fields:
+            extra += f"MD5: {hashlib.md5(data).hexdigest()}\n"
+        (binhost / "Packages").write_text(
+            "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\nBUILD_ID: 1\nBUILD_TIME: 100\n"
+            "CPV: dev-libs/packagepkg-1.0\nDEFINED_PHASES: -\nEAPI: 8\nIUSE:\n"
+            "KEYWORDS: amd64\nPATH: dev-libs/packagepkg/packagepkg-1.0-1.gpkg.tar\n"
+            f"REPO: testrepo\n{extra}SLOT: 0\nUSE:\n\n"
+        )
+        case = tmp_path / ("case-" + "-".join(sorted(fields)))
+        case.mkdir()
+        clientetc = _clientetc_with_500_binhost(case, 0)
+        (clientetc / "etc/portage/binrepos.conf").write_text(
+            f"[nodigest]\npriority = 1\nsync-uri = file://{binhost}\nverify-signature = false\n"
+        )
+        root = tmp_path / ("root-" + "-".join(sorted(fields)))
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = _getbinpkg_500_env(tmp_path, root, clientetc, tmp_path / "pkgdir-x")
+        env["NOCOLOR"] = "true"
+        # Portage always prints ROOT with a trailing slash; portuale echoes the
+        # string it was given (a separate, older difference), so give it one.
+        env["ROOT"] = str(root) + "/"
+        r = subprocess.run(
+            [str(emerge_binary), "-1", "--getbinpkgonly", "--nodeps", "dev-libs/packagepkg"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        return root, r
+
+    root, r = serve_and_run(set(digests))
+    cache = root / "var/cache/binhost/nodigest/dev-libs/packagepkg"
+    partial = cache / "packagepkg-1.0-1.gpkg.tar.partial"
+    assert r.returncode == 1, (r.stdout, r.stderr)
+    assert (
+        "\n!!! Digest verification failed:\n"
+        f"!!! {partial}\n"
+        "!!! Reason: binhost's Packages index lacks size and checksum\n"
+        "!!! for this package\n\n"
+        f">>> Failed to emerge dev-libs/packagepkg-1.0 for {root}/\n"
+    ) in r.stdout and r.stdout.endswith(f"for {root}/\n"), r.stdout
+    # No build log: Portage has not initialised PORTAGE_LOG_FILE when it refuses.
+    assert "Log file" not in r.stdout
+    assert partial.is_file()
+    assert not (cache / "packagepkg-1.0-1.gpkg.tar").exists()
+    assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists()
+    assert not (root / "usr/share/packagepkg/hello.txt").exists()
+    assert "Failed on" not in r.stdout and "File renamed" not in r.stdout
+
+    # Control: size and checksum both present -> merged.
+    root, r = serve_and_run({"size", "md5"})
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert (root / "usr/share/packagepkg/hello.txt").is_file()
+    assert "Digest verification failed" not in r.stdout
 
 
 def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_path):
@@ -12166,7 +12265,10 @@ def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_p
     downloaded is still verified. Expected bytes captured on Portage 3.0.82.2 with the
     same index and fixture binary (`LLM/evidence/2026-10-19-b424/` in portuale:
     `setup.sh`, `cells.sh`), modulo the cuts the other fetchonly pins name; the wget
-    progress block is portuale's own `wget` output (Portage ran its `FETCHCOMMAND`)."""
+    progress block is portuale's own `wget` output (Portage ran its `FETCHCOMMAND`).
+    Portage 3.0.83-r1 refuses a remote binary without both size and checksum (backlog
+    #501), so the index record carries an `MD5` and the verify line names `MD5 size`."""
+    import hashlib
     import shutil
 
     root = _fetchonly_root(tmp_path)
@@ -12179,7 +12281,8 @@ def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_p
         "TIMESTAMP: 1\nVERSION: 0\nPACKAGES: 1\n\nBUILD_ID: 1\n"
         "CPV: dev-libs/gpkgreadpkg-1.0\nDEFINED_PHASES: -\nEAPI: 8\nKEYWORDS: amd64\n"
         "MTIME: 1000\nBUILD_TIME: 1000\nPATH: dev-libs/gpkgreadpkg-1.0.gpkg.tar\n"
-        f"REPO: fetchrepo\nSIZE: {binary.stat().st_size}\nSLOT: 0\nUSE:\n"
+        f"REPO: fetchrepo\nSIZE: {binary.stat().st_size}\n"
+        f"MD5: {hashlib.md5(binary.read_bytes()).hexdigest()}\nSLOT: 0\nUSE:\n"
     )
     server, port = _serve_dir(binhost)
     try:
@@ -12226,8 +12329,8 @@ def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_p
             f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}\n"
         )
         verify = (
-            " * gpkgreadpkg-1.0.gpkg.tar size ;-) ..."
-            + " " * (80 - len("gpkgreadpkg-1.0.gpkg.tar size ;-) ...") - 3 - 7)
+            " * gpkgreadpkg-1.0.gpkg.tar MD5 size ;-) ..."
+            + " " * (80 - len("gpkgreadpkg-1.0.gpkg.tar MD5 size ;-) ...") - 3 - 7)
             + "[ ok ]\n"
         )
         result = run("-f", "--getbinpkg")
