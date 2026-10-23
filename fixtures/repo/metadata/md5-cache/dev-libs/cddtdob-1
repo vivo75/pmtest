@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/cddtdoa
+DESCRIPTION=#506 fixture: unconditional build-time dependency back on dev-libs/cddtdoa
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=221a58d4b34ad2cd4485ddd57be56a7f

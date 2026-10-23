@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=doc? ( dev-libs/cddsevb ) nls? ( dev-libs/cddsevb )
+DESCRIPTION=#506 fixture: dev-libs/cddsevb under both doc? and nls?, so both flags are blamed (upstream testSeveralUseFlagsInCycleMessage)
+EAPI=8
+IUSE=+doc +nls
+KEYWORDS=amd64
+SLOT=0
+_md5_=6aa9a6d8e8f143fa7652294c02f8fd6e

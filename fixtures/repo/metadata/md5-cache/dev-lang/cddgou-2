@@ -1,0 +1,8 @@
+BDEPEND=|| ( dev-lang/cddgou[cgo?] dev-lang/cddgou-bootstrap )
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: as dev-lang/cddgo, the self branch carries a conditional USE dependency (upstream testUseDependencyAlternative)
+EAPI=8
+IUSE=+cgo
+KEYWORDS=amd64
+SLOT=0
+_md5_=543dd96c3492bbbce03fd5ccc877d381

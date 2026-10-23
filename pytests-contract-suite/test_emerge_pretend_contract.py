@@ -3093,6 +3093,17 @@ CASES = [
     ("#503: --merge-wait-scope=all is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--merge-wait-scope=all", "dev-libs/newpkg"], 2),
     ("#503: a trailing bare --merge-wait-scope expects one argument (Portage 3.0.83-r1, rc 2)", ["--pretend", "dev-libs/newpkg", "--merge-wait-scope"], 2),
     ("#503: --cycle-break stays unrecognised (Portage 3.0.83-r1 also rejects it, rc 2)", ["--pretend", "--cycle-break", "dev-libs/newpkg"], 2),
+    ("#506: a cycle edge pulled in while a flag is off names it as USE=-flag (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddnega"], 1),
+    ("#506: a cycle edge that is also unconditional names no USE flag (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-libs/cddunra"], 1),
+    ("#506: a cycle edge only two flags together drop names both (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddseva"], 1),
+    ("#506: a test? cycle edge points at FEATURES=test via package.env (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-libs/cddtsta"], 1),
+    ("#506: a test? cycle edge in colour (Portage 3.0.83-r1, rc 1)", ["--pretend", "--color", "y", "dev-libs/cddtsta"], 1),
+    ("#506: a test? and doc? cycle edge still points at FEATURES=test (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddtdoa"], 1),
+    ("#506: an unkeyworded || bootstrap is listed as a masked alternative of the self cycle (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgo"], 1),
+    ("#506: the masked alternative matches a [flag?] self atom unevaluated (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgou"], 1),
+    ("#506: a -amd64 bootstrap reads as a missing keyword and is listed (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgok"], 1),
+    ("#506: a package.mask'd bootstrap is listed as a masked alternative (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgop"], 1),
+    ("#506: the USE-change search gives up past PORTAGE_CIRCULAR_MAX_USE_FLAGS=10 (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddtrna"], 1),
 ]
 
 
@@ -4195,7 +4206,11 @@ def test_circular_dep_use_flag_suggestion(
     starts (`shortest_cycle[0]` — here `usecycleb`, matching Portage's
     `FX_HOST_ROOTS=1` capture; portuale
     `LLM/evidence/2026-09-30-278/`). The `-x` suggestion is
-    unaffected (it names the USE-gated member, not the start node)."""
+    unaffected (it names the USE-gated member, not the start node).
+    Backlog #506: Portage 3.0.83 names the flag behind each edge, so the
+    usecyclea -> usecycleb edge reads `(buildtime, USE=x)` (bed
+    `l0-fixture-oracle-506.txt` and host captures, portuale
+    `LLM/evidence/2026-10-23-506/`)."""
     base = ["--pretend", "dev-libs/usecyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
@@ -4211,7 +4226,7 @@ def test_circular_dep_use_flag_suggestion(
         "\n"
         "(dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=x)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -4247,7 +4262,9 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     probe shows live Portage starting this cycle at `gpcycleb-1.0`
     (`gpcycleb → gpcyclea → gpcycleb`); backlog #278 starts portuale's
     printed cycle there too (`shortest_cycle[0]`; portuale
-    `LLM/evidence/2026-09-30-278/`), so the pin records Portage's bytes."""
+    `LLM/evidence/2026-09-30-278/`), so the pin records Portage's bytes.
+    Backlog #506: the gpcyclea -> gpcycleb edge carries `, USE=x` like
+    Portage 3.0.83 (bed `l0-fixture-oracle-506.txt`)."""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4264,7 +4281,7 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
         "\n"
         "(dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=x)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -4357,7 +4374,9 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     single-root rendering starts (`shortest_cycle[0]` — `cyc4b`,
     matching Portage's `FX_HOST_ROOTS=1` capture; portuale
     `LLM/evidence/2026-09-30-278/`; Portage's default-staging rendering
-    starts at `cyc4c`, cross-root Track X #242)."""
+    starts at `cyc4c`, cross-root Track X #242). Backlog #506: the gated
+    cyc4a -> cyc4b edge reads `(buildtime, USE=x)` like Portage 3.0.83
+    (bed `l0-fixture-oracle-506.txt`)."""
     args = ["--pretend", "dev-libs/cyc4a"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
@@ -4377,7 +4396,7 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
         " (dev-libs/cyc4c-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "  (dev-libs/cyc4d-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "   (dev-libs/cyc4a-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "    (dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "    (dev-libs/cyc4b-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=x)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -28172,7 +28191,10 @@ def test_oracle_233_world_member_stale_slot_operator_dep_does_not_abort_world(
 # solutions, which live `emerge` does not reproduce. Captures:
 # portuale LLM/evidence/2026-09-27-181-circular-text/ (fixture-oracle run
 # l0-fx-20260927T202111Z, Portage 3.0.82.2). Each pin is a strict
-# xfail until its backlog item lands.
+# xfail until its backlog item lands. Backlog #506: Portage 3.0.83 adds the
+# `, USE=<flags>` tail to the edge a flag pulls in (cyc0b-1 and cyc0w-3 from
+# the bed `l0-fixture-oracle-506.txt` run; the cyc0z-1 cross-root block by
+# the same rule, its single-root sibling in that run reads `USE=-bar foo`).
 _CYC0_PORTAGE_BLOCKS = {
     # #206 only: same cycle and suggestion, Portage prints package nodes.
     # Backlog #278: the start is Portage's single-root (`FX_HOST_ROOTS=1`)
@@ -28184,7 +28206,7 @@ _CYC0_PORTAGE_BLOCKS = {
     # pin records the hostroots bytes.
     "=dev-libs/cyc0b-1": (
         "(dev-libs/cyc0a-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        " (dev-libs/cyc0b-1:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=foo)\n"
         "  (dev-libs/cyc0a-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
@@ -28194,7 +28216,7 @@ _CYC0_PORTAGE_BLOCKS = {
     # #207: Portage backtracks and blames cyc0z-3, not the argument.
     "=dev-libs/cyc0z-1": (
         "(dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        " (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=-bar foo)\n"
         "  (dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         "It might be possible to break this cycle\n"
@@ -28205,7 +28227,7 @@ _CYC0_PORTAGE_BLOCKS = {
     "=dev-libs/cyc0w-3": (
         "(dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) depends on\n"
         " (dev-libs/cyc0z-3:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/cyc0y-1:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=foo)\n"
         "\n"
         "It might be possible to break this cycle\n"
         "by applying the following change:\n"
@@ -33495,3 +33517,201 @@ def test_new_3_0_83_options_are_accepted_and_inert(emerge_binary, fixture_env, e
     assert result.returncode == 0
     assert result.stdout == base.stdout
     assert result.stderr == base.stderr
+
+
+# Backlog #506 (portuale plan 02.442 S7): the Portage 3.0.83 circular-dependency
+# report text. Expected values are Portage 3.0.83-r1: the host `emerge -p` on
+# the staged fixture repo (portuale `LLM/evidence/2026-10-23-506/`, shapes
+# 03-19 and 42-44) and the bed fixture-oracle run of
+# `differential-test-bed/atomlists/l0-fixture-oracle-506.txt`
+# (`FX_HOST_ROOTS=1`), which agree. Shapes follow upstream
+# `lib/portage/tests/resolver/test_circular_dependency_display.py`.
+_CDD_NODE = "(dev-{c}/{p}:0/0::testrepo, ebuild scheduled for merge)"
+_CDD_ADVISORY = (
+    "\n\n * Note that circular dependencies can often be avoided by temporarily\n"
+    " * disabling USE flags that trigger optional dependencies.\n"
+)
+
+
+def _cdd_ring(a: str, b: str, tail: str, cat: str = "libs") -> str:
+    """The two-node block `b -> a -> b`, `tail` on the a -> b edge."""
+    na = _CDD_NODE.format(c=cat, p=a)
+    nb = _CDD_NODE.format(c=cat, p=b)
+    return (
+        "\n\n\n * Error: circular dependencies:\n\n"
+        f"{nb} depends on\n"
+        f" {na} (buildtime)\n"
+        f"  {nb} (buildtime{tail})"
+    )
+
+
+def _cdd_change(cpv: str, change: str) -> str:
+    return (
+        "\n\nIt might be possible to break this cycle\n"
+        "by applying the following change:\n"
+        f"- {cpv} (Change USE: {change})\n"
+        "\nNote that this change can be reverted, once the package has been installed.\n"
+    )
+
+
+def _cdd_test_block(cpv: str) -> str:
+    return (
+        "\n\n * This cycle involves test dependencies. If you do not\n"
+        " * need to run the test suites of the packages listed below,\n"
+        ' * disable FEATURES=test for them. Put FEATURES="-test" in\n'
+        " * /etc/portage/env/no-test.conf, then add the following to\n"
+        ' * /etc/portage/package.env (see "package.env" in the\n'
+        " * portage(5) man page for more details):\n\n"
+        f"={cpv} no-test.conf\n"
+    )
+
+
+def _cdd_self(pkg: str) -> str:
+    n = _CDD_NODE.format(c="lang", p=f"{pkg}-2")
+    return (
+        "\n\n\n * Error: circular dependencies:\n\n"
+        f"{n} depends on\n"
+        f" {n} (buildtime)"
+        "\n\n * The following masked packages could be used instead of a\n"
+        " * package in the cycle. Unmasking them, for example via\n"
+        " * /etc/portage/package.accept_keywords, might solve it:\n"
+        f"- dev-lang/{pkg}-bootstrap-1 (instead of dev-lang/{pkg}-2)\n"
+        + _CDD_ADVISORY
+    )
+
+
+_CDD_TRUNC_FLAGS = "flag0 flag1 flag10 flag11 flag2 flag3 flag4 flag5 flag6 flag7 flag8 flag9"
+
+
+def _cdd_trunc(max_flags: int, a: str, b: str, flags: str, cpv: str) -> str:
+    return (
+        _cdd_ring(a, b, f", USE={flags}")
+        + "\n\n * The search for USE changes was given up on for the following\n"
+        " * packages, because they have too many USE flags that affect the\n"
+        f" * dependency. Raise PORTAGE_CIRCULAR_MAX_USE_FLAGS (currently {max_flags})\n"
+        " * to search harder:\n"
+        f"- {cpv}\n" + _CDD_ADVISORY
+    )
+
+
+_CDD_STDERR = {
+    "neg": _cdd_ring("cddnega-1", "cddnegb-1", ", USE=-system-b")
+    + _cdd_change("dev-libs/cddnega-1", "+system-b"),
+    "unrelated": _cdd_ring("cddunra-1", "cddunrb-1", "") + _CDD_ADVISORY,
+    "several": _cdd_ring("cddseva-1", "cddsevb-1", ", USE=doc nls")
+    + _cdd_change("dev-libs/cddseva-1", "-doc -nls"),
+    "test": _cdd_ring("cddtsta-1", "cddtstb-1", ", USE=test")
+    + _cdd_test_block("dev-libs/cddtsta-1")
+    + _cdd_change("dev-libs/cddtsta-1", "-test"),
+    "testdoc": _cdd_ring("cddtdoa-1", "cddtdob-1", ", USE=doc test")
+    + _cdd_test_block("dev-libs/cddtdoa-1")
+    + _cdd_change("dev-libs/cddtdoa-1", "-doc -test"),
+    "go": _cdd_self("cddgo"),
+    "gou": _cdd_self("cddgou"),
+    "gok": _cdd_self("cddgok"),
+    "gop": _cdd_self("cddgop"),
+    "trunc": _cdd_trunc(10, "cddtrna-1", "cddtrnb-1", _CDD_TRUNC_FLAGS, "dev-libs/cddtrna-1"),
+}
+
+
+@pytest.mark.parametrize(
+    "key,args",
+    [
+        ("neg", ["--autounmask-use=n", "dev-libs/cddnega"]),
+        ("unrelated", ["dev-libs/cddunra"]),
+        ("several", ["--autounmask-use=n", "dev-libs/cddseva"]),
+        ("test", ["dev-libs/cddtsta"]),
+        ("testdoc", ["--autounmask-use=n", "dev-libs/cddtdoa"]),
+        ("go", ["dev-lang/cddgo"]),
+        ("gou", ["dev-lang/cddgou"]),
+        ("gok", ["dev-lang/cddgok"]),
+        ("gop", ["dev-lang/cddgop"]),
+        ("trunc", ["--autounmask-use=n", "dev-libs/cddtrna"]),
+    ],
+)
+def test_506_circular_report_text_matches_portage_3_0_83(
+    emerge_binary, fixture_env, key, args
+):
+    """Backlog #506: the circular-dependency block of Portage 3.0.83-r1 for
+    one upstream `test_circular_dependency_display.py` shape: the
+    `, USE=<flags>` tail on the edge a flag pulls in (sorted; `-flag` for a
+    disabled one, nothing for an edge that is also unconditional), the
+    FEATURES=test pointer, the masked `||` alternatives (unkeyworded,
+    `-amd64` read as a missing keyword, `package.mask`; a `[cgo?]` self
+    atom matched unevaluated), and the give-up past
+    `PORTAGE_CIRCULAR_MAX_USE_FLAGS`. Portage prints the flags of a
+    multi-flag `Change USE:` in hash order (portuale
+    `LLM/portage-quirks.md` Q4); portuale sorts them, which is one of
+    Portage's orders. Whole stderr pinned."""
+    rust = _run([str(emerge_binary)], ["--pretend", *args], fixture_env)
+    assert rust.returncode == 1
+    assert rust.stderr == _CDD_STDERR[key]
+
+
+def test_506_circular_max_use_flags_raised_lets_the_search_run(
+    emerge_binary, fixture_env
+):
+    """Backlog #506 (upstream `testMaxUseFlagsRaised`): with
+    `PORTAGE_CIRCULAR_MAX_USE_FLAGS=16` the twelve flags of
+    dev-libs/cddtrna are searched and the one solution turns all of them
+    off (Portage 3.0.83-r1, host shape 16; Portage's flag order is hash
+    order, so the flags are compared as a set)."""
+    env = dict(fixture_env)
+    env["PORTAGE_CIRCULAR_MAX_USE_FLAGS"] = "16"
+    rust = _run([str(emerge_binary)], ["--pretend", "--autounmask-use=n", "dev-libs/cddtrna"], env)
+    assert rust.returncode == 1
+    head = _cdd_ring("cddtrna-1", "cddtrnb-1", f", USE={_CDD_TRUNC_FLAGS}")
+    assert rust.stderr.startswith(head + "\n\nIt might be possible to break this cycle\n")
+    assert "given up on" not in rust.stderr
+    line = next(x for x in rust.stderr.splitlines() if "Change USE:" in x)
+    flags = line.split("(Change USE: ")[1].rstrip(")").split()
+    assert sorted(flags) == sorted(f"-flag{i}" for i in range(12))
+
+
+@pytest.mark.parametrize(
+    "value,limit,warn",
+    [("abc", 10, True), ("0", 10, True), ("1", 1, False), ("", 10, False)],
+)
+def test_506_circular_max_use_flags_invalid_values_warn_and_fall_back(
+    emerge_binary, fixture_env, value, limit, warn
+):
+    """Backlog #506 (`_get_max_affecting_use`): a value that is not an
+    integer of at least 1 prints Portage's two-line `!!! Invalid
+    PORTAGE_CIRCULAR_MAX_USE_FLAGS` warning and uses 10; `1` gives up on
+    dev-libs/cddseva's two flags; an empty value is the default, silently
+    (Portage 3.0.83-r1, host shapes 17, 18 and 19)."""
+    env = dict(fixture_env)
+    env["PORTAGE_CIRCULAR_MAX_USE_FLAGS"] = value
+    if limit == 1:
+        args, expect = ["dev-libs/cddseva"], _cdd_trunc(1, "cddseva-1", "cddsevb-1", "doc nls", "dev-libs/cddseva-1")
+    else:
+        args, expect = ["dev-libs/cddtrna"], _CDD_STDERR["trunc"]
+    if warn:
+        expect = (
+            f"!!! Invalid PORTAGE_CIRCULAR_MAX_USE_FLAGS: {value}\n"
+            "!!! Expected an integer greater than zero, using 10 instead.\n" + expect
+        )
+    rust = _run([str(emerge_binary)], ["--pretend", "--autounmask-use=n", *args], env)
+    assert rust.returncode == 1
+    assert rust.stderr == expect
+
+
+def test_506_circular_report_colours_the_edge_flags_and_the_nomerge_row(
+    emerge_binary, fixture_env
+):
+    """Backlog #506 (`e0689630f`, Portage 3.0.83-r1 host shape 09 and the
+    bed `l0-fixture-oracle-506.txt` run): under `--color y` an enabled
+    edge flag is red, the FEATURES=test block keeps the red ` * ` prefix,
+    the re-displayed `[nomerge]` row is teal (`PKG_NOMERGE`, word and
+    package), and the argument is not coloured as world (Portage
+    `_show_circular_deps` calls `display()` without favorites)."""
+    rust = _run([str(emerge_binary)], ["--pretend", "--color", "y", "dev-libs/cddtsta"], fixture_env)
+    assert rust.returncode == 1
+    red = "\x1b[31;01m"
+    reset = "\x1b[39;49;00m"
+    assert f"(buildtime, USE={red}test{reset})\n" in rust.stderr
+    assert f"{red} * {reset}This cycle involves test dependencies." in rust.stderr
+    rows = rust.stdout.splitlines()
+    assert rows[0].startswith(f"[\x1b[36mnomerge      {reset} ] \x1b[36mdev-libs/cddtsta-1::testrepo{reset}")
+    assert rows[2].startswith(f"[\x1b[32mebuild{reset}  ")
+    assert f"\x1b[32mdev-libs/cddtsta-1::testrepo{reset}" in rows[2]

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/cddnega
+DESCRIPTION=#506 fixture: unconditional build-time dependency back on dev-libs/cddnega
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=99118ae868c4b8dce9ad2a428d828fc1

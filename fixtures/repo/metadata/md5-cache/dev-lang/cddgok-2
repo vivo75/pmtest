@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-lang/cddgok dev-lang/cddgok-bootstrap )
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: BDEPEND || ( self bootstrap ) whose bootstrap is keyworded -amd64, a mask configuration cannot lift (no masked alternative)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=38a989d542100ccefde0999f71cd7d5d

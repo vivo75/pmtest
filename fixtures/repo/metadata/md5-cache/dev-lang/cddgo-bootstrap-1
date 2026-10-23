@@ -1,0 +1,5 @@
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: unkeyworded bootstrap branch of dev-lang/cddgo
+EAPI=8
+SLOT=0
+_md5_=cfbf5fcd9fed7c1376dce999b93c32d4

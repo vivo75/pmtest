@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=test? ( dev-libs/cddtdob ) doc? ( dev-libs/cddtdob )
+DESCRIPTION=#506 fixture: dev-libs/cddtdob under test? and doc?, USE=test doc from package.use (upstream testTestDepCycleWithAnotherFlag)
+EAPI=8
+IUSE=test doc
+KEYWORDS=amd64
+SLOT=0
+_md5_=f17c68acddb4a5fa1dc83f63e7f2554b

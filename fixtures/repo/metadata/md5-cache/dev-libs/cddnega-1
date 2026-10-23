@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=!system-b? ( dev-libs/cddnegb )
+DESCRIPTION=#506 fixture: build cycle with dev-libs/cddnegb pulled in only while system-b is off (upstream testNegatedUseFlagInCycleMessage)
+EAPI=8
+IUSE=system-b
+KEYWORDS=amd64
+SLOT=0
+_md5_=bbb9e2c42a4ae430f63b69b8e7c52003

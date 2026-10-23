@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-lang/cddgop dev-lang/cddgop-bootstrap )
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: BDEPEND || ( self bootstrap ) whose keyworded bootstrap is in package.mask (listed as a masked alternative)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=9dc78bb6a954aff13cc6ce50f92200fa

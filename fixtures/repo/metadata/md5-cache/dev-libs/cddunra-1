@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=unrelated? ( dev-libs/cddunrb ) dev-libs/cddunrb
+DESCRIPTION=#506 fixture: dev-libs/cddunrb both under unrelated? ( ) and unconditional, so the flag is not blamed (upstream testUnrelatedUseFlagNotReported)
+EAPI=8
+IUSE=+unrelated
+KEYWORDS=amd64
+SLOT=0
+_md5_=ad89f7c0cd0f8787b6506bd83070737a

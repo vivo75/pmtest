@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/cddtrna
+DESCRIPTION=#506 fixture: unconditional build-time dependency back on dev-libs/cddtrna
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f2c839c6cd7ec470c51d56f9fef1c5b5

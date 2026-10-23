@@ -1,0 +1,7 @@
+BDEPEND=|| ( dev-lang/cddgo dev-lang/cddgo-bootstrap )
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: BDEPEND || ( self bootstrap ) whose bootstrap is unkeyworded (upstream testMaskedBootstrapAlternative)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=241e85aeb3a460d03491263082316a05

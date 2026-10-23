@@ -1,0 +1,6 @@
+EAPI=8
+DESCRIPTION="#506 fixture: twelve default-on flags each pull in dev-libs/cddtrnb, past PORTAGE_CIRCULAR_MAX_USE_FLAGS=10 (upstream testSearchTruncated)"
+SLOT="0"
+KEYWORDS="amd64"
+IUSE="+flag0 +flag1 +flag2 +flag3 +flag4 +flag5 +flag6 +flag7 +flag8 +flag9 +flag10 +flag11"
+DEPEND="flag0? ( dev-libs/cddtrnb ) flag1? ( dev-libs/cddtrnb ) flag2? ( dev-libs/cddtrnb ) flag3? ( dev-libs/cddtrnb ) flag4? ( dev-libs/cddtrnb ) flag5? ( dev-libs/cddtrnb ) flag6? ( dev-libs/cddtrnb ) flag7? ( dev-libs/cddtrnb ) flag8? ( dev-libs/cddtrnb ) flag9? ( dev-libs/cddtrnb ) flag10? ( dev-libs/cddtrnb ) flag11? ( dev-libs/cddtrnb )"

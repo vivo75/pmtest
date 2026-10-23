@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/cddunra
+DESCRIPTION=#506 fixture: unconditional build-time dependency back on dev-libs/cddunra
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=3f0e2a43670aeb8c0eb33feac6a8396a

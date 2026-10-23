@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: bootstrap branch of dev-lang/cddgok, KEYWORDS=-amd64
+EAPI=8
+KEYWORDS=-amd64
+SLOT=0
+_md5_=3617e25401f4e18d938872a9c2dcc2ea

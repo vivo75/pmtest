@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=test? ( dev-libs/cddtstb )
+DESCRIPTION=#506 fixture: test? ( dev-libs/cddtstb ) with USE=test from package.use (upstream testTestDepCycle)
+EAPI=8
+IUSE=test
+KEYWORDS=amd64
+SLOT=0
+_md5_=e75f42516b345d0ec1809b01519f96f3

@@ -1,0 +1,28 @@
+# Backlog #506 (portuale plan 02.442 S7): the Portage 3.0.83 circular-dependency
+# report text -- the USE flags named per edge, the FEATURES=test pointer, masked
+# || alternatives and the give-up beyond PORTAGE_CIRCULAR_MAX_USE_FLAGS --
+# on the cycle fixtures shaped after upstream test_circular_dependency_display.py
+# (dev-libs/cdd*, dev-lang/cddgo*) and the older cycle pins whose edge lines
+# gain a USE= tail. Host captures: portuale LLM/evidence/2026-10-23-506/.
+# Run with FX_HOST_ROOTS=1 (single root, like the host captures).
+dev-libs/usecyclea
+--autounmask-use=n dev-libs/cddnega
+dev-libs/cddunra
+--autounmask-use=n dev-libs/cddseva
+dev-libs/cddtsta
+--autounmask-use=n dev-libs/cddtdoa
+dev-lang/cddgo
+dev-lang/cddgou
+dev-lang/cddgok
+dev-lang/cddgop
+--autounmask-use=n dev-libs/cddtrna
+--tree dev-libs/gpcyclec
+dev-libs/fucyclec
+dev-libs/cyc4a
+dev-libs/hardcyclea
+dev-libs/slopcyca
+dev-libs/sbrA
+=dev-libs/cyc0z-1
+=dev-libs/cyc0b-1
+=dev-libs/cyc0w-3
+--backtrack=0 dev-libs/ccd4a

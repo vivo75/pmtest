@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=#506 fixture: bootstrap branch of dev-lang/cddgop, masked by etc/portage/package.mask
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=cb620b730cd3ab518ae4242ad4a3a128
