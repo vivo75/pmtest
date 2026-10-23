@@ -3223,8 +3223,8 @@ _INFO_VOLATILE = [
     (re.compile(r"^System uname: .*", re.M), "System uname: XXX"),
     (re.compile(r"^KiB (Mem|Swap): .*", re.M), r"KiB \1: XXX"),
     (
-        re.compile(r"^(Timestamp|Head commit) of repository (\S+):.*", re.M),
-        r"\1 of repository \2: XXX",
+        re.compile(r"^( {4}(?:timestamp|head commit)): .*", re.M),
+        r"\1: XXX",
     ),
     (re.compile(r"^(sh|coreutils|ld): .*", re.M), r"\1: XXX"),
     (
@@ -22446,8 +22446,8 @@ def test_info_prints_the_deterministic_config_block(
     emerge_binary, fixture_env
 ):
     """emerge --info (Portage action_info): the host-state header (Portage
-    version line, `System uname:`, `KiB Mem/Swap:`, repo `Timestamp`/
-    `Head commit`, `sh:`/`coreutils:`/`ld:` probes, `info_pkgs` table),
+    version line, `System uname:`, `KiB Mem/Swap:`, repo `timestamp:`/
+    `head commit:` lines (now inside the repo block, #504), `sh:`/`coreutils:`/`ld:` probes, `info_pkgs` table),
     then `Repositories:`, `Binary Repositories:`, `Installed sets:`, the
     sorted VAR="value" dump and the `Unset:` line, compared once the
     volatile header values are XXX-normalized (`_normalize_info`)."""
@@ -22462,6 +22462,90 @@ def test_info_prints_the_deterministic_config_block(
     assert "\nBinary Repositories:\n" in rust.stdout
     assert '\nACCEPT_KEYWORDS="amd64"\n' in rust.stdout
     assert "\nUnset:  " in rust.stdout
+
+
+def test_504_info_repo_block_timestamp_head_commit_and_masked_uris(
+    emerge_binary, tmp_path
+):
+    """Backlog #504 (Portage 3.0.83-r1, `ae78e95a8`/`fce6ff1f9`/
+    `0ef099992`/`c4760f80e`): `emerge --info` prints `timestamp:` and
+    `head commit:` as indented lines at the end of each repo block (not
+    `Timestamp of repository X:` in the header), a blank line before
+    `Repositories:`, and `sync-uri` of repos and binrepos goes through
+    `_hide_url_passwd` (`user:*password*@`).
+
+    Grounding: host Portage 3.0.83 on the same hermetic tree, recorded
+    with asciinema in `LLM/evidence/2026-10-23-504/` (portage.txt vs
+    portuale.txt; probe.sh)."""
+    cfg = tmp_path / "cfg"
+    git_repo = tmp_path / "repo1"
+    ts_repo = tmp_path / "repo2"
+    bh = tmp_path / "bh"
+    (git_repo / "profiles/pfx").mkdir(parents=True)
+    (git_repo / "metadata").mkdir()
+    (git_repo / "profiles/repo_name").write_text("main\n")
+    (git_repo / "profiles/pfx/make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\n'
+    )
+    (git_repo / "metadata/timestamp.chk").write_text(
+        "Mon, 01 Jan 2026 00:00:00 +0000\n"
+    )
+    (ts_repo / "profiles").mkdir(parents=True)
+    (ts_repo / "metadata").mkdir()
+    (ts_repo / "profiles/repo_name").write_text("second\n")
+    (ts_repo / "metadata/layout.conf").write_text("masters = main\n")
+    (ts_repo / "metadata/timestamp.chk").write_text(
+        "# c\nTue, 02 Feb 2026 01:02:03 +0000  \n"
+    )
+    bh.mkdir()
+    for args in (
+        ["init", "-q"],
+        ["add", "-A"],
+        ["-c", "user.name=a", "-c", "user.email=a@b", "commit", "-qm", "i"],
+    ):
+        subprocess.run(["git", "-C", str(git_repo), *args], check=True)
+    head = subprocess.run(
+        ["git", "-C", str(git_repo), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    (cfg / "etc/portage/repos.conf").mkdir(parents=True)
+    (cfg / "etc/portage/make.profile").symlink_to(git_repo / "profiles/pfx")
+    (cfg / "etc/portage/repos.conf/r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {git_repo}\n"
+        "sync-type = git\nsync-uri = https://alice:s3cret@example.invalid/m.git\n"
+        f"\n[second]\nlocation = {ts_repo}\npriority = 5\n"
+        "sync-type = rsync\nsync-uri = rsync://bob:hunter2@example.invalid/s\n"
+    )
+    (cfg / "etc/portage/binrepos.conf").write_text(
+        "[bh]\nsync-uri = https://carol:pw123@binhost.example.invalid/p\n"
+        f"priority = 7\nlocation = {bh}\nverify-signature = false\n"
+    )
+    env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+    rust = _run([str(emerge_binary)], ["--info"], env)
+    assert rust.returncode == 0, rust.stderr
+    out = rust.stdout
+    assert "Timestamp of repository" not in out
+    assert "Head commit of repository" not in out
+    assert "\n\nRepositories:\n\nmain\n" in out
+    assert (
+        f"main\n    location: {git_repo}\n    sync-type: git\n"
+        "    sync-uri: https://alice:*password*@example.invalid/m.git\n"
+        "    priority: -1000\n    volatile: True\n"
+        "    timestamp: Mon, 01 Jan 2026 00:00:00 +0000\n"
+        f"    head commit: {head}\n\nsecond\n"
+    ) in out
+    # rsync repo: timestamp only, no head commit; trailing blanks stripped.
+    assert (
+        "    sync-uri: rsync://bob:*password*@example.invalid/s\n"
+    ) in out
+    assert "    timestamp: Tue, 02 Feb 2026 01:02:03 +0000\n\n" in out
+    assert out.count("head commit:") == 1
+    assert (
+        f"Binary Repositories:\n\nbh\n    location: {bh}\n    priority: 7\n"
+        "    sync-uri: https://carol:*password*@binhost.example.invalid/p\n"
+    ) in out
+    assert "s3cret" not in out and "hunter2" not in out and "pw123" not in out
+    assert not any(ln != ln.rstrip() for ln in out.split("\nACCEPT_")[0].splitlines())
 
 
 def test_info_stacks_make_globals_profile_env_and_info_vars(
