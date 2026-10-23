@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: grammar registry (#494-#497) target: SLOT 2, no sub-slot, no IUSE
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=6e32a5141cb97784ec39045d24230513

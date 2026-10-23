@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: grammar registry (#494) resolvable: RDEPEND names a slot-only atom (:2) that gxslotdep satisfies
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/gxslotdep:2
+SLOT=0
+_md5_=456033980f25ca8ff1b1ab1a21f82b60

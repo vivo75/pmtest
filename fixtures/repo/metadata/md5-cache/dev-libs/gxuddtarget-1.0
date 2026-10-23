@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: grammar registry (#496) target: deliberately has no IUSE, so [flag(-)] defaults the absent flag to disabled
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=31bba13467f9eec6bffbfbf7c8ce5409

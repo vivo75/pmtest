@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: grammar registry (#496) unsatisfiable: RDEPEND needs [flag(-)] on a target whose IUSE lacks flag, so the (-) default makes it disabled and the match fails
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/gxuddtarget[flag(-)]
+SLOT=0
+_md5_=868b5fdce20452686bba4c59de24b792

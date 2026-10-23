@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: grammar registry (#495) unsatisfiable: RDEPEND names a slot-operator atom (:9=) no gxslotdep ebuild satisfies
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/gxslotdep:9=
+SLOT=0
+_md5_=c6b43d8732d3c14cea96a643134586c7

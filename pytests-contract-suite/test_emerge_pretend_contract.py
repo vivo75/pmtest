@@ -3080,6 +3080,10 @@ CASES = [
     ("#484 B: -pvuDN keeps installed f484b-x-1.0, only f484b-q upgrades (Portage 3.0.82.2 rows)", ["-pvuDN", "dev-lang/f484b-q", "www-servers/f484b-p"], 0),
     ("#483: -pvuD uninstalls f483-t, whose only parent f483-p is replaced, to resolve f483-w's soft block (Portage 3.0.82.2 rows)", ["-pvuD", "dev-lang/f483-p", "www-servers/f483-w"], 0),
     ("#490: -pvuD upgrades f490-top and f490-lib with no slot conflict: top-2.0 drops cons, releasing its =lib-1.0* pin (Portage 3.0.82.2 rows)", ["-pvuD", "dev-libs/f490-top", "dev-libs/f490-lib"], 0),
+    ("#494: a slot-only (:2) dependency atom that gxslotdep satisfies resolves (rc 0, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxslotonlyok"], 0),
+    ("#494: a slot-only (:9) dependency atom no ebuild satisfies aborts with `no ebuilds to satisfy` (rc 1, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxslotonlybad"], 1),
+    ("#495: a slot-operator (:9=) dependency atom no ebuild satisfies aborts with `no ebuilds to satisfy` (rc 1, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxslotopbad"], 1),
+    ("#496: a [flag(-)] USE-dep on a target without flag in IUSE fails to match (rc 1, Portage 3.0.82.2)", ["--pretend", "dev-libs/gxuddbad"], 1),
 ]
 
 
@@ -33254,3 +33258,66 @@ def test_f490_orphaned_version_pin_does_not_block_the_upgrade_like_portage(
         "Total: 2 packages (2 upgrades), Size of downloads: 0 KiB",
     ]
     assert result.stderr == ""
+
+
+def _gx_unsat_abort(result, atom, parent):
+    """Shared assertion of the #494-#496 unsatisfiable-dependency pins:
+    Portage 3.0.82.2 `_show_unsatisfied_dep` (depgraph.py:7031) prints the
+    bare `no ebuilds to satisfy` line plus the parent chain, rc 1."""
+    assert result.returncode == 1
+    _assert_abort_preamble(result.stdout)
+    assert result.stderr.strip().splitlines() == [
+        f'emerge: there are no ebuilds to satisfy "{atom}".',
+        f'(dependency required by "dev-libs/{parent}-1.0::testrepo" [ebuild])',
+        f'(dependency required by "dev-libs/{parent}" [argument])',
+    ]
+
+
+def test_slot_only_dependency_atom_resolves_when_the_slot_exists(emerge_binary, fixture_env):
+    """Backlog #494, resolvable half. `gxslotonlyok`'s RDEPEND is
+    `dev-libs/gxslotdep:2` and `gxslotdep-1.0` has SLOT 2. Portage 3.0.82.2
+    on a staged copy of this tree prints both `[ebuild  N]` rows, rc 0.
+    A PM that drops the slot-only atom as unparsed would omit the
+    gxslotdep row; one that ignores the slot still merges both."""
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/gxslotonlyok"], fixture_env)
+    assert result.returncode == 0
+    assert result.stdout.splitlines()[-2:] == [
+        f'[ebuild  N     ] dev-libs/gxslotdep-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/gxslotonlyok-1.0 to {fixture_env["ROOT"]}',
+    ]
+
+
+def test_slot_only_dependency_atom_rejects_a_missing_slot(emerge_binary, fixture_env):
+    """Backlog #494, unsatisfiable half. `gxslotonlybad` needs
+    `dev-libs/gxslotdep:9`; gxslotdep exists only in SLOT 2. Portage
+    3.0.82.2 prints the `no ebuilds to satisfy` line (depgraph.py:7031) and
+    exits 1. If the slot restriction regressed to "ignored" this would
+    resolve (rc 0, a gxslotdep row); if the dependency were dropped as
+    unparsed it would also resolve with only the parent row."""
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/gxslotonlybad"], fixture_env)
+    _gx_unsat_abort(result, "dev-libs/gxslotdep:9", "gxslotonlybad")
+
+
+def test_slot_operator_dependency_atom_rejects_a_missing_slot(emerge_binary, fixture_env):
+    """Backlog #495. `gxslotopbad` needs `dev-libs/gxslotdep:9=`.
+    Portage never rejects `:=` by itself; the rejection here is the
+    nonexistent slot 9, reached through a dependency (not a CLI atom).
+    Portage 3.0.82.2 prints `no ebuilds to satisfy "...:9="` with the
+    operator kept in the atom, rc 1. A PM that skips operator-bearing
+    dependency tokens would resolve rc 0; one that strips the operator
+    would print the atom without the trailing `=`."""
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/gxslotopbad"], fixture_env)
+    _gx_unsat_abort(result, "dev-libs/gxslotdep:9=", "gxslotopbad")
+
+
+def test_use_dep_default_minus_makes_an_absent_flag_fail_the_match(emerge_binary, fixture_env):
+    """Backlog #496. `gxuddbad` needs `dev-libs/gxuddtarget[flag(-)]`;
+    gxuddtarget has no IUSE, so the `(-)` default treats `flag` as
+    disabled and the enabled-flag requirement fails. Portage 3.0.82.2
+    reports plain `no ebuilds to satisfy "...[flag(-)]"` (not the
+    `built with USE flags` / Missing IUSE wording: with a default the flag
+    is not a missing-IUSE error), rc 1. A PM that ignored `(-)` and
+    treated the absent flag as satisfied, or as an invalid-metadata mask
+    (the unrelated 1284 shape), would differ in rc or wording."""
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/gxuddbad"], fixture_env)
+    _gx_unsat_abort(result, "dev-libs/gxuddtarget[flag(-)]", "gxuddbad")
