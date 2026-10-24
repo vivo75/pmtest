@@ -34456,7 +34456,7 @@ def test_507_json_report_is_not_printed_when_nothing_cycles(emerge_binary, fixtu
     assert result.stderr == base.stderr
 
 
-def _mixed_binhost_env(fixture_env, tmp_path):
+def _mixed_binhost_env(fixture_env, tmp_path, overlap=False):
     """A hermetic config for the backlog #511 mixed-binhost pins: a scratch
     `s511` repo (profiles only, NO ebuilds — every package exists only as a
     remote binary, like the #347 S9 cells) plus two `file://` binhosts with
@@ -34501,8 +34501,28 @@ def _mixed_binhost_env(fixture_env, tmp_path):
     plain = tmp_path / "binhost-plain"
     sig.mkdir()
     plain.mkdir()
+    overlap_sig = overlap_plain = ""
+    if overlap:
+        # Backlog #536: one CPV in both indexes under different `gpkg_only`
+        # policies (mirrors `LLM/evidence/2026-10-23-511/probe-overlap.sh`).
+        overlap_sig = (
+            idx("app-misc/s511ov-1", "PATH: app-misc/s511ov-1.weird\nBUILD_ID: 1\nBUILD_TIME: 1000")
+            + "\n"
+            + idx("app-misc/s511ow-1", "PATH: app-misc/s511ow-1.weird\nBUILD_ID: 1\nBUILD_TIME: 1000")
+            + "\n"
+            + idx("app-misc/s511ox-1", "PATH: app-misc/s511ox-1.weird\nBUILD_ID: 1\nBUILD_TIME: 1000")
+            + "\n"
+        )
+        overlap_plain = (
+            idx("app-misc/s511ov-1", "PATH: app-misc/s511ov-1.gpkg.tar\nBUILD_ID: 1\nBUILD_TIME: 1000")
+            + "\n"
+            + idx("app-misc/s511ow-1", "PATH: app-misc/s511ow-1.tbz2\nBUILD_ID: 1\nBUILD_TIME: 1000")
+            + "\n"
+            + idx("app-misc/s511ox-1", "PATH: app-misc/s511ox-1.tbz2\nBUILD_ID: 1\nBUILD_TIME: 1000")
+            + "\n"
+        )
     (sig / "Packages").write_text(
-        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 6\n\n"
+        f"VERSION: 0\nTIMESTAMP: 0\nPACKAGES: {9 if overlap else 6}\n\n"
         + idx("app-misc/s511-a-1", "PATH: app-misc/s511-a-1.gpkg.tar\nBUILD_ID: 1\nBUILD_TIME: 1000")
         + "\n"
         + idx("app-misc/s511-b-1", "PATH: app-misc/s511-b-1.tbz2\nBUILD_ID: 1\nBUILD_TIME: 1000")
@@ -34515,6 +34535,7 @@ def _mixed_binhost_env(fixture_env, tmp_path):
         + "\n"
         + idx("app-misc/s511-f-1", "BUILD_ID: 1\nBUILD_TIME: 1000")
         + "\n"
+        + overlap_sig
     )
     (plain / "Packages").write_text(
         "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 4\n\n"
@@ -34526,6 +34547,7 @@ def _mixed_binhost_env(fixture_env, tmp_path):
         + "\n"
         + idx("app-misc/s511-j-1", "BUILD_ID: 1\nBUILD_TIME: 1000")
         + "\n"
+        + overlap_plain
     )
     (cfg / "etc" / "portage" / "binrepos.conf").write_text(
         f"[mixsig]\nsync-uri = file://{sig}\npriority = 1\nverify-signature = true\n\n"
@@ -34648,6 +34670,362 @@ def test_511_request_signature_filters_every_repo_highest_priority_first(
     sig_at = result.stderr.index("[mixsig] Remote XPAK binpkgs in")
     assert plain_at < sig_at
     assert 'no ebuilds to satisfy "app-misc/s511-g"' in result.stderr
+
+
+
+
+def test_536_overlap_higher_priority_gpkg_shadows_lower_xpak_silently(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #536 (`bintree._populate_remote_repo` `cpv_exists` skip):
+    `mixplain` (priority 2) carries `s511ov-1` as gpkg and `mixsig`
+    (priority 1, `gpkg_only`) as xpak. The plain copy injects first, so the
+    sig xpak is skipped before its format check: no `[mixsig]` warning, and
+    the atom resolves. Oracle:
+    `LLM/evidence/2026-10-23-511/probe-overlap.sh`, `ov-s511ov.*`."""
+    env = _mixed_binhost_env(fixture_env, tmp_path, overlap=True)
+    result = _s511_run(emerge_binary, env, "app-misc/s511ov")
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N g   ] app-misc/s511ov-1-1 to {env['ROOT']}" in result.stdout
+    assert "Unsupported binary package format from 'app-misc/s511ov-1.weird'" not in result.stderr
+
+
+def test_536_overlap_higher_priority_xpak_shadows_lower_gpkg_silently(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #536: `mixplain` carries `s511ow-1` as xpak (kept: the plain
+    repo is not `gpkg_only`) and `mixsig` as gpkg. The plain xpak injects
+    first, so the sig gpkg is skipped silently and the atom resolves from
+    the plain xpak. Oracle: `ov-s511ow.*` of the same probe."""
+    env = _mixed_binhost_env(fixture_env, tmp_path, overlap=True)
+    result = _s511_run(emerge_binary, env, "app-misc/s511ow")
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N g   ] app-misc/s511ow-1-1 to {env['ROOT']}" in result.stdout
+    assert "Unsupported binary package format from 'app-misc/s511ow-1.weird'" not in result.stderr
+
+
+def test_536_overlap_plain_xpak_resolves_without_warnings(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #536: `s511ox-1` is xpak in both repos; the plain copy is
+    kept (not `gpkg_only`) and shadows the sig copy, so nothing warns and
+    the atom resolves. Oracle: `ov-s511ox.*` of the same probe."""
+    env = _mixed_binhost_env(fixture_env, tmp_path, overlap=True)
+    result = _s511_run(emerge_binary, env, "app-misc/s511ox")
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N g   ] app-misc/s511ox-1-1 to {env['ROOT']}" in result.stdout
+    assert "Unsupported binary package format from 'app-misc/s511ox-1.weird'" not in result.stderr
+
+
+def test_536_overlap_dropped_entries_do_not_shadow(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #536: under `FEATURES=binpkg-request-signature` both repos
+    are `gpkg_only`, so the plain `s511ox-1` xpak warns and drops WITHOUT
+    injecting — and the sig copy is therefore not shadowed and warns too.
+    Both warnings print in descending-priority order, then the miss. Oracle:
+    `ov-s511ox-reqsig.*` of the same probe."""
+    env = _mixed_binhost_env(fixture_env, tmp_path, overlap=True)
+    env["FEATURES"] = "-news binpkg-request-signature"
+    result = _s511_run(emerge_binary, env, "app-misc/s511ox")
+    assert result.returncode == 1
+    plain_at = result.stderr.index("[mixplain] Remote XPAK binpkgs in")
+    sig_at = result.stderr.index("[mixsig] Remote XPAK binpkgs in")
+    assert plain_at < sig_at
+    assert 'no ebuilds to satisfy "app-misc/s511ox"' in result.stderr
+
+
+
+
+
+
+def _dup_basename_env(fixture_env, tmp_path):
+    """A hermetic config for the backlog #538 same-basename pins: a tmp
+    PKGDIR holding two real `.tbz2` binpkgs that share a basename in
+    different subdirs (`app-misc/dup-1.0.tbz2`, `dev-libs/dup-1.0.tbz2`,
+    equal SIZE from a fixed payload, equal mtime) plus a full
+    minimum-keys `Packages` stanza for the app-misc file only. The
+    archives are generated here with stdlib `tarfile`/`bz2` only, in the
+    layout both readers accept (`bz2(tar)` + `XPAKPACK..XPAKSTOP` segment +
+    trailer); the odd one out is that no host Portage is needed to build
+    them. Mirrors the oracle setup
+    (`LLM/evidence/2026-10-23-511/probe-overlap538.sh`)."""
+    import bz2
+    import io
+    import struct
+    import tarfile
+
+    def make_xpak(cat, pf):
+        members = {"CATEGORY": cat + "\n", "PF": pf + "\n", "SLOT": "0\n",
+                   "KEYWORDS": "amd64\n"}
+        index, data = b"", b""
+        for k, v in members.items():
+            kb, vb = k.encode(), v.encode()
+            index += struct.pack(">I", len(kb)) + kb
+            index += struct.pack(">I", len(data)) + struct.pack(">I", len(vb))
+            data += vb
+        seg = (b"XPAKPACK" + struct.pack(">I", len(index))
+               + struct.pack(">I", len(data)) + index + data + b"XPAKSTOP")
+        img = io.BytesIO()
+        with tarfile.open(fileobj=img, mode="w") as tf:
+            ti = tarfile.TarInfo("payload")
+            blob = b"x" * 512
+            ti.size = len(blob)
+            tf.addfile(ti, io.BytesIO(blob))
+        # Segment and trailer share the one XPAKSTOP: file = bz2(tar) +
+        # segment (XPAKPACK..XPAKSTOP inclusive) + be32(len(segment)) + STOP.
+        return bz2.compress(img.getvalue()) + seg \
+            + struct.pack(">I", len(seg)) + b"STOP"
+
+    fx = Path(fixture_env["PORTAGE_CONFIGROOT"])
+    cfg = tmp_path / "cfg"
+    (cfg / "etc" / "portage" / "repos.conf").mkdir(parents=True)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "parent").write_text(
+        f"{fx}/repo/profiles/base\n{fx}/repo/profiles/arch/amd64\n"
+    )
+    (cfg / "etc" / "portage" / "make.profile").symlink_to(profile)
+    (cfg / "etc" / "portage" / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n"
+    )
+    (cfg / "etc" / "portage" / "make.conf").write_text(
+        f'PKGDIR="{tmp_path / "pkgdir"}"\nFEATURES="-news -pkgdir-index-trusted"\n'
+        'ACCEPT_LICENSE="*"\n'
+    )
+    for cat in ("app-misc", "dev-libs"):
+        d = tmp_path / "pkgdir" / cat
+        d.mkdir(parents=True)
+        raw = make_xpak(cat, "dup-1.0")
+        (d / "dup-1.0.tbz2").write_bytes(raw)
+        os.utime(d / "dup-1.0.tbz2", (1700000000, 1700000000))
+    size = (tmp_path / "pkgdir" / "app-misc" / "dup-1.0.tbz2").stat().st_size
+    assert size == (tmp_path / "pkgdir" / "dev-libs" / "dup-1.0.tbz2").stat().st_size
+    keys = ["BDEPEND", "BUILD_ID", "BUILD_TIME", "CHOST", "CPV", "DEFINED_PHASES",
+            "DEPEND", "EAPI", "IDEPEND", "IUSE", "KEYWORDS", "LICENSE", "PDEPEND",
+            "PROPERTIES", "PROVIDES", "RDEPEND", "repository", "REQUIRES",
+            "RESTRICT", "SIZE", "SLOT", "USE", "PATH", "_mtime_"]
+    vals = {"BUILD_ID": "1", "BUILD_TIME": "1000", "CPV": "app-misc/dup-1.0",
+            "DEFINED_PHASES": "-", "EAPI": "8", "KEYWORDS": "amd64", "SLOT": "0",
+            "SIZE": str(size), "PATH": "app-misc/dup-1.0.tbz2",
+            "_mtime_": "1700000000"}
+    with open(tmp_path / "pkgdir" / "Packages", "w") as f:
+        f.write("VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 1\n\n")
+        for k in keys:
+            f.write("%s: %s\n" % (k, vals.get(k, "")))
+        f.write("\n")
+    root = tmp_path / "root"
+    root.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env
+
+
+def test_538_same_basename_vouches_only_its_own_dir(emerge_binary, fixture_env, tmp_path):
+    """Backlog #538 (`bintree._populate_local` `basename_index`, bug
+    978985): one stanza must vouch only the file in its own directory, even
+    when another subdir holds the same basename with equal SIZE/mtime.
+    Pre-fix, the dev-libs file vouched the app-misc stanza, so
+    `dev-libs/dup` had no candidate (rc 1, `no binary packages to
+    satisfy`); post-fix both atoms resolve, each as its own CPV. Oracle:
+    `LLM/evidence/2026-10-23-511/probe-overlap538.sh`, `ov538-dup-{app,dev}.*`
+    (host Portage rc 0 on both; the `-1` build suffix on portuale's
+    app-misc row is its vouched-stanza `BUILD_ID` convention, also present
+    in trusted mode where both managers agree)."""
+    env = _dup_basename_env(fixture_env, tmp_path)
+    for atom, row in (
+        ("app-misc/dup", f"[binary  N     ] app-misc/dup-1.0-1 to {env['ROOT']}"),
+        ("dev-libs/dup", f"[binary  N     ] dev-libs/dup-1.0 to {env['ROOT']}"),
+    ):
+        result = _run(
+            [str(emerge_binary)], ["-p", "--color=n", "--usepkgonly", atom], env
+        )
+        assert result.returncode == 0, (atom, result.stderr)
+        assert row in result.stdout, (atom, result.stdout)
+
+
+
+
+
+def _local_xpak_env(fixtures_root, fixture_env, tmp_path, request_signature):
+    """A hermetic config for the backlog #537 local-`gpkg_only` pins: a tmp
+    `$PKGDIR` holding only the real `binaryonlypkg-1.0.tbz2` fixture
+    binpkg (no `Packages` index, so both managers walk and parse the file
+    live under `-pkgdir-index-trusted`), resolved with `--usepkgonly`.
+    `request_signature` toggles `FEATURES=binpkg-request-signature`.
+    Mirrors the oracle setup
+    (`LLM/evidence/2026-10-24-537/probe-local-xpak.sh`)."""
+    import shutil
+
+    fx = fixtures_root
+    cfg = tmp_path / "cfg"
+    (cfg / "etc" / "portage" / "repos.conf").mkdir(parents=True)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "parent").write_text(
+        f"{fx}/repo/profiles/base\n{fx}/repo/profiles/arch/amd64\n"
+    )
+    (cfg / "etc" / "portage" / "make.profile").symlink_to(profile)
+    (cfg / "etc" / "portage" / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n"
+    )
+    features = "-news -pkgdir-index-trusted"
+    if request_signature:
+        features += " binpkg-request-signature"
+    (cfg / "etc" / "portage" / "make.conf").write_text(
+        f'PKGDIR="{tmp_path / "pkgdir"}"\nFEATURES="{features}"\n'
+        'ACCEPT_LICENSE="*"\n'
+    )
+    pkgdir = tmp_path / "pkgdir" / "dev-libs"
+    pkgdir.mkdir(parents=True)
+    shutil.copy(
+        fixtures_root / "pkgdir" / "dev-libs" / "binaryonlypkg-1.0.tbz2",
+        pkgdir / "binaryonlypkg-1.0.tbz2",
+    )
+    root = tmp_path / "root"
+    root.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env
+
+
+def test_537_local_xpak_resolves_without_request_signature(
+    emerge_binary, fixtures_root, fixture_env, tmp_path
+):
+    """Backlog #537: without the flag the local xpak resolves, rc 0.
+    Oracle: `LLM/evidence/2026-10-24-537/xpak-plain.*` (host Portage rc 0,
+    same row)."""
+    env = _local_xpak_env(fixtures_root, fixture_env, tmp_path, request_signature=False)
+    result = _run(
+        [str(emerge_binary)],
+        ["-p", "--color=n", "--usepkgonly", "dev-libs/binaryonlypkg"],
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (
+        f"[binary  N     ] dev-libs/binaryonlypkg-1.0-1 to {env['ROOT']}"
+        in result.stdout
+    )
+
+
+def test_537_local_xpak_ignored_under_request_signature(
+    emerge_binary, fixtures_root, fixture_env, tmp_path
+):
+    """Backlog #537 (`bintree._populate_local` `gpkg_only`): with
+    `FEATURES=binpkg-request-signature` the local xpak is ignored with
+    Portage's exact warning and the atom has no candidate (rc 1). Oracle:
+    `LLM/evidence/2026-10-24-537/xpak-reqsig.*` (host Portage rc 1, same
+    warning, same miss)."""
+    env = _local_xpak_env(fixtures_root, fixture_env, tmp_path, request_signature=True)
+    result = _run(
+        [str(emerge_binary)],
+        ["-p", "--color=n", "--usepkgonly", "dev-libs/binaryonlypkg"],
+        env,
+    )
+    assert result.returncode == 1
+    assert (
+        "Local XPAK packages are ignored due to 'binpkg-request-signature'.\n"
+        in result.stderr
+    )
+    assert (
+        'there are no binary packages to satisfy "dev-libs/binaryonlypkg"'
+        in result.stderr
+    )
+
+
+
+
+
+def _default_inherit_env(fixtures_root, fixture_env, tmp_path, default_false):
+    """A hermetic config for the backlog #539 `[DEFAULT]`-inheritance pins:
+    a single keyless `file://` binrepo serving one xpak `Packages` entry,
+    with or without a `[DEFAULT] verify-signature = false` section.
+    Mirrors the oracle setup
+    (`LLM/evidence/2026-10-24-539/probe.sh`)."""
+    fx = fixtures_root
+    cfg = tmp_path / "cfg"
+    (cfg / "etc" / "portage" / "repos.conf").mkdir(parents=True)
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    (profile / "parent").write_text(
+        f"{fx}/repo/profiles/base\n{fx}/repo/profiles/arch/amd64\n"
+    )
+    (cfg / "etc" / "portage" / "make.profile").symlink_to(profile)
+    (cfg / "etc" / "portage" / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n"
+    )
+    (cfg / "etc" / "portage" / "make.conf").write_text(
+        'FEATURES="-news"\nACCEPT_LICENSE="*"\n'
+    )
+    binhost = tmp_path / "binhost"
+    binhost.mkdir()
+    (binhost / "Packages").write_text(
+        "VERSION: 0\nTIMESTAMP: 0\nPACKAGES: 1\n\n"
+        "CPV: app-misc/s539-1\nDEFINED_PHASES: -\n"
+        "DESCRIPTION: backlog #539 pin\nEAPI: 8\nKEYWORDS: amd64\n"
+        "SLOT: 0\nSIZE: 100\nBUILD_ID: 1\nBUILD_TIME: 1000\n"
+        "PATH: app-misc/s539-1.tbz2\n\n"
+    )
+    default = (
+        "[DEFAULT]\nverify-signature = false\n\n"
+        if default_false
+        else ""
+    )
+    (cfg / "etc" / "portage" / "binrepos.conf").write_text(
+        f"{default}[plain]\nsync-uri = file://{binhost}\npriority = 1\n"
+    )
+    root = tmp_path / "root"
+    root.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env
+
+
+def test_539_default_verify_signature_false_opts_keyless_repo_out(
+    emerge_binary, fixtures_root, fixture_env, tmp_path
+):
+    """Backlog #539: `[DEFAULT] verify-signature = false` is inherited by
+    the keyless section, so it is not `gpkg_only` and its xpak entry
+    resolves (rc 0). Oracle:
+    `LLM/evidence/2026-10-24-539/default-false.*` (host Portage rc 0, same
+    row)."""
+    env = _default_inherit_env(fixtures_root, fixture_env, tmp_path, True)
+    result = _run(
+        [str(emerge_binary)],
+        ["-p", "--color=n", "--getbinpkg", "app-misc/s539"],
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert f"[binary  N g   ] app-misc/s539-1-1 to {env['ROOT']}" in result.stdout
+
+
+def test_539_no_default_keeps_the_verifying_default(
+    emerge_binary, fixtures_root, fixture_env, tmp_path
+):
+    """Backlog #539: without `[DEFAULT]` the stock-global
+    `verify-signature = true` applies, so the keyless xpak repo is
+    `gpkg_only`: ignored with the warning, rc 1. Oracle:
+    `LLM/evidence/2026-10-24-539/no-default.*` (host Portage rc 1, same
+    warning, same miss)."""
+    env = _default_inherit_env(fixtures_root, fixture_env, tmp_path, False)
+    result = _run(
+        [str(emerge_binary)],
+        ["-p", "--color=n", "--getbinpkg", "app-misc/s539"],
+        env,
+    )
+    assert result.returncode == 1
+    assert (
+        "[plain] Remote XPAK binpkgs in "
+        f"'file://{tmp_path}/binhost' ignored: signatures are missing "
+        "(FEATURES=binpkg-request-signature or verify-signature in "
+        "binrepos.conf).\n" in result.stderr
+    )
+    assert 'no ebuilds to satisfy "app-misc/s539"' in result.stderr
+
+
 
 
 def _user_patches_env(fixture_env, tmp_path):
