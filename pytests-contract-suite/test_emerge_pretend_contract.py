@@ -4051,6 +4051,10 @@ def test_unbreakable_build_time_cycle_prints_the_circular_deps_error(
 
     assert rust.returncode == 1
     assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 1/20).\n"
+        "\n"
         f'[nomerge       ] dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/hardcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/hardcyclea-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
@@ -4110,6 +4114,10 @@ def test_softened_build_time_cycle_reports_the_persisting_ring(
     `Complete` -- rc 1 WITH backtracking on (contrast the bt0-only
     legs, which never retry).
 
+    Backlog #517 (a): the ring starts where Portage's starts (`sbrB`,
+    the successor of the earliest-discovered node), not at the lowest
+    entry index (`sbrA`).
+
     Grounded in Portage runs (`/tmp/opencode/g221b/probe_sbr.py`,
     3rdparty portage 3.0.82.2 `ResolverPlayground`, debug
     `backtracking try` count): backtracking on fails after exactly 1
@@ -4127,6 +4135,10 @@ def test_softened_build_time_cycle_reports_the_persisting_ring(
 
     assert rust.returncode == 1
     assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 1/20).\n"
+        "\n"
         f'[nomerge       ] dev-libs/sbrA-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/sbrB-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/sbrA-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
@@ -4136,9 +4148,9 @@ def test_softened_build_time_cycle_reports_the_persisting_ring(
     assert rust.stderr == (
         "\n\n\n * Error: circular dependencies:\n"
         "\n"
-        "(dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/sbrB-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "(dev-libs/sbrB-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/sbrA-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "  (dev-libs/sbrB-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
         "\n"
         " * Note that circular dependencies can often be avoided by temporarily\n"
         " * disabling USE flags that trigger optional dependencies.\n"
@@ -4178,6 +4190,10 @@ def test_mixed_priority_cycle_prints_each_edge_portage_label(
 
     assert rust.returncode == 1
     assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 1/20).\n"
+        "\n"
         f'[nomerge       ] dev-libs/slopcyca-1.0::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/slopcycb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/slopcyca-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
@@ -4228,6 +4244,10 @@ def test_circular_dep_use_flag_suggestion(
     rust = _run([str(emerge_binary)], base, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 1/20).\n"
+        "\n"
         f'[nomerge       ] dev-libs/usecyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" \n'
         f'[ebuild  N     ]  dev-libs/usecycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   dev-libs/usecyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB\n'
@@ -4282,6 +4302,10 @@ def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 1/20).\n"
+        "\n"
         f'[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" \n'
         f'[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
@@ -4324,6 +4348,12 @@ def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 1/20).",
+        "",
         f'[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" ',
         f'[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
@@ -4394,6 +4424,12 @@ def test_circular_dep_four_ring_reports_redisplay_suggestion_and_lot_of_cycles(
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 1
     assert rust.stdout.splitlines() == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        "Dependency resolution took (backtrack: 1/20).",
+        "",
         f'[nomerge       ] dev-libs/cyc4a-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" ',
         f'[ebuild  N     ]  dev-libs/cyc4b-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
         f'[ebuild  N     ]   dev-libs/cyc4c-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
@@ -4687,7 +4723,7 @@ def test_abort_debug_child_line_shows_post_flip_use(
         ),
         (
             "dev-libs/abort-cycle-mid",
-            ["abort-cycle-mid", "abort-cycle-a", "abort-cycle-b"],
+            ["abort-cycle-a", "abort-cycle-b", "abort-cycle-mid"],
             {"reason": "unserializable-cycle"},
         ),
     ],
@@ -4715,9 +4751,9 @@ def test_abort_path_json_carries_partial_list_and_aborted_reason(
         assert aborted[key] == value
     if expected_reason["reason"] == "unserializable-cycle":
         assert aborted["members"] == [
-            "dev-libs/abort-cycle-mid-1.0",
             "dev-libs/abort-cycle-a-1.0",
             "dev-libs/abort-cycle-b-1.0",
+            "dev-libs/abort-cycle-mid-1.0",
         ]
 
 
@@ -10288,7 +10324,12 @@ def test_required_use_violated_top_level_aborts_the_whole_run(emerge_binary, fix
         [str(emerge_binary)], ["--pretend", "dev-libs/requiredusebadpkg"], fixture_env
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
+    )
     assert result.stderr.strip() == (
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
         "unmet requirements.\n"
@@ -10317,7 +10358,12 @@ def test_required_use_violated_dependency_still_aborts_the_whole_run(
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
+    )
     assert result.stderr.strip() == (
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg" has '
         "unmet requirements.\n"
@@ -10352,7 +10398,12 @@ def test_required_use_violations_are_collected_across_the_whole_walk_not_just_th
         fixture_env,
     )
     assert result.returncode == 1
-    assert result.stdout == ""
+    assert result.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/20).\n"
+        "\n"
+    )
     assert result.stderr.strip() == (
         '!!! The ebuild selected to satisfy "dev-libs/requiredusebadpkg2" has '
         "unmet requirements.\n"
@@ -21150,6 +21201,97 @@ def test_jobs_and_load_average_are_scheduling_only_under_pretend(
         assert rust.stderr.strip() == message
 
 
+
+
+# Portage 3.0.83's full `usage:` block for `emerge` (78 lines), printed above
+# every argparse-native `invalid choice` error (backlog #520, plan
+# residui-514-555 Task 3 Step 4). Verbatim from
+# `LLM/evidence/2026-10-23-507/captures/53-none.portage.err` (lines 1-78);
+# the option order inside is hash-randomized per Portage process, so no
+# byte order matches every run -- portuale prints this fixed capture, like
+# the sorted `Change USE:` flags of quirks Q4. Used as a prefix for the
+# exact-stderr pins below.
+_PORTAGE_USAGE_78 = (
+    "usage: emerge [--sync] [--unmerge] [--moo] [--help] [--check-news]\n"
+    "              [--rage-clean] [--list-sets] [--regen] [--info] [--clean]\n"
+    "              [--prune] [--metadata] [--search] [--depclean] [--config]\n"
+    "              [--status] [--version] [--alphabetical] [--ask-enter-invalid]\n"
+    "              [--buildpkgonly] [--changed-use] [--columns] [--debug]\n"
+    "              [--digest] [--emptytree] [--verbose-conflicts] [--fetchonly]\n"
+    "              [--fetch-all-uri] [--ignore-default-opts] [--noconfmem]\n"
+    "              [--newrepo] [--newuse] [--nobindeps] [--nodeps] [--noreplace]\n"
+    "              [--nospinner] [--oneshot] [--onlydeps] [--pretend]\n"
+    "              [--quiet-repo-display] [--quiet-unmerge-warn] [--resume]\n"
+    "              [--searchdesc] [--skipfirst] [--tree] [--unordered-display]\n"
+    "              [--update] [--update-if-installed] [-1] [-B] [-c] [-C] [-d] [-e]\n"
+    "              [-f] [-F] [-h] [-n] [-N] [-o] [-O] [-p] [-P] [-r] [-s] [-S] [-t]\n"
+    "              [-u] [-U] [-V] [--cols] [--skip-first] [--alert {True,y,n}]\n"
+    "              [--ask {True,y,n}] [--autounmask {True,y,n}]\n"
+    "              [--autounmask-backtrack {y,n}]\n"
+    "              [--autounmask-continue {True,y,n}]\n"
+    "              [--autounmask-only {True,y,n}] [--autounmask-license {y,n}]\n"
+    "              [--autounmask-unrestricted-atoms {True,y,n}]\n"
+    "              [--autounmask-use {y,n}] [--autounmask-keep-keywords {True,y,n}]\n"
+    "              [--autounmask-keep-masks {True,y,n}]\n"
+    "              [--autounmask-write {True,y,n}]\n"
+    "              [--accept-properties ACCEPT_PROPERTIES]\n"
+    "              [--accept-restrict ACCEPT_RESTRICT] [--backtrack BACKTRACK]\n"
+    "              [--binpkg-changed-deps {True,y,n}]\n"
+    "              [--binpkg-respect-use {True,y,n}]\n"
+    "              [--binpkg-respect-user-patches {True,y,n}]\n"
+    "              [--buildpkg {True,y,n}] [--buildpkg-exclude BUILDPKG_EXCLUDE]\n"
+    "              [--changed-deps {True,y,n}] [--changed-deps-report {True,y,n}]\n"
+    "              [--changed-slot {True,y,n}]\n"
+    "              [--circular-deps-report {True,text,json}]\n"
+    "              [--config-root CONFIG_ROOT] [--color {y,n}]\n"
+    "              [--complete-graph {True,y,n}]\n"
+    "              [--complete-graph-if-new-use {y,n}]\n"
+    "              [--complete-graph-if-new-ver {y,n}] [--deep DEEP]\n"
+    "              [--depclean-lib-check {True,y,n}] [--deselect {True,y,n}]\n"
+    "              [--dynamic-deps {y,n}] [--exclude EXCLUDE]\n"
+    "              [--fail-clean {True,y,n}] [--fuzzy-search {True,y,n}]\n"
+    "              [--ignore-built-slot-operator-deps {y,n}]\n"
+    "              [--ignore-soname-deps {y,n}] [--ignore-world {True,y,n}]\n"
+    "              [--implicit-system-deps {y,n}] [--jobs JOBS]\n"
+    "              [--jobs-tmpdir-require-free-gb JOBS_TMPDIR_REQUIRE_FREE_GB]\n"
+    "              [--keep-going {True,y,n}] [--load-average LOAD_AVERAGE]\n"
+    "              [--merge-wait-scope {deep,system,toolchain,none}]\n"
+    "              [--misspell-suggestions {y,n}] [--with-bdeps {y,n}]\n"
+    "              [--with-bdeps-auto {y,n}] [--reinstall {changed-use}]\n"
+    "              [--reinstall-atoms REINSTALL_ATOMS] [--getbinpkg {True,y,n}]\n"
+    "              [--getbinpkgonly {True,y,n}]\n"
+    "              [--getbinpkg-exclude GETBINPKG_EXCLUDE]\n"
+    "              [--getbinpkg-include GETBINPKG_INCLUDE]\n"
+    "              [--usepkg-exclude USEPKG_EXCLUDE]\n"
+    "              [--usepkg-include USEPKG_INCLUDE]\n"
+    "              [--onlydeps-with-ideps {True,y,n}]\n"
+    "              [--onlydeps-with-rdeps {True,y,n}]\n"
+    "              [--rebuild-exclude REBUILD_EXCLUDE]\n"
+    "              [--rebuild-ignore REBUILD_IGNORE] [--package-moves {True,y,n}]\n"
+    "              [--prefix PREFIX] [--pkg-format PKG_FORMAT]\n"
+    "              [--quickpkg-direct {y,n}]\n"
+    "              [--quickpkg-direct-root QUICKPKG_DIRECT_ROOT]\n"
+    "              [--quiet {True,y,n}] [--quiet-build {True,y,n}]\n"
+    "              [--quiet-fail {True,y,n}] [--read-news {True,y,n}]\n"
+    "              [--rebuild-if-new-slot {True,y,n}]\n"
+    "              [--rebuild-if-new-rev {True,y,n}]\n"
+    "              [--rebuild-if-new-ver {True,y,n}]\n"
+    "              [--rebuild-if-unbuilt {True,y,n}]\n"
+    "              [--rebuilt-binaries {True,y,n}]\n"
+    "              [--rebuilt-binaries-timestamp REBUILT_BINARIES_TIMESTAMP]\n"
+    "              [--regex-search-auto {y,n}] [--root ROOT]\n"
+    "              [--root-deps {True,rdeps}] [--search-index {y,n}]\n"
+    "              [--search-similarity SEARCH_SIMILARITY] [--select {True,y,n}]\n"
+    "              [--selective {True,y,n}] [--sync-submodule {glsa,news,profiles}]\n"
+    "              [--sysroot SYSROOT] [--use-ebuild-visibility {True,y,n}]\n"
+    "              [--useoldpkg-atoms USEOLDPKG_ATOMS] [--usepkg {True,y,n}]\n"
+    "              [--usepkgonly {True,y,n}] [--usepkg-exclude-live {True,y,n}]\n"
+    "              [--verbose {True,y,n}] [--verbose-missing-ebuilds {True,y,n}]\n"
+    "              [--verbose-slot-rebuilds {True,y,n}]\n"
+    "              [--with-test-deps {True,y,n}]\n"
+    "              [positional_args ...]\n")
+
+
 @pytest.mark.parametrize(
     "args,stderr",
     [
@@ -21171,32 +21313,38 @@ def test_jobs_and_load_average_are_scheduling_only_under_pretend(
         ),
         (
             ["--pretend", "--color=maybe"],
-            "emerge: error: argument --color: invalid choice: 'maybe' "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --color: invalid choice: 'maybe' "
             "(choose from 'y', 'n')\n",
         ),
         (
             ["--pretend", "--with-bdeps=x"],
-            "emerge: error: argument --with-bdeps: invalid choice: 'x' "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --with-bdeps: invalid choice: 'x' "
             "(choose from 'y', 'n')\n",
         ),
         (
             ["--pretend", "--with-bdeps-auto=x"],
-            "emerge: error: argument --with-bdeps-auto: invalid choice: 'x' "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --with-bdeps-auto: invalid choice: 'x' "
             "(choose from 'y', 'n')\n",
         ),
         (
             ["--pretend", "--onlydeps-with-rdeps=x"],
-            "emerge: error: argument --onlydeps-with-rdeps: invalid choice: 'x' "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --onlydeps-with-rdeps: invalid choice: 'x' "
             "(choose from 'True', 'y', 'n')\n",
         ),
         (
             ["--pretend", "--onlydeps-with-ideps=x"],
-            "emerge: error: argument --onlydeps-with-ideps: invalid choice: 'x' "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --onlydeps-with-ideps: invalid choice: 'x' "
             "(choose from 'True', 'y', 'n')\n",
         ),
         (
             ["--pretend", "--autounmask-backtrack=x"],
-            "emerge: error: argument --autounmask-backtrack: invalid choice: 'x' "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --autounmask-backtrack: invalid choice: 'x' "
             "(choose from 'y', 'n')\n",
         ),
         (
@@ -21234,14 +21382,15 @@ def test_s8_argparse_error_lines_match_portage(
     emerge_binary, fixture_env, args, stderr
 ):
     """Plan #347 S8 (347-ERR): every option-parsing failure prints
-    Portage's `emerge: error:` line, without the `usage:` block (347-USG
-    cut: its option order comes from a `frozenset`, so it is not
-    reproducible byte for byte). Messages Portage passes to
+    Portage's `emerge: error:` line. Messages Portage passes to
     `parser.error` (`--jobs`, `--load-average`, `--deep`,
     `--backtrack`, `--exclude`, `--buildpkg-exclude`) carry their
     trailing `\\n`, so a blank line follows (rule D4); argparse-native
-    errors (`invalid choice`, `unrecognized arguments`) end in one
-    `\\n`. stdout is empty, rc 2.
+    `unrecognized arguments` ends in one `\\n` with no `usage:` block
+    (347-USG cut, narrowed by backlog #520). Every argparse-native
+    `invalid choice` row instead asserts Portage's full `usage:` block
+    first (`_PORTAGE_USAGE_78`, fixed 3.0.83 capture: the option order is
+    hash-randomized per process, quirks Q11). stdout is empty, rc 2.
 
     Oracle: Portage 3.0.82.2, this host (S0 C cells
     `LLM/evidence/2026-10-15-346-s0/c/`, `PYTHONHASHSEED=0` runs), full
@@ -29391,10 +29540,14 @@ def test_278_printed_cycle_starts_where_portages_shortest_cycle_starts(
     )
     assert r.returncode == 1
     assert r.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/0).\n"
+        "\n"
         f'[nomerge       ] dev-util/u278make-1::testrepo to {fixture_env["ROOT"]}\n'
         f'[ebuild  N     ]  dev-libs/u278json-1::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
-        f'[ebuild  N     ]   dev-util/u278make-1::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         f'[ebuild  N     ]   virtual/u278make-0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        f'[ebuild  N     ]    dev-util/u278make-1::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
         "\n"
         "Total: 3 packages (3 new), Size of downloads: 0 KiB\n"
     )
@@ -33677,22 +33830,26 @@ def test_use_dep_default_minus_makes_an_absent_flag_fail_the_match(emerge_binary
     [
         (
             ["--pretend", "--binpkg-respect-user-patches=true", "dev-libs/newpkg"],
-            "emerge: error: argument --binpkg-respect-user-patches: invalid choice: "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --binpkg-respect-user-patches: invalid choice: "
             "'true' (choose from 'True', 'y', 'n')\n",
         ),
         (
             ["--pretend", "--circular-deps-report=xml", "dev-libs/newpkg"],
-            "emerge: error: argument --circular-deps-report: invalid choice: "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --circular-deps-report: invalid choice: "
             "'xml' (choose from 'True', 'text', 'json')\n",
         ),
         (
             ["--pretend", "--circular-deps-report=", "dev-libs/newpkg"],
-            "emerge: error: argument --circular-deps-report: invalid choice: "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --circular-deps-report: invalid choice: "
             "'' (choose from 'True', 'text', 'json')\n",
         ),
         (
             ["--pretend", "--merge-wait-scope=all", "dev-libs/newpkg"],
-            "emerge: error: argument --merge-wait-scope: invalid choice: "
+            _PORTAGE_USAGE_78
+            + "emerge: error: argument --merge-wait-scope: invalid choice: "
             "'all' (choose from 'deep', 'system', 'toolchain', 'none')\n",
         ),
         (
@@ -33710,7 +33867,10 @@ def test_new_3_0_83_options_report_argparse_errors(emerge_binary, fixture_env, a
     """Backlog #503. Portage 3.0.83-r1 (host probe, `LLM/evidence/2026-10-23-503/`
     cells 04, 05, 11, 13, 18, 19, 21): the three options added in 3.0.83 are
     `choices`-checked by argparse, and `--cycle-break` is not an option. The
-    `usage:` block Portage prints above each line is the documented 347-USG cut."""
+    `usage:` block Portage prints above each `invalid choice` line is the
+    fixed 3.0.83 capture (`_PORTAGE_USAGE_78`, backlog #520: hash order is
+    unreproducible, quirks Q11); `--cycle-break`'s `unrecognized arguments`
+    keeps the documented 347-USG cut (error line only)."""
     result = _run([str(emerge_binary)], args, fixture_env)
     assert result.returncode == 2
     assert result.stdout == ""
@@ -33966,10 +34126,13 @@ def test_506_circular_report_colours_the_edge_flags_and_the_nomerge_row(
     reset = "\x1b[39;49;00m"
     assert f"(buildtime, USE={red}test{reset})\n" in rust.stderr
     assert f"{red} * {reset}This cycle involves test dependencies." in rust.stderr
+    # Backlog #519: the resolution preamble now precedes the re-displayed
+    # rows, so locate them past it instead of indexing from zero.
     rows = rust.stdout.splitlines()
-    assert rows[0].startswith(f"[\x1b[36mnomerge      {reset} ] \x1b[36mdev-libs/cddtsta-1::testrepo{reset}")
-    assert rows[2].startswith(f"[\x1b[32mebuild{reset}  ")
-    assert f"\x1b[32mdev-libs/cddtsta-1::testrepo{reset}" in rows[2]
+    first = next(i for i, line in enumerate(rows) if line.startswith("["))
+    assert rows[first].startswith(f"[\x1b[36mnomerge      {reset} ] \x1b[36mdev-libs/cddtsta-1::testrepo{reset}")
+    assert rows[first + 2].startswith(f"[\x1b[32mebuild{reset}  ")
+    assert f"\x1b[32mdev-libs/cddtsta-1::testrepo{reset}" in rows[first + 2]
 
 
 # Backlog #507 (portuale plan 02.442 S8): `--circular-deps-report=json`. Expected
@@ -34919,3 +35082,166 @@ def test_513_user_block_is_printed_for_search_and_depclean(emerge_binary, fixtur
     assert result.stderr == _VIRT_USER, result.stderr
     result = _run([str(emerge_binary)], ["--depclean", "--pretend", "dev-libs/dccyca"], env)
     assert result.stderr.startswith(_VIRT_USER), result.stderr
+
+
+def test_517b_backtrack0_g216top_remainder_lists_flat_merge_rows_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #517 (b) (plan residui-514-555 Task 3 Step 1): with
+    `--backtrack=0` Portage re-displays the stuck remainder as the reduced
+    merge list through the same `--tree` `display()` (leaf-drain order,
+    reversed for the walk), so the rows come out flat under their parents
+    with no `[nomerge]` marking (`LLM/evidence/2026-10-23-506/captures/36-
+    g216top.portage.{out,err}`). Portuale used to walk the tree reversed
+    and reordered the remainder, printing `[nomerge]` ancestors
+    (`*.portuale-before.*`). Fails until Step 3 (#519) on the missing
+    resolution preamble only; the rows and the error block already match."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--color=n", "--backtrack=0", "app-misc/g216top"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/0).\n"
+        "\n"
+        f'[ebuild  N     ] app-misc/g216top-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        f'[ebuild  N     ]  dev-libs/g216mid-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        f'[ebuild  N     ]   dev-lang/g216comp-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        "\n"
+        "Total: 3 packages (3 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(dev-lang/g216comp-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-lang/g216comp-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+def test_517b_backtrack0_ccd5a_remainder_nests_under_nomerge_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #517 (b) (plan residui-514-555 Task 3 Step 1): the
+    `--backtrack=0` re-display of the `virtual/ccd5v` two-cycle starts from
+    the leaf-drained reduced list, so the top target re-prints as a
+    `[nomerge]` ancestor above the flat merge rows
+    (`LLM/evidence/2026-10-23-506/captures/39-ccd5a.portage.{out,err}`).
+    Fails until Step 3 (#519) on the missing resolution preamble only; the
+    rows and the error block already match."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--color=n", "--backtrack=0", "dev-libs/ccd5a"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert rust.stdout == (
+        "\nThese are the packages that would be merged, in order:\n"
+        "\nCalculating dependencies ... done!\n"
+        "Dependency resolution took (backtrack: 0/0).\n"
+        "\n"
+        f'[nomerge       ] dev-libs/ccd5a-6.1.10.3:6::testrepo to {fixture_env["ROOT"]}\n'
+        f'[ebuild  N     ]  virtual/ccd5v-1.6.0:1.6::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        f'[ebuild  N     ]   dev-libs/ccd5a-6.1.10.3:6::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
+        "\n"
+        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
+    )
+    assert rust.stderr == (
+        "\n\n\n * Error: circular dependencies:\n"
+        "\n"
+        "(virtual/ccd5v-1.6.0:1.6/1.6::testrepo, ebuild scheduled for merge) depends on\n"
+        " (dev-libs/ccd5a-6.1.10.3:6/6::testrepo, ebuild scheduled for merge) (runtime)\n"
+        "  (virtual/ccd5v-1.6.0:1.6/1.6::testrepo, ebuild scheduled for merge) (buildtime)\n"
+        "\n"
+        " * Note that circular dependencies can often be avoided by temporarily\n"
+        " * disabling USE flags that trigger optional dependencies.\n"
+    )
+
+
+
+def test_517d_invalid_max_use_flags_warns_before_the_merge_rows(
+    emerge_binary, fixture_env
+):
+    """Backlog #517 (d) (plan residui-514-555 Task 3 Step 1): Portage warns
+    about a bad `PORTAGE_CIRCULAR_MAX_USE_FLAGS` at handler construction,
+    before the merge-list rows print; portuale printed it after the rows,
+    from inside the error block. The pin merges stderr into stdout (one
+    pipe, write order) and asserts the warning precedes the first row.
+    Would fail pre-fix (warning after the rows)."""
+    import subprocess
+
+    env = dict(fixture_env)
+    env["PORTAGE_CIRCULAR_MAX_USE_FLAGS"] = "abc"
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--autounmask-use=n", "dev-libs/cddtrna"],
+        capture_output=False,
+        text=True,
+        check=False,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    assert r.returncode == 1
+    warn = r.stdout.index("!!! Invalid PORTAGE_CIRCULAR_MAX_USE_FLAGS: abc")
+    first_row = r.stdout.index("[nomerge")
+    assert warn < first_row, r.stdout
+
+
+def test_518_onlydeps_json_lists_ab_before_ba_like_portage(emerge_binary, fixture_env):
+    """Backlog #518 (plan residui-514-555 Task 3 Step 2): under `--onlydeps`
+    Portage inserts the dependency before the suppressed top-level target,
+    so its digraph node order -- and therefore `get_cycles` -- lists
+    `[a, b]` before `[b, a]` and the `shortest_cycle` starts at
+    `usecycleb` (`LLM/evidence/2026-10-23-507/captures/54-onlydeps.*`).
+    Portuale used the plain-run order (`[b, a]` first). The pin compares
+    the parsed document but keeps `cycles` and `shortest_cycle` ordered;
+    the remaining keys compare as sets (Portage hash order, quirks Q6)."""
+    import json as _json
+
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--circular-deps-report=json", "--onlydeps", "dev-libs/usecyclea"],
+        fixture_env,
+    )
+    assert rust.returncode == 1
+    assert rust.stderr == ""
+    parsed = _json.loads("{" + rust.stdout.split("{", 1)[1])
+    assert parsed["cycles"] == [
+        ["dev-libs/usecyclea-1.0", "dev-libs/usecycleb-1.0"],
+        ["dev-libs/usecycleb-1.0", "dev-libs/usecyclea-1.0"],
+    ]
+    assert [e["parent"] for e in parsed["shortest_cycle"]] == [
+        "dev-libs/usecycleb-1.0",
+        "dev-libs/usecyclea-1.0",
+    ]
+    assert parsed["shortest_cycle"][0]["child"] == "dev-libs/usecyclea-1.0"
+
+
+def test_520_invalid_choice_prints_usage_block_like_portage(emerge_binary, fixture_env):
+    """Backlog #520 (plan residui-514-555 Task 3 Step 4): an argparse-native
+    `invalid choice` error prints Portage 3.0.83's 78-line `usage:` block
+    above the error line (rc 2). The block's option order is hash-randomized
+    per Portage process (`PYTHONHASHSEED`), so no byte order matches every
+    run; portuale prints the fixed oracle capture instead (quirks Q10).
+    Grounded on `LLM/evidence/2026-10-23-507/captures/53-none.*` (byte-equal
+    to that capture, whose order this run happened to use)."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--circular-deps-report=none", "dev-libs/newpkg"],
+        fixture_env,
+    )
+    assert rust.returncode == 2
+    assert rust.stdout == ""
+    lines = rust.stderr.splitlines(keepends=True)
+    assert len(lines) == 79, rust.stderr
+    assert lines[0] == "usage: emerge [--sync] [--unmerge] [--moo] [--help] [--check-news]\n"
+    assert lines[-1] == (
+        "emerge: error: argument --circular-deps-report: invalid choice: "
+        "'none' (choose from 'True', 'text', 'json')\n"
+    )
+    assert rust.stderr == _PORTAGE_USAGE_78 + lines[-1]
