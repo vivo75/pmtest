@@ -13248,3 +13248,68 @@ def test_emerge_resume_pretend_marks_installed_entry_reinstall(emerge_binary, tm
     )
     assert r.returncode == 1, r.stderr
     assert ">>> Failed to install dev-util/postinstfail-1" in r.stdout
+
+
+def test_ebuild_merge_no_iuse_runs_post_install_qa_without_ebuild_phase(
+    ebuild_binary, tmp_path
+):
+    """Backlog #516: a standalone `ebuild <file> merge` of an ebuild without
+    `IUSE="test"` passes. Portage runs the post-`install` QA sequence on every
+    path (`doebuild()` reaches `_PostPhaseCommands` through its synchronous
+    `EbuildPhase`), but the QA spawn is a `MiscFunctionsProcess`, which pops
+    `EBUILD_PHASE` (`_emerge/EbuildPhase.py`), so `use()`'s `IUSE`-membership
+    gate stays off there and a repo-local check like `60noop-testsuites`'
+    `use test` checks `USE` instead of dying with
+    `USE Flag 'test' not in IUSE`. Portuale used to keep `EBUILD_PHASE`
+    set and died exactly there (rc 1, `60noop-testsuites` line in the call
+    stack). Grounding: the same shape (EAPI 8, no `IUSE`, repo-local
+    `install-qa-check.d` check calling `use test`) merges rc 0 under host
+    Portage 3.0.83-r1 and, post-fix, under portuale; the pre-fix binary
+    dies rc 1 on this overlay."""
+    overlay = tmp_path / "overlay516"
+    (overlay / "profiles").mkdir(parents=True)
+    (overlay / "profiles/repo_name").write_text("probeoverlay\n")
+    (overlay / "metadata").mkdir()
+    (overlay / "metadata/layout.conf").write_text(
+        "masters = testrepo\nprofile-formats = portage-2\n"
+    )
+    checks = overlay / "metadata/install-qa-check.d"
+    checks.mkdir()
+    (checks / "65probe-noiuse").write_text(
+        "# probe: `use test` must not die without EBUILD_PHASE\n"
+        "probe_noiuse_check() {\n"
+        '\techo "EBUILD_PHASE=[${EBUILD_PHASE-unset}]" > "${T}/qa-ebuild-phase"\n'
+        "\tif use test; then\n"
+        '\t\t: > "${T}/qa-probe-ran"\n'
+        "\telse\n"
+        '\t\t: > "${T}/qa-probe-skip"\n'
+        "\tfi\n"
+        "}\n"
+        "probe_noiuse_check\n"
+        ": # guarantee successful exit\n"
+    )
+    pkg_dir = overlay / "app-misc/noiuseqa"
+    pkg_dir.mkdir(parents=True)
+    (pkg_dir / "noiuseqa-1.0.ebuild").write_text(
+        'EAPI=8\nDESCRIPTION="probe: no IUSE"\nHOMEPAGE="https://example.invalid"\n'
+        'LICENSE="GPL-2"\nSLOT="0"\nKEYWORDS="amd64"\nS="${WORKDIR}"\n'
+        "src_install() {\n\techo probe > \"${T}/hi\"\n\tinsinto /usr/share/noiuseqa\n\tdoins \"${T}/hi\"\n}\n"
+    )
+    clientetc = _write_tmp_clientetc(tmp_path, tmp_path / "pkgdir")
+    with open(clientetc / "etc/portage/repos.conf/repos.conf", "a") as f:
+        f.write("\n[probeoverlay]\nlocation = %s\nmasters = testrepo\n" % overlay)
+    root = tmp_path / "root516"
+    (root / "var/db/pkg").mkdir(parents=True)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(clientetc)
+    env["ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "pt516")
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    ebuild = str(pkg_dir / "noiuseqa-1.0.ebuild")
+    r = subprocess.run(
+        [str(ebuild_binary), ebuild, "merge"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, r.stderr
+    assert (root / "var/db/pkg/app-misc/noiuseqa-1.0/CONTENTS").is_file()
+    assert (root / "usr/share/noiuseqa/hi").is_file()
