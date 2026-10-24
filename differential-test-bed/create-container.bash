@@ -11,14 +11,19 @@ if [[ ! -d ${BASEDIR} ]] ; then echo "failed discovery of workdir" ; exit 1 ; fi
 
 declare -a REPOS=( gentoo buildovl )
 declare -A LAST_COMMIT
-LAST_COMMIT["gentoo"]="11c58b7af1df0fbc3e9f2560a82c4355231967a6"
+LAST_COMMIT["gentoo"]="350c0882200cebbdc04d67cace7c99a6725e1889"
 LAST_COMMIT["buildovl"]="cd571fc637a805ebde0e8497eab6f124b41c8f96"
-# The `--shallow-since` cutoff for fetching the two LAST_COMMIT hashes
-# above: must stay AT OR BEFORE both commits' own dates (gentoo
-# 2026-08-29, buildovl 2026-08-27) or `git fetch --shallow-since` prunes
-# the very commit being fetched. Independent of DATESTART/the stage3
-# snapshot below -- re-pin only when LAST_COMMIT changes too.
-REPOS_SHALLOW_SINCE=2026-08-23T15:30:57Z
+# The `--shallow-since` cutoff per repo for fetching its LAST_COMMIT:
+# must stay AT OR BEFORE that commit's own date (gentoo 2026-10-23,
+# buildovl 2026-08-27) or `git fetch --shallow-since` prunes the very
+# commit being fetched -- and AT OR AFTER the shallow boundary of the
+# local clone under repos/<repo> (the gentoo clone only holds complete history
+# after its shallow boundary 22cdf70 (2026-10-23T07:15:37Z), an older cutoff fails with "Could not read"
+# an object). Independent of DATESTART/the stage3 snapshot below --
+# re-pin only when LAST_COMMIT changes too.
+declare -A SHALLOW_SINCE
+SHALLOW_SINCE["gentoo"]=2026-10-23T07:20:00Z
+SHALLOW_SINCE["buildovl"]=2026-08-23T15:30:57Z
 DATESTART=2026-08-23T15:30:57Z
 
 STAGEID=stage3-amd64-systemd
@@ -67,7 +72,7 @@ for repo in ${REPOS[@]} ; do
   git init
   git remote add origin file://${BASEDIR}/repos/${repo}/
   # limit it with '--depth=...' or '--shallow-since=...'
-  git fetch origin --shallow-since=${REPOS_SHALLOW_SINCE} ${LAST_COMMIT[${repo}]}
+  git fetch origin --shallow-since=${SHALLOW_SINCE[${repo}]} ${LAST_COMMIT[${repo}]}
   git reset --hard FETCH_HEAD
   popd # ${repo}
 done
@@ -189,7 +194,7 @@ buildah config --entrypoint '["/init"]' "$ctr"
 # -- `podman commit` over the previous image, backup tag
 # `localhost/test-portuale:pre-281` -- so it matches this recipe except
 # for build provenance.)
-buildah run --network host "$ctr" -- env FEATURES="-cgroup -userpriv -usersandbox -userfetch -usersync -pid-sandbox -network-sandbox -ipc-sandbox" ACCEPT_KEYWORDS="~amd64" /usr/bin/emerge -q -1 --usepkg=n "=sys-apps/portage-$PORTAGE_PIN" \
+buildah run --network host "$ctr" -- env FEATURES="-cgroup -userpriv -usersandbox -userfetch -usersync -pid-sandbox -network-sandbox -ipc-sandbox" ACCEPT_KEYWORDS="~amd64" /usr/bin/emerge -q -1 --usepkg=n "=sys-apps/portage-$PORTAGE_PIN" </dev/null \
   || { echo "portage pin emerge failed" >&2; exit 1; }
 buildah commit "$ctr" localhost/test-portuale:latest
 buildah rm "$ctr"

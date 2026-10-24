@@ -4,6 +4,6 @@
 # scripts/repo-pins.sh --write when the owner announces a repo update, and
 # commit the change together with any re-baselined expectation.
 # Portage under test: 3.0.83-r1 (see Portage pin in layers/l0-fixture-oracle).
-gentoo_timestamp_chk=Sun, 18 Oct 2026 23:15:53 +0000
+gentoo_timestamp_chk=Fri, 23 Oct 2026 23:00:51 +0000
 buildovl_head=cd571fc637a805ebde0e8497eab6f124b41c8f96
-recorded=2026-10-20
+recorded=2026-10-24
