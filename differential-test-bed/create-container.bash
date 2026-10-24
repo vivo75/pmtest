@@ -12,7 +12,7 @@ if [[ ! -d ${BASEDIR} ]] ; then echo "failed discovery of workdir" ; exit 1 ; fi
 declare -a REPOS=( gentoo buildovl )
 declare -A LAST_COMMIT
 LAST_COMMIT["gentoo"]="11c58b7af1df0fbc3e9f2560a82c4355231967a6"
-LAST_COMMIT["buildovl"]="3b1df68114f4c486520864338b1b6a42efcaec7e"
+LAST_COMMIT["buildovl"]="cd571fc637a805ebde0e8497eab6f124b41c8f96"
 # The `--shallow-since` cutoff for fetching the two LAST_COMMIT hashes
 # above: must stay AT OR BEFORE both commits' own dates (gentoo
 # 2026-08-29, buildovl 2026-08-27) or `git fetch --shallow-since` prunes
