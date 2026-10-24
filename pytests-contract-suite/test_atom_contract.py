@@ -128,9 +128,10 @@ def test_parse_modes_match_between_implementations(
     assert rust_result == python_result
 
 
-# The S2 oracle battery: the 83 probe strings of
-# LLM/evidence/2026-10-11-341-oracle/probe_atoms.py, re-probed live into
-# crates/portage-dep/src/testdata/atoms-3.0.82.2.tsv by
+# The S2 oracle battery: the 86 probe strings of
+# LLM/evidence/2026-10-11-341-oracle/probe_atoms.py (the tail three are the
+# #510 atoms, added by backlog #528), re-probed live into
+# crates/portage-dep/src/testdata/atoms-3.0.83.tsv by
 # LLM/tools/atom_oracle_table.py. The 6 rows tagged S3OK need the wildcard
 # branch (S3, now implemented); other S3* verdicts stay skipped. Match
 # parity for build-id atoms is intentionally out of scope (S2 review C-1;
@@ -157,7 +158,7 @@ def _battery_rows():
         / "portage-dep"
         / "src"
         / "testdata"
-        / "atoms-3.0.82.2.tsv"
+        / "atoms-3.0.83.tsv"
     )
     rows = []
     for line in tsv.read_text().splitlines()[1:]:
