@@ -13780,8 +13780,11 @@ def test_color_y_renders_real_ansi_bracket_line(emerge_binary, fixture_env):
 
     pc_args = ["--pretend", "-C", "--color=y", "dev-libs/systempkg"]
     pc = _run([str(emerge_binary)], pc_args, fixture_env)
+    # Non-`/` ROOT: the ROOT notice, then the header -- each with its own
+    # leading blank line, both inside the darkgreen span (backlog #521).
     assert pc.stdout.startswith(
-        f"\x1b[32m>>> These are the packages that would be unmerged:{R}\n"
+        f"\x1b[32m\n>>> Using system located in ROOT tree {fixture_env['ROOT']}/{R}\n"
+        f"\x1b[32m\n>>> These are the packages that would be unmerged:{R}\n"
     )
     # selected version -> UNMERGE_WARN (red), the legend words coloured.
     assert f"    selected: \x1b[31;01m1.0 {R}\n" in pc.stdout
@@ -17861,6 +17864,9 @@ def _cycle_depclean_env(fixture_env, tmp_path, installed, world):
 
 
 _CYCLE_PAIR = {"dccyca": "dev-libs/dccycb", "dccycb": "dev-libs/dccyca"}
+# The resolver notice every depclean run prints first (backlog #522):
+# a blank line, then the spinner's static completion line.
+_DEPCLEAN_NOTICE = ["", "Calculating dependencies ... done!"]
 _CYCLE_NOTICE_A = [
     "  dev-libs/dccyca-1.0 is only required by packages that it requires",
     "  itself. Pass all of them at once in order to remove them:",
@@ -17881,7 +17887,7 @@ def test_508_depclean_names_the_whole_cycle_in_a_notice(emerge_binary, fixture_e
     )
     result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines() == _CYCLE_NOTICE_A + [
+    assert result.stdout.splitlines() == _DEPCLEAN_NOTICE + _CYCLE_NOTICE_A + [
         ">>> No packages selected for removal by depclean",
         ">>> To see reverse dependencies, use --verbose",
         "Packages installed:   3",
@@ -17905,7 +17911,7 @@ def test_508_notice_follows_the_pulled_in_block_under_verbose(emerge_binary, fix
         env,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines()[:6] == [
+    assert result.stdout.splitlines()[:8] == _DEPCLEAN_NOTICE + [
         "  dev-libs/dccyca-1.0 pulled in by:",
         "    dev-libs/dccycb-1.0 requires dev-libs/dccyca",
         "",
@@ -17933,8 +17939,10 @@ def test_508_each_argument_in_a_three_cycle_gets_its_own_notice(emerge_binary, f
     members = "    emerge --depclean =dev-libs/dccycx-1.0 =dev-libs/dccycy-1.0 =dev-libs/dccycz-1.0"
     lines = result.stdout.splitlines()
     assert lines.count(members) == 2
-    assert lines[0] == "  dev-libs/dccycx-1.0 is only required by packages that it requires"
-    assert lines[4] == "  dev-libs/dccycy-1.0 is only required by packages that it requires"
+    # The resolver notice precedes the blocks (backlog #522).
+    assert lines[:2] == _DEPCLEAN_NOTICE
+    assert lines[2] == "  dev-libs/dccycx-1.0 is only required by packages that it requires"
+    assert lines[6] == "  dev-libs/dccycy-1.0 is only required by packages that it requires"
 
 
 def test_508_parent_outside_the_cycle_silences_the_notice(emerge_binary, fixture_env, tmp_path):
@@ -17951,7 +17959,9 @@ def test_508_parent_outside_the_cycle_silences_the_notice(emerge_binary, fixture
     result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
     assert result.returncode == 0, result.stderr
     assert "is only required by packages" not in result.stdout
-    assert result.stdout.splitlines()[0] == ">>> No packages selected for removal by depclean"
+    assert result.stdout.splitlines()[:3] == _DEPCLEAN_NOTICE + [
+        ">>> No packages selected for removal by depclean"
+    ]
 
 
 def test_508_world_listed_member_still_gets_the_notice(emerge_binary, fixture_env, tmp_path):
@@ -17965,7 +17975,7 @@ def test_508_world_listed_member_still_gets_the_notice(emerge_binary, fixture_en
     )
     result = _run([str(emerge_binary)], ["--pretend", "--depclean", "dev-libs/dccyca"], env)
     assert result.returncode == 0, result.stderr
-    assert result.stdout.splitlines()[:4] == _CYCLE_NOTICE_A[:3] + [""]
+    assert result.stdout.splitlines()[:6] == _DEPCLEAN_NOTICE + _CYCLE_NOTICE_A[:3] + [""]
     # The suggested pair removes both, the world-listed one included.
     both = _run(
         [str(emerge_binary)],
@@ -18273,8 +18283,12 @@ def test_depclean_lib_check_keeps_a_link_level_only_provider(
     assert result.stdout.splitlines()[-1] == "Number to remove:     1"
 
     err = result.stderr.splitlines()
-    assert ">>> Checking for lib consumers..." in err
-    assert ">>> Adding lib providers to graph..." in err
+    out = result.stdout.splitlines()
+    # Portage's progress lines are INFO-level `writemsg_level` -> stdout;
+    # the warning block below them is WARNING-level -> stderr.
+    assert ">>> Checking for lib consumers..." in out
+    assert ">>> Assigning files to packages..." in out
+    assert ">>> Adding lib providers to graph..." in out
     assert (
         " * In order to avoid breakage of link level dependencies, one or more"
         in err
@@ -18838,6 +18852,9 @@ def test_unmerge_pretend_lists_selected_and_omitted(emerge_binary, fixture_env):
     )
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
+        "",
+        f">>> Using system located in ROOT tree {fixture_env['ROOT']}/",
+        "",
         ">>> These are the packages that would be unmerged:",
         "",
         " dev-libs/unmergepkg",
@@ -18849,6 +18866,7 @@ def test_unmerge_pretend_lists_selected_and_omitted(emerge_binary, fixture_env):
         "",
         ">>> 'Selected' packages are slated for removal.",
         ">>> 'Protected' and 'omitted' packages will not be removed.",
+        "",
     ]
 
     # A bare atom selects every installed version.
@@ -18885,7 +18903,11 @@ def test_unmerge_pretend_accepts_a_literal_vdb_path(emerge_binary, fixture_env, 
         assert result.returncode == 0, target
         out = result.stdout.splitlines()
         assert out[0] == "=dev-libs/foo-1.0", target
-        assert out[1] == ">>> These are the packages that would be unmerged:", target
+        # The non-`/` ROOT notice and the header's leading blank follow.
+        assert out[1] == "", target
+        assert out[2] == f">>> Using system located in ROOT tree {root}/", target
+        assert out[3] == "", target
+        assert out[4] == ">>> These are the packages that would be unmerged:", target
         assert "    selected: 1.0 " in out, target
         assert "All selected packages: =dev-libs/foo-1.0" in out, target
 
@@ -18930,6 +18952,9 @@ def test_unmerge_pretend_refuses_portage_itself(emerge_binary, fixture_env):
     result = _run([str(emerge_binary)], ["--pretend", "-C", "sys-apps/portage"], fixture_env)
     assert result.returncode == 1
     assert result.stdout.splitlines() == [
+        "",
+        f">>> Using system located in ROOT tree {fixture_env['ROOT']}/",
+        "",
         ">>> These are the packages that would be unmerged:",
         "",
         ">>> No packages selected for removal by unmerge",
@@ -18962,7 +18987,7 @@ def test_unmerge_pretend_system_profile_warning(emerge_binary, fixture_env):
     assert result.returncode == 0
     assert "'dev-libs/systempkg' is part of your system profile." in result.stderr
     assert "Unmerging it may be damaging to your system." in result.stderr
-    assert result.stdout.splitlines()[2:6] == [
+    assert result.stdout.splitlines()[5:9] == [
         " dev-libs/systempkg",
         "    selected: 1.0 ",
         "   protected: none ",
@@ -18977,7 +19002,10 @@ def test_unmerge_pretend_still_listed_in_package_sets_warning(emerge_binary, fix
     directly selects. The warning (stdout) names that set."""
     result = _run([str(emerge_binary)], ["--pretend", "-C", "dev-libs/nestedsetpkg"], fixture_env)
     assert result.returncode == 0
-    assert result.stdout.splitlines()[:4] == [
+    assert result.stdout.splitlines()[:7] == [
+        "",
+        f">>> Using system located in ROOT tree {fixture_env['ROOT']}/",
+        "",
         ">>> These are the packages that would be unmerged:",
         "Package dev-libs/nestedsetpkg-1.0 is going to be unmerged,",
         "but still listed in the following package sets:",
@@ -19009,7 +19037,7 @@ def test_unmerge_pretend_set_warning_higher_slot_refinement(emerge_binary, fixtu
         [str(emerge_binary)], ["--pretend", "-C", "dev-libs/dualslotpkg:2"], fixture_env
     )
     assert high.returncode == 0
-    assert high.stdout.splitlines()[1:4] == [
+    assert high.stdout.splitlines()[4:7] == [
         "Package dev-libs/dualslotpkg-2.0 is going to be unmerged,",
         "but still listed in the following package sets:",
         "    dualslotset",
@@ -35245,3 +35273,60 @@ def test_520_invalid_choice_prints_usage_block_like_portage(emerge_binary, fixtu
         "'none' (choose from 'True', 'text', 'json')\n"
     )
     assert rust.stderr == _PORTAGE_USAGE_78 + lines[-1]
+
+
+def test_523_lib_check_second_pass_repeats_the_cleanlist_blocks(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #523 (plan residui-514-555 Task 4): when `--depclean-lib-check`
+    keeps a provider, Portage runs `create_cleanlist()` a second time after
+    the re-closure, so the `pulled in by:` blocks print again (and, in `args`
+    mode, each package's cycle notice with them). The progress lines are
+    INFO-level `writemsg_level` (stdout); only the warning block is stderr.
+    Grounded on host Portage 3.0.83-r1 over this shape with real ELF files
+    and `FEATURES=-preserve-libs` (world `libmapw` -> `libmapc` needing
+    `libmapa.so.1`, `libmapa` orphan): notice, blocks, `>>> Checking for lib
+    consumers...`, `>>> Assigning files to packages...`, `>>> Adding lib
+    providers to graph...`, a SECOND `Calculating dependencies ... done!`,
+    the blocks again (the re-closure adds `dclibdep`), then the removal list."""
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-c", "-v"],
+        _libcheck_env(fixture_env, tmp_path),
+    )
+    assert result.returncode == 0, result.stderr
+    out = result.stdout.splitlines()
+    notice_i = out.index("Calculating dependencies ... done!")
+    check_i = out.index(">>> Checking for lib consumers...")
+    assert out[notice_i - 1] == ""  # the notice's leading blank line
+    # Pass 1's blocks sit between the notice and the lib scan.
+    assert out[notice_i + 1 : check_i] == [
+        "  dev-libs/dcconsumer-1.0 pulled in by:",
+        "    dev-libs/dcworld-1.0 requires dev-libs/dcconsumer",
+        "",
+        "  dev-libs/dcworld-1.0 pulled in by:",
+        "    @selected requires dev-libs/dcworld",
+        "",
+    ]
+    # The progress lines follow on stdout, in Portage's order.
+    assert out[check_i : check_i + 3] == [
+        ">>> Checking for lib consumers...",
+        ">>> Assigning files to packages...",
+        ">>> Adding lib providers to graph...",
+    ]
+    # Second pass: the notice again, then the blocks -- now including the
+    # provider's own RDEPEND that the re-closure pulled back in.
+    second_notice = out.index("Calculating dependencies ... done!", notice_i + 1)
+    assert out[second_notice - 1] == ""
+    order_i = out.index(">>> Calculating removal order...")
+    assert out[second_notice + 1 : order_i] == [
+        "  dev-libs/dcconsumer-1.0 pulled in by:",
+        "    dev-libs/dcworld-1.0 requires dev-libs/dcconsumer",
+        "",
+        "  dev-libs/dclibdep-1.0 pulled in by:",
+        "    dev-libs/dclib-1.0 requires dev-libs/dclibdep",
+        "",
+        "  dev-libs/dcworld-1.0 pulled in by:",
+        "    @selected requires dev-libs/dcworld",
+        "",
+    ]
