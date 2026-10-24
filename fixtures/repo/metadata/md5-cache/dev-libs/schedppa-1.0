@@ -1,0 +1,6 @@
+DEFINED_PHASES=install pretend
+DESCRIPTION=fixture package: Scheduler / parallel pkg_pretend test (schedppa) -- pretend announces itself and sleeps, so overlapping phases prove parallelism and replay order proves merge-list order
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=431598e18028c1b2ea2251ac04a3d5d3

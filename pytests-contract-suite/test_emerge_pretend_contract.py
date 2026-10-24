@@ -3089,6 +3089,9 @@ CASES = [
     ("#503: --binpkg-respect-user-patches=maybe is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--binpkg-respect-user-patches=maybe", "dev-libs/newpkg"], 2),
     ("#503: --circular-deps-report json (space form) is accepted (Portage 3.0.83-r1, rc 0)", ["--pretend", "--circular-deps-report", "json", "dev-libs/newpkg"], 0),
     ("#503: --circular-deps-report=xml is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--circular-deps-report=xml", "dev-libs/newpkg"], 2),
+    ("#512: --merge-wait-scope=deep is accepted and leaves the pretend list alone (Portage 3.0.83-r1, rc 0)", ["--pretend", "--merge-wait-scope=deep", "dev-libs/newpkg"], 0),
+    ("#512: --merge-wait-scope=system is accepted and leaves the pretend list alone (Portage 3.0.83-r1, rc 0)", ["--pretend", "--merge-wait-scope=system", "dev-libs/newpkg"], 0),
+    ("#512: --merge-wait-scope=toolchain is accepted and leaves the pretend list alone (Portage 3.0.83-r1, rc 0)", ["--pretend", "--merge-wait-scope=toolchain", "dev-libs/newpkg"], 0),
     ("#503: --merge-wait-scope=none is accepted (Portage 3.0.83-r1, rc 0)", ["--pretend", "--merge-wait-scope=none", "dev-libs/newpkg"], 0),
     ("#503: --merge-wait-scope=all is an invalid choice (Portage 3.0.83-r1, rc 2)", ["--pretend", "--merge-wait-scope=all", "dev-libs/newpkg"], 2),
     ("#503: a trailing bare --merge-wait-scope expects one argument (Portage 3.0.83-r1, rc 2)", ["--pretend", "dev-libs/newpkg", "--merge-wait-scope"], 2),
@@ -17274,7 +17277,7 @@ Build scheduling:
       --read-news[=y|n]      with --ask: offer to read unread news via eselect
       --ignore-default-opts  ignore the EMERGE_DEFAULT_OPTS variable for this run
       --keep-going           on a build failure, drop that package's dependents and carry on
-      --merge-wait-scope <deep|system|toolchain|none>  accepted; inert until merge-wait scheduling lands (backlog 512)
+      --merge-wait-scope <deep|system|toolchain|none>  which merges wait for idle builders (deep is the default)
       --quiet-build[=y|n]    redirect a build's phase output to ${T}/build.log (implied by -j >1 and -q)
 
 Output:
@@ -33724,16 +33727,47 @@ def test_new_3_0_83_options_report_argparse_errors(emerge_binary, fixture_env, a
         ["--circular-deps-report", "json"],
         ["--merge-wait-scope=none"],
         ["--merge-wait-scope", "toolchain"],
+        ["--merge-wait-scope=deep"],
+        ["--merge-wait-scope=system"],
     ],
-    ids=["respect-bare", "respect-n", "report-bare", "report-json", "report-json-space", "scope-none", "scope-toolchain"],
+    ids=["respect-bare", "respect-n", "report-bare", "report-json", "report-json-space", "scope-none", "scope-toolchain", "scope-deep", "scope-system"],
 )
 def test_new_3_0_83_options_are_accepted_and_inert(emerge_binary, fixture_env, extra):
     """Backlog #503. Portage 3.0.83-r1 accepts the three new options (probe cells
     01-03, 06, 08-10, 12, 14-17, 20) and a plain `--pretend` merge list has no
     cycle, binary or build, so the output is the baseline's: the options change
-    nothing without a cycle (#507 json report, tested separately), until #509 (user patches) and #512 (merge-wait)."""
+    nothing without a cycle (#507 json report, tested separately), user patches
+    (#509, tested separately) or a real merge (#512 merge-wait lives in the
+    `-j` scheduler only; pretend lists are identical under every scope)."""
     base = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
     result = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/newpkg"], fixture_env)
+    assert base.returncode == 0
+    assert result.returncode == 0
+    assert result.stdout == base.stdout
+    assert result.stderr == base.stderr
+
+
+@pytest.mark.parametrize(
+    "scope",
+    ["deep", "system", "toolchain", "none"],
+    ids=["scope-deep", "scope-system", "scope-toolchain", "scope-none"],
+)
+def test_512_merge_wait_scope_leaves_the_pretend_list_alone(
+    emerge_binary, fixture_env, scope
+):
+    """Backlog #512 (Portage 3.0.83-r1): `--merge-wait-scope` governs the
+    `-j` merge scheduler only, so a `--pretend` merge list is byte-identical
+    under every scope — the `deep` default stays byte-identical to the
+    current behaviour by construction. Oracle:
+    `LLM/evidence/2026-10-23-512/` (probe shapes 01-08: real `-j` merges
+    whose `>>> Installing` order differs per scope; the `--pretend` lists
+    there are scope-independent)."""
+    base = _run([str(emerge_binary)], ["--pretend", "dev-libs/newpkg"], fixture_env)
+    result = _run(
+        [str(emerge_binary)],
+        ["--pretend", f"--merge-wait-scope={scope}", "dev-libs/newpkg"],
+        fixture_env,
+    )
     assert base.returncode == 0
     assert result.returncode == 0
     assert result.stdout == base.stdout

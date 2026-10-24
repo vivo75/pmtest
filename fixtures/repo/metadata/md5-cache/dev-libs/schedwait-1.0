@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile install
+DESCRIPTION=fixture package: Scheduler / merge-wait barrier test (schedwait) -- src_compile sleeps long enough that a barriered merge lands strictly after it
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=ea769d9270f4b00b5fdd950aafac8ab5

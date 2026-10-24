@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile install
+DESCRIPTION=fixture package: Scheduler / cycle post-merge test (schedcyca) -- RDEPEND on schedcycb, which PDEPENDs back
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=80dd580ecb08427c0904d3255e4a2bed

@@ -1,0 +1,6 @@
+DEFINED_PHASES=install
+DESCRIPTION=fixture package: Scheduler / merge-wait barrier test (schedsys) -- fast, a member of the test @system set in the Rust test's own config
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=8862abd53bca63a12502a1798de33102

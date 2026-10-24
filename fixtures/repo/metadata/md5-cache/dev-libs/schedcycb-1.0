@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile install
+DESCRIPTION=fixture package: Scheduler / cycle post-merge test (schedcycb) -- PDEPEND on schedcyca, which RDEPENDs back; the post edge must not gate the build
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=261ffd5817a91fc8d1a74506961df02c

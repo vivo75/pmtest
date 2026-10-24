@@ -1,0 +1,6 @@
+DEFINED_PHASES=install pretend
+DESCRIPTION=fixture package: Scheduler / pkg_pretend failure test (schedppfail) -- pretend dies, so the run must abort before anything builds
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=27733586d365bc55eeb59af5f629a40e
