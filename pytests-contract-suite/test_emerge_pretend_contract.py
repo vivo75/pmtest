@@ -34757,3 +34757,165 @@ def test_509_slot_qualified_binary_row(emerge_binary, fixture_env, tmp_path):
         + _all_binary_masked("app-misc/up-e", "app-misc/up-e-1.0::up509", "user patches", env["ROOT"])
         + "\n\n"
     ) in result.stderr
+
+
+# ---------------------------------------------------------------------------
+# #513: deprecated `virtuals` files. Oracle: host Portage 3.0.83 captures in
+# portuale LLM/evidence/2026-10-24-513/captures (probe.sh, shapes.tsv).
+# Portage's profile warning carries its own install prefix; the pins below use
+# portuale's `portage/package/ebuild/_config/VirtualsManager.py:54` location.
+
+_VIRT_WARN = (
+    "portage/package/ebuild/_config/VirtualsManager.py:54: UserWarning: {file} "
+    "is deprecated, support for PROVIDE virtuals was removed in portage-2.3.25, "
+    "use GLEP 37 virtual packages instead\n  warnings.warn(\n"
+)
+_VIRT_USER = (
+    "\n!!! /etc/portage/virtuals is deprecated and ignored.\n"
+    "!!! Support for PROVIDE virtuals was removed in\n"
+    "!!! portage-2.3.25; use GLEP 37 virtual packages\n"
+    "!!! instead. Please remove this file.\n\n"
+)
+
+
+def _virtuals_env(fixture_env, tmp_path, *, user=None, profile=None, parent=None, user_profile=None):
+    """A config root chained onto the fixture base and amd64 profiles (as in
+    the #508 oracle config) with optional `virtuals` files: `user` is the
+    `/etc/portage/virtuals` content (`""` = an empty file), `profile` the
+    leaf profile's, `parent` an extra profile between the chain and the leaf,
+    `user_profile` the `/etc/portage/profile/virtuals` content."""
+    fx = Path(fixture_env["PORTAGE_CONFIGROOT"])
+    cfg = tmp_path / "cfg"
+    etc = cfg / "etc" / "portage"
+    (etc / "repos.conf").mkdir(parents=True)
+    root = tmp_path / "root"
+    (root / "var" / "lib" / "portage").mkdir(parents=True)
+    (root / "var" / "db" / "pkg").mkdir(parents=True)
+    profile_dir = tmp_path / "profile"
+    profile_dir.mkdir()
+    parents = [f"{fx}/repo/profiles/base", f"{fx}/repo/profiles/arch/amd64"]
+    if parent is not None:
+        parent_dir = tmp_path / "pparent"
+        parent_dir.mkdir()
+        (parent_dir / "virtuals").write_text(parent)
+        parents.append(str(parent_dir))
+    (profile_dir / "parent").write_text("\n".join(parents) + "\n")
+    if profile is not None:
+        (profile_dir / "virtuals").write_text(profile)
+    (etc / "make.profile").symlink_to(profile_dir)
+    (etc / "repos.conf" / "r.conf").write_text(
+        f"[DEFAULT]\nmain-repo = testrepo\n\n[testrepo]\nlocation = {fx}/repo\n"
+    )
+    (etc / "make.conf").write_text('FEATURES="-news"\nACCEPT_LICENSE="*"\n')
+    if user is not None:
+        (etc / "virtuals").write_text(user)
+    if user_profile is not None:
+        (etc / "profile").mkdir()
+        (etc / "profile" / "virtuals").write_text(user_profile)
+    env = dict(fixture_env)
+    env["PORTAGE_CONFIGROOT"] = str(cfg)
+    env["ROOT"] = str(root)
+    return env, profile_dir, tmp_path / "pparent"
+
+
+_VIRT_PROVIDE = "virtual/editor app-editors/vim\n"
+
+
+def test_513_non_empty_profile_virtuals_warn_once_on_stderr(emerge_binary, fixture_env, tmp_path):
+    """#513 (Portage 3.0.83 `VirtualsManager._read_dirVirtuals`, a Python
+    `UserWarning` at config load): a non-empty leaf-profile `virtuals` prints
+    one warning, stream stderr, rc 0, stdout unchanged. Oracle: 02-profile-nonempty."""
+    env, profile_dir, _ = _virtuals_env(fixture_env, tmp_path, profile=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr.startswith(
+        _VIRT_WARN.format(file=f"{profile_dir}/virtuals")
+    ), result.stderr
+    assert result.stderr.count("UserWarning") == 1
+    assert "virtuals" not in result.stdout
+
+
+def test_513_profile_warning_is_printed_for_info_and_search_too(emerge_binary, fixture_env, tmp_path):
+    """#513: the profile warning is a config-load message, so `--info` and
+    `--search` print it as well (oracle: 07-both-info, 08-profile-search)."""
+    env, profile_dir, _ = _virtuals_env(fixture_env, tmp_path, profile=_VIRT_PROVIDE)
+    expected = _VIRT_WARN.format(file=f"{profile_dir}/virtuals")
+    for args in (["--info"], ["--search", "dccyca"]):
+        result = _run([str(emerge_binary)], args, env)
+        assert result.stderr.startswith(expected), (args, result.stderr)
+
+
+def test_513_parent_profile_warns_before_the_leaf(emerge_binary, fixture_env, tmp_path):
+    """#513: the chain is read parent first, so the parent's warning precedes
+    the leaf's (oracle: 06-profile-parent for one parent; the two-profile
+    shape is 11-two-profiles-nonempty)."""
+    env, profile_dir, parent_dir = _virtuals_env(
+        fixture_env, tmp_path, profile=_VIRT_PROVIDE, parent=_VIRT_PROVIDE
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == (
+        _VIRT_WARN.format(file=f"{parent_dir}/virtuals")
+        + _VIRT_WARN.format(file=f"{profile_dir}/virtuals")
+    ), result.stderr
+
+
+def test_513_comment_and_one_token_virtuals_files_are_silent(emerge_binary, fixture_env, tmp_path):
+    """#513: Portage's `grabdict` drops comment and one-token lines, so an
+    empty dict prints nothing (oracle: 05-profile-comment, 18-one-token-line)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, profile="# nothing to see\n")
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == ""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path / "second", profile="virtual/editor\n")
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.stderr == ""
+
+
+def test_513_user_profile_virtuals_warn_as_the_last_profile(emerge_binary, fixture_env, tmp_path):
+    """#513: `/etc/portage/profile` joins the profile list after the chain
+    (oracle: 19-user-profile-dir)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user_profile=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    user_profile = f"{tmp_path}/cfg/etc/portage/profile/virtuals"
+    assert result.stderr == _VIRT_WARN.format(file=user_profile), result.stderr
+
+
+def test_513_user_virtuals_block_follows_the_profile_warning_under_pretend(emerge_binary, fixture_env, tmp_path):
+    """#513: `/etc/portage/virtuals` is ignored and reported after the
+    profile warning, for a pretend run (oracle: 03-both-nonempty)."""
+    env, profile_dir, _ = _virtuals_env(
+        fixture_env, tmp_path, user=_VIRT_PROVIDE, profile=_VIRT_PROVIDE
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == _VIRT_WARN.format(file=f"{profile_dir}/virtuals") + _VIRT_USER
+
+
+def test_513_an_empty_user_virtuals_file_still_gets_the_block(emerge_binary, fixture_env, tmp_path):
+    """#513: the user block tests only that the file exists, not its content
+    (oracle: 04-user-empty)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user="")
+    result = _run([str(emerge_binary)], ["--pretend", "dev-libs/dccyca"], env)
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == _VIRT_USER
+
+
+def test_513_user_block_is_not_printed_for_info(emerge_binary, fixture_env, tmp_path):
+    """#513: `--info` returns before Portage's `validate_ebuild_environment`,
+    so the user block is absent (oracle: 22-info-user)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["--info"], env)
+    assert "/etc/portage/virtuals" not in result.stderr
+    assert result.returncode == 0, result.stderr
+
+
+def test_513_user_block_is_printed_for_search_and_depclean(emerge_binary, fixture_env, tmp_path):
+    """#513: search and depclean run `validate_ebuild_environment` as well
+    (oracle: 20-search-user, 21-depclean-user)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["--search", "dccyca"], env)
+    assert result.stderr == _VIRT_USER, result.stderr
+    result = _run([str(emerge_binary)], ["--depclean", "--pretend", "dev-libs/dccyca"], env)
+    assert result.stderr.startswith(_VIRT_USER), result.stderr
