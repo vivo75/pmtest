@@ -8508,18 +8508,20 @@ def _t346_user_file_root(tmp_path, fixtures_root, files):
 def test_s2_user_package_keywords_accepts_like_portage(
     emerge_binary, tmp_path, fixtures_root
 ):
-    """Backlog #346 S2: user `package.keywords`
+    """Backlog #346 S2 (framed by #547): user `package.keywords`
     `dev-libs/bareacceptkeywordspkg ~amd64` accepts the package, with
-    the message-only deprecation warning on stderr.
+    the deprecation warning on stderr.
 
     Portage 3.0.82.2, full argv `emerge -p --package-moves=n
     dev-libs/bareacceptkeywordspkg` (S0 cell `k01-user-keywords`, rc 0,
     stdout row `[ebuild  N    ~] dev-libs/bareacceptkeywordspkg-1.0 to
     <cfg>/`, stderr `<cfg>/etc/portage/package.keywords is deprecated,
     use <cfg>/etc/portage/package.accept_keywords instead` besides
-    Portage's own repo warnings and `UserWarning` frame, which portuale
-    omits by the S2 Q3 ruling). The hermetic root below replays the
-    same shape."""
+    Portage's own repo warnings). Portage 3.0.83 prints the same message
+    inside its `UserWarning` frame (`KeywordsManager.py:89`, S0 cell
+    `k01-user-keywords-portage.stderr:17-18` re-read for #547); portuale
+    copies the frame with the hermetic-relative location, like #513.
+    The hermetic root below replays the same shape."""
     env, cfg = _t346_user_file_root(
         tmp_path,
         fixtures_root,
@@ -8535,8 +8537,10 @@ def test_s2_user_package_keywords_accepts_like_portage(
         f'[ebuild  N    ~] dev-libs/bareacceptkeywordspkg-1.0 to {env["ROOT"]}',
     ]
     assert result.stderr.strip() == (
+        "portage/package/ebuild/_config/KeywordsManager.py:89: UserWarning: "
         f"{cfg}/etc/portage/package.keywords is deprecated, "
         f"use {cfg}/etc/portage/package.accept_keywords instead"
+        "\n  warnings.warn("
     )
 
 
@@ -8664,10 +8668,13 @@ def test_s2_cross_file_minus_cancels_like_portage(
     assert result.returncode == 1
     assert result.stdout == _TOP_LEVEL_ABORT_STDOUT
     warning = (
+        "portage/package/ebuild/_config/KeywordsManager.py:89: UserWarning: "
         f"{cfg}/etc/portage/package.keywords is deprecated, "
         f"use {cfg}/etc/portage/package.accept_keywords instead"
+        "\n  warnings.warn("
     )
-    assert result.stderr.strip().splitlines()[0] == warning
+    assert result.stderr.strip().splitlines()[0] == warning.splitlines()[0]
+    assert warning in result.stderr
     assert _all_masked(
         "dev-libs/bareacceptkeywordspkg",
         "dev-libs/bareacceptkeywordspkg-1.0::testrepo",
@@ -13790,8 +13797,14 @@ def test_color_y_renders_real_ansi_bracket_line(emerge_binary, fixture_env):
     assert f"    selected: \x1b[31;01m1.0 {R}\n" in pc.stdout
     assert f">>> \x1b[31;01m'Selected'{R} packages are slated for removal.\n" in pc.stdout
     assert f">>> \x1b[32;01m'Protected'{R} and \x1b[32;01m'omitted'{R} packages" in pc.stdout
-    # the system-profile warning -> BAD / WARN, on stderr.
+    # the depclean-safety note comes first (backlog #553: Portage prints it
+    # in run_action ahead of unmerge()), each line a WARN-coloured ` * `
+    # span plus the plain body -- then the system-profile warning.
+    Y = "\x1b[33;01m * \x1b[39;49;00m"
     assert pc.stderr.startswith(
+        f"{Y}This action can remove important packages! In order to be safer, use\n"
+        f"{Y}`emerge -pv --depclean <atom>` to check for reverse dependencies before\n"
+        f"{Y}removing packages.\n"
         f"\x1b[31;01m\n\n!!! 'dev-libs/systempkg' is part of your system profile.{R}\n"
     )
 
@@ -18080,9 +18093,16 @@ def test_depclean_package_provided_removes_a_provided_cpv_even_as_a_world_root_o
     assert " dev-libs/pdwtest\n" not in result.stdout
 
 
-def test_depclean_package_provided_pinned_output(
+def test_depclean_provided_pkgs_pinned_output(
     emerge_binary, fixture_env, tmp_path
 ):
+    """Pinned `--pretend --depclean` output over the `package.provided`
+    ROOT (see `_depclean_pprovided_root`). Named off the 30-char
+    `tmp_path` truncation: the sibling
+    `test_depclean_package_provided_removes_...` test owns the
+    `test_depclean_package_provided` prefix, so sharing it made both
+    tests' `ROOT` idents (`...provided0` vs `...provided1`) depend on
+    execution order and the corpus entries unmatchable (backlog #555)."""
     env = dict(fixture_env)
     env["ROOT"] = str(_depclean_pprovided_root(tmp_path))
     for args in (
@@ -35488,6 +35508,102 @@ def test_513_user_block_is_printed_for_search_and_depclean(emerge_binary, fixtur
     assert result.stderr == _VIRT_USER, result.stderr
     result = _run([str(emerge_binary)], ["--depclean", "--pretend", "dev-libs/dccyca"], env)
     assert result.stderr.startswith(_VIRT_USER), result.stderr
+
+
+# ---------------------------------------------------------------------------
+# Task 9 (#547-#554): the virtuals-adjacent actions. Oracle: host Portage
+# 3.0.83 captures in portuale LLM/evidence/2026-10-24-513/captures.
+
+_UNMERGE_SAFETY_NOTE = (
+    " * This action can remove important packages! In order to be safer, use\n"
+    " * `emerge -pv --depclean <atom>` to check for reverse dependencies before\n"
+    " * removing packages.\n"
+)
+
+
+def test_552_version_prints_the_portage_line(emerge_binary, fixture_env, tmp_path):
+    """#552 (oracle: 12-version): `emerge --version` prints the `Portage ...`
+    line on stdout and exits 0. The volatile parenthetical is structural
+    only (like `_INFO_VOLATILE`); the profile warning still prints, the user
+    block does not."""
+    env, profile_dir, _ = _virtuals_env(
+        fixture_env, tmp_path, user=_VIRT_PROVIDE, profile=_VIRT_PROVIDE
+    )
+    result = _run([str(emerge_binary)], ["--version"], env)
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    assert len(lines) == 1, result.stdout
+    assert lines[0].startswith("Portage "), result.stdout
+    assert "(python " in lines[0], result.stdout
+    assert result.stderr == _VIRT_WARN.format(file=f"{profile_dir}/virtuals"), result.stderr
+
+
+def test_553_unmerge_missing_reports_on_stderr(emerge_binary, fixture_env, tmp_path):
+    """#553 (oracle: 24-unmerge-user): `-C -p` for a package nothing
+    installed provides prints the depclean-safety note and the
+    `--- Couldn't find ...` line on stderr (never stdout), rc 1."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["-C", "-p", "dev-libs/dccyca"], env)
+    assert result.returncode == 1, result.stderr
+    assert result.stderr == (
+        _VIRT_USER + _UNMERGE_SAFETY_NOTE + "\n--- Couldn't find 'dev-libs/dccyca' to unmerge.\n"
+    ), result.stderr
+    assert "Couldn't find" not in result.stdout, result.stdout
+    assert "This action can remove" not in result.stdout, result.stdout
+
+
+def test_553_rage_clean_without_atoms_names_the_action(emerge_binary, fixture_env, tmp_path):
+    """#553 (oracle: 27-rage-clean-user): `--rage-clean -p` with no atoms
+    prints `emerge rage-clean can only be used with specific package names`
+    on stdout (blank line each side), rc 1, with no stderr beyond the user
+    block and no safety note."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["--rage-clean", "-p"], env)
+    assert result.returncode == 1, result.stderr
+    assert result.stdout == "\nemerge rage-clean can only be used with specific package names\n\n", (
+        result.stdout
+    )
+    assert result.stderr == _VIRT_USER, result.stderr
+
+
+def test_554_check_news_reports_invalid_items(emerge_binary, fixture_env, tmp_path):
+    """#554 (oracle: 25-check-news-user): `--check-news` reports every
+    invalid news item on stderr (`Invalid news item` + `line 7:` detail),
+    which the count then skips (the testrepo count stays 1)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["--check-news"], env)
+    assert result.returncode == 0, result.stderr
+    fx = Path(fixture_env["PORTAGE_CONFIGROOT"]) / "repo" / "metadata" / "news"
+    for item, atom in [
+        ("2026-09-10-portuale-format1-useatom", "dev-libs/infoinstpkg[alpha]"),
+        ("2026-09-09-portuale-format1-slotatom", "dev-libs/samepkg:1"),
+        ("2026-09-08-portuale-malformed", "dev-libs/infoinstpkg[[bad"),
+    ]:
+        assert f"!!! Invalid news item: {fx}/{item}/{item}.en.txt\n" in result.stderr, (
+            result.stderr
+        )
+        assert f"!!!   line 7: Display-If-Installed: {atom}\n" in result.stderr, result.stderr
+    assert "* IMPORTANT: 1 news items need reading for repository 'testrepo'." in (
+        result.stdout
+    ), result.stdout
+
+
+def test_550_regen_deselect_config_resume_print_the_user_block(emerge_binary, fixture_env, tmp_path):
+    """#550 (oracle: 30/31/32/33-*-user): `--regen`, `--config`, `--deselect`
+    and `--resume` all run Portage's `validate_ebuild_environment`, so the
+    user virtuals block prints for each (the early-dispatch actions regressed
+    to silence here before the fix). `--regen` has no pmtest pin: it would
+    rewrite the shared fixture repo's md5-cache; the probe capture covers it.
+    """
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    for args in (
+        ["--config", "dev-libs/dccyca"],
+        ["--deselect"],
+        ["--resume"],
+    ):
+        result = _run([str(emerge_binary)], args, env)
+        assert result.returncode == 0, (args, result.stderr)
+        assert result.stderr == _VIRT_USER, (args, result.stderr)
 
 
 def test_517b_backtrack0_g216top_remainder_lists_flat_merge_rows_like_portage(
