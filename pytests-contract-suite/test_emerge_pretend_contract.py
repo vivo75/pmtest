@@ -35538,6 +35538,20 @@ def test_552_version_prints_the_portage_line(emerge_binary, fixture_env, tmp_pat
     assert result.stderr == _VIRT_WARN.format(file=f"{profile_dir}/virtuals"), result.stderr
 
 
+def test_552_version_ignores_the_privilege_gate(emerge_binary, fixture_env):
+    """#552 follow-up (review): `emerge --version` prints unconditionally
+    (Portage has no privilege check for it); with `ROOT=/` as non-root it
+    still exits 0 with the single `Portage ...` line."""
+    env = dict(fixture_env)
+    env["ROOT"] = "/"
+    result = _run([str(emerge_binary)], ["--version"], env)
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.splitlines()
+    assert len(lines) == 1, result.stdout
+    assert lines[0].startswith("Portage "), result.stdout
+    assert "(python " in lines[0], result.stdout
+
+
 def test_553_unmerge_missing_reports_on_stderr(emerge_binary, fixture_env, tmp_path):
     """#553 (oracle: 24-unmerge-user): `-C -p` for a package nothing
     installed provides prints the depclean-safety note and the
@@ -35564,6 +35578,21 @@ def test_553_rage_clean_without_atoms_names_the_action(emerge_binary, fixture_en
         result.stdout
     )
     assert result.stderr == _VIRT_USER, result.stderr
+
+
+def test_553_rage_clean_with_atoms_prints_no_safety_note(emerge_binary, fixture_env, tmp_path):
+    """#553 follow-up (review): Portage prints the depclean-safety note for
+    `action == \"unmerge\"` only (`_emerge/actions.py`), never for
+    `--rage-clean`. A rage-clean run reports its missing atoms on stderr
+    with no note (oracle: host `--pretend --rage-clean` on a scratch ROOT,
+    rc 1, zero note lines)."""
+    env, _, _ = _virtuals_env(fixture_env, tmp_path, user=_VIRT_PROVIDE)
+    result = _run([str(emerge_binary)], ["-p", "--rage-clean", "dev-libs/dccyca"], env)
+    assert result.returncode == 1, result.stderr
+    assert "This action can remove" not in result.stderr, result.stderr
+    assert result.stderr == (
+        _VIRT_USER + "\n--- Couldn't find 'dev-libs/dccyca' to rage-clean.\n"
+    ), result.stderr
 
 
 def test_554_check_news_reports_invalid_items(emerge_binary, fixture_env, tmp_path):
