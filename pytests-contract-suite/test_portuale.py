@@ -6098,6 +6098,111 @@ def test_usepkgonly_refuses_hostile_gpkg_archives_like_portage(emerge_binary, tm
         assert not any(image_dir.iterdir()), (image_dir, list(image_dir.iterdir()))
 
 
+def test_usepkgonly_matches_portage_on_temp_root_and_dotdot_hardlink_shapes(emerge_binary, tmp_path):
+    """Backlog #514 (plan `plan-residui-514-555.md` Task 1). Portage 3.0.83-r1's
+    containment root is its temporary directory, one level above `image/`
+    (`gpkg.tar_safe_extract.extractall`, `gpkg.py:741-768), and Python
+    `tarfile` extracts what GNU tar 1.35 can not. Oracle: the crafted tars
+    through real `tar_safe_extract` as root vs GNU tar
+    (`LLM/evidence/2026-10-23-500-501/514-oracle-matrix.txt` in portuale).
+
+    - `temp-root-bare` (`image/opt/link -> ../..`, climbing exactly to the
+      temp root): Portage rc 0, tar rc 0. Pinned: rc 0, the link merges with
+      its target byte-preserved.
+    - `temp-root-member` (a file under that link): Portage rc 0 (the file
+      lands in the temp root and is discarded with it), GNU tar rc 2
+      (deferred `..` symlink). Documented divergence: portuale rc 1, nothing
+      installed, the image dir left empty.
+    - `dotdot-hardlink` (hard link of `image/deep/link -> ../marker` with a
+      member under the hard link): Portage rc 0, GNU tar rc 2. Same
+      documented divergence.
+    - `relocated-in-place` (`image/opt/deep/link -> ../x` + hard link, no
+      member under): Portage rc 0, tar rc 0. Pinned: rc 0, merged."""
+    shapes = {
+        "temp-root-bare": (
+            [
+                ("image/opt/link", _HOSTILE_S, "../..", b""),
+            ],
+            0,
+            None,
+        ),
+        "temp-root-member": (
+            [
+                ("image/opt/link", _HOSTILE_S, "../..", b""),
+                ("image/opt/link/tool", _HOSTILE_F, "", b"t\n"),
+            ],
+            1,
+            "failed",
+        ),
+        "dotdot-hardlink": (
+            [
+                ("image/opt/marker", _HOSTILE_D, "", b""),
+                ("image/opt/marker/f", _HOSTILE_F, "", b"m\n"),
+                ("image/opt/deep", _HOSTILE_D, "", b""),
+                ("image/opt/deep/link", _HOSTILE_S, "../marker", b""),
+                ("image/opt/deep/hard", _HOSTILE_L, "image/opt/deep/link", b""),
+                ("image/opt/deep/hard/x", _HOSTILE_F, "", b"x\n"),
+            ],
+            1,
+            "failed",
+        ),
+        "relocated-in-place": (
+            [
+                ("image/opt/deep/link", _HOSTILE_S, "../x", b""),
+                ("image/opt/hard2", _HOSTILE_L, "image/opt/deep/link", b""),
+            ],
+            0,
+            None,
+        ),
+    }
+    root0 = tmp_path / "root0"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    env0 = _getbinpkg_500_env(tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir")
+    env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
+    subprocess.run(
+        [str(emerge_binary), "--buildpkgonly", "dev-libs/packagepkg"],
+        capture_output=True, text=True, check=True, env=env0,
+    )
+    base = root0 / "pkgdir/dev-libs/packagepkg-1.0.gpkg.tar"
+
+    image_base = [
+        ("image", _HOSTILE_D, "", b""),
+        ("image/usr", _HOSTILE_D, "", b""),
+        ("image/usr/share", _HOSTILE_D, "", b""),
+        ("image/usr/share/packagepkg", _HOSTILE_D, "", b""),
+        ("image/usr/share/packagepkg/hello.txt", _HOSTILE_F, "", b"hello\n"),
+    ]
+    for shape, (extra, want_rc, needle) in shapes.items():
+        pkgdir = tmp_path / f"pkgdir-{shape}"
+        (pkgdir / "dev-libs").mkdir(parents=True)
+        _hostile_gpkg(base, pkgdir / "dev-libs/packagepkg-1.0.gpkg.tar", image_base + extra, None)
+
+        root = tmp_path / f"root-{shape}"
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        env = _getbinpkg_500_env(tmp_path, root, Path(FIXTURES_ROOT), pkgdir)
+        env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+        env["NOCOLOR"] = "true"
+        r = subprocess.run(
+            [str(emerge_binary), "-1", "--usepkgonly", "--nodeps", "dev-libs/packagepkg"],
+            capture_output=True, text=True, check=False, env=env,
+        )
+        out = r.stdout + r.stderr
+        assert r.returncode == want_rc, (shape, out)
+        if needle is None:
+            assert (root / "usr/share/packagepkg/hello.txt").is_file(), (shape, out)
+            if shape == "temp-root-bare":
+                assert os.readlink(root / "opt/link") == "../..", (shape, out)
+            if shape == "relocated-in-place":
+                assert (root / "opt/hard2").is_symlink(), (shape, out)
+        else:
+            assert needle in out, (shape, out)
+            assert not (root / "var/db/pkg/dev-libs/packagepkg-1.0").exists(), shape
+            assert not (root / "usr/share/packagepkg/hello.txt").exists(), shape
+            for stray in ("tool", "x"):
+                assert not (root / stray).exists() and not (tmp_path / stray).exists(), (shape, stray)
+
+
 def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_path):
     """Backlog #175 case (b): the only binhost 500s every index fetch and
     PKGDIR is empty. Real (`bintree._populate_remote`'s `except OSError`,
