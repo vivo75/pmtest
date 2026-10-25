@@ -198,11 +198,7 @@
 - id: perl-544-stabilization-slot-conflict-a
   layer: l0
   categories: [error]
-  slugs: ["dev-perl_XML-Parser", "virtual_perl-ExtUtils-MakeMaker",
-    "dev-lang_ruby", "dev-ruby_rake", "kde-apps_kdecore-meta",
-    "app-text_texlive", "app-text_texlive-core",
-    "dev-texlive_texlive-latex", "dev-db_mariadb",
-    "MULTI_deep-update-world"]
+  slugs: ["MULTI_deep-update-world"]
   match: "Multiple package instances within a single package slot"
   reason: >
     dev-lang/perl-5.44.0 was stabilized (KEYWORDS ~amd64 to amd64) in
@@ -210,33 +206,39 @@
     (timestamp.chk Sun, 18 Oct 2026) and 350c0882 (Fri, 23 Oct 2026):
     `git diff 11c58b7a 350c0882 -- dev-lang/perl/perl-5.44.0.ebuild`
     shows the stabilization plus a new RDEPEND on
-    sys-libs/timezone-data. The newly visible 5.44.0 is pulled into all
-    ten probes' graphs (via `=dev-lang/perl-5.44*` from virtual/perl-*
+    sys-libs/timezone-data. The newly visible 5.44.0 is pulled into the
+    -uD @world graph (via `=dev-lang/perl-5.44*` from virtual/perl-*
     providers) and conflicts with the installed 5.42-era reverse deps;
-    real heals it (skipped-update block plus reinstall, or upgrade with
-    rebuilds under -uD @world) while portuale aborts with the
-    slot-conflict header -- the standing #276-family skip/rebuild
-    fallback gap, not a resolver regression (no resolver-path code
-    changed between the two bed binaries; the bed re-run with the
-    current binary reproduces the same 0.733/109). One entry per
+    real heals it (upgrade with rebuilds under -uD @world) while
+    portuale aborts with the slot-conflict header -- the standing
+    #276-family skip/rebuild fallback gap, not a resolver regression
+    (pre-heal isolation runs showed no resolver-path change moving the
+    needle; the post-fix re-run holds the same 0.733 parity with only
+    the nine healed probes moved).
+    2026-10-25 (#563 heal): the nine explicit-atom probes
+    (dev-perl_XML-Parser, virtual_perl-ExtUtils-MakeMaker, dev-lang_ruby,
+    dev-ruby_rake, kde-apps_kdecore-meta, app-text_texlive,
+    app-text_texlive-core, dev-texlive_texlive-latex, dev-db_mariadb)
+    now heal (rc 0, byte-identical merge lists, Portage-style skip
+    block), so the slugs narrow to the remaining -uD @world shape, where
+    the contradicting wants come from merge-bound virtual/perl revisions
+    on both sides of the transition and the installed-instance arm never
+    fires (re-run: backtrack 10/20, list byte-identical to baseline,
+    still rc 1; Portage heals with 34 reinstall rows). One entry per
     physical line of Portage's two-line header because the comparator
     splits findings per line; the sibling -b entry covers the second
     line. Masking tradeoff, stated plainly: a future same-message
-    conflict on these probes (e.g. the next perl subslot bump before
+    conflict on this probe (e.g. the next perl subslot bump before
     the fallback ships) hides here too -- re-tighten when the gap
-    closes. The [exit], [skipped-updates] and real-only skip-text rows
-    stay unexplained, as does dev-lang_perl's "no ebuilds" row (same
-    trigger, but the message misreports availability).
+    closes. The [exit] rows stay unexplained, as does dev-lang_perl's
+    "no ebuilds" row (same trigger, but the message misreports
+    availability).
   owner: portuale-bug
 
 - id: perl-544-stabilization-slot-conflict-b
   layer: l0
   categories: [error]
-  slugs: ["dev-perl_XML-Parser", "virtual_perl-ExtUtils-MakeMaker",
-    "dev-lang_ruby", "dev-ruby_rake", "kde-apps_kdecore-meta",
-    "app-text_texlive", "app-text_texlive-core",
-    "dev-texlive_texlive-latex", "dev-db_mariadb",
-    "MULTI_deep-update-world"]
+  slugs: ["MULTI_deep-update-world"]
   match: "into the dependency graph, resulting in a slot conflict"
   reason: >
     Second physical line of the header adjudicated by

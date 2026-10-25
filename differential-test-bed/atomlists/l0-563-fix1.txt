@@ -1,0 +1,14 @@
+## Task-2 fix round 1 targeted re-run: 9 healed perl probes + 4 C3 probes.
+dev-perl/XML-Parser
+virtual/perl-ExtUtils-MakeMaker
+dev-lang/ruby
+dev-ruby/rake
+kde-apps/kdecore-meta
+app-text/texlive
+app-text/texlive-core
+dev-texlive/texlive-latex
+dev-db/mariadb
+app-office/libreoffice
+media-gfx/gimp
+kde-plasma/plasma-meta
+gnome-base/gnome-shell

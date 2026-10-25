@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #563 perl-shape puller, new pin (mirrors virtual/perl-Time-Local RDEPEND =dev-lang/perl-5.44*)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p563prov-5.44* dev-libs/p563con
+SLOT=0
+_md5_=7ee88e467a10e736dc7d1aa7d3de2374

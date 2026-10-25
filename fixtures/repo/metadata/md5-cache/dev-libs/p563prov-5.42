@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #563 perl-shape provider, old subslot (mirrors dev-lang/perl-5.42.2:0/5.42)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.42
+_md5_=b66e0daaed902ca5f8cf084fcc7dd65d
