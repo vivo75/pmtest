@@ -97,7 +97,14 @@ printf '%s\n' "$CATEGORIES" > "$FX/etc/portage/categories"
 for repo in repo overlay independentoverlay layoutmasteroverlay repnamerepo; do
   [ -d "$FX/$repo" ] || continue
   mkdir -p "$FX/$repo/profiles"
-  printf '%s\n' "$CATEGORIES" > "$FX/$repo/profiles/categories"
+  committed="$FX/$repo/profiles/categories"
+  # The union is committed in the fixture tree (Task 11a); staging must
+  # agree with it -- a mismatch means the committed file went stale.
+  if [ -f "$committed" ] && ! printf '%s\n' "$CATEGORIES" | cmp -s - "$committed"; then
+    echo "stage.sh step 3: computed category union differs from committed $repo/profiles/categories -- refresh the committed file" >&2
+    exit 1
+  fi
+  printf '%s\n' "$CATEGORIES" > "$committed"
 done
 
 # 7. stale-entry case (#46 S4): the committed `common-1.0` entry is
