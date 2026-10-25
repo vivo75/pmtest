@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #569 merge-bound puller pinning the old provider and pulling the virtual in-graph (mirrors the perl pullers)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p569prov-5.42* dev-libs/p569virt
+SLOT=0
+_md5_=c194f325aa9022ae3ae182e20e197af1

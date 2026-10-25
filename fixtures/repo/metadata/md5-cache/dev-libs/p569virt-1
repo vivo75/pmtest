@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #569 installed virtual with a version-menu || plus a slot-operator dep (mirrors virtual/perl-File-Spec RDEPEND)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p569prov-5.42* =dev-libs/p569prov-5.40* =dev-libs/p569prov-5.38* ~dev-libs/p569core-1.0 ) dev-libs/p569prov:=
+SLOT=0
+_md5_=f556cd1d68e9f1a23628bdabe1ad514c

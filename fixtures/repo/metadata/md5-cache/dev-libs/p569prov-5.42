@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #569 provider, old subslot (mirrors dev-lang/perl-5.42.2:0/5.42)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.42
+_md5_=ddf264e22685b37aa8a54098c38c390a

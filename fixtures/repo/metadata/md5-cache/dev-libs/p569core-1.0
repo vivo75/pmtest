@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #569 dual-life dist alternative for the virtual's || menu (mirrors perl-core/*)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=e6465f217ae63d87d3b38d38aacbc286

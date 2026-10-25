@@ -3114,6 +3114,7 @@ CASES = [
     ("#507: the json report under --tree (Portage 3.0.83-r1, rc 1)", ["--pretend", "--tree", "--circular-deps-report=json", "dev-libs/gpcyclec"], 1),
     ("#507: --circular-deps-report json (space form) prints the json report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report", "json", "dev-libs/usecyclea"], 1),
     ("#507: --circular-deps-report=text keeps the text report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=text", "dev-libs/usecyclea"], 1),
+    ("#568/#569: the perl-heal skip block keeps the built subslot atom and drops non-selected || branches (Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p569pull"], 0),
 ]
 
 
@@ -35852,4 +35853,51 @@ def test_523_lib_check_second_pass_repeats_the_cleanlist_blocks(
         "  dev-libs/dcworld-1.0 pulled in by:",
         "    @selected requires dev-libs/dcworld",
         "",
+    ]
+
+
+def test_skip_block_keeps_the_built_atom_and_drops_non_selected_or_branches(
+    emerge_binary, fixture_env
+):
+    """#568/#569: the perl-heal skip block renders both pin forms and only
+    the vdb-selected `||` branch. Installed `dev-libs/p569virt-1` records
+    `|| ( =p569prov-5.42* =p569prov-5.40* =p569prov-5.38* ~p569core-1.0 )`
+    plus the built `dev-libs/p569prov:0/5.42=` (mirrors the bed's old
+    `virtual/perl-*` revisions); merge-bound `p569pull-2` pulls 5.44, the
+    heal falls back to `p569pull-1` (rc 0, backtrack 2/20 both sides).
+
+    Portage oracle (`LLM/evidence/2026-10-26-568/captures/`,
+    `probe-p569.sh`): the WARNING block names `dev-libs/p569prov:0/5.42=`
+    first, then `=dev-libs/p569prov-5.42*` — the non-selected `||` arms
+    never become parent atoms (Portage `dep_zapdeps`, `dep_check.py:339`,
+    installed-preferred arm wins) and the `with_slot("=")` strip
+    (`depgraph.py:2509-2517`) is constraint-only. Bed cross-check
+    (`l0-20261025T111515Z`, `dev-perl_XML-Parser`): 48 real-only
+    `:0/5.42=` lines, 15 portuale-only `=5.38*`/`=5.40*` lines. Before
+    this slice portuale printed the three `=5.3x*` arms and no built
+    form. Expected text is the oracle's block in portuale's own
+    destination convention (quoted `to '<root>'`, no `for <root>` line —
+    the same convention every other skip-block pin carries)."""
+    root = fixture_env["ROOT"]
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/p569pull"], fixture_env)
+    assert rust.returncode == 0
+    # (The harness strips the `--pretend` preamble, so the pin starts at
+    # the merge list, like every other `splitlines` pin in this file.)
+    assert rust.stdout.splitlines() == [
+        f"[ebuild  N     ] dev-libs/p569pull-1 to {root}",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        "dev-libs/p569prov:0",
+        "",
+        f"  (dev-libs/p569prov-5.44:0/5.44::testrepo, ebuild scheduled for merge to '{root}') USE=\"\" ELIBC=\"glibc\" conflicts with",
+        f"    dev-libs/p569prov:0/5.42= required by (dev-libs/p569virt-1:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "    " + " " * 17 + "^" * 8,
+        f"    =dev-libs/p569prov-5.42* required by (dev-libs/p569virt-1:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "    ^                  ^^^^ ",
+        "",
+        "",
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies",
+        "!!! triggered by backtracking:",
+        "",
+        "dev-libs/p569pull:0",
     ]

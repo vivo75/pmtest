@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #569 merge-bound puller pinning the new provider (mirrors the bumped virtuals RDEPEND on perl-5.44)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p569prov-5.44* dev-libs/p569virt
+SLOT=0
+_md5_=5fbd04569d8e8a602b7a285bab3b094e
