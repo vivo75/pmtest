@@ -731,6 +731,13 @@ def _remote_env(fixture_env, sshd_client):
     home = sshd_client["home"]
     os.makedirs(home, exist_ok=True)
     env["HOME"] = home
+    # Backlog #564: the loopback ssh client checks ownership of the
+    # system ssh config files, which show as `nobody`-owned inside the
+    # filter's user namespace ("Bad owner or permissions"), so these
+    # tests bypass the filter. The pins are behavioral (preflight lines,
+    # trust lines, merge file outcomes on fixture-only packages), not
+    # repo-set-sensitive.
+    env["PMTEST_REPOS_FILTER"] = "off"
     return env
 
 
@@ -7562,6 +7569,10 @@ def test_merge_skips_an_identical_file_preserving_ownership(emerge_binary, tmp_p
         f"PORTAGE_CONFIGROOT={FIXTURES_ROOT}",
         f"ROOT={root}",
         f"PORTAGE_TMPDIR={tmp_path / 'portage-tmpdir'}",
+        # Backlog #564: this merge runs under `sudo -n`, which does not
+        # work inside the suite's repos.conf-filter user namespace, so it
+        # bypasses the filter and runs unfiltered like the suite always did.
+        "PMTEST_REPOS_FILTER=off",
     ]
     ebuild_link = tmp_path / "ebuild"
     ebuild_link.symlink_to(Path(emerge_binary).resolve())

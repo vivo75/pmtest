@@ -58,6 +58,25 @@ _TMP_BASE = os.environ.get("PMTEST_TMPDIR") or os.environ.get("TMPDIR") or "/var
 os.environ.setdefault("TMPDIR", _TMP_BASE)
 _BASETEMP = Path(_TMP_BASE) / "pytest-basetemp"
 
+# Backlog #564: the contract suite hides the host's installed system
+# repos.conf (`/usr/share/portage/config/repos.conf`, which Portage
+# merges with every run's config-root one) behind a per-invocation
+# mount-namespace bind of a comments-only fixture file
+# (`pytests-contract-suite/repos_filter.sh`, wrapping every PM applet
+# below). Set here -- before `import corpus` -- so the variable is part
+# of corpus.py's import-time host environment and stays out of every
+# case identity (like $TMPDIR above); the file itself is written by the
+# `_repos_conf_filter` session fixture, before any test runs.
+os.environ.setdefault(
+    "PMTEST_REPOS_FILTER_SRC", str(Path(_TMP_BASE) / "repos-filter-global.conf")
+)
+REPOS_FILTER_SH = Path(__file__).resolve().parent / "repos_filter.sh"
+_REPOS_FILTER_SRC_TEXT = (
+    "# Backlog #564 filter: comments only, so neither manager sees a host repo.\n"
+    "# (Portage merges this installed-system file with every run; binding\n"
+    "# comments here keeps suite repo sets fixture-determined.)\n"
+)
+
 import corpus  # noqa: E402  (see the ordering note above)
 
 # Preflight thresholds (env-overridable -- "tune to what this machine
@@ -205,6 +224,11 @@ _ENV_CONFIG_VARS = (
     "BINPKG_FORMAT", "BINPKG_COMPRESS", "BINPKG_COMPRESS_FLAGS",
     "PORTAGE_BZIP2_COMMAND", "PORTAGE_BUNZIP2_COMMAND",
     "CONFIG_PROTECT", "CONFIG_PROTECT_MASK", "ENV_UNSET",
+    # Backlog #564: ambient `PORTAGE_REPOSITORIES` replaces both repos.conf
+    # files outright (Portage `load_repository_config`; portuale honours it
+    # too now), so an inherited one would silently re-scope every fixture
+    # run. A test that exercises it sets the var explicitly in its own env.
+    "PORTAGE_REPOSITORIES",
 )
 
 
@@ -235,6 +259,42 @@ def _require_fixture_tree():
             f"fixture tree at {FIXTURES_ROOT} is missing {', '.join(missing)}: "
             "it exists, but it is not the fixture tree this suite grades against"
         )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _repos_conf_filter():
+    """Backlog #564: hide the host's installed system repos.conf from
+    every PM invocation (see `repos_filter.sh`).
+
+    Writes the comments-only fixture file the filter binds over the host
+    path, then probes the mount-namespace wrapper once. When user
+    namespaces are unavailable the session fails loudly here -- running
+    unfiltered would silently make every repo set host-dependent. An
+    explicit `PMTEST_REPOS_FILTER=off` in the launching environment opts
+    out (the sudo/real-root pass, which cannot enter a user namespace);
+    the per-test bypass for those tests sets the same variable.
+    """
+    src = Path(os.environ["PMTEST_REPOS_FILTER_SRC"])
+    src.parent.mkdir(parents=True, exist_ok=True)
+    src.write_text(_REPOS_FILTER_SRC_TEXT)
+    if os.environ.get("PMTEST_REPOS_FILTER", "on") == "off":
+        yield
+        return
+    probe = subprocess.run(
+        [str(REPOS_FILTER_SH), "/bin/true", "/bin/true"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if probe.returncode != 0:
+        pytest.fail(
+            "backlog #564 repos.conf filter unavailable: "
+            f"`repos_filter.sh /bin/true` failed (rc {probe.returncode}: "
+            f"{probe.stderr.strip()}): user namespaces are required; "
+            "run with PMTEST_REPOS_FILTER=off to opt out explicitly, "
+            "never silently unfiltered"
+        )
+    yield
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -271,13 +331,44 @@ def _pm_applet(kind):
     return _resolved("applet", kind)
 
 
-def _applet_symlink(kind, tmp_path_factory):
-    """A real `kind` symlink to the active PM's applet, so tests exercise
-    the same argv[0]-dispatch path a real installation would use."""
+def _applet_launcher(kind, tmp_path_factory):
+    """A real `kind` launcher for the active PM's applet, so tests exercise
+    the same argv[0]-dispatch path a real installation would use -- through
+    the backlog #564 repos.conf filter (`repos_filter.sh`), which hides the
+    host's installed system repos.conf in a per-invocation mount namespace.
+    `PMTEST_REPOS_FILTER=off` bypasses the filter (the sudo/real-root
+    tests, since `sudo` does not work inside a user namespace).
+
+    The launcher is Python, not shell: POSIX shells reset `$PWD` at
+    startup when it names a nonexistent dir, which would clobber the
+    title tests' fake `PWD`. Python preserves the environment byte for
+    byte; the real `$PWD` travels to the helper in `_PMTEST_SAVED_PWD`
+    (restored and unset at every exec point there)."""
     target = _pm_applet(kind)
     link_dir = tmp_path_factory.mktemp(f"{kind}-symlink")
     link = link_dir / kind
-    link.symlink_to(target)
+    # The filter-src path is baked in (not inherited): tests that build a
+    # minimal child env from scratch would otherwise drop it and the
+    # helper would have nothing to bind. The interpreter is absolute
+    # (`sys.executable`, not `env python3`) so a scrubbed `PATH` cannot
+    # break the launch either.
+    link.write_text(
+        f"#!{sys.executable}\n"
+        "import os, sys\n"
+        f"REAL = {str(target)!r}\n"
+        f"HELPER = {str(REPOS_FILTER_SH)!r}\n"
+        # The filter-src path is baked in (not inherited): tests that build
+        # a minimal child env from scratch would otherwise drop it and the
+        # helper would have nothing to bind.
+        f"SRC = {os.environ['PMTEST_REPOS_FILTER_SRC']!r}\n"
+        "env = dict(os.environ)\n"
+        'env["PMTEST_REPOS_FILTER_SRC"] = SRC\n'
+        'env.setdefault("PWD", os.getcwd())\n'
+        'env["_PMTEST_SAVED_PWD"] = env["PWD"]\n'
+        "argv0 = sys.argv[0]\n"
+        "os.execve(HELPER, [HELPER, REAL, argv0, *sys.argv[1:]], env)\n"
+    )
+    link.chmod(0o755)
     return link
 
 
@@ -333,17 +424,17 @@ def portuale_binary() -> Path:
 
 @pytest.fixture(scope="session")
 def emerge_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    return _applet_symlink("emerge", tmp_path_factory)
+    return _applet_launcher("emerge", tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
 def ebuild_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    return _applet_symlink("ebuild", tmp_path_factory)
+    return _applet_launcher("ebuild", tmp_path_factory)
 
 
 @pytest.fixture(scope="session")
 def mrg_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    return _applet_symlink("mrg", tmp_path_factory)
+    return _applet_launcher("mrg", tmp_path_factory)
 
 
 @pytest.fixture(autouse=True)

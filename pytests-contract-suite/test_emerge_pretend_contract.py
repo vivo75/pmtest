@@ -22223,6 +22223,20 @@ def _run_on_pty(argv, env, err_path=None, timeout=120):
     return proc.returncode, out, err_bytes
 
 
+def _repos_pin_text(fixtures_root):
+    """Backlog #564: the merged text of the fixture `repos.conf` dir for
+    `PORTAGE_REPOSITORIES` pinning (sorted file order; the dir holds one
+    file today). Only for tests that cannot enter the suite's filter
+    namespace (raw-pty exit latency, ssh ownership checks): bypass + pin
+    keeps their repo set hermetic without namespaces. The sections and
+    config-root-relative locations match the on-disk file exactly."""
+    parts = []
+    repos_dir = Path(fixtures_root) / "etc/portage/repos.conf"
+    for path in sorted(p for p in repos_dir.rglob("*") if p.is_file()):
+        parts.append(path.read_text())
+    return "\n".join(parts)
+
+
 def _title_env(fixture_env):
     """Controlled host state for the title tests: fixed TERM, LOGNAME,
     HOSTNAME, HOME and PWD; no PROMPT_COMMAND; colour left on (a pty is
@@ -22235,6 +22249,11 @@ def _title_env(fixture_env):
     env["PWD"] = "/home/testuser/work"
     for var in ("PROMPT_COMMAND", "NOCOLOR", "NO_COLOR"):
         env.pop(var, None)
+    # Backlog #564: raw-pty children hang on exit inside the filter's
+    # namespaces; bypass it here and pin the repo set instead so the pins
+    # stay hermetic on any host.
+    env["PMTEST_REPOS_FILTER"] = "off"
+    env["PORTAGE_REPOSITORIES"] = _repos_pin_text(env["PORTAGE_CONFIGROOT"])
     return env
 
 
