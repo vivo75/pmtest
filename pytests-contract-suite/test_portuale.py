@@ -2863,6 +2863,7 @@ def test_emerge_regen_regenerates_md5_cache_from_the_depend_phase(
     (repo / "dev-libs" / "regenpkg").mkdir(parents=True)
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles" / "repo_name").write_text("regentest\n")
+    (repo / "profiles" / "categories").write_text("dev-libs\n")
     ebuild = repo / "dev-libs" / "regenpkg" / "regenpkg-1.0.ebuild"
     ebuild_text = (
         'EAPI=8\n'
@@ -3362,6 +3363,7 @@ def test_emerge_regen_skips_a_repo_whose_cache_formats_have_no_md5_dict(
     (repo / "dev-libs" / "pmsregenpkg").mkdir(parents=True)
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles" / "repo_name").write_text("pmsregen\n")
+    (repo / "profiles" / "categories").write_text("dev-libs\n")
     (repo / "metadata").mkdir(parents=True)
     (repo / "metadata" / "layout.conf").write_text("cache-formats = pms\n")
     (repo / "dev-libs" / "pmsregenpkg" / "pmsregenpkg-1.0.ebuild").write_text(
@@ -3405,6 +3407,7 @@ def test_emerge_regen_prunes_a_stale_cache_entry(emerge_binary, tmp_path):
     (repo / "dev-libs" / "goneppkg").mkdir(parents=True)
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles" / "repo_name").write_text("regentest\n")
+    (repo / "profiles" / "categories").write_text("dev-libs\n")
     keeper = repo / "dev-libs" / "keeperpkg" / "keeperpkg-1.0.ebuild"
     keeper.write_text('EAPI=8\nSLOT="0"\nKEYWORDS="amd64"\n')
     gone = repo / "dev-libs" / "goneppkg" / "goneppkg-1.0.ebuild"
@@ -3465,6 +3468,7 @@ def test_emerge_regen_finds_an_inherited_eclass_across_the_masters_chain(
     (master_repo / "eclass").mkdir(parents=True)
     (master_repo / "profiles").mkdir(parents=True)
     (master_repo / "profiles" / "repo_name").write_text("mastertest\n")
+    (master_repo / "profiles" / "categories").write_text("dev-libs\n")
     eclass_text = "# fixture eclass, lives only in the master repo\n"
     (master_repo / "eclass" / "regenclass.eclass").write_text(eclass_text)
 
@@ -3472,6 +3476,7 @@ def test_emerge_regen_finds_an_inherited_eclass_across_the_masters_chain(
     (overlay_repo / "dev-libs" / "inheritspkg").mkdir(parents=True)
     (overlay_repo / "profiles").mkdir(parents=True)
     (overlay_repo / "profiles" / "repo_name").write_text("regentest\n")
+    (overlay_repo / "profiles" / "categories").write_text("dev-libs\n")
     ebuild = overlay_repo / "dev-libs" / "inheritspkg" / "inheritspkg-1.0.ebuild"
     ebuild_text = (
         'EAPI=8\n'
@@ -3533,6 +3538,7 @@ def test_emerge_regen_jobs_parallel_matches_serial_cache_bytes(emerge_binary, tm
     (repo / "dev-libs" / "otherpkg").mkdir(parents=True)
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles" / "repo_name").write_text("regentest\n")
+    (repo / "profiles" / "categories").write_text("dev-libs\n")
     (repo / "dev-libs" / "regenpkg" / "regenpkg-1.0.ebuild").write_text(
         'EAPI=8\nDESCRIPTION="regen test"\nSLOT="0"\nKEYWORDS="amd64"\n'
     )
@@ -3623,6 +3629,7 @@ def test_emerge_regen_skips_the_depend_phase_when_the_cache_entry_is_valid(
     (repo / "eclass").mkdir(parents=True)
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles" / "repo_name").write_text("regentest\n")
+    (repo / "profiles" / "categories").write_text("dev-libs\n")
     eclass_text = "# fixture eclass\n"
     (repo / "eclass" / "regenclass.eclass").write_text(eclass_text)
     ebuild = repo / "dev-libs" / "regenpkg" / "regenpkg-1.0.ebuild"
@@ -3716,6 +3723,7 @@ def test_emerge_regen_retries_a_cp_on_an_unexpected_returncode(
     (repo / "dev-libs" / "retryfailpkg").mkdir(parents=True)
     (repo / "profiles").mkdir(parents=True)
     (repo / "profiles" / "repo_name").write_text("regentest\n")
+    (repo / "profiles" / "categories").write_text("dev-libs\n")
     (repo / "dev-libs" / "goodpkg" / "goodpkg-1.0.ebuild").write_text(
         'EAPI=8\nDESCRIPTION="good"\nSLOT="0"\nKEYWORDS="amd64"\n'
     )
