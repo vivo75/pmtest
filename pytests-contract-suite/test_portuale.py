@@ -12373,7 +12373,9 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
     the download, and exits 1 with `>>> Failed to emerge` when the fetch fails, leaving
     the vdb alone. Every expected byte was captured from Portage 3.0.82.2 on this very
     root (`LLM/evidence/2026-10-18-401-s0/portage-cells.txt` in portuale), modulo the
-    wall-clock seconds portuale cuts and the trailing `/` Portage puts on `ROOT`."""
+    wall-clock seconds portuale cuts (and, on the failure path, the trailing `/`
+    Portage puts on `ROOT` in the `Failed to emerge` line — the `Fetching` line
+    now carries it since backlog #566)."""
     root = _fetchonly_root(tmp_path)
     cmd = "cp {src} \"${{DISTDIR}}/${{FILE}}\"".format(src=tmp_path / "src/probe-1.tar.gz")
     env = dict(os.environ)
@@ -12399,7 +12401,7 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
         "Calculating dependencies ... done!\n"
         "Dependency resolution took (backtrack: 0/20).\n\n\n"
     )
-    fetching = f">>> Fetching (1 of 1) dev-util/fetchprobe-1::fetchrepo for {root_dir}\n"
+    fetching = f">>> Fetching (1 of 1) dev-util/fetchprobe-1::fetchrepo for {root_dir}/\n"
     downloading = ">>> Downloading 'https://example.invalid/probe-1.tar.gz'\n"
     if argv[0].startswith("-p"):
         assert result.returncode == 0
@@ -12483,7 +12485,7 @@ def _fetchonly_extra_packages(root):
             "dev-util/fetchrestrict",
             "",
             1,
-            "\n\n>>> Fetching (1 of 1) dev-util/fetchrestrict-1::fetchrepo for {root}\n"
+            "\n\n>>> Fetching (1 of 1) dev-util/fetchrestrict-1::fetchrepo for {root}/\n"
             "\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n"
             "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}:\n\n"
             " * The following files cannot be fetched for fetchrestrict:\n"
@@ -12513,7 +12515,9 @@ def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
     `Failed to emerge` block even under `-p`, and lists no URI; `FEATURES=mirror` makes
     the listing as `--fetch-all-uri` does. Captured on Portage 3.0.82.2 with the
     same root (`LLM/evidence/2026-10-19-b415/` in portuale: `setup.sh`, `cells.sh`),
-    modulo the cuts the other fetchonly pin names; the `Messages for package` block
+    modulo the cuts the other fetchonly pin names (the `Fetching`-line trailing
+    `/` on `ROOT` now matches since backlog #566; the `Failed to emerge` /
+    `merged to` lines still omit it); the `Messages for package` block
     after `Failed to emerge` is `pkg_nofetch`'s elog summary (backlog #422)."""
     root = _fetchonly_root(tmp_path)
     _fetchonly_extra_packages(root)
@@ -12548,8 +12552,9 @@ def test_emerge_resume_fetchonly_fetches_without_merging_like_portage(
     nothing (`-p` lists the URIs); the saved resume list stays. portuale used to
     run the whole merge. Expected bytes captured on Portage 3.0.82.2
     (`LLM/evidence/2026-10-19-b415/resume-portage.txt` in portuale), modulo the
-    wall-clock seconds portuale cuts, the trailing `/` on `ROOT` and the colour of
-    the verify line (`NOCOLOR=yes` here)."""
+    wall-clock seconds portuale cuts and the colour of
+    the verify line (`NOCOLOR=yes` here) — the trailing `/` Portage puts on
+    `ROOT` now matches since backlog #566."""
     root = _fetchonly_root(tmp_path)
     good = "cp {src} \"${{DISTDIR}}/${{FILE}}\"".format(src=tmp_path / "src/probe-1.tar.gz")
     env = dict(os.environ)
@@ -12589,7 +12594,7 @@ def test_emerge_resume_fetchonly_fetches_without_merging_like_portage(
         )
         root_dir = tmp_path / "root"
         assert result.stdout == (
-            head + f"\n>>> Fetching (1 of 1) dev-util/fetchprobe-1::fetchrepo for {root_dir}\n"
+            head + f"\n>>> Fetching (1 of 1) dev-util/fetchprobe-1::fetchrepo for {root_dir}/\n"
             ">>> Downloading 'https://example.invalid/probe-1.tar.gz'\n" + verify
         )
         assert (tmp_path / "dist/probe-1.tar.gz").is_file()
@@ -12756,7 +12761,8 @@ def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_p
     `location` and `-pf` lists its URI (nothing once it is there); a binary already
     downloaded is still verified. Expected bytes captured on Portage 3.0.82.2 with the
     same index and fixture binary (`LLM/evidence/2026-10-19-b424/` in portuale:
-    `setup.sh`, `cells.sh`), modulo the cuts the other fetchonly pins name; the wget
+    `setup.sh`, `cells.sh`), modulo the cuts the other fetchonly pins name (the
+    `Fetching`-line trailing `/` on `ROOT` now matches since backlog #566); the wget
     progress block is portuale's own `wget` output (Portage ran its `FETCHCOMMAND`).
     Portage 3.0.83-r1 refuses a remote binary without both size and checksum (backlog
     #501), so the index record carries an `MD5` and the verify line names `MD5 size`."""
@@ -12818,7 +12824,7 @@ def test_emerge_fetchonly_getbinpkg_lists_and_downloads_the_remote_binary_like_p
         header = (
             "Calculating dependencies ... done!\n"
             "Dependency resolution took (backtrack: 0/20).\n\n\n"
-            f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}\n"
+            f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}/\n"
         )
         verify = (
             " * gpkgreadpkg-1.0.gpkg.tar MD5 size ;-) ..."
@@ -12852,7 +12858,8 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
     has no `location` (the test sets EPREFIX to the root via PORTAGE_OVERRIDE_EPREFIX), and the verify line names every checksum of the index record plus
     `size` (`MD5 SHA1 size`). Expected values from Portage 3.0.82.2 with the same index
     (`LLM/evidence/2026-10-20-b428/` in portuale: `setup.sh`, `cells.sh`, `f-fetchcommand`);
-    the default `location` is rooted at `EPREFIX` in both (backlog #436 (b))."""
+    the default `location` is rooted at `EPREFIX` in both (backlog #436 (b)), and
+    the `Fetching`-line trailing `/` on `ROOT` now matches since backlog #566."""
     import hashlib
     import shutil
 
@@ -12906,7 +12913,7 @@ def test_emerge_fetchonly_getbinpkg_runs_fetchcommand_and_names_every_digest(
         assert result.stdout == (
             "Calculating dependencies ... done!\n"
             "Dependency resolution took (backtrack: 0/20).\n\n\n"
-            f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}\n"
+            f">>> Fetching (1 of 1) dev-libs/gpkgreadpkg-1.0::fetchrepo for {tmp_path / 'root'}/\n"
             f" * {name}" + " " * (80 - len(name) - 3 - 7) + "[ ok ]\n"
         )
         cache = tmp_path / "root/var/cache/binhost/tmpbinhost/dev-libs"
@@ -12971,7 +12978,8 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     notice, the `dropped because` notice, the counter restarting at `(1 of 1)`, the
     elog `Messages for package` blocks of the failed and the dropped package, the
     stderr list of failed packages, and a `world` that holds only what merged. Cut
-    here: timings, `Verifying ebuild manifests`, the trailing `/` on `ROOT`."""
+    here: timings, `Verifying ebuild manifests`, and the trailing `/` on `ROOT`
+    everywhere but the `Emerging` line (which now matches since backlog #566)."""
     import shutil
 
     root = tmp_path / "root"
@@ -13004,7 +13012,7 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
         f"\n>>> Failed to emerge dev-libs/schedbad-1.0 for {root}, Log file:\n\n>>>  '{log}'\n",
         "*** Resuming merge...\nCalculating dependencies ... done!\nDependency resolution took .\n\n",
         dropped,
-        f">>> Emerging (1 of 1) dev-libs/schedok-1.0::testrepo for {root}\n",
+        f">>> Emerging (1 of 1) dev-libs/schedok-1.0::testrepo for {root}/\n",
         f"\n * Messages for package dev-libs/schedbad-1.0 merged to {root}:\n\n"
         " * ERROR: dev-libs/schedbad-1.0::testrepo failed (install phase):\n",
         f"\n * Messages for package dev-libs/schedbaddep-1.0 merged to {root}:\n\n" + dropped,
@@ -13040,7 +13048,9 @@ def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_pa
     whose only failure is one build shows that build's whole log before the elog
     blocks, with no blank lines inside the `Failed to emerge` block, unless
     `--quiet-fail`; (c) in `-jN` the elog block ends with `The complete build log is
-    located at '<build.log>'.`"""
+    located at '<build.log>'.` The `Installing`/`Completed` trailing `/` on `ROOT`
+    now matches since backlog #566 (`Failed to emerge` / `merged to` lines still
+    omit it)."""
     import shutil
 
     def run(name, args):
@@ -13062,9 +13072,9 @@ def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_pa
     root, _, r = run("ok", ["dev-libs/schedok"])
     assert r.returncode == 0, r.stderr
     assert (
-        f">>> Installing (1 of 1) dev-libs/schedok-1.0::testrepo to {root}\n\n"
+        f">>> Installing (1 of 1) dev-libs/schedok-1.0::testrepo to {root}/\n\n"
         '>>> Recording dev-libs/schedok in "world" favorites file...\n\n'
-        f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}\n"
+        f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}/\n"
     ) in r.stdout, r.stdout
 
     # (e)
