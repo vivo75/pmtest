@@ -1,0 +1,6 @@
+DEFINED_PHASES=install pretend
+DESCRIPTION=fixture package: ordered live-replay probe (first) -- pretend announces itself at once, so a later entry can tell replayed output from buffered output
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=e25754025739701d4a6e7f8621c14a61

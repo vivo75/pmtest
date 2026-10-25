@@ -1,0 +1,6 @@
+DEFINED_PHASES=install pretend
+DESCRIPTION=fixture package: ordered live-replay probe (second) -- pretend passes only once no other pretend log is still buffered, so it distinguishes live replay from buffered replay
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=4e1cfbc3fdab10bcbb666dcdf4940823
