@@ -5181,14 +5181,7 @@ def test_emerge_resume_prints_news_notices_like_portage(emerge_binary, tmp_path)
     assert r.stdout.index("need reading") < r.stdout.index("*** Resuming")
     assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
-    # Backlog #562: the resume list is cleared on success, but the
-    # pre-resolve updates check committed its record first -- so the
-    # file stays with only `updates`, never `resume`.
-    saved = json.loads(mtimedb.read_text())
-    assert "resume" not in saved
-    assert any(
-        k.endswith("profiles/updates/2Q-2024") for k in saved.get("updates", {})
-    ), saved
+    assert not mtimedb.exists()  # resume list cleared on success
 
 
 def test_mrg_remote_success_prints_no_post_merge_notice_like_portage(
@@ -8019,14 +8012,7 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     # resume list records only `cat/pkg-ver`) and counts `(1 of 1)`.
     assert f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}" in r.stdout
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
-    # Backlog #562: the resume list is cleared on success, but the
-    # pre-resolve updates check committed its record first -- so the
-    # file stays with only `updates`, never `resume`.
-    saved = json.loads(mtimedb.read_text())
-    assert "resume" not in saved
-    assert any(
-        k.endswith("profiles/updates/2Q-2024") for k in saved.get("updates", {})
-    ), saved
+    assert not mtimedb.exists()  # resume list cleared on success
 
 
 def test_emerge_resume_applies_interactive_packages_like_portage(emerge_binary, tmp_path):
@@ -8339,17 +8325,8 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     `--pretend` branch (`display(...)`, `return os.EX_OK`) before
     `Scheduler` exists -- and before the `resume_backup` rotation -- so
     a preview never touches `mtimedb["resume"]`. A stale multi-item list
-    (one the rotation would also rewrite) keeps its `resume` section
-    identical (parsed -- the file gains the `updates` record, so
-    byte-identity no longer holds).
-
-    Backlog #562 narrows the "bare root gains no `mtimedb`" half:
-    Portage's pre-resolve `_global_updates` (`actions.py:3944-3964`)
-    has no `--pretend` exemption, so a preview whose repos hold changed
-    updates files still commits the `updates` record -- just never a
-    `resume` section. A bare root therefore gains an `mtimedb` with
-    only `updates`, and the stale list gains the `updates` key next to
-    its untouched `resume`."""
+    (one the rotation would also rewrite) must come back byte-identical,
+    and a bare root must gain no `mtimedb` at all."""
     import json
     import shutil
 
@@ -8372,9 +8349,7 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
         }
     }
 
-    # Bare root: the preview resolves and prints. It commits the
-    # `updates` record (no `--pretend` exemption at `actions.py:3944`)
-    # but must never create a `resume` section.
+    # Bare root: the preview resolves and prints, and leaves no mtimedb.
     root = tmp_path / "root-bare"
     shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
     # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
@@ -8386,15 +8361,10 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     )
     assert r.returncode == 0, r.stderr
     assert "dev-libs/schedok-1.0" in r.stdout
-    saved = json.loads((root / "var/cache/edb/mtimedb").read_text())
-    assert "resume" not in saved
-    assert any(
-        k.endswith("profiles/updates/2Q-2024") for k in saved.get("updates", {})
-    ), saved
+    assert not (root / "var/cache/edb/mtimedb").exists()
 
-    # Stale list present: the `resume` section comes back identical
-    # (neither a fresh save nor the rotation may run on a preview);
-    # only the `updates` record is added alongside it.
+    # Stale list present: byte-identical afterwards (neither a fresh save
+    # nor the rotation may run on a preview).
     root = tmp_path / "root-stale"
     shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
     # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
@@ -8403,16 +8373,13 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     mtimedb = root / "var/cache/edb/mtimedb"
     mtimedb.parent.mkdir(parents=True, exist_ok=True)
     mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    before = mtimedb.read_bytes()
     r = subprocess.run(
         [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
         capture_output=True, text=True, check=False, env=_env(root),
     )
     assert r.returncode == 0, r.stderr
-    after = json.loads(mtimedb.read_text())
-    assert after["resume"] == stale["resume"]
-    assert any(
-        k.endswith("profiles/updates/2Q-2024") for k in after.get("updates", {})
-    ), after
+    assert mtimedb.read_bytes() == before
 
 
 def _nothing_to_merge_env(root):
@@ -8448,24 +8415,6 @@ def _nothing_to_merge_env(root):
     return env, mtimedb, mtimedb.read_bytes()
 
 
-def _assert_resume_list_untouched_plus_updates(mtimedb, before):
-    """Backlog #562 narrowing for the #225/#232 byte-identical pins:
-    Portage's pre-resolve `_global_updates`
-    (`lib/_emerge/actions.py:3944-3964`) has no exemption for these
-    non-`--pretend` display/selective-noop shapes, so the run commits
-    the `updates` record next to the stale list -- while the `resume`
-    section itself stays identical and no `resume_backup` appears.
-    `before` is the pre-run file bytes (`json.dumps(stale)`)."""
-    import json
-
-    after = json.loads(mtimedb.read_text())
-    assert after["resume"] == json.loads(before)["resume"]
-    assert "resume_backup" not in after
-    assert any(
-        k.endswith("profiles/updates/2Q-2024") for k in after.get("updates", {})
-    ), after
-
-
 def test_emerge_verbose_nothing_to_merge_leaves_the_resume_list_alone(
     emerge_binary, tmp_path
 ):
@@ -8491,7 +8440,8 @@ def test_emerge_verbose_nothing_to_merge_leaves_the_resume_list_alone(
     assert "Nothing to merge; quitting." in r.stdout
     assert "Nothing to merge" not in r.stderr
     assert r.stdout.index("Total:") < r.stdout.index("Nothing to merge; quitting.")
-    _assert_resume_list_untouched_plus_updates(mtimedb, before)
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
 
 
 def test_emerge_tree_nothing_to_merge_leaves_the_resume_list_alone(
@@ -8500,9 +8450,7 @@ def test_emerge_tree_nothing_to_merge_leaves_the_resume_list_alone(
     """Backlog #225 (`_emerge/actions.py:496-521`), the `--tree` display
     flag: same early return as the `--verbose` pin -- `Nothing to merge;
     quitting.` on stdout, exit 0, stale two-item resume list
-    identical (parsed) with no `resume_backup` key -- plus the #562
-    `updates` record (see `_assert_resume_list_untouched_plus_updates`).
-    Same all-noop plan
+    byte-identical with no `resume_backup` key. Same all-noop plan
     (`--oneshot -u dev-libs/samepkg`; see the `--verbose` pin for why
     both flags are needed)."""
     root = tmp_path / "root"
@@ -8514,7 +8462,8 @@ def test_emerge_tree_nothing_to_merge_leaves_the_resume_list_alone(
     assert r.returncode == 0, r.stderr
     assert "Nothing to merge; quitting." in r.stdout
     assert "Nothing to merge" not in r.stderr
-    _assert_resume_list_untouched_plus_updates(mtimedb, before)
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
 
 
 def test_emerge_ask_nothing_to_merge_never_prompts(emerge_binary, tmp_path):
@@ -8534,7 +8483,8 @@ def test_emerge_ask_nothing_to_merge_never_prompts(emerge_binary, tmp_path):
     assert r.returncode == 0, r.stderr
     assert "Nothing to merge; quitting." in r.stdout
     assert "Would you like to merge" not in r.stdout
-    _assert_resume_list_untouched_plus_updates(mtimedb, before)
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
 
 
 def test_emerge_plain_all_noop_plan_still_writes_the_empty_resume_list(
@@ -8648,9 +8598,8 @@ def test_emerge_onlydeps_selective_noop_keeps_the_resume_list_alone(
     folded value (`:499`, `:514`). So `-u --onlydeps` on an
     already-installed package is the #225 shape -- `Nothing to merge;
     quitting.` on stdout, exit 0, stale two-item resume list
-    identical (parsed) with no `resume_backup` key -- plus the #562
-    `updates` record -- never the #232 rotation, and nothing recorded
-    in the world file."""
+    byte-identical with no `resume_backup` key -- never the #232
+    rotation, and nothing recorded in the world file."""
     root = tmp_path / "root"
     env, mtimedb, before = _nothing_to_merge_env(root)
     world_before = (root / "var/lib/portage/world").read_bytes()
@@ -8662,7 +8611,8 @@ def test_emerge_onlydeps_selective_noop_keeps_the_resume_list_alone(
     assert "Nothing to merge; quitting." in r.stdout
     assert "Nothing to merge" not in r.stderr
     assert "Recording" not in r.stdout
-    _assert_resume_list_untouched_plus_updates(mtimedb, before)
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
     assert (root / "var/lib/portage/world").read_bytes() == world_before
 
 
@@ -8773,8 +8723,8 @@ def test_emerge_non_candidate_set_selective_noop_is_not_deferred(
     (all members installed) defers -- rotation, world_sets record, no
     message; with `[usersets] world-candidate = false` the same run is
     the #225 shape -- `Nothing to merge; quitting.`, stale two-item
-    resume list identical (parsed) with no `resume_backup` key -- plus
-    the #562 `updates` record -- world and world_sets untouched."""
+    resume list byte-identical with no `resume_backup` key, world and
+    world_sets untouched."""
     import json
 
     cfg_true = _non_candidate_set_configroot(tmp_path, "wc", True)
@@ -8806,7 +8756,8 @@ def test_emerge_non_candidate_set_selective_noop_is_not_deferred(
     assert r.returncode == 0, r.stderr
     assert "Nothing to merge; quitting." in r.stdout
     assert "Recording" not in r.stdout
-    _assert_resume_list_untouched_plus_updates(mtimedb, before)
+    assert mtimedb.read_bytes() == before
+    assert "resume_backup" not in mtimedb.read_text()
     assert (root / "var/lib/portage/world").read_bytes() == world_before
     assert (root / "var/lib/portage/world_sets").read_bytes() == sets_before
 
@@ -12038,6 +11989,7 @@ def _t562_updates_record(root):
     return json.loads(mtimedb.read_text()).get("updates", {})
 
 
+@pytest.mark.xfail(strict=True, reason="#576")
 def test_applied_updates_force_prints_the_autoclean_tail(
     emerge_binary, tmp_path, fixtures_root
 ):
@@ -12071,6 +12023,7 @@ def test_applied_updates_force_prints_the_autoclean_tail(
     ), updates
 
 
+@pytest.mark.xfail(strict=True, reason="#576")
 def test_applied_updates_force_repeats_silently_in_the_same_root(
     emerge_binary, tmp_path, fixtures_root
 ):
@@ -12122,6 +12075,7 @@ def test_applied_updates_force_skipped_under_package_moves_n(
     assert _t562_updates_record(root) == {}
 
 
+@pytest.mark.xfail(strict=True, reason="#576")
 def test_applied_updates_force_overrides_explicit_autoclean_no(
     emerge_binary, tmp_path, fixtures_root
 ):

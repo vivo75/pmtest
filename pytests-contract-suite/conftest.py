@@ -109,16 +109,7 @@ def _reclaim_fixture_mtimedb() -> None:
     resume-clear assertions on its `resume_backup` residue. The
     originating run is intermittent (observed once in a full session,
     not reproducible under a watcher), so sweep defensively at session
-    start next to the other tmp hygiene.
-
-    Backlog #562 widens the writers: the pre-resolve updates check
-    commits the `updates` record for the running root too (which this
-    suite pins at the fixtures), on every non-exempt action --
-    including `--pretend`. The sweep and the ignore stay the same
-    mechanism. The record itself prints nothing, and the tail it can
-    force needs a successful non-`--pretend` merge -- which the suite
-    runs on per-test fresh tmp roots -- so shared-state outputs stay
-    order-independent; only this path needs reclaiming."""
+    start next to the other tmp hygiene."""
     (FIXTURES_ROOT / "var" / "cache" / "edb" / "mtimedb").unlink(missing_ok=True)
 
 
