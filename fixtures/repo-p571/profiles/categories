@@ -1,0 +1,5 @@
+# Task 12 (#571) fixture: lists only p571-listed. p571-hidden holds a
+# valid ebuild but is deliberately unlisted (masked everywhere);
+# p571-shared holds a valid ebuild in the MAIN repo but is listed only
+# by the overlay (valid via the cross-repo union).
+p571-listed

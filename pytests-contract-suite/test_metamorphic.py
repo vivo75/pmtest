@@ -297,6 +297,23 @@ def _rename_category(root: Path, args: list[str]) -> tuple[list[str], Callable]:
             continue
         if old + "/" in text:
             _atomic_write(path, text.replace(old + "/", new + "/"))
+    # `profiles/categories` lists bare category names (no trailing slash),
+    # so the pass above misses them: rename whole-line matches too, or the
+    # renamed category is unlisted and Portage masks it (backlog #571).
+    for repo in REPO_NAMES:
+        cats = root / repo / "profiles" / "categories"
+        if not cats.is_file():
+            continue
+        lines = cats.read_text().splitlines(keepends=True)
+        _atomic_write(
+            cats,
+            "".join(
+                (new + "\n" if line.endswith("\n") else new)
+                if line.rstrip("\n") == old
+                else line
+                for line in lines
+            ),
+        )
     rewritten = [a.replace(old + "/", new + "/") for a in args]
     # the bare name too: --json prints the category on its own
     return rewritten, lambda s: s.replace(new, old)

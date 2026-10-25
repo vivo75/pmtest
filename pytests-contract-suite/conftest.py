@@ -499,3 +499,27 @@ def fixture_env() -> dict[str, str]:
     env["PORTAGE_RUNNING_ROOT"] = str(FIXTURES_ROOT)
     env["DISTDIR"] = str(FIXTURES_ROOT / "distfiles")
     return env
+
+
+def write_repo_categories(repo: Path) -> Path:
+    """Write `profiles/categories` for an ad-hoc test repo: the sorted
+    union of its ebuild-bearing category dirs (backlog #571: Portage
+    masks every package whose category is not listed, so a synthetic
+    repo without the file resolves nothing -- the same shape the
+    committed fixtures carry since Task 11a). Call after the ebuilds
+    are written; returns `repo` for inline use. Non-category top dirs
+    (`profiles`, `metadata`, `eclass`, ...) are skipped like the
+    `test_fixture_categories.py` guard does."""
+    cats = []
+    for child in sorted(repo.iterdir()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        if child.name in (
+            "eclass", "profiles", "metadata", "licenses", "scripts", "distfiles",
+        ):
+            continue
+        if next(child.rglob("*.ebuild"), None) is not None:
+            cats.append(child.name)
+    (repo / "profiles").mkdir(parents=True, exist_ok=True)
+    (repo / "profiles" / "categories").write_text("".join(c + "\n" for c in cats))
+    return repo

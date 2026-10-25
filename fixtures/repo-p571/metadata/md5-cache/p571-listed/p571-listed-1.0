@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=p571 control package in a listed category
+EAPI=8
+HOMEPAGE=https://example.com/p571
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=5cc30e46bdf9d715f0feb5c53b509807

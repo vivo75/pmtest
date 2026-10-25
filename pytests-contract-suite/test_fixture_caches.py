@@ -33,6 +33,7 @@ FIXTURE_ROOTS = [
         "repnamerepo",
         "repo-341",
         "repo-348",
+        "repo-p571",
     )
 ] + [REPO_ROOT / "differential-test-bed" / "images" / "overlay" / "porttest"]
 

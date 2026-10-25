@@ -24,6 +24,7 @@ import signal
 import subprocess
 import tarfile
 from pathlib import Path
+from conftest import write_repo_categories
 
 import pytest
 
@@ -2718,6 +2719,7 @@ def _signed_binhost_env(tmp_path, home):
     # `make.conf` one, so the download still lands in this dir.
     env["PKGDIR"] = str(pkgdir)
     env["BINPKG_GPG_VERIFY_GPG_HOME"] = str(home)
+    write_repo_categories(repo)
     return env
 
 
@@ -3910,6 +3912,7 @@ def test_emerge_failed_build_prints_emerging_but_no_installing_line(
     env["ROOT"] = str(root)
     env["DISTDIR"] = str(tmp_path / "dist")
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt")
+    write_repo_categories(repo)
     result = subprocess.run(
         [str(emerge_binary), "--oneshot", "dev-libs/failpkg"],
         capture_output=True,
@@ -11996,6 +11999,7 @@ def test_autoclean_skipped_under_pretend_and_on_a_failed_merge(
         f'FEATURES="{_S5_FEATURES_BASE}"\n'
         'AUTOCLEAN="yes"\n'
     )
+    write_repo_categories(repo)
     r = subprocess.run(
         [str(emerge_binary), "--oneshot", "--package-moves=n", "app-misc/s404-fail"],
         capture_output=True, text=True, check=False, env=fenv,
@@ -12256,6 +12260,7 @@ def test_ebuild_sources_the_profile_user_and_env_hook_bashrcs_like_portage(
     env["PORTAGE_TMPDIR"] = str(tmp_path / "tmp")
     env["DISTDIR"] = str(tmp_path / "dist")
     (tmp_path / "dist").mkdir()
+    write_repo_categories(repo)
     result = subprocess.run(
         [str(ebuild_binary), str(ebuild), "compile"],
         capture_output=True,
@@ -12363,6 +12368,7 @@ def _fetchonly_root(tmp_path):
     (tmp_path / "src/probe-1.tar.gz").write_text("probe payload\n")
     (tmp_path / "root").mkdir(exist_ok=True)
     (tmp_path / "tmp").mkdir(exist_ok=True)
+    write_repo_categories(repo)
     return root
 
 
@@ -12743,6 +12749,7 @@ def test_ebuild_sources_package_bashrc_by_atom_specificity_like_portage(
     env["PORTAGE_TMPDIR"] = str(tmp_path / "tmp")
     env["DISTDIR"] = str(tmp_path / "dist")
     (tmp_path / "dist").mkdir()
+    write_repo_categories(repo)
     result = subprocess.run(
         [str(ebuild_binary), str(ebuild), "compile"],
         capture_output=True, text=True, check=False, env=env,
@@ -13526,6 +13533,7 @@ def test_ebuild_merge_no_iuse_runs_post_install_qa_without_ebuild_phase(
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt516")
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     ebuild = str(pkg_dir / "noiuseqa-1.0.ebuild")
+    write_repo_categories(overlay)
     r = subprocess.run(
         [str(ebuild_binary), ebuild, "merge"],
         capture_output=True, text=True, check=False, env=env,

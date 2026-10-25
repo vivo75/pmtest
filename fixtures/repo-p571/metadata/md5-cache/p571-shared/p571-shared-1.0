@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=p571 package listed outside its own repository
+EAPI=8
+HOMEPAGE=https://example.com/p571
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=c5b465d24b7e423fe9db7f687135f8ef

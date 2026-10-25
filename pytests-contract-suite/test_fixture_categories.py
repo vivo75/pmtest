@@ -36,8 +36,18 @@ FIXTURE_REPOS = [
         "repo-341-formats",
         "repo-348",
         "repo-355",
+        "repo-p571",
+        "overlay-p571",
     )
 ]
+
+# Backlog #571: `repo-p571` deliberately leaves category dirs unlisted in
+# its own `profiles/categories` (the allow-list fixture: `p571-hidden` is
+# listed nowhere, `p571-shared` only by the overlay). Every other repo
+# must list every ebuild-bearing dir.
+DELIBERATELY_UNLISTED = {
+    "repo-p571": {"p571-hidden", "p571-shared"},
+}
 
 
 def _category_dirs(root: Path) -> list[str]:
@@ -67,9 +77,22 @@ def test_fixture_repo_profiles_categories_lists_every_category_dir(root: Path):
         f"{root}: profiles/categories is missing -- Portage masks "
         f"every package whose category is not listed there"
     )
+    listed = _listed_categories(categories_file)
+    # Backlog #571: the allow-list fixture's deliberate omissions (kept
+    # minimal and named -- anything else missing still fails).
+    excused = DELIBERATELY_UNLISTED.get(root.name, set())
     missing = [c for c in _category_dirs(root)
-               if c not in _listed_categories(categories_file)]
+               if c not in listed and c not in excused]
     assert not missing, (
         f"{root}: category dir(s) not listed in profiles/categories "
         f"(Portage would mask them): {', '.join(missing)}"
     )
+    # The excuse list itself must stay exact: no repo may list an
+    # "unlisted" category, and no excused dir may go missing from disk.
+    for cat in excused:
+        assert cat not in listed, (
+            f"{root}: {cat} is excused as unlisted but is listed"
+        )
+        assert (root / cat).is_dir(), (
+            f"{root}: excused unlisted dir {cat} is missing from disk"
+        )

@@ -43,6 +43,7 @@ from pathlib import Path
 import pytest
 
 import corpus
+from conftest import write_repo_categories
 from pretend_preamble import strip_pretend_preamble, strip_zero_size_suffix
 
 # (description, args, expected_exit_code) -- exit codes: 0 success,
@@ -3115,6 +3116,12 @@ CASES = [
     ("#507: --circular-deps-report json (space form) prints the json report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report", "json", "dev-libs/usecyclea"], 1),
     ("#507: --circular-deps-report=text keeps the text report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=text", "dev-libs/usecyclea"], 1),
     ("#568/#569: the perl-heal skip block keeps the built subslot atom and drops non-selected || branches (Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p569pull"], 0),
+    ("#571: a direct target in an unlisted category is masked (Portage 3.0.83, rc 1)", ["--pretend", "p571-hidden/p571-hidden"], 1),
+    ("#571: a short name in an unlisted category has no match (Portage 3.0.83, rc 1)", ["--pretend", "p571-hidden"], 1),
+    ("#571: a dependency on an unlisted category is unsatisfiable (Portage 3.0.83, rc 1)", ["--pretend", "p571-listed/p571-need"], 1),
+    ("#571: a category listed only by the overlay still merges (Portage 3.0.83, rc 0)", ["--pretend", "p571-shared/p571-shared"], 0),
+    ("#571: the overlay-listed short name expands (Portage 3.0.83, rc 0)", ["--pretend", "p571-shared"], 0),
+    ("#571: the listed-category control merges (Portage 3.0.83, rc 0)", ["--pretend", "p571-listed/p571-listed"], 0),
 ]
 
 
@@ -11546,6 +11553,7 @@ def test_useoldpkg_atoms_picks_the_newest_multi_instance_old_binary(
         for bid, bt in ((1, 100), (2, 300), (3, 200))
     )
     (binhost / "Packages").write_text(f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 3\n\n{entries}")
+    write_repo_categories(repo)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     # Default: the newer ebuild wins.
@@ -11632,6 +11640,7 @@ def _binscan_configroot(tmp_path, fixtures_root, binpkg_files, packages_text=Non
         assert not (pkgdir / "Packages").exists()
     else:
         (pkgdir / "Packages").write_text(packages_text)
+    write_repo_categories(repo)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -11817,6 +11826,7 @@ def test_binrepos_conf_is_read_as_a_directory_of_fragments(
     (cfg / "etc/portage/binrepos.conf/20-b.conf").write_text(
         f"[b]\nsync-uri = file://{bh2}\npriority = 2\nverify-signature = false\n"
     )
+    write_repo_categories(repo)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     for pkg in ("dev-libs/remotebinpkg", "dev-libs/dirbinhostonly"):
@@ -11898,6 +11908,7 @@ def test_pkgdir_scan_reads_a_multi_instance_xpak_from_the_cat_pn_subdir(
     dest.parent.mkdir(parents=True)
     shutil.copy(fixtures_root / "pkgdir/dev-libs/packagepkg-1.0.tbz2", dest)
     assert not (pkgdir / "Packages").exists()
+    write_repo_categories(repo)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     args = ["--pretend", "--usepkgonly", "dev-libs/packagepkg"]
@@ -11956,6 +11967,7 @@ def test_pkgdir_scan_skips_portage_invalid_class(
     )
     (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{pkgdir}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
+    write_repo_categories(repo)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
     args = ["--pretend", "--usepkgonly", "dev-libs/binaryonlypkg"]
     expected = [f'[binary  N     ] dev-libs/binaryonlypkg-1.0-1 to {env["ROOT"]}']
@@ -12287,6 +12299,7 @@ def test_usepkg_binary_of_a_since_removed_ebuild_is_reinstalled_only_when_it_dif
     (vdb / "BUILD_TIME").write_text("1000\n")
     (vdb / "repository").write_text("main\n")
     pkgdir.mkdir()
+    write_repo_categories(repo)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     # Identical BUILD_TIME -> identical_binary suppresses the reinstall.
@@ -12505,6 +12518,7 @@ def _multi_instance_tree(tmp_path, remote_builds, local_builds=()):
         (pkgdir / "Packages").write_text(
             f"TIMESTAMP: 0\nVERSION: 0\nPACKAGES: {len(local_builds)}\n\n{entries(local_builds)}"
         )
+    write_repo_categories(repo)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg), "PKGDIR": str(pkgdir)}
 
 
@@ -12616,6 +12630,7 @@ def _slotop_pin_tree(tmp_path):
     )
     (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{tmp_path / "pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    write_repo_categories(repo)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -12719,6 +12734,7 @@ def _slotop_new_slot_tree(tmp_path):
         "PATH: dev-libs/pinned/pinned-1.0-1.gpkg.tar\n"
         "RDEPEND: dev-libs/mislot:0/1=\nREPO: main\nSIZE: 4096\nSLOT: 0\nUSE:\n\n"
     )
+    write_repo_categories(repo)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg), "PKGDIR": str(pkgdir)}
 
 
@@ -15525,6 +15541,7 @@ def test_repo_name_section_mismatch_drops_the_repo_with_a_warning(
         "KEYWORDS=amd64\nRDEPEND=\nSLOT=0\n"
         f"_md5_={hashlib.md5(mainpkg_ebuild.encode()).hexdigest()}\n"
     )
+    write_repo_categories(repo)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
     rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/mainpkg"], env)
@@ -15595,6 +15612,8 @@ def test_profile_parent_resolves_an_aliased_repo_name(
         f"_md5_={hashlib.md5(aliasusepkg_ebuild.encode()).hexdigest()}\n"
     )
 
+    write_repo_categories(other)
+    write_repo_categories(main)
     env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
     args = ["--pretend", "-v", "dev-libs/aliasusepkg"]
     rust = _run([str(emerge_binary)], args, env)
@@ -35920,3 +35939,163 @@ def test_skip_block_keeps_the_built_atom_and_drops_non_selected_or_branches(
         "",
         "dev-libs/p569pull:0",
     ]
+
+
+def _p571_not_listed_line(fixture_env):
+    """Portage `porttree.py:1216-1225`'s `!!!` for `p571-hidden/p571-hidden`:
+    the unlisted-category line names `<configroot>/etc/portage/categories`
+    (the union's user-file member, even though the set also stacks every
+    repo's `profiles/categories`)."""
+    return (
+        "!!! 'p571-hidden/p571-hidden' has a category that is not listed in "
+        f"{fixture_env['PORTAGE_CONFIGROOT']}/etc/portage/categories"
+    )
+
+
+def test_571_direct_target_in_an_unlisted_category_is_masked(
+    emerge_binary, fixture_env
+):
+    """#571: `emerge -p p571-hidden/p571-hidden` fails rc 1. The `p571main`
+    repo carries a valid ebuild there but no `profiles/categories` entry
+    lists it (and neither does the overlay); Portage's `cp_list` prints
+    the `!!! ... not listed ...` line once and yields no candidates, so
+    the run dies with the plain top-level miss (no `for <root>` suffix by
+    the fixture-miss convention) and allow-list-filtered similar names.
+
+    Oracle: Portage 3.0.83 host (`LLM/evidence/2026-10-26-571/`,
+    `probe-p571.sh`, `portage-hidden-direct.{rc,stdout,stderr}`): the
+    `!!!` line, then `emerge: there are no ebuilds to satisfy
+    "p571-hidden/p571-hidden" for <root>.`, then `searching for similar
+    names...` suggesting only the three listed cps."""
+    r = _run([str(emerge_binary)], ["--pretend", "p571-hidden/p571-hidden"], fixture_env)
+    assert r.returncode == 1
+    # (The harness strips the `--pretend` preamble on a plain top-level
+    # miss, so stdout is empty here; the raw run still prints it, as the
+    # oracle capture shows. The blank line between the `!!!` and the miss
+    # is the composition of the `!!!` line with portuale's established
+    # miss-report leading blank (`is_plain_miss_report`); Portage prints
+    # them adjacent.)
+    assert r.stdout == ""
+    lines = r.stderr.splitlines()
+    assert lines[0] == ""
+    assert lines[1] == _p571_not_listed_line(fixture_env)
+    assert lines[2] == ""
+    assert lines[3] == 'emerge: there are no ebuilds to satisfy "p571-hidden/p571-hidden".'
+    assert lines[4:6] == ["", "emerge: searching for similar names..."]
+    suggestions = lines[6]
+    assert suggestions == (
+        "emerge: Maybe you meant any of these: p571-shared/p571-shared, "
+        "p571-listed/p571-listed, p571-listed/p571-need?"
+    )
+    assert "p571-hidden" not in suggestions
+
+
+def test_571_short_name_in_an_unlisted_category_has_no_match(
+    emerge_binary, fixture_env
+):
+    """#571: `emerge -p p571-hidden` fails rc 1 with NO `!!!` line.
+    Short-name expansion iterates the allowed categories (`cpv_expand` /
+    `_dep_expand` over `db.categories`), so the unlisted cp is never
+    queried and `cp_list`'s notice never fires; the bare atom dies as a
+    plain miss with similar names.
+
+    Oracle: `portage-hidden-short.*` — same miss shape as the qualified
+    form, minus the `!!!` line, atom still bare."""
+    r = _run([str(emerge_binary)], ["--pretend", "p571-hidden"], fixture_env)
+    assert r.returncode == 1
+    assert r.stdout == ""
+    assert "has a category that is not listed in" not in r.stderr
+    # (No leading blank line: the harness strips the miss report's own,
+    # and no `!!!` precedes it here. The two blanks before `searching`
+    # are the bare-name path's pre-existing shape — the miss line plus
+    # the suggestion block's own leading blank — not something this
+    # slice changes.)
+    lines = r.stderr.splitlines()
+    assert lines[0] == 'emerge: there are no ebuilds to satisfy "p571-hidden".'
+    assert lines[1:4] == ["", "", "emerge: searching for similar names..."]
+    assert "p571-hidden" not in lines[4]
+
+
+def test_571_dependency_on_an_unlisted_category_is_unsatisfiable(
+    emerge_binary, fixture_env
+):
+    """#571: `emerge -p p571-listed/p571-need` fails rc 1: its RDEPEND
+    names the unlisted `p571-hidden/p571-hidden`, whose `cp_list` is
+    empty (the `!!!` fires once for the dep lookup), so the needer is
+    unsatisfiable with the two `dependency required by` legs.
+
+    Oracle: `portage-need-hidden-dep.*` (rc 1, `backtrack: 1/20`): the
+    `!!!` line, the miss, `(dependency required by
+    "p571-listed/p571-need-1.0::p571main" [ebuild])`, `(dependency
+    required by "p571-listed/p571-need" [argument])`."""
+    r = _run([str(emerge_binary)], ["--pretend", "p571-listed/p571-need"], fixture_env)
+    assert r.returncode == 1
+    assert r.stderr.count("has a category that is not listed in") == 1
+    assert _p571_not_listed_line(fixture_env) in r.stderr
+    assert (
+        'emerge: there are no ebuilds to satisfy "p571-hidden/p571-hidden".'
+        in r.stderr
+    )
+    assert (
+        '(dependency required by "p571-listed/p571-need-1.0::p571main" [ebuild])'
+        in r.stderr
+    )
+    assert '(dependency required by "p571-listed/p571-need" [argument])' in r.stderr
+
+
+def test_571_category_listed_only_by_the_overlay_still_merges(
+    emerge_binary, fixture_env
+):
+    """#571: `emerge -p p571-shared/p571-shared` (and the bare
+    `p571-shared`) merges rc 0. The ebuild lives in the MAIN repo but
+    only the overlay's `profiles/categories` lists `p571-shared`: the
+    union makes it valid for every repo (Portage `config.py:948-960`
+    stacks main first, then overlays — one set, not per-repo sets).
+
+    Oracle: `portage-shared-direct.*` / `portage-shared-short.*` (rc 0,
+    one merge row each)."""
+    root = fixture_env["ROOT"]
+    for args in (["--pretend", "p571-shared/p571-shared"], ["--pretend", "p571-shared"]):
+        r = _run([str(emerge_binary)], args, fixture_env)
+        assert r.returncode == 0, r.stderr
+        # (The harness strips the `--pretend` preamble, so the pin starts
+        # at the merge list, like every other `splitlines` pin in this file.)
+        assert r.stdout.splitlines() == [
+            f"[ebuild  N     ] p571-shared/p571-shared-1.0 to {root}",
+        ]
+        assert r.stderr == ""
+
+
+def test_571_listed_category_control_merges(emerge_binary, fixture_env):
+    """#571 control: `emerge -p p571-listed/p571-listed` merges rc 0 —
+    the allow-list changes nothing for a category every repo file lists.
+
+    Oracle: `portage-listed-direct.*` (rc 0, one merge row)."""
+    root = fixture_env["ROOT"]
+    r = _run([str(emerge_binary)], ["--pretend", "p571-listed/p571-listed"], fixture_env)
+    assert r.returncode == 0, r.stderr
+    # (Preamble stripped by the harness — see the overlay test above.)
+    assert r.stdout.splitlines() == [
+        f"[ebuild  N     ] p571-listed/p571-listed-1.0 to {root}",
+    ]
+    assert r.stderr == ""
+
+
+def test_571_search_hides_the_unlisted_category(emerge_binary, fixture_env):
+    """#571: `emerge --search p571-hidden` finds 0 applications (rc 0,
+    no `!!!`); `--search p571-shared` finds the overlay-listed one.
+    `--search` walks `cp_all(categories=settings.categories)`
+    (`porttree.py:1097-1128`), so unlisted categories are invisible.
+
+    Oracle: `portage-search-hidden.*` (`[ Applications found : 0 ]`) /
+    `portage-search-shared.*` (one `*  p571-shared/p571-shared` hit)."""
+    hidden = _run([str(emerge_binary)], ["--search", "p571-hidden"], fixture_env)
+    assert hidden.returncode == 0
+    assert "[ Applications found : 0 ]" in hidden.stdout
+    assert "p571-hidden/p571-hidden" not in hidden.stdout
+    assert hidden.stderr == ""
+    shared = _run([str(emerge_binary)], ["--search", "p571-shared"], fixture_env)
+    assert shared.returncode == 0
+    assert "*  p571-shared/p571-shared" in shared.stdout
+    assert "[ Applications found : 1 ]" in shared.stdout
+    assert shared.stderr == ""

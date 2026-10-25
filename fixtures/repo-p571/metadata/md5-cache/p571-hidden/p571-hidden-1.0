@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=p571 package in an unlisted category
+EAPI=8
+HOMEPAGE=https://example.com/p571
+KEYWORDS=amd64
+LICENSE=MIT
+SLOT=0
+_md5_=ddaea441b03569c349ffabd0464670e7
