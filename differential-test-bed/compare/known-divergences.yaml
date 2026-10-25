@@ -195,3 +195,53 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
+- id: perl-544-stabilization-slot-conflict-a
+  layer: l0
+  categories: [error]
+  slugs: ["dev-perl_XML-Parser", "virtual_perl-ExtUtils-MakeMaker",
+    "dev-lang_ruby", "dev-ruby_rake", "kde-apps_kdecore-meta",
+    "app-text_texlive", "app-text_texlive-core",
+    "dev-texlive_texlive-latex", "dev-db_mariadb",
+    "MULTI_deep-update-world"]
+  match: "Multiple package instances within a single package slot"
+  reason: >
+    dev-lang/perl-5.44.0 was stabilized (KEYWORDS ~amd64 to amd64) in
+    the container tree between the pinned snapshots 11c58b7a
+    (timestamp.chk Sun, 18 Oct 2026) and 350c0882 (Fri, 23 Oct 2026):
+    `git diff 11c58b7a 350c0882 -- dev-lang/perl/perl-5.44.0.ebuild`
+    shows the stabilization plus a new RDEPEND on
+    sys-libs/timezone-data. The newly visible 5.44.0 is pulled into all
+    ten probes' graphs (via `=dev-lang/perl-5.44*` from virtual/perl-*
+    providers) and conflicts with the installed 5.42-era reverse deps;
+    real heals it (skipped-update block plus reinstall, or upgrade with
+    rebuilds under -uD @world) while portuale aborts with the
+    slot-conflict header -- the standing #276-family skip/rebuild
+    fallback gap, not a resolver regression (no resolver-path code
+    changed between the two bed binaries; the bed re-run with the
+    current binary reproduces the same 0.733/109). One entry per
+    physical line of Portage's two-line header because the comparator
+    splits findings per line; the sibling -b entry covers the second
+    line. Masking tradeoff, stated plainly: a future same-message
+    conflict on these probes (e.g. the next perl subslot bump before
+    the fallback ships) hides here too -- re-tighten when the gap
+    closes. The [exit], [skipped-updates] and real-only skip-text rows
+    stay unexplained, as does dev-lang_perl's "no ebuilds" row (same
+    trigger, but the message misreports availability).
+  owner: portuale-bug
+
+- id: perl-544-stabilization-slot-conflict-b
+  layer: l0
+  categories: [error]
+  slugs: ["dev-perl_XML-Parser", "virtual_perl-ExtUtils-MakeMaker",
+    "dev-lang_ruby", "dev-ruby_rake", "kde-apps_kdecore-meta",
+    "app-text_texlive", "app-text_texlive-core",
+    "dev-texlive_texlive-latex", "dev-db_mariadb",
+    "MULTI_deep-update-world"]
+  match: "into the dependency graph, resulting in a slot conflict"
+  reason: >
+    Second physical line of the header adjudicated by
+    perl-544-stabilization-slot-conflict-a (same trigger, same gap,
+    same masking tradeoff); split because the comparator grades
+    findings per line.
+  owner: portuale-bug
+
