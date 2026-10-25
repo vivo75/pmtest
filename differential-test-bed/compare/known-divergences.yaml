@@ -195,6 +195,29 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
+- id: perl-544-stabilization-built-pin-residual
+  layer: l0
+  categories: [skipped-updates]
+  slugs: ["dev-lang_perl", "dev-perl_XML-Parser",
+    "virtual_perl-ExtUtils-MakeMaker", "dev-lang_ruby", "dev-ruby_rake",
+    "kde-apps_kdecore-meta", "app-text_texlive", "app-text_texlive-core",
+    "dev-texlive_texlive-latex", "dev-db_mariadb"]
+  match: "dev-lang/perl:0/5.42= required by"
+  reason: >
+    Post-#568/#569 residual (re-grade of l0-20261025T145359Z against
+    l0-20261025T111515Z, batch Task 4): the nine healed probes' skip
+    blocks now carry both pin forms for installed-virtual providers
+    (#569's 15 portuale-only deselected-branch lines are gone, 21
+    virtual-provider `:0/5.42=` lines now match), but the `:0/5.42=`
+    rows with real-package requirers (app-text/po4a, 24 dev-perl/*,
+    perl-core/File-Temp, virtual/perl-File-Temp -- set-identical across
+    all nine probes) stay real-only, and dev-lang_perl's block covers a
+    single provider (virtual/perl-CPAN, 23 lines vs Portage's 158).
+    Filed as backlog #573. Masking tradeoff, stated plainly: a future
+    same-substring skip divergence on these ten slugs hides here too --
+    re-tighten when #573 ships.
+  owner: portuale-bug
+
 - id: perl-544-stabilization-slot-conflict-a
   layer: l0
   categories: [error]
@@ -233,6 +256,11 @@
     closes. The [exit] rows stay unexplained, as does dev-lang_perl's
     "no ebuilds" row (same trigger, but the message misreports
     availability).
+    2026-10-26 re-grade (batch Task 4, log l0-20261025T145359Z):
+    dev-lang_perl's "no ebuilds" + [exit] rows are gone (rc now 0/0,
+    single-provider skip block remains -- see
+    perl-544-stabilization-built-pin-residual); the slugs stay narrowed
+    to MULTI, whose list is byte-identical to baseline, still rc 1.
   owner: portuale-bug
 
 - id: perl-544-stabilization-slot-conflict-b
@@ -245,5 +273,39 @@
     perl-544-stabilization-slot-conflict-a (same trigger, same gap,
     same masking tradeoff); split because the comparator grades
     findings per line.
+  owner: portuale-bug
+
+- id: perl-544-stabilization-version-selection-encode
+  layer: l0
+  categories: [missing]
+  slugs: ["gnome-base_gnome-shell", "app-office_libreoffice",
+    "media-gfx_gimp"]
+  match: "perl-core/Encode-3.210.0 present for real, absent for portuale"
+  reason: >
+    The perl-5.44.0 stabilization co-schedules a perl-5.42.2 to 5.44.0
+    upgrade that kills the installed 5.42-era virtuals' nested `||`
+    5.42-bound branches; Portage re-resolves them post-upgrade and
+    falls through to ~perl-core/Encode-3.210.0 while portuale keeps the
+    dead branches (backlog #567 S0, LLM/evidence/2026-10-25-567/;
+    transition-specific -- a future vdb with perl-5.44.0 installed
+    binds the same `||`s to 5.44 branches on both managers and the rows
+    vanish with no code change). The portuale half is filed as backlog
+    #572. Scoped to this exact ebuild row on these three probes, so any
+    other missing row resurfaces.
+  owner: portuale-bug
+
+- id: perl-544-stabilization-version-selection-sub-name
+  layer: l0
+  categories: [missing]
+  slugs: ["gnome-base_gnome-shell", "app-office_libreoffice",
+    "media-gfx_gimp"]
+  match: "dev-perl/Sub-Name-0.280.0-r1 present for real, absent for portuale"
+  reason: >
+    Same adjudication as
+    perl-544-stabilization-version-selection-encode (same trigger, same
+    S0, same #572 follow-up); split because the comparator grades
+    findings per row. Try-Tiny's `|| ( >=virtual/perl-SLU-1.400.0
+    dev-perl/Sub-Name )` falls through to Sub-Name because the
+    installed virtual's own `||` is doubly dead post-upgrade.
   owner: portuale-bug
 
