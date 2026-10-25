@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #491 libplasma-shape provider, new subslot (mirrors libplasma-6.8.1:6/8)
+EAPI=8
+KEYWORDS=amd64
+SLOT=6/8
+_md5_=9dde5bf1f954874239c144799af7c8cf

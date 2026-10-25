@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #491 replacement parent accepting the new child subslot (mirrors plasma-pa-6.8.1: >=libplasma-6.7.5:6)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/p491lib-1:6
+SLOT=6
+_md5_=037bd682a4fae570eeb3b46f22da60df

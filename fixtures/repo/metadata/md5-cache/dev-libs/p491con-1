@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #491 installed parent pinning the old child subslot (mirrors plasma-pa-6.7.5: >=libplasma-6.7.5:6=; the vdb bakes :6/7=)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/p491lib-1:6=
+SLOT=6
+_md5_=9700730d0cc5cdbf343d8066ca8c1de1

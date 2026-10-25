@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #491 update root pulling the rebuilding parent and the pinned keeper (plays @world hermetically)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p491con dev-libs/p491keep
+SLOT=6
+_md5_=78fc68dfc875119c1588e560ee03b679
