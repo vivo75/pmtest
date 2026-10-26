@@ -12191,6 +12191,177 @@ def test_applied_updates_force_overrides_explicit_autoclean_no(
     assert ">>> Auto-cleaning packages..." in r.stdout.splitlines()
 
 
+def _gu584_env(tmp_path, fixtures_root):
+    """Child env for the backlog #584 early-action global-updates pins: a
+    scratch copy of the `fixtures/global-updates` oracle template as both
+    ROOT and PORTAGE_CONFIGROOT (the Task 5 capture shape), with a
+    generated `repos.conf` pointing at the copied repo. The updates
+    record is deliberately NOT seeded, so the run is a first run.
+    `PORTAGE_RUNNING_ROOT` is the scratch ROOT itself (not the fixture
+    tree): the repo paths here are per-test scratch paths no seeding
+    could cover, so a fixture-tree running pass would re-fire the
+    scratch updates file against the shared tree."""
+    gu = Path(fixtures_root) / "global-updates"
+    root = tmp_path / "root"
+    shutil.copytree(
+        gu / "root",
+        root,
+        symlinks=True,
+        ignore=fixtures_copytree_ignore("mtimedb"),
+    )
+    repo = tmp_path / "repo"
+    shutil.copytree(gu / "repo", repo, symlinks=True)
+    (root / "etc/portage/repos.conf").mkdir(parents=True, exist_ok=True)
+    (root / "etc/portage/repos.conf/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = gutest\n\n[gutest]\nlocation = %s\n" % repo
+    )
+    (tmp_path / "tmp").mkdir(exist_ok=True)
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = str(root)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "tmp")
+    env["NOCOLOR"] = "yes"
+    env.pop("CLEAN_DELAY", None)
+    env.pop("AUTOCLEAN", None)
+    return env, root
+
+
+def _gu584_assert_first_run_updates(r, root):
+    """The shared #584 first-run shape: the updates block printed, and
+    the fixture moves applied -- the world entry rewritten and the
+    `1Q-2026` mtime recorded."""
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "Performing Global Updates" in r.stdout
+    assert any(
+        key.endswith("repo/profiles/updates/1Q-2026")
+        for key in _t562_updates_record(root)
+    ), _t562_updates_record(root)
+    assert "dev-libs/oldpkg" not in (root / "var/lib/portage/world").read_text()
+    assert not (root / "var/db/pkg/dev-libs/oldpkg-1.0").exists()
+    assert (root / "var/db/pkg/dev-libs/newpkg-1.0").is_dir()
+
+
+def test_early_action_deselect_runs_global_updates_first(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #584: `emerge --deselect` on a fresh ROOT runs the global
+    updates before its own output -- the world move applies, then the
+    deselect line prints.
+
+    Portage source: `run_action` (`lib/_emerge/actions.py:3933-3960`)
+    calls `_global_updates` for every action except
+    help/info/sync/version (and never with `--package-moves=n`), long
+    before the uninstall dispatch (`:4418-4448`). S0 (host Portage
+    3.0.83, `emerge --deselect dev-libs/deppkg` on a scratch copy of
+    `fixtures/global-updates`, report `t584.md`): the `Performing
+    Global Updates` block with the `1Q-2026..` file line and the
+    `@%sSpp###***` progress, then `>>> Removing dev-libs/deppkg from
+    "world" favorites file...`; world holds `dev-libs/newpkg`."""
+    env, root = _gu584_env(tmp_path, fixtures_root)
+    r = subprocess.run(
+        [str(emerge_binary), "--deselect", "dev-libs/deppkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    _gu584_assert_first_run_updates(r, root)
+    removal = '>>> Removing dev-libs/deppkg from "world" favorites file...'
+    assert removal in r.stdout
+    assert r.stdout.index("Performing Global Updates") < r.stdout.index(removal)
+    assert (root / "var/lib/portage/world").read_text().splitlines() == [
+        "dev-libs/newpkg"
+    ]
+
+
+def test_early_action_list_sets_runs_global_updates_first(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #584: `emerge --list-sets` on a fresh ROOT runs the global
+    updates before listing the sets.
+
+    Portage source: `run_action` (`lib/_emerge/actions.py:3933-3960`)
+    calls `_global_updates` for every action except
+    help/info/sync/version, long before the list-sets return
+    (`:4111-4115`). S0 (host Portage 3.0.83, `emerge --list-sets` on a
+    scratch copy of `fixtures/global-updates`, report `t584.md`): the
+    `Performing Global Updates` block with the `1Q-2026..` file line
+    and the `@%sSpp###***` progress, then the sets list; world holds
+    `dev-libs/deppkg` and the moved `dev-libs/newpkg`."""
+    env, root = _gu584_env(tmp_path, fixtures_root)
+    r = subprocess.run(
+        [str(emerge_binary), "--list-sets"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    _gu584_assert_first_run_updates(r, root)
+    assert "\nworld\n" in r.stdout
+    assert r.stdout.index("Performing Global Updates") < r.stdout.index("\nworld\n")
+    assert (root / "var/lib/portage/world").read_text().splitlines() == [
+        "dev-libs/deppkg",
+        "dev-libs/newpkg",
+    ]
+
+
+def test_early_action_regen_runs_global_updates_first(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #584: `emerge --regen` on a fresh ROOT runs the global
+    updates before regenerating the cache.
+
+    Portage source: `run_action` (`lib/_emerge/actions.py:3933-3960`)
+    calls `_global_updates` for every action except
+    help/info/sync/version, long before the regen dispatch
+    (`:4393-4400`). S0 (host Portage 3.0.83, `emerge --regen` on a
+    scratch copy of `fixtures/global-updates`, report `t584.md`): the
+    `Performing Global Updates` block with the `1Q-2026..` file line
+    and the `@%sSpp###***` progress, then `Regenerating cache
+    entries...`; world holds `dev-libs/deppkg` and the moved
+    `dev-libs/newpkg`."""
+    env, root = _gu584_env(tmp_path, fixtures_root)
+    r = subprocess.run(
+        [str(emerge_binary), "--regen"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    _gu584_assert_first_run_updates(r, root)
+    assert "Regenerating cache entries..." in r.stdout
+    assert r.stdout.index("Performing Global Updates") < r.stdout.index(
+        "Regenerating cache entries..."
+    )
+    assert (root / "var/lib/portage/world").read_text().splitlines() == [
+        "dev-libs/deppkg",
+        "dev-libs/newpkg",
+    ]
+
+
+def test_early_action_metadata_runs_global_updates_first(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #584: `emerge --metadata` on a fresh ROOT runs the global
+    updates before the cache header.
+
+    Portage source: `run_action` (`lib/_emerge/actions.py:3933-3960`)
+    calls `_global_updates` for every action except
+    help/info/sync/version, long before the metadata dispatch
+    (`:4387-4392`). S0 (host Portage 3.0.83, `emerge --metadata` on a
+    scratch copy of `fixtures/global-updates`, report `t584.md`): the
+    `Performing Global Updates` block with the `1Q-2026..` file line
+    and the `@%sSpp###***` progress, then `>>> Updating Portage
+    cache`; world holds `dev-libs/deppkg` and the moved
+    `dev-libs/newpkg`."""
+    env, root = _gu584_env(tmp_path, fixtures_root)
+    r = subprocess.run(
+        [str(emerge_binary), "--metadata"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    _gu584_assert_first_run_updates(r, root)
+    assert ">>> Updating Portage cache" in r.stdout
+    assert r.stdout.index("Performing Global Updates") < r.stdout.index(
+        ">>> Updating Portage cache"
+    )
+    assert (root / "var/lib/portage/world").read_text().splitlines() == [
+        "dev-libs/deppkg",
+        "dev-libs/newpkg",
+    ]
+
+
 def test_autoclean_leaves_a_different_slot_instance_protected(
     emerge_binary, ebuild_binary, tmp_path, fixtures_root
 ):
