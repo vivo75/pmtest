@@ -222,6 +222,40 @@ solo). A `-n 16` il guadagno è piccolo (~76 s) e una volta su quattro una run
 usare 8. Dopo la run: `sudo rm -rf /var/tmp/pytest-parallel` (un test crea file
 di root) e `git clean -fdq fixtures/`.
 
+## Filtro repos.conf (backlog #564)
+
+Ogni invocazione del PM passa da `pytests-contract-suite/repos_filter.sh`:
+nasconde il repos.conf di sistema dell'host
+(`/usr/share/portage/config/repos.conf`, che Portage fonde con quello di
+ogni config-root) dietro un bind mount per-invocazione di un file di soli
+commenti, così l'insieme dei repo è determinato dalle fixture e non
+dall'host. Il bind vive in un mount namespace privato (due `unshare`
+annidati); lavoratori xdist paralleli non vedono i mount altrui. Costo
+misurato: circa 5,5 ms per invocazione. Self-test del filtro:
+`pytests-contract-suite/test_repos_filter.py`.
+
+- **Requisito: user namespace non privilegiati.** Se il kernel li
+  disabilita, la sessione fallisce subito nel probe iniziale (fixture
+  `_repos_conf_filter` in `conftest.py`) invece di girare senza filtro e
+  rendere ogni repo set dipendente dall'host. Dentro il filtro uid e
+  proprietà dei file si comportano come senza filtro (il namespace
+  annidato ripristina l'uid), e il gid primario interno mappa al gruppo
+  `portage` così le fasi ebuild che fanno `chgrp` riescono in silenzio
+  come fuori.
+- **Bypass: `PMTEST_REPOS_FILTER=off`.** Esegue il binario direttamente,
+  senza namespace. Lo usano i test sudo/root (`sudo` non funziona dentro
+  un user namespace); il probe iniziale lo rispetta (salta il controllo).
+  Quando il file di sistema dell'host non esiste non c'è nulla da
+  nascondere e il binario gira diretto comunque.
+- **Perché non una variabile suite-wide al posto del filtro:**
+  `PORTAGE_REPOSITORIES` sostituirebbe entrambi i repos.conf in entrambi
+  i manager, quindi i ~32 test (più helper) che scrivono il proprio
+  `repos.conf` verrebbero ignorati in silenzio — inclusi i test di
+  mismatch sezione/nome repo, alias e regen/depcache, che fallirebbero o
+  passerebbero a vuoto; sparirebbe dalla copertura black-box il parsing
+  on-disk (frammenti di directory, `DEFAULT`, alias) che gli utenti usano
+  davvero, e il corpus andrebbe ri-keyato.
+
 ## Registrazioni del terminale (backlog #443)
 
 `scripts/cast_cells.py [--out DIR]` esegue 8 celle `--pretend` sotto Portage e
