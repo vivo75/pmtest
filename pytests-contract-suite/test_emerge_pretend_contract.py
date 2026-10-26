@@ -36340,3 +36340,120 @@ def test_571_search_hides_the_unlisted_category(emerge_binary, fixture_env):
     assert "*  p571-shared/p571-shared" in shared.stdout
     assert "[ Applications found : 1 ]" in shared.stdout
     assert shared.stderr == ""
+
+
+def _write_stray_mtimedb(root: Path) -> Path:
+    """A scratch ROOT whose `mtimedb` carries Portage's own default keys
+    plus one unknown key, like the S0 (b)/(d) probe roots."""
+    edb = root / "var" / "cache" / "edb"
+    edb.mkdir(parents=True, exist_ok=True)
+    target = edb / "mtimedb"
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    data["bogus"] = 1
+    target.write_text(
+        json.dumps(data, ensure_ascii=False, indent="\t", sort_keys=True),
+        encoding="utf-8",
+    )
+    return target
+
+
+def test_mtimedb_stray_key_warns_once_and_drops_on_pretend(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Portage drops an unknown `mtimedb` key with `Deleting invalid
+    mtimedb key: <k>` on stderr at load (`lib/portage/util/mtimedb.py:88-90`;
+    `writemsg` defaults to stderr), and the first committing run rewrites
+    the file normalized. Here a fresh ROOT (deliberately not seeded, so
+    the run applies the fixture updates and commits, as in S0 (b))
+    `emerge -p dev-libs/schedok`: rc 0, stderr exactly the warning line,
+    and the file afterwards carries only the five default keys.
+
+    S0: `t2/b-p.err` (one warning line on stderr), `t2/b-mtimedb` (full
+    default key set, stray/`old`/`cur` gone)."""
+    root = tmp_path / "root"
+    mtimedb = _write_stray_mtimedb(root)
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--oneshot", "dev-libs/schedok"], env
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stderr == "Deleting invalid mtimedb key: bogus\n"
+    data = json.loads(mtimedb.read_text(encoding="utf-8"))
+    assert "bogus" not in data
+    assert set(data) == {"info", "ldpath", "starttime", "updates", "version"}
+
+
+def test_mtimedb_stray_key_warns_on_info_and_version_but_not_help(
+    emerge_binary, fixture_env, tmp_path
+):
+    """`--info` and `--version` load the file (so they warn) but never
+    commit it (the stray key survives); `--help` returns before the load
+    and stays silent. Portage: `lib/_emerge/main.py:1288-1290` (help
+    early exit) and `:1360` (`load_emerge_config` for the rest);
+    `lib/_emerge/actions.py:3944-3946` (no global updates for
+    help/info/version).
+
+    S0: `t2/d-info.*` (warning on stderr, info on stdout, file
+    untouched), `t2/d-version.*`, `t2/d-help.*` (empty stderr)."""
+    root = tmp_path / "root"
+    # Steady updates record, so the runs stay quiet apart from the
+    # warning under test.
+    seed_updates_record(root)
+    mtimedb = _write_stray_mtimedb(root)
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+
+    info = _run([str(emerge_binary)], ["--info"], env)
+    assert info.returncode == 0, info.stderr
+    assert info.stderr == "Deleting invalid mtimedb key: bogus\n"
+    assert info.stdout.startswith("Portage ")
+    assert json.loads(mtimedb.read_text(encoding="utf-8"))["bogus"] == 1
+
+    version = _run([str(emerge_binary)], ["--version"], env)
+    assert version.returncode == 0, version.stderr
+    assert version.stderr == "Deleting invalid mtimedb key: bogus\n"
+    assert version.stdout.startswith("Portage ")
+
+    help_text = _run([str(emerge_binary)], ["--help"], env)
+    assert help_text.returncode == 0, help_text.stderr
+    assert help_text.stderr == ""
+    assert "Deleting invalid mtimedb key" not in help_text.stdout
+
+
+def test_mtimedb_stray_key_warns_once_per_root(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Portage builds one `MtimeDB` per root — target, then the running
+    root when it differs (`lib/_emerge/actions.py:3378-3391`) — and each
+    load warns for its own unknown keys. Two stray-carrying roots print
+    the line twice (target first); with a clean running root, once.
+    The two-warning count is source-derived (the host's own running-root
+    file must stay untouched, so no live two-stray probe runs there);
+    the single-warning count is empirical in S0 (d).
+
+    S0: `t2/b-p.err` (one line with `ROOT` set and the running root
+    clean)."""
+    target = tmp_path / "target"
+    running = tmp_path / "running"
+    seed_updates_record(target)
+    seed_updates_record(running)
+    _write_stray_mtimedb(target)
+    _write_stray_mtimedb(running)
+    env = dict(fixture_env)
+    env["ROOT"] = str(target)
+    env["PORTAGE_RUNNING_ROOT"] = str(running)
+
+    both = _run([str(emerge_binary)], ["--version"], env)
+    assert both.returncode == 0, both.stderr
+    assert both.stderr == "Deleting invalid mtimedb key: bogus\n" * 2
+
+    env["PORTAGE_RUNNING_ROOT"] = fixture_env["ROOT"]
+    one = _run([str(emerge_binary)], ["--version"], env)
+    assert one.returncode == 0, one.stderr
+    assert one.stderr == "Deleting invalid mtimedb key: bogus\n"
