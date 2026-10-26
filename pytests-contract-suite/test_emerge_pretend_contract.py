@@ -36184,10 +36184,12 @@ def _p571_not_listed_line(fixture_env):
     """Portage `porttree.py:1216-1225`'s `!!!` for `p571-hidden/p571-hidden`:
     the unlisted-category line names `<configroot>/etc/portage/categories`
     (the union's user-file member, even though the set also stacks every
-    repo's `profiles/categories`)."""
+    repo's `profiles/categories`). The root renders with exactly one
+    trailing slash, like Portage's normalised `%s` substitution
+    (`LocationsManager.py:79-83`): `/` prints `/etc/...`, never `//etc/...`."""
     return (
         "!!! 'p571-hidden/p571-hidden' has a category that is not listed in "
-        f"{fixture_env['PORTAGE_CONFIGROOT']}/etc/portage/categories"
+        f"{fixture_env['PORTAGE_CONFIGROOT'].rstrip('/')}/etc/portage/categories"
     )
 
 
