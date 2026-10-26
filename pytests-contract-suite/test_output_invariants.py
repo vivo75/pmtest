@@ -25,7 +25,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 
 import output_invariants as inv
-from conftest import FIXTURES_ROOT
+from conftest import FIXTURES_ROOT, configroot_updates_dirs, seed_updates_record
 from test_emerge_pretend_contract import CASES
 
 REPO_ROOTS = [FIXTURES_ROOT / r for r in
@@ -199,6 +199,11 @@ def test_repos_conf_section_order_does_not_change_output(emerge_binary, fixture_
     configroot = _reversed_repos_conf(tmp_path)
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(configroot)
+    # The symlinked repos resolve under the scratch configroot, so the
+    # compared runs see scratch-pathed updates keys: seed them into the
+    # fixtures record (both runs use ROOT=fixtures), or the copied-root
+    # run applies the updates to the shared tree and prints the block.
+    seed_updates_record(env["ROOT"], configroot_updates_dirs(configroot))
 
     def one(item):
         args, rc = item

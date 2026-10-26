@@ -43,7 +43,13 @@ from pathlib import Path
 import pytest
 
 import corpus
-from conftest import write_repo_categories
+from conftest import (
+    configroot_updates_dirs,
+    fixtures_copytree_ignore,
+    repos_pin_text,
+    seed_updates_record,
+    write_repo_categories,
+)
 from pretend_preamble import strip_pretend_preamble, strip_zero_size_suffix
 
 # (description, args, expected_exit_code) -- exit codes: 0 success,
@@ -3668,6 +3674,11 @@ def test_bdepend_routes_to_the_running_root_for_a_cross_root_build_without_root_
     cross = dict(fixture_env)
     cross["ROOT"] = str(tmp_path)
     cross["PORTAGE_RUNNING_ROOT"] = str(fixture_env["ROOT"])
+    # Steady state for the scratch target ROOT (the running ROOT stays
+    # the fixtures, covered by the session seed): without the record the
+    # run applies the fixture updates to the target, as Portage does on
+    # a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     args = ["--pretend", "dev-libs/rootdepspkg"]
 
     rust = _run([str(emerge_binary)], args, cross)
@@ -5967,6 +5978,10 @@ def test_dependency_avoid_update_is_slot_aware(
     (d / "repository").write_text("testrepo\n")
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     args = ["--pretend", "dev-libs/avoidslotconsumer"]
     result = _run([str(emerge_binary)], args, env)
     assert result.returncode == 0
@@ -6007,6 +6022,10 @@ def _slotbind_root(tmp_path):
     world = tmp_path / "var" / "lib" / "portage" / "world"
     world.parent.mkdir(parents=True)
     world.write_text("dev-libs/slotbindconsumer\ndev-libs/slotbindfresh\n")
+    # Steady state for runs through the fixture configroot (the repos
+    # resolve to the fixture paths): without the record the run applies
+    # the fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -6225,6 +6244,9 @@ def _slotcascade_root(tmp_path):
     world = tmp_path / "var" / "lib" / "portage" / "world"
     world.parent.mkdir(parents=True)
     world.write_text("dev-libs/casctail\n")
+    # Steady state for runs through the fixture configroot (see the
+    # slotbind root above).
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -6324,6 +6346,11 @@ def _wildcard_mask_configroot(tmp_path, fixtures_root, mask_line):
         fixtures_root / "repo/profiles/default"
     )
     (cfg / "etc/portage/package.mask").write_text(mask_line + "\n")
+    # Steady state for this scratch ROOT (the repos resolve to the
+    # fixture paths): without the record the run applies the fixture
+    # updates here, as Portage does on a fresh root, and prints the
+    # block.
+    seed_updates_record(cfg)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -6380,6 +6407,11 @@ def _t341_configroot(tmp_path, fixtures_root):
     (cfg / "etc/portage/make.profile").symlink_to(
         fixtures_root / "repo/profiles/default"
     )
+    # Steady state for this scratch ROOT: the repos are the fixture paths
+    # themselves, so the seeded record covers them -- without it the run
+    # applies the fixture updates here (as Portage does on a fresh root)
+    # and prints the block.
+    seed_updates_record(cfg)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -7606,6 +7638,11 @@ def _t341_profile_configroot(tmp_path, fixtures_root, repo="repo-341", layout=No
     )
     (cfg / "etc/portage/make.conf").write_text(f'PKGDIR="{cfg / "pkgdir"}"\nFEATURES="-news"\n')
     (cfg / "etc/portage/make.profile").symlink_to(dst / "profiles/t341/noeapi")
+    # Steady state for this scratch ROOT (the shared repos resolve to the
+    # fixture paths; the scratch overlay carries no updates file): without
+    # the record the run applies the fixture updates here, as Portage
+    # does on a fresh root, and prints the block.
+    seed_updates_record(cfg)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}, cfg, dst
 
 
@@ -7923,6 +7960,9 @@ def _t341_user_configroot(tmp_path, fixtures_root):
         "\n".join(f"{line} x" for line in u8) + "\n"
     )
     (cfg / "etc/portage/profile/packages").write_text("\n".join(u8) + "\n")
+    # Steady state for this scratch ROOT (the shared repos resolve to
+    # the fixture paths).
+    seed_updates_record(cfg)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}, cfg
 
 
@@ -9870,6 +9910,10 @@ def _abk0_worldb_root(tmp_path):
     world = tmp_path / "var" / "lib" / "portage" / "world"
     world.parent.mkdir(parents=True)
     world.write_text("dev-libs/abk0b\n")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -12133,6 +12177,11 @@ def test_emerge_default_opts_from_a_sourced_make_conf(
 
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(configroot)
+    # The repos are symlinked under the scratch configroot: seed its
+    # updates keys into the fixtures record (ROOT stays the fixtures),
+    # or this run applies the updates to the shared tree, as Portage
+    # does on a fresh root, and prints the block.
+    seed_updates_record(env["ROOT"], configroot_updates_dirs(configroot))
     sourced = _run([str(emerge_binary)], ["dev-libs/samepkg"], env)
     explicit = _run(
         [str(emerge_binary)], ["--pretend", "dev-libs/samepkg"], fixture_env
@@ -12184,9 +12233,13 @@ def test_profile_set_packages_join_world_and_are_a_target(
     # With profile-set, the unstarred package is part of @world and
     # @profile -- and not of @system.
     env = dict(fixture_env)
-    env["PORTAGE_CONFIGROOT"] = str(
-        _configroot_with_profile_set(tmp_path, fixtures_root)
-    )
+    configroot = _configroot_with_profile_set(tmp_path, fixtures_root)
+    env["PORTAGE_CONFIGROOT"] = str(configroot)
+    # The copied repo resolves under the scratch configroot: seed its
+    # updates keys into the fixtures record (ROOT stays the fixtures),
+    # or these runs apply the updates to the shared tree and print the
+    # block, as Portage does on a fresh root.
+    seed_updates_record(env["ROOT"], configroot_updates_dirs(configroot))
     world = _run([str(emerge_binary)], ["--pretend", "@world"], env)
     assert "[ebuild  N     ] dev-libs/diamond-1.0" in world.stdout
 
@@ -14035,6 +14088,9 @@ def test_envd_use_read_from_eroot_not_config_root(
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
     env["PORTAGE_RUNNING_ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (see the avoid-update seed
+    # above): the `splitlines()[:1]` pin breaks on the updates block.
+    seed_updates_record(tmp_path)
     base = ["--pretend", "-v", "dev-libs/envdusepkg"]
     rust = _run([str(emerge_binary)], base, env)
     assert rust.returncode == 0
@@ -17561,6 +17617,10 @@ def test_installed_set_expands_to_a_slot_atom_per_vdb_package(
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
     args = ["--pretend", "@installed"]
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     result = _run([str(emerge_binary)], args, env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
@@ -17604,6 +17664,10 @@ def test_preserved_rebuild_set_expands_to_the_consumers_of_registered_preserved_
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
     args = ["--pretend", "@preserved-rebuild"]
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     result = _run([str(emerge_binary)], args, env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
@@ -17621,6 +17685,10 @@ def test_preserved_rebuild_set_is_empty_when_the_registry_is_empty(
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
     args = ["--pretend", "@preserved-rebuild"]
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     result = _run([str(emerge_binary)], args, env)
     assert result.returncode == 0
     assert result.stdout == ""
@@ -17641,6 +17709,10 @@ def test_world_missing_file_expands_to_system_not_an_error(
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
 
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     # @world -> @system: resolves, rc 0, and
     w_rust = _run([str(emerge_binary)], ["--pretend", "@world"], env)
     assert w_rust.returncode == 0, w_rust.stderr
@@ -17660,6 +17732,10 @@ def test_empty_target_list_verbose_prints_total_zero(emerge_binary, fixture_env,
     rc 0 (portuale `LLM/evidence/2026-10-18-s8/out/c371-preserved.txt`)."""
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     result = _run([str(emerge_binary)], ["-pv", "@preserved-rebuild"], env)
     assert result.returncode == 0
     assert result.stdout.splitlines()[-1] == "Total: 0 packages, Size of downloads: 0 KiB"
@@ -17679,6 +17755,10 @@ def test_world_sets_unresolvable_set_name_is_a_real_error(emerge_binary, fixture
     (world_lib / "world_sets").write_text("@doesnotexist\n")
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     result = _run([str(emerge_binary)], ["--pretend", "@world"], env)
     assert result.returncode == 1
     assert result.stdout == ""
@@ -17740,6 +17820,10 @@ def _deselect_root(tmp_path):
     install("dev-libs", "bar", "1.0", slot="1")
     install("dev-libs", "baz", "1.0", slot="1")
     install("dev-libs", "notinworld", "1.0")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -17794,6 +17878,10 @@ def _depclean_root(tmp_path):
     install("dcorphan", rdepend="dev-libs/dcorphandep")
     install("dcorphandep")
     install("systempkg")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -17893,6 +17981,11 @@ def _cycle_depclean_env(fixture_env, tmp_path, installed, world):
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT (the repo resolves to the
+    # fixture path): without the record the run applies the fixture
+    # updates here, as Portage does on a fresh root, and prints the
+    # block.
+    seed_updates_record(root)
     return env
 
 
@@ -18092,6 +18185,10 @@ def _depclean_pprovided_root(tmp_path):
     install("pdwtest", rdepend="dev-libs/providedpkg2")
     install("providedpkg")
     install("providedpkg2")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18297,6 +18394,10 @@ def _libcheck_root(tmp_path):
     )
     install("dclibdep")
     install("dcplainorphan")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18425,6 +18526,10 @@ def _unresolved_root(tmp_path):
     )
     install("uany")
     install("uorphan")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18527,6 +18632,10 @@ def _depclean_revdep_root(tmp_path):
     install("dcshared")
     install("dcorphan", rdepend="dev-libs/dcorphandep")
     install("dcorphandep")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18587,6 +18696,10 @@ def _depclean_order_root(tmp_path):
     install("mmid", rdepend="dev-libs/zztop")
     install("zztop", rdepend="dev-libs/aabase")
     install("aabase")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18650,6 +18763,10 @@ def _depclean_cycle_root(tmp_path):
     install("cyclicdepa", depend="dev-libs/cyclicdepb")
     install("cyclicdepb", rdepend="dev-libs/cyclicdepa")
     install("keeper")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18698,6 +18815,10 @@ def _prune_root(tmp_path):
     install("mm", "3.0")
     install("keeper", "1.0", rdepend="=dev-libs/mm-2.0")
     install("single", "1.0")
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates here, as Portage does
+    # on a fresh root, and prints the block.
+    seed_updates_record(tmp_path)
     return tmp_path
 
 
@@ -18741,6 +18862,10 @@ def test_prune_pretend_nothing_to_prune(emerge_binary, fixture_env, tmp_path):
         (d / "SLOT").write_text("0\n")
     env = dict(fixture_env)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(root)
     result = _run([str(emerge_binary)], ["--pretend", "--prune"], env)
     assert result.returncode == 0
     assert result.stdout.splitlines() == [
@@ -18926,6 +19051,9 @@ def _vdb_path_root(tmp_path):
     (d / "SLOT").write_text("0\n")
     (d / "CONTENTS").write_text("obj /usr/bin/foo 0000 1700000000\n")
     (d / "foo-1.0.ebuild").write_text("")
+    # Steady state for runs through the fixture configroot (see the
+    # deselect/depclean roots above).
+    seed_updates_record(tmp_path)
     return tmp_path, d
 
 
@@ -20604,11 +20732,17 @@ def _world_extra_env(fixture_env, tmp_path, fixtures_root, *atoms):
     and relative `make.profile` symlink unchanged, so a plain
     `copytree` is enough; no rewriting needed."""
     dest = tmp_path / "fixtures"
-    shutil.copytree(fixtures_root, dest, symlinks=True)
+    shutil.copytree(fixtures_root, dest, symlinks=True, ignore=fixtures_copytree_ignore())
     world = dest / "var" / "lib" / "portage" / "world"
     with world.open("a") as f:
         for atom in atoms:
             f.write(f"{atom}\n")
+    # Steady state for this copied tree: its repos resolve under the
+    # copy's paths, so seed the copy's record (keys are paths), or the
+    # run applies the updates here, as Portage does on a fresh root,
+    # and prints the block. (The copy inherits the fixtures record, but
+    # under the wrong -- fixture-pathed -- keys.)
+    seed_updates_record(dest, configroot_updates_dirs(dest))
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(dest)
     env["ROOT"] = str(dest)
@@ -22242,20 +22376,6 @@ def _run_on_pty(argv, env, err_path=None, timeout=120):
     return proc.returncode, out, err_bytes
 
 
-def _repos_pin_text(fixtures_root):
-    """Backlog #564: the merged text of the fixture `repos.conf` dir for
-    `PORTAGE_REPOSITORIES` pinning (sorted file order; the dir holds one
-    file today). Only for tests that cannot enter the suite's filter
-    namespace (raw-pty exit latency, ssh ownership checks): bypass + pin
-    keeps their repo set hermetic without namespaces. The sections and
-    config-root-relative locations match the on-disk file exactly."""
-    parts = []
-    repos_dir = Path(fixtures_root) / "etc/portage/repos.conf"
-    for path in sorted(p for p in repos_dir.rglob("*") if p.is_file()):
-        parts.append(path.read_text())
-    return "\n".join(parts)
-
-
 def _title_env(fixture_env):
     """Controlled host state for the title tests: fixed TERM, LOGNAME,
     HOSTNAME, HOME and PWD; no PROMPT_COMMAND; colour left on (a pty is
@@ -22272,7 +22392,7 @@ def _title_env(fixture_env):
     # namespaces; bypass it here and pin the repo set instead so the pins
     # stay hermetic on any host.
     env["PMTEST_REPOS_FILTER"] = "off"
-    env["PORTAGE_REPOSITORIES"] = _repos_pin_text(env["PORTAGE_CONFIGROOT"])
+    env["PORTAGE_REPOSITORIES"] = repos_pin_text(env["PORTAGE_CONFIGROOT"])
     return env
 
 
@@ -22596,6 +22716,10 @@ def _check_news_isolated_root(fixture_env, tmp_path, name="root"):
     )
     env = dict(fixture_env)
     env["ROOT"] = str(root)
+    # Steady state for runs through the fixture configroot: without the
+    # record the run applies the fixture updates under this fresh ROOT
+    # (as Portage does on a fresh root) and prints the block.
+    seed_updates_record(root)
     return env
 
 
@@ -23478,6 +23602,10 @@ def test_check_news_reports_none_when_all_items_are_read(
     # the fixtures (for repos.conf / the news items themselves).
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     rust = _run([str(emerge_binary)], ["--check-news"], env)
     assert rust.returncode == 0
     assert rust.stdout.strip() == "* No news items were found."
@@ -23496,6 +23624,10 @@ def test_check_news_skip_file_excludes_items_like_the_read_file(
     (news_dir / "news-testrepo.skip").write_text("2026-09-01-portuale-general\n")
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     rust = _run([str(emerge_binary)], ["--check-news"], env)
     assert rust.returncode == 0
     assert rust.stdout.strip() == "* No news items were found."
@@ -23521,6 +23653,10 @@ def test_check_news_read_file_lazily_removes_a_previously_unread_item(
     (news_dir / "news-testrepo.read").write_text("2026-09-01-portuale-general\n")
     env = dict(fixture_env)
     env["ROOT"] = str(tmp_path)
+    # Steady state for this scratch ROOT (runs resolve through the
+    # fixture configroot): without the record the run applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(tmp_path)
     rust = _run([str(emerge_binary)], ["--check-news"], env)
     assert rust.returncode == 0
     assert "1 news items need reading for repository 'testrepo'." in rust.stdout
@@ -23594,6 +23730,11 @@ def _b1_root(tmp_path, world_atoms, installed):
         (d / "repository").write_text("testrepo\n")
         for name, content in files.items():
             (d / name).write_text(content + "\n")
+    # Steady state for runs through the fixture configroot (most callers;
+    # the b0b cells pass their own configroot with copies and seed those
+    # keys too): without the record the run applies the fixture updates
+    # here, as Portage does on a fresh root, and prints the block.
+    seed_updates_record(root)
     return root
 
 
@@ -26682,7 +26823,7 @@ def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
     """
     cfg = tmp_path / "cfg"
     shutil.copytree(Path(__file__).resolve().parents[1] / "fixtures", cfg,
-                    symlinks=True)
+                    symlinks=True, ignore=fixtures_copytree_ignore())
     root = _b1_root(
         tmp_path,
         ["dev-libs/videodrv"],
@@ -26704,6 +26845,10 @@ def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
     env["ROOT"] = str(root)
     env["PORTAGE_RUNNING_ROOT"] = str(root)
     env["DISTDIR"] = str(cfg / "distfiles")
+    # Steady state for this scratch ROOT: the copied configroot's repos
+    # resolve under scratch paths (the `_b1_root` seed covers only the
+    # fixture-pathed keys).
+    seed_updates_record(root, configroot_updates_dirs(cfg))
 
     # Inverse cell: the stock profile leaves the `+` IUSE default
     # standing, exactly as Portage on the same tree.
@@ -27550,6 +27695,10 @@ def _b0b_root(tmp_path, bparent_installed=True):
 def _b0b_env(fixture_env, root, configroot):
     env = _b1_env(fixture_env, root)
     env["PORTAGE_CONFIGROOT"] = str(configroot)
+    # The copied repo carries its `profiles/updates` file under a scratch
+    # path: seed this scratch ROOT, or the run applies the updates here
+    # (as Portage does on a fresh root) and prints the block.
+    seed_updates_record(root, configroot_updates_dirs(configroot))
     return env
 
 
@@ -29200,7 +29349,7 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
     )
     # Profile A: staged package.use enabling bar -- the pair collapses.
     dest = tmp_path / "fixtures"
-    shutil.copytree(fixtures_root, dest, symlinks=True)
+    shutil.copytree(fixtures_root, dest, symlinks=True, ignore=fixtures_copytree_ignore())
     with (dest / "etc" / "portage" / "package.use").open("a") as f:
         f.write("dev-libs/r266lib bar\n")
     env = dict(fixture_env)
@@ -29208,6 +29357,9 @@ def test_266_minimize_children_matches_use_deps_against_candidate_use(
     env["ROOT"] = str(dest)
     env["PORTAGE_RUNNING_ROOT"] = str(dest)
     env["DISTDIR"] = str(dest / "distfiles")
+    # Steady state for this scratch ROOT: the copied tree's repos resolve
+    # under scratch paths, as Portage records them after its first run.
+    seed_updates_record(dest, configroot_updates_dirs(dest))
     rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/r266mid"], env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [
@@ -29832,6 +29984,9 @@ def _t348_configroot(tmp_path, fixtures_root):
     (cfg / "etc/portage/make.profile").symlink_to(
         fixtures_root / "repo/profiles/default"
     )
+    # Steady state for this scratch ROOT (the repos resolve to the
+    # fixture paths; the repo-348 overlay carries no updates file).
+    seed_updates_record(cfg)
     return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
 
 
@@ -32573,6 +32728,10 @@ def _t355_configroot(tmp_path, fixtures_root):
     env["PORTAGE_RUNNING_ROOT"] = str(root)
     env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
     env["DISTDIR"] = str(tmp_path / "distdir")
+    # Steady state for this scratch ROOT (the repos resolve to the
+    # fixture paths): without the record the first merge applies the
+    # fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(root)
     return env
 
 
@@ -33697,7 +33856,7 @@ def _f484_old_build_root(fixture_env, fixtures_root, tmp_path):
     binary build 1's 100); `PORTAGE_CONFIGROOT` stays at the shared
     fixtures."""
     root = tmp_path / "f484old"
-    shutil.copytree(fixtures_root / "var", root / "var", symlinks=True)
+    shutil.copytree(fixtures_root / "var", root / "var", symlinks=True, ignore=fixtures_copytree_ignore())
     (root / "var/db/pkg/app-misc/f484-mime-1.0/BUILD_TIME").write_text("50\n")
     env = dict(fixture_env)
     env["ROOT"] = str(root)
@@ -34617,6 +34776,10 @@ def _mixed_binhost_env(fixture_env, tmp_path, overlap=False):
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT: without the record the run
+    # applies the repos' updates here (as Portage does on a fresh root)
+    # and prints the block.
+    seed_updates_record(root, configroot_updates_dirs(cfg))
     return env
 
 
@@ -34878,6 +35041,10 @@ def _dup_basename_env(fixture_env, tmp_path):
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT: without the record the run
+    # applies the repos' updates here (as Portage does on a fresh root)
+    # and prints the block.
+    seed_updates_record(root, configroot_updates_dirs(cfg))
     return env
 
 
@@ -34947,6 +35114,10 @@ def _local_xpak_env(fixtures_root, fixture_env, tmp_path, request_signature):
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT: without the record the run
+    # applies the repos' updates here (as Portage does on a fresh root)
+    # and prints the block.
+    seed_updates_record(root, configroot_updates_dirs(cfg))
     return env
 
 
@@ -35040,6 +35211,10 @@ def _default_inherit_env(fixtures_root, fixture_env, tmp_path, default_false):
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT: without the record the run
+    # applies the repos' updates here (as Portage does on a fresh root)
+    # and prints the block.
+    seed_updates_record(root, configroot_updates_dirs(cfg))
     return env
 
 
@@ -35180,6 +35355,10 @@ def _user_patches_env(fixture_env, tmp_path):
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT: without the record the run
+    # applies the repos' updates here (as Portage does on a fresh root)
+    # and prints the block.
+    seed_updates_record(root, configroot_updates_dirs(cfg))
     return env
 
 
@@ -35443,6 +35622,11 @@ def _virtuals_env(fixture_env, tmp_path, *, user=None, profile=None, parent=None
     env = dict(fixture_env)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
+    # Steady state for this scratch ROOT (the repo resolves to the
+    # fixture path): without the record the run applies the fixture
+    # updates here, as Portage does on a fresh root, and prints the
+    # block.
+    seed_updates_record(root)
     return env, profile_dir, tmp_path / "pparent"
 
 

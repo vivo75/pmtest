@@ -38,7 +38,12 @@ from pathlib import Path
 
 import pytest
 
-from conftest import FIXTURES_ROOT
+from conftest import (
+    FIXTURES_ROOT,
+    configroot_updates_dirs,
+    fixtures_copytree_ignore,
+    seed_updates_record,
+)
 from test_emerge_pretend_contract import CASES
 
 REPO_NAMES = ("repo", "overlay", "independentoverlay", "layoutmasteroverlay", "repnamerepo")
@@ -151,7 +156,15 @@ def _materialize(dst: Path) -> Path:
     # symlinks=True: `etc/portage/make.profile` is a relative symlink, and
     # following it breaks the profile's `../base` parent -- every run then
     # fails identically and the comparison proves nothing.
-    shutil.copytree(FIXTURES_ROOT, root, symlinks=True)
+    shutil.copytree(FIXTURES_ROOT, root, symlinks=True,
+                      ignore=fixtures_copytree_ignore())
+    # Steady state for runs against this copy (its repos resolve under
+    # the copy's paths): without the record the first run applies the
+    # updates here, as Portage does on a fresh root, and prints the
+    # block -- which would differ between a reused copy (silent) and a
+    # fresh one. (The copy inherits the fixtures record, but under the
+    # wrong -- fixture-pathed -- keys.)
+    seed_updates_record(root, configroot_updates_dirs(root))
     return root
 
 
@@ -374,6 +387,10 @@ def transformed_fixtures(tmp_path_factory: pytest.TempPathFactory):
             _, rewrite = transform(root, _subset_args())
             assert _tree_fingerprint(root) != before, (
                 f"transform {transform_id!r} did not modify the fixture tree")
+            # Re-seed after the transform: `rename-category` rewrites the
+            # updates file itself (new mtime), which would stale the
+            # `_materialize` record and fire the block on this copy only.
+            seed_updates_record(root, configroot_updates_dirs(root))
             built[transform_id] = (root, rewrite)
         return built[transform_id]
 

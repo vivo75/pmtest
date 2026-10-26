@@ -1,8 +1,12 @@
+import configparser
+import fcntl
 import getpass
+import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -100,17 +104,160 @@ def _sudo_rm_rf(path: Path) -> bool:
     return result.returncode == 0 and not path.exists()
 
 
-def _reclaim_fixture_mtimedb() -> None:
-    """Backlog #267: `fixtures/var/cache/edb/mtimedb` is runtime state
-    that any real-merge run with `ROOT=fixtures` leaves behind (the
-    pre-merge `Scheduler._save_resume_list` shape), never committed
-    fixture state -- and it is `gitignore`d, so it drifts silently. A
-    stale one rides into every `_news_env` copytree and fails the
-    resume-clear assertions on its `resume_backup` residue. The
-    originating run is intermittent (observed once in a full session,
-    not reproducible under a watcher), so sweep defensively at session
-    start next to the other tmp hygiene."""
-    (FIXTURES_ROOT / "var" / "cache" / "edb" / "mtimedb").unlink(missing_ok=True)
+# --- global-updates steady state ---------------------------------------------
+#
+# Portage `_global_updates.py` runs on every `emerge`/`mrg` whose target
+# root the invoking user may write (an owned root is unprivileged-mode
+# `secpass` 2, `portage/data.py`), and portuale now does the same: the
+# first run against a root applies `fixtures/repo/profiles/updates/*`
+# (renaming tracked VDB entries, rewriting SLOTs), records each updates
+# file's mtime under `mtimedb["updates"]`, and prints the `Performing
+# Global Updates` block, while later runs print and move nothing. The
+# seeded record below is the state a user is in after having run once,
+# so the suite grades steady-state output deterministically.
+#
+# Record keys are the updates files' full paths, exactly as both
+# managers read them (Portage `update.py::grab_updates` `myfile.path`;
+# portuale `global_updates::changed_updates_files` `updpath.join(name)`),
+# with whole-second mtimes on both sides.
+
+def _fixture_repo_updates_dirs() -> "list[Path]":
+    """Every `profiles/updates/` dir of the repos the fixture configroot
+    serves (Portage `_global_updates.py::_do_global_updates` scans one
+    per repo in `portdb` order). Locations come from the committed
+    `repos.conf`; a relative one joins the fixture root the way both
+    managers resolve it."""
+    conf = FIXTURES_ROOT / "etc/portage/repos.conf/repos.conf"
+    parser = configparser.ConfigParser()
+    try:
+        parser.read(conf, encoding="utf-8")
+    except configparser.Error:
+        return []
+    dirs = []
+    for section in parser.sections():
+        try:
+            location = parser.get(section, "location")
+        except configparser.Error:
+            continue
+        loc = Path(location)
+        if not loc.is_absolute():
+            loc = FIXTURES_ROOT / location
+        upd = loc / "profiles" / "updates"
+        if upd.is_dir() and upd not in dirs:
+            dirs.append(upd)
+    return dirs
+
+
+def fixture_updates_seed() -> dict:
+    """`{updates-file path: whole-second mtime}` for every applicable
+    fixture updates file (Portage `update.py::grab_updates` skips
+    dotfiles and non-files; portuale additionally skips symlinks, which
+    `DirEntry::file_type` reports as non-files -- none exist here)."""
+    seed = {}
+    for upd in _fixture_repo_updates_dirs():
+        seed.update(_scan_updates_dir(upd))
+    return seed
+
+
+def _merge_updates_section(root, seed) -> dict:
+    """Merge `seed` (`{updates-file path: mtime}`) into
+    `root/var/cache/edb/mtimedb` under `updates`, keeping every other
+    top-level key (see `seed_updates_record`). Like Portage's
+    `prev_mtimes.update(timestamps)`, the record accumulates. The file
+    is written the way Portage's `MtimeDB.commit` writes it (tab
+    indent, sorted keys); an unreadable one starts fresh, like
+    Portage's `_load`."""
+    root = Path(root)
+    edb = root / "var" / "cache" / "edb"
+    edb.mkdir(parents=True, exist_ok=True)
+    target = edb / "mtimedb"
+    with open(edb / ".mtimedb.seed.lock", "w") as guard:
+        fcntl.flock(guard, fcntl.LOCK_EX)
+        try:
+            data = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        if not isinstance(data, dict):
+            data = {}
+        current = data.get("updates")
+        if not isinstance(current, dict):
+            current = {}
+        if all(current.get(key) == value for key, value in seed.items()):
+            return seed
+        current.update(seed)
+        data["updates"] = current
+        fd, tmp = tempfile.mkstemp(dir=str(edb), prefix=".mtimedb.tmp.")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as out:
+                out.write(json.dumps(data, ensure_ascii=False, indent="\t", sort_keys=True))
+            os.chmod(tmp, 0o644)
+            os.replace(tmp, target)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
+    return seed
+
+
+def configroot_updates_dirs(configroot) -> "list[Path]":
+    """The `profiles/updates` dirs of `configroot`, for a scratch
+    configroot that mirrors the fixture layout (symlinked or copied
+    repos): each fixture updates dir re-rooted under `configroot`.
+    Runs through such a configroot compare record keys built from
+    these paths, so `seed_updates_record(root,
+    configroot_updates_dirs(configroot))` puts them in steady state."""
+    dirs = []
+    for upd in _fixture_repo_updates_dirs():
+        try:
+            rel = upd.relative_to(FIXTURES_ROOT)
+        except ValueError:
+            continue
+        candidate = Path(configroot) / rel
+        if candidate.is_dir() and candidate not in dirs:
+            dirs.append(candidate)
+    return dirs
+
+
+def _scan_updates_dir(updates_dir) -> dict:
+    """`{updates-file path: whole-second mtime}` for one updates dir,
+    skipping dotfiles, non-files and symlinks like the managers do."""
+    seed = {}
+    try:
+        names = sorted(os.listdir(updates_dir))
+    except OSError:
+        return seed
+    for name in names:
+        if name.startswith("."):
+            continue
+        path = Path(updates_dir) / name
+        try:
+            if path.is_symlink() or not path.is_file():
+                continue
+            seed[str(path)] = int(os.stat(path).st_mtime)
+        except OSError:
+            continue
+    return seed
+
+
+def seed_updates_record(root, updates_dirs=None) -> dict:
+    """Merge the steady-state `updates` record into
+    `root/var/cache/edb/mtimedb`, creating the file when absent and
+    keeping every other top-level key (such as `resume`). The
+    seed always covers every applicable fixture updates file
+    (`fixture_updates_seed()`); a root whose configroot also serves
+    repo copies under scratch paths passes their `profiles/updates`
+    dirs as `updates_dirs`, since record keys are paths. The file is
+    written in Portage's `MtimeDB.commit` shape, atomically
+    (same-directory temporary plus rename, mode 0644) under an exclusive lock so parallel suite workers
+    converge instead of racing; a record that already covers the seed
+    is left untouched. Returns the seed map. Entries for repos a root
+    never serves are ignored by both managers, so overseeding is safe
+    and builders seed unconditionally."""
+    seed = fixture_updates_seed()
+    for updates_dir in updates_dirs or ():
+        seed.update(_scan_updates_dir(updates_dir))
+    if not seed:
+        return seed
+    return _merge_updates_section(root, seed)
 
 
 def _reclaim_portuale_bin_overlays(base: Path) -> None:
@@ -147,7 +294,11 @@ def pytest_configure(config):
         _TMP_BASE_PATH = Path(_TMP_BASE)
         _TMP_BASE_PATH.mkdir(parents=True, exist_ok=True)
         _reclaim_portuale_bin_overlays(_TMP_BASE_PATH)
-        _reclaim_fixture_mtimedb()
+        # Steady-state global-updates record for the shared fixture tree
+        # (see `_seed_fixture_updates_record`): merged, never deleted, so
+        # a worker starting late cannot wipe what an early worker seeded
+        # while another worker's tests are running.
+        seed_updates_record(FIXTURES_ROOT)
         if not _BASETEMP.exists() or _sudo_rm_rf(_BASETEMP):
             config.option.basetemp = str(_BASETEMP)
         else:
@@ -250,6 +401,60 @@ def _require_fixture_tree():
             f"fixture tree at {FIXTURES_ROOT} is missing {', '.join(missing)}: "
             "it exists, but it is not the fixture tree this suite grades against"
         )
+
+
+def fixtures_copytree_ignore(*extra) -> "callable":
+    """`ignore=` for copies of the fixture tree (or its `var` subtree):
+    skip runtime state that concurrent suite runs create and delete --
+    the vdb lockfile (every fixtures-root run takes the vdb lock while
+    checking for global updates, so a parallel copy can list it just as
+    its owner deletes it and fail with ENOENT) and the updates-record
+    seeder's lock and temp files. All live under gitignored paths; none
+    is fixture state a copy must carry (a copied lock in particular must
+    never travel: lock state is not transferable). `extra` appends
+    site-specific names (for example `mtimedb`, where the copy must
+    start record-free)."""
+    return shutil.ignore_patterns(
+        ".pkg.portage_lockfile", ".mtimedb.seed.lock", ".mtimedb.tmp.*", *extra
+    )
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _seed_fixture_updates_record():
+    """Steady-state global-updates record for the shared fixture tree.
+
+    The first `emerge`/`mrg` run against a root applies
+    `profiles/updates/*`, records each file's mtime under
+    `mtimedb["updates"]`, and prints the `Performing Global Updates`
+    block; later runs print and move nothing (Portage
+    `lib/portage/_global_updates.py`, `_do_global_updates` with
+    `prev_mtimes`, `lib/portage/update.py::grab_updates`). Seeding the
+    record before any test runs puts the suite in the post-first-run
+    state, so exact-output pins grade steady-state text and no run
+    renames the tracked fixture VDB entries. The merge is atomic
+    (temporary plus rename) and idempotent under parallel workers (an
+    exclusive lock; a covering record is left untouched -- see
+    `seed_updates_record`, which tests with their own scratch roots
+    call directly). The updates file itself stays: read-time move pins
+    depend on it. The seeded file lives under the gitignored
+    `fixtures/var/cache/` and stays untracked.
+    """
+    seed_updates_record(FIXTURES_ROOT)
+    yield
+
+
+def repos_pin_text(fixtures_root) -> str:
+    """The merged text of the fixture `repos.conf` dir (sorted file
+    order) for `PORTAGE_REPOSITORIES` pinning. Only for tests that
+    cannot enter the suite's repos.conf filter namespace (raw-pty exit
+    latency, ssh ownership checks, direct-binary dispatch): bypass + pin
+    keeps their repo set hermetic without namespaces. The sections and
+    config-root-relative locations match the on-disk file exactly."""
+    parts = []
+    repos_dir = Path(fixtures_root) / "etc/portage/repos.conf"
+    for path in sorted(p for p in repos_dir.rglob("*") if p.is_file()):
+        parts.append(path.read_text())
+    return "\n".join(parts)
 
 
 @pytest.fixture(scope="session", autouse=True)

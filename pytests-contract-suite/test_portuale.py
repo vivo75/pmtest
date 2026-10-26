@@ -24,7 +24,13 @@ import signal
 import subprocess
 import tarfile
 from pathlib import Path
-from conftest import write_repo_categories
+from conftest import (
+    configroot_updates_dirs,
+    fixtures_copytree_ignore,
+    repos_pin_text,
+    seed_updates_record,
+    write_repo_categories,
+)
 
 import pytest
 
@@ -67,15 +73,21 @@ def test_dispatch_via_symlink_emerge(portuale_binary, tmp_path):
     """Exercises Portage's `emerge --pretend` resolution (see
     test_emerge_pretend_contract.py for full coverage of the outcomes);
     here the point is that the symlink-dispatched binary reaches it at
-    all."""
+    all. Direct invocation cannot enter the suite's repos.conf filter
+    namespace, so the repo set is pinned via `PORTAGE_REPOSITORIES`
+    (the bypass-plus-pin shape from the title tests) -- otherwise the
+    host repo set joins the run and its unrecorded updates files fire
+    the global-updates block here."""
     emerge_link = tmp_path / "emerge"
     emerge_link.symlink_to(portuale_binary)
+    env = _fixture_env()
+    env["PORTAGE_REPOSITORIES"] = repos_pin_text(env["PORTAGE_CONFIGROOT"])
     result = subprocess.run(
         [str(emerge_link), "--pretend", "dev-libs/newpkg"],
         capture_output=True,
         text=True,
         check=True,
-        env=_fixture_env(),
+        env=env,
     )
     assert strip_pretend_preamble(result.stdout).strip() == f'[ebuild  N     ] dev-libs/newpkg-1.0 to {FIXTURES_ROOT}'
 
@@ -100,6 +112,9 @@ def test_dispatch_via_path_lookup_by_bare_name(portuale_binary, tmp_path):
     (tmp_path / "ebuild").symlink_to(portuale_binary)
     env = _fixture_env()
     env["PATH"] = f"{tmp_path}{os.pathsep}{env.get('PATH', '')}"
+    # Direct invocation cannot enter the filter namespace: pin the repo
+    # set (see the symlink test above), or the host updates fire here.
+    env["PORTAGE_REPOSITORIES"] = repos_pin_text(env["PORTAGE_CONFIGROOT"])
 
     result = subprocess.run(
         ["emerge", "--pretend", "dev-libs/newpkg"],
@@ -467,6 +482,11 @@ def test_solver_backends_schedule_stale_equals_consumer_reinstalls(
     scope, noted, not pinned beyond a clean exit."""
     env = dict(fixture_env)
     env["ROOT"] = str(_slotbind_root(tmp_path))
+    # Same record state for every compared solver: the first run on this
+    # fresh ROOT would otherwise apply the fixture updates and print the
+    # block (as Portage does on a fresh root) while later runs stay
+    # silent, breaking the comparison.
+    seed_updates_record(env["ROOT"])
     portage = subprocess.run(
         [str(emerge_binary), "--pretend", "--solver=portage", "dev-libs/slotbindtarget"],
         capture_output=True,
@@ -820,11 +840,15 @@ def test_mrg_remote_unwritable_root_fails_preflight(
 def _remote_resolve_env(fixture_env, root, config_root):
     """Resolve-against-this-config env: fresh client ROOT, config root
     override left to the RAII guard (PORTAGE_CONFIGROOT initial value is
-    irrelevant, but keep it sane)."""
+    irrelevant, but keep it sane). The client repos resolve to the
+    fixture paths, so the scratch ROOT gets the steady-state record --
+    otherwise the run applies the fixture updates there (as Portage does
+    on a fresh root) and prints the block."""
     env = dict(fixture_env)
     env["ROOT"] = str(root)
     env["PORTAGE_OVERRIDE_EPREFIX"] = str(root)  # binrepo default location
     env["PORTAGE_CONFIGROOT"] = str(config_root)
+    seed_updates_record(root)
     return env
 
 
@@ -2062,9 +2086,15 @@ def _gzip_make_conf_env(tmp_path, env):
     `make.globals` default) so they don't need it installed."""
     cfg = tmp_path / "cfg-gzip"
     if not cfg.exists():
-        shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+        shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
         with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
             fh.write('\nBINPKG_COMPRESS="gzip"\n')
+    # The configroot copy carries the fixture repo (with its
+    # `profiles/updates` file) under a scratch path: runs with
+    # ROOT=fixtures compare scratch-pathed record keys, so seed them
+    # into the fixtures record (steady state), or the first run applies
+    # the updates to the shared tree and prints the block.
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env.pop("BINPKG_COMPRESS", None)
     return env
@@ -2243,9 +2273,10 @@ def test_emerge_buildpkgonly_make_conf_binpkg_format_xpak_is_obeyed(
     import shutil
 
     cfg = tmp_path / "cfg173"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
         fh.write('\nBINPKG_FORMAT="xpak"\n')
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
 
     env = _real_build_env(tmp_path)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -2305,12 +2336,13 @@ def test_emerge_buildpkgonly_make_conf_binpkg_chain_is_obeyed(
     import shutil
 
     cfg = tmp_path / "cfg180"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     pkgdir_conf = tmp_path / "pkgdir-conf"
     with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
         fh.write(f'\nPKGDIR="{pkgdir_conf}"\n')
         fh.write('\nBINPKG_FORMAT="xpak"\n')
         fh.write('\nBINPKG_COMPRESS="gzip"\n')
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
 
     env = _real_build_env(tmp_path)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -2387,11 +2419,12 @@ def test_emerge_buildpkgonly_make_conf_bzip2_command_is_obeyed(
     import shutil
 
     cfg = tmp_path / "cfg180bzip2"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
         fh.write('\nBINPKG_FORMAT="xpak"\n')
         fh.write('\nBINPKG_COMPRESS="bzip2"\n')
         fh.write('\nPORTAGE_BZIP2_COMMAND="definitely-not-a-compressor-180"\n')
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
 
     env = _real_build_env(tmp_path)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -2502,7 +2535,7 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
     import shutil
 
     cfg = tmp_path / "cfg147s1"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     (cfg / "etc" / "portage" / "env" / "penv-nomulti").write_text(
         'FEATURES="-binpkg-multi-instance"\n'
     )
@@ -2511,7 +2544,7 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
     with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
         fh.write('FEATURES="${FEATURES} binpkg-multi-instance"\n')
     root = tmp_path / "root147s1"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     pkgdir = tmp_path / "pkgdir147s1"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -2522,6 +2555,10 @@ def test_emerge_buildpkg_layout_stays_run_wide_with_per_entry_build_id(
     env["FEATURES"] = "buildpkg"
     env.pop("BINPKG_COMPRESS", None)
     env.pop("BINPKG_FORMAT", None)
+    # Steady state for this scratch ROOT (the copied configroot's repos
+    # resolve under scratch paths): without their keys the run applies
+    # the fixture updates here, as Portage does on a fresh root.
+    seed_updates_record(root, configroot_updates_dirs(cfg))
     r = subprocess.run(
         [str(emerge_binary), "dev-libs/penvcmppkg", "dev-libs/packagepkg"],
         capture_output=True, text=True, check=False, env=env,
@@ -2966,9 +3003,14 @@ def test_cache_less_repo_metadata_falls_back_to_the_depend_phase(
     # `symlinks=True`: the fixtures config root's `make.profile` is a
     # relative symlink into `repo/profiles/default`; copying it as a
     # directory would break its own `parent` resolution.
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "repos.conf" / "repos.conf").open("a") as fh:
         fh.write(f"\n[porttest]\nlocation = {repo}\n")
+    # Steady state for the copied configroot's repo paths: ROOT and the
+    # running root are the fixtures, so without the scratch-pathed keys
+    # the run would apply the fixture updates to the shared tree (as
+    # Portage does on a fresh root) and print the block.
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
 
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -3054,9 +3096,14 @@ def test_cache_less_repo_metadata_is_written_to_the_depcache(emerge_binary, tmp_
     shutil.rmtree(repo / "metadata" / "md5-cache")
 
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "repos.conf" / "repos.conf").open("a") as fh:
         fh.write(f"\n[porttest]\nlocation = {repo}\n")
+    # Steady state for the copied configroot's repo paths (ROOT and the
+    # running root are the fixtures): without the scratch-pathed keys
+    # the run would apply the fixture updates to the shared tree, as
+    # Portage does on a fresh root, and print the block.
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
 
     depcache = tmp_path / "depcache"
     env = dict(os.environ)
@@ -3156,9 +3203,14 @@ def _stage_md5_validation_repo(emerge_binary, tmp_path, ebuild_text, *,
         cache_dir.mkdir(parents=True)
         (cache_dir / "md5pkg-1.0").write_text(cache_text)
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "repos.conf" / "repos.conf").open("a") as fh:
         fh.write(f"\n[md5test]\nlocation = {repo}\n")
+    # Steady state for the copied configroot's repo paths (ROOT and the
+    # running root are the fixtures): without the scratch-pathed keys
+    # the run would apply the fixture updates to the shared tree, as
+    # Portage does on a fresh root, and print the block.
+    seed_updates_record(FIXTURES_ROOT, configroot_updates_dirs(cfg))
     depcache = tmp_path / "depcache"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -3820,7 +3872,7 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
     # as installed and the resolve doesn't try to pull it in).
     import shutil
 
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -3959,7 +4011,7 @@ def test_emerge_source_merge_writes_only_the_vdb_aux_files_with_values(
     `--pretend` run never writes a vdb (this pin is therefore real
     execution, not a CASES/contract entry)."""
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4013,7 +4065,7 @@ def test_emerge_atom_docompress_compresses_docs_and_repairs_symlinks(
     if shutil.which("bzip2") is None:
         pytest.skip("bzip2 not available on the host")
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4068,7 +4120,7 @@ def test_emerge_instprep_compresses_at_merge_for_source_and_binary(
     atom = "dev-libs/doccompresspkg"
 
     def merge(root, *args):
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         result = subprocess.run(
             [str(emerge_binary), *args, atom],
             capture_output=True,
@@ -4129,7 +4181,7 @@ def test_emerge_emptytree_without_pretend_really_merges(emerge_binary, tmp_path)
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4163,7 +4215,7 @@ def test_emerge_debug_flag_enables_set_x_in_the_build_phases(emerge_binary, tmp_
 
     def _run(extra_args):
         root = tmp_path / ("root" + "".join(extra_args))
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -4200,7 +4252,7 @@ def test_emerge_atom_source_build_sees_the_resolved_use_and_build_flags(
     root = tmp_path / "root"
     import shutil
 
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4247,7 +4299,7 @@ def test_emerge_atom_source_build_package_env_overrides_the_build_flags(
     root = tmp_path / "root"
     import shutil
 
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4295,7 +4347,7 @@ def test_emerge_atom_source_build_package_env_applies_when_the_process_is_silent
     root = tmp_path / "root"
     import shutil
 
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4328,7 +4380,7 @@ def test_standalone_ebuild_setup_sees_the_full_resolved_config_env(
     import shutil
 
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
         fh.write('\nCC="makeconf-cc"\n')
 
@@ -4362,7 +4414,7 @@ def _cfg_with_envdump_tmpdir(tmp_path, probe):
     import shutil
 
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     (cfg / "etc" / "portage" / "env" / "penv-tmpdir").write_text(
         f'PORTAGE_TMPDIR="{probe}"\n'
     )
@@ -4455,7 +4507,7 @@ def test_emerge_atom_source_build_sees_the_per_package_tmpdir(
     probe.mkdir()
     cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
@@ -4480,7 +4532,7 @@ def test_emerge_atom_source_build_fails_for_a_missing_per_package_tmpdir(
     probe = tmp_path / "probe-tmp"  # deliberately not created
     cfg = _cfg_with_envdump_tmpdir(tmp_path, probe)
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
@@ -4502,14 +4554,14 @@ def _cfg_with_splitdebug_env(tmp_path, process_features):
     import shutil
 
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     (cfg / "etc" / "portage" / "env" / "penv-splitdebug").write_text(
         'FEATURES="splitdebug"\n'
     )
     with (cfg / "etc" / "portage" / "package.env").open("a") as fh:
         fh.write("dev-libs/splitdbgpkg penv-splitdebug\n")
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
@@ -4589,7 +4641,7 @@ def test_standalone_ebuild_setup_sees_the_per_package_features(
     import shutil
 
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     (cfg / "etc" / "portage" / "env" / "penv-standalone-features").write_text(
         'FEATURES="standalone-probe"\n'
     )
@@ -4646,7 +4698,7 @@ def test_emerge_atom_with_buildpkg_writes_a_binpkg_and_still_merges(
     def _fresh_root():
         root = tmp_path / f"root{_fresh_root.n}"
         _fresh_root.n += 1
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -4727,7 +4779,7 @@ def test_emerge_usepkg_merges_a_local_pkgdir_binary_without_getbinpkg(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4777,7 +4829,7 @@ def test_emerge_without_display_flags_shows_no_merge_list_like_portage(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4839,7 +4891,7 @@ def test_emerge_oneshot_prints_news_count_notice_twice_like_portage(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4895,7 +4947,7 @@ def test_emerge_buildpkgonly_without_news_feature_prints_no_notice(
     import shutil
 
     root = tmp_path / "root-gated"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -4930,8 +4982,13 @@ def _news_env(tmp_path, name):
     # `resume_backup` residue rather than on this test's own bookkeeping.
     shutil.copytree(
         Path(FIXTURES_ROOT) / "var", root / "var",
-        ignore=shutil.ignore_patterns("mtimedb"),
+        ignore=fixtures_copytree_ignore("mtimedb"),
     )
+    # Steady-state global-updates record for this scratch ROOT: without
+    # it the run would apply the fixture updates here (printing the
+    # block and renaming the copied VDB entries), which is what Portage
+    # does on a fresh root too -- not what the news pins grade.
+    seed_updates_record(root)
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -5181,7 +5238,12 @@ def test_emerge_resume_prints_news_notices_like_portage(emerge_binary, tmp_path)
     assert r.stdout.index("need reading") < r.stdout.index("*** Resuming")
     assert r.stdout.rindex("need reading") > r.stdout.rindex(">>>")
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
-    assert not mtimedb.exists()  # resume list cleared on success
+    # The emptied resume list deletes the `resume` key (Portage
+    # `_emerge/Scheduler.py:1804-1806`); the file stays for the
+    # steady-state `updates` record it also carries.
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert saved["updates"]
 
 
 def test_mrg_remote_success_prints_no_post_merge_notice_like_portage(
@@ -5204,7 +5266,7 @@ def test_mrg_remote_success_prints_no_post_merge_notice_like_portage(
     binhost = _write_tmp_binhost(tmp_path)
     clientetc = _write_tmp_clientetc(tmp_path, binhost)
     root = tmp_path / "root-remote-news"
-    _shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    _shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = _remote_resolve_env(fixture_env, root, clientetc)
     env["FEATURES"] = "news"
     result = subprocess.run(
@@ -5411,7 +5473,7 @@ def test_emerge_ask_merge_sigint_prints_interrupted_without_quitting_like_portag
     import shutil
 
     root = tmp_path / "root-ask-merge-sigint"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -5557,7 +5619,7 @@ def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_portage(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -5632,7 +5694,7 @@ def test_getbinpkg_merge_honours_env_install_mask(emerge_binary, tmp_path):
 
     def _fresh_root(n):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -5788,7 +5850,7 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
 
     # One real gpkg to serve under both build ids.
     root0 = tmp_path / "root0"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var", ignore=fixtures_copytree_ignore())
     env0 = _getbinpkg_500_env(tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir")
     env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
@@ -5818,7 +5880,7 @@ def test_getbinpkg_multi_instance_downloads_the_planned_build(emerge_binary, tmp
         f"[multiinst]\npriority = 1\nsync-uri = file://{binhost}\nverify-signature = false\n"
     )
     root1 = tmp_path / "root1"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root1 / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root1 / "var", ignore=fixtures_copytree_ignore())
     pkgdir = tmp_path / "pkgdir1"
     env = _getbinpkg_500_env(tmp_path, root1, clientetc, pkgdir)
     (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
@@ -5854,7 +5916,7 @@ def test_getbinpkgonly_refuses_a_remote_binary_without_size_and_checksum(
     import shutil
 
     root0 = tmp_path / "root0"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var", ignore=fixtures_copytree_ignore())
     env0 = _getbinpkg_500_env(
         tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir"
     )
@@ -5889,7 +5951,7 @@ def test_getbinpkgonly_refuses_a_remote_binary_without_size_and_checksum(
             f"[nodigest]\npriority = 1\nsync-uri = file://{binhost}\nverify-signature = false\n"
         )
         root = tmp_path / ("root-" + "-".join(sorted(fields)))
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = _getbinpkg_500_env(tmp_path, root, clientetc, tmp_path / "pkgdir-x")
         env["NOCOLOR"] = "true"
         # Portage always prints ROOT with a trailing slash; portuale echoes the
@@ -6056,7 +6118,7 @@ def test_usepkgonly_refuses_hostile_gpkg_archives_like_portage(emerge_binary, tm
     is not compared byte for byte (portuale prefixes the archive path); the `Danger:`
     line and the metadata member name are."""
     root0 = tmp_path / "root0"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var", ignore=fixtures_copytree_ignore())
     env0 = _getbinpkg_500_env(tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir")
     env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
@@ -6096,7 +6158,7 @@ def test_usepkgonly_refuses_hostile_gpkg_archives_like_portage(emerge_binary, tm
     _hostile_gpkg(base, pkgdir / "dev-libs/packagepkg-1.0.gpkg.tar", image, metadata_members)
 
     root = tmp_path / "root-hostile"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = _getbinpkg_500_env(tmp_path, root, Path(FIXTURES_ROOT), pkgdir)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["NOCOLOR"] = "true"
@@ -6178,7 +6240,7 @@ def test_usepkgonly_matches_portage_on_temp_root_and_dotdot_hardlink_shapes(emer
         ),
     }
     root0 = tmp_path / "root0"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root0 / "var", ignore=fixtures_copytree_ignore())
     env0 = _getbinpkg_500_env(tmp_path, root0, Path(FIXTURES_ROOT) / "etc/portage/..", root0 / "pkgdir")
     env0["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
@@ -6201,7 +6263,7 @@ def test_usepkgonly_matches_portage_on_temp_root_and_dotdot_hardlink_shapes(emer
         _hostile_gpkg(base, pkgdir / "dev-libs/packagepkg-1.0.gpkg.tar", image_base + extra, None)
 
         root = tmp_path / f"root-{shape}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = _getbinpkg_500_env(tmp_path, root, Path(FIXTURES_ROOT), pkgdir)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["NOCOLOR"] = "true"
@@ -6239,7 +6301,7 @@ def test_getbinpkg_with_500ing_binhost_falls_back_to_source(emerge_binary, tmp_p
     try:
         clientetc = _clientetc_with_500_binhost(tmp_path, port)
         root = tmp_path / "root"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         pkgdir = tmp_path / "empty-pkgdir"
         pkgdir.mkdir()
         env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
@@ -6306,7 +6368,7 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_portage(
     try:
         clientetc = _clientetc_with_500_binhost(tmp_path, port)
         root = tmp_path / "root"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         pkgdir = tmp_path / "stale-pkgdir"
         build_env = _getbinpkg_500_env(tmp_path, root, clientetc, pkgdir)
         build_env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir-build")
@@ -6376,7 +6438,7 @@ def test_emerge_atom_oneshot_does_not_touch_the_world_file(emerge_binary, tmp_pa
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -6408,7 +6470,7 @@ def test_emerge_slotted_atom_is_recorded_slot_qualified_in_world(emerge_binary, 
 
     def _root(n):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -6458,7 +6520,7 @@ def test_emerge_custom_set_is_recorded_in_world_sets(emerge_binary, tmp_path):
 
     def _root(n):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -6503,7 +6565,7 @@ def test_emerge_jobs_builds_independent_packages_in_parallel(emerge_binary, tmp_
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -6630,7 +6692,7 @@ def test_emerge_serial_merge_status_lines_carry_portages_leading_blank(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -6713,7 +6775,7 @@ def test_emerge_skips_noop_source_phases_like_portage(emerge_binary, tmp_path):
 
     for n, args in enumerate(([], ["--quiet-build=n"])):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -6762,7 +6824,7 @@ def test_emerge_quiet_build_n_still_shows_phases_for_source_packages(
 
     for n, args in enumerate(([], ["--quiet-build=n"])):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -6806,7 +6868,7 @@ def test_emerge_failed_postinst_matches_portage(emerge_binary, tmp_path):
         tag = n[0]
         n[0] += 1
         root = tmp_path / f"root{tag}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         ptdir = tmp_path / f"pt{tag}"
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -6896,7 +6958,7 @@ def test_emerge_quiet_verbose_shows_jobs_lines_without_blanks(
 
     def _run(args, n):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -6963,7 +7025,7 @@ def test_emerge_jobs_failure_shape_counts_failed_exactly_once(
 
     def _run(args, pkgs, n):
         root = tmp_path / f"failroot{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -7031,7 +7093,7 @@ def test_emerge_signal_while_building_stops_the_phase_and_exits_128_plus_n(
 
     for n, (sig, rc) in enumerate([(signal.SIGINT, 130), (signal.SIGTERM, 143)]):
         root = tmp_path / f"sigroot{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         pt = tmp_path / f"sigpt{n}"
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -7068,7 +7130,7 @@ def test_emerge_quiet_build_redirects_a_single_job_build_to_the_log(
 
     def _root(n):
         root = tmp_path / f"root{n}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -7140,7 +7202,7 @@ def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path)
     # Success path, with PORTAGE_LOGDIR: the real log lives in the
     # logdir under the `.log.gz` name; `${T}/build.log.gz` links to it.
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     logdir = tmp_path / "logs"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -7172,7 +7234,7 @@ def test_emerge_compress_build_logs_gzips_the_build_log(emerge_binary, tmp_path)
     # Failure path: the tail folded into the report is decoded, and the
     # header names the `.gz` log.
     root2 = tmp_path / "root2"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root2 / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root2 / "var", ignore=fixtures_copytree_ignore())
     env["ROOT"] = str(root2)
     env["PORTAGE_TMPDIR"] = str(tmp_path / "pt2")
     del env["PORTAGE_LOGDIR"]
@@ -7198,7 +7260,7 @@ def test_emerge_pre_cleans_a_dirty_builddir_before_rebuilding(emerge_binary, tmp
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7246,7 +7308,7 @@ def test_emerge_jobs_with_load_average_still_builds_everything(emerge_binary, tm
 
     for la in ("999", "0.01"):
         root = tmp_path / f"root_{la}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -7273,7 +7335,7 @@ def test_emerge_jobs_keep_going_skips_a_failed_builds_dependents(emerge_binary, 
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7312,7 +7374,7 @@ def test_emerge_atom_upgrade_replaces_the_installed_version(emerge_binary, tmp_p
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7364,7 +7426,7 @@ def test_direct_ebuild_merge_prints_the_portage_listing(emerge_binary, tmp_path)
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7419,7 +7481,7 @@ def test_direct_ebuild_qmerge_replacement_prints_safely_unmerging(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7495,7 +7557,7 @@ def test_emerge_atom_merge_regenerates_the_gnu_info_directory_index(
         pytest.skip("no /usr/bin/install-info on this host")
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     # INFOPATH reaches the post-merge step through the env.d collation
     # Portage `settings.reload(); settings.regenerate()` derives
     # `${ROOT}/etc/profile.env` from.
@@ -7568,7 +7630,7 @@ def test_merge_skips_an_identical_file_preserving_ownership(emerge_binary, tmp_p
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env_args = [
         f"PORTAGE_CONFIGROOT={FIXTURES_ROOT}",
         f"ROOT={root}",
@@ -7643,7 +7705,7 @@ def test_emerge_unmerge_without_pretend_really_removes_and_deselects(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7820,7 +7882,7 @@ def test_emerge_preserved_libs_advisory_and_rebuild_set(emerge_binary, tmp_path)
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -7894,7 +7956,7 @@ def test_emerge_two_consecutive_soname_bumps_replace_the_registry_record(emerge_
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     # A real Gentoo ROOT's `/etc/ld.so.conf` lists `/usr/lib64`, so the
     # consumer in that libdir is found; the merge regenerates the file
     # from env.d `LDPATH` itself.
@@ -7960,7 +8022,7 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -8012,7 +8074,12 @@ def test_emerge_resume_replays_the_saved_mergelist(emerge_binary, tmp_path):
     # resume list records only `cat/pkg-ver`) and counts `(1 of 1)`.
     assert f">>> Completed (1 of 1) dev-libs/schedok-1.0::testrepo to {root}" in r.stdout
     assert (root / "var/db/pkg/dev-libs/schedok-1.0/CONTENTS").is_file()
-    assert not mtimedb.exists()  # resume list cleared on success
+    # The emptied resume list deletes the `resume` key (Portage
+    # `_emerge/Scheduler.py:1804-1806`); the file stays for the
+    # steady-state `updates` record it also carries.
+    saved = json.loads(mtimedb.read_text())
+    assert "resume" not in saved
+    assert saved["updates"]
 
 
 def test_emerge_resume_applies_interactive_packages_like_portage(emerge_binary, tmp_path):
@@ -8026,7 +8093,7 @@ def test_emerge_resume_applies_interactive_packages_like_portage(emerge_binary, 
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -8094,7 +8161,7 @@ def test_emerge_resume_builds_see_the_resolved_build_flags(emerge_binary, tmp_pa
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -8144,7 +8211,7 @@ def test_emerge_resume_carries_the_oneshot_flag(emerge_binary, tmp_path):
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
     (root / "var/lib/portage/world").write_text("")
     env = dict(os.environ)
@@ -8185,7 +8252,7 @@ def test_emerge_resume_stays_quiet_after_a_quiet_run_like_portage(emerge_binary,
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
     (root / "var/lib/portage/world").write_text("")
     env = dict(os.environ)
@@ -8229,7 +8296,7 @@ def test_emerge_resume_skipfirst_on_a_one_item_list_matches_portage(emerge_binar
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     (root / "var/lib/portage").mkdir(parents=True, exist_ok=True)
     (root / "var/lib/portage/world").write_text("")
     env = dict(os.environ)
@@ -8293,7 +8360,7 @@ def test_emerge_binary_merge_uses_the_entrys_package_env_portage_tmpdir(
     import shutil
 
     cfg = tmp_path / "cfg467"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     run_tmp = tmp_path / "run-tmp"
     entry_tmp = tmp_path / "entry-tmp"
     (cfg / "etc/portage/env/penv-tmp467").write_text(f'PORTAGE_TMPDIR="{entry_tmp}"\n')
@@ -8302,7 +8369,7 @@ def test_emerge_binary_merge_uses_the_entrys_package_env_portage_tmpdir(
     with (cfg / "etc/portage/make.conf").open("a") as fh:
         fh.write(f'PORTAGE_TMPDIR="{run_tmp}"\n')
     root = tmp_path / "root467"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
@@ -8326,7 +8393,16 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
     `Scheduler` exists -- and before the `resume_backup` rotation -- so
     a preview never touches `mtimedb["resume"]`. A stale multi-item list
     (one the rotation would also rewrite) must come back byte-identical,
-    and a bare root must gain no `mtimedb` at all."""
+    and a steady-state root must gain no `resume` section.
+
+    The `mtimedb` itself does exist on a steady-state root: Portage
+    `run_action` (`_emerge/actions.py:3933-3960`) runs global updates for
+    every action except help/info/sync/version -- including `--pretend`
+    -- so a fresh root's preview prints the `Performing Global Updates`
+    block and records `mtimedb["updates"]` (verified live against
+    Portage 3.0.83 on a fixture copy: identical block text and identical
+    `updates` key and mtime). Both halves below therefore start from the
+    seeded steady-state record."""
     import json
     import shutil
 
@@ -8349,30 +8425,37 @@ def test_emerge_pretend_writes_no_resume_list(emerge_binary, tmp_path):
         }
     }
 
-    # Bare root: the preview resolves and prints, and leaves no mtimedb.
+    # Steady-state root: the preview resolves and prints, and leaves the
+    # seeded record byte-identical with no `resume` section.
     root = tmp_path / "root-bare"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
-    # test starts from no resume list whatever earlier runs left there.
+    # test starts from the seeded record whatever earlier runs left there.
     (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
+    seed_updates_record(root)
+    before = (root / "var/cache/edb/mtimedb").read_bytes()
     r = subprocess.run(
         [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
         capture_output=True, text=True, check=False, env=_env(root),
     )
     assert r.returncode == 0, r.stderr
     assert "dev-libs/schedok-1.0" in r.stdout
-    assert not (root / "var/cache/edb/mtimedb").exists()
+    assert (root / "var/cache/edb/mtimedb").read_bytes() == before
+    assert "resume" not in json.loads(
+        (root / "var/cache/edb/mtimedb").read_text()
+    )
 
     # Stale list present: byte-identical afterwards (neither a fresh save
     # nor the rotation may run on a preview).
     root = tmp_path / "root-stale"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
     # test starts from no resume list whatever earlier runs left there.
     (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
     mtimedb = root / "var/cache/edb/mtimedb"
     mtimedb.parent.mkdir(parents=True, exist_ok=True)
     mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    seed_updates_record(root)
     before = mtimedb.read_bytes()
     r = subprocess.run(
         [str(emerge_binary), "--pretend", "--oneshot", "dev-libs/schedok"],
@@ -8395,7 +8478,7 @@ def _nothing_to_merge_env(root):
     env["ROOT"] = str(root)
     env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
     env["PORTAGE_TMPDIR"] = str(root / "pt")
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     # fixtures/var/cache is gitignored: drop a leftover mtimedb so the
     # test starts from no resume list whatever earlier runs left there.
     (root / "var/cache/edb/mtimedb").unlink(missing_ok=True)
@@ -8412,6 +8495,12 @@ def _nothing_to_merge_env(root):
         }
     }
     mtimedb.write_text(json.dumps(stale, sort_keys=True))
+    # Steady-state global-updates record alongside the stale list: the
+    # run must leave the file byte-identical, and without the record it
+    # would apply the fixture updates here instead (Portage does the
+    # same on a fresh root -- verified live on Portage 3.0.83, whose
+    # `--pretend` prints the block and records the identical key).
+    seed_updates_record(root)
     return env, mtimedb, mtimedb.read_bytes()
 
 
@@ -8710,7 +8799,12 @@ def _non_candidate_set_configroot(tmp_path, tag, world_candidate):
 def _non_candidate_set_env(root, configroot):
     env, mtimedb, before = _nothing_to_merge_env(root)
     env["PORTAGE_CONFIGROOT"] = str(configroot)
-    return env, mtimedb, before
+    # The private configroot mirrors the fixture repos (symlinked), so
+    # the run compares configroot-pathed updates keys: seed those too,
+    # or the run applies the fixture updates on this scratch ROOT (as
+    # Portage does on a fresh root) instead of leaving the file alone.
+    seed_updates_record(root, configroot_updates_dirs(configroot))
+    return env, mtimedb, mtimedb.read_bytes()
 
 
 def test_emerge_non_candidate_set_selective_noop_is_not_deferred(
@@ -8808,7 +8902,7 @@ def test_emerge_non_candidate_set_is_not_recorded_on_success_path(
 
     cfg = _non_candidate_set_configroot(tmp_path, "succ", False)
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
     env["ROOT"] = str(root)
@@ -8852,7 +8946,7 @@ def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary
     # Fresh binary merge first, on its own root: the `::repo` a resumed
     # entry must equal.
     fresh = tmp_path / "root-fresh"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", fresh / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", fresh / "var", ignore=fixtures_copytree_ignore())
     r = subprocess.run(
         [str(emerge_binary), "-k", "--oneshot", "dev-libs/binaryonlypkg"],
         capture_output=True, text=True, check=False, env=_env(fresh),
@@ -8866,7 +8960,7 @@ def test_emerge_resume_replays_a_binary_entry_with_the_binary_repo(emerge_binary
     # A mixed run: schedbad fails, the binary is never attempted, and the
     # saved list records both kinds.
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     r = subprocess.run(
         [str(emerge_binary), "-k", "--oneshot", "dev-libs/schedbad", "dev-libs/binaryonlypkg"],
         capture_output=True, text=True, check=False, env=_env(root),
@@ -8910,7 +9004,7 @@ def test_emerge_elog_echo_prints_a_message_summary(emerge_binary, tmp_path):
 
     def _emerge(env_extra):
         root = tmp_path / f"root{len(env_extra)}_{sum(len(v) for v in env_extra.values())}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -8950,7 +9044,7 @@ def test_emerge_elog_save_and_save_summary_write_log_files(emerge_binary, tmp_pa
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     logdir = tmp_path / "logs"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -9026,7 +9120,7 @@ def _mail_env(tmp_path, root, extra=None):
     import shutil
 
     if not (root / "var").exists():
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -9259,7 +9353,7 @@ def test_standalone_ebuild_merge_applies_package_env_build_vars(emerge_binary, t
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -9343,7 +9437,7 @@ def test_standalone_ebuild_package_env_cc_reaches_the_tc_is_lto_probe(
     import shutil
 
     cfg = tmp_path / "cfg"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     stub = tmp_path / "stub-cc"
     stub.write_text(
         "#!/bin/sh\n"
@@ -9356,7 +9450,7 @@ def test_standalone_ebuild_package_env_cc_reaches_the_tc_is_lto_probe(
         fh.write("dev-libs/penvccpkg penv-cc\n")
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     portage_tmpdir = tmp_path / "pt"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = str(cfg)
@@ -9391,7 +9485,7 @@ def test_emerge_unmerge_processes_prerm_postrm_elog(emerge_binary, tmp_path):
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     logdir = tmp_path / "logs"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -9442,7 +9536,7 @@ def test_emerge_upgrade_in_place_processes_the_old_versions_rm_elog(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     logdir = tmp_path / "logs"
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -9606,7 +9700,7 @@ def test_emerge_ask_prompts_before_a_real_merge_and_honours_the_answer(
     def _run(answer, extra):
         counter[0] += 1
         root = tmp_path / f"root{counter[0]}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -9637,7 +9731,7 @@ def test_emerge_ask_prompts_before_a_real_unmerge(emerge_binary, tmp_path):
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -9662,7 +9756,7 @@ def test_emerge_unmerge_with_pretend_still_only_previews(emerge_binary, tmp_path
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -10018,7 +10112,7 @@ def test_emerge_unmerge_shell_flag_reaches_prerm_postrm(emerge_binary, tmp_path)
     )
     for shell in ("brush", "bash"):
         root = tmp_path / f"root-{shell}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -10187,7 +10281,7 @@ def test_emerge_unmerge_backup_make_conf_binpkg_format_xpak_is_obeyed(
     import tarfile as _tarfile
 
     cfg = tmp_path / "cfg173unmerge"
-    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True)
+    shutil.copytree(Path(FIXTURES_ROOT), cfg, symlinks=True, ignore=fixtures_copytree_ignore())
     with (cfg / "etc" / "portage" / "make.conf").open("a") as fh:
         fh.write('\nBINPKG_FORMAT="xpak"\n')
 
@@ -11989,7 +12083,6 @@ def _t562_updates_record(root):
     return json.loads(mtimedb.read_text()).get("updates", {})
 
 
-@pytest.mark.xfail(strict=True, reason="#576")
 def test_applied_updates_force_prints_the_autoclean_tail(
     emerge_binary, tmp_path, fixtures_root
 ):
@@ -12023,7 +12116,6 @@ def test_applied_updates_force_prints_the_autoclean_tail(
     ), updates
 
 
-@pytest.mark.xfail(strict=True, reason="#576")
 def test_applied_updates_force_repeats_silently_in_the_same_root(
     emerge_binary, tmp_path, fixtures_root
 ):
@@ -12075,7 +12167,6 @@ def test_applied_updates_force_skipped_under_package_moves_n(
     assert _t562_updates_record(root) == {}
 
 
-@pytest.mark.xfail(strict=True, reason="#576")
 def test_applied_updates_force_overrides_explicit_autoclean_no(
     emerge_binary, tmp_path, fixtures_root
 ):
@@ -12354,7 +12445,13 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
     root (`LLM/evidence/2026-10-18-401-s0/portage-cells.txt` in portuale), modulo the
     wall-clock seconds portuale cuts (and, on the failure path, the trailing `/`
     Portage puts on `ROOT` in the `Failed to emerge` line — the `Fetching` line
-    now carries it since backlog #566)."""
+    now carries it since backlog #566).
+
+    Fetch-only still creates the empty vdb dir: Portage takes the vdb
+    lock on every gated run including fetch (`_global_updates.py:42-46`)
+    and the lock ensures its directory (`dbapi/vartree.py:460-477`,
+    `_dbroot` at `:410`). No entries, no world, no `mtimedb` (this repo
+    carries no `profiles/updates`, and fetch paths save no resume list)."""
     root = _fetchonly_root(tmp_path)
     cmd = "cp {src} \"${{DISTDIR}}/${{FILE}}\"".format(src=tmp_path / "src/probe-1.tar.gz")
     env = dict(os.environ)
@@ -12411,8 +12508,13 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
         assert result.stderr == "!!! Couldn't download 'probe-1.tar.gz'. Aborting.\n" + (
             summary if "--keep-going" in argv else ""
         )
-    # Fetch-only never writes the vdb, the world file or the resume list.
-    assert not (tmp_path / "root/var").exists()
+    # Fetch-only never writes vdb entries, the world file or the resume
+    # list -- but the run takes the vdb lock, which ensures the (empty)
+    # vdb dir on both managers (see the docstring).
+    assert (tmp_path / "root/var/db/pkg").is_dir()
+    assert list((tmp_path / "root/var/db/pkg").iterdir()) == []
+    assert not (tmp_path / "root/var/cache").exists()
+    assert not (tmp_path / "root/var/lib").exists()
 
 
 def _fetchonly_extra_packages(root):
@@ -12520,7 +12622,12 @@ def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
     assert result.returncode == rc, (result.stdout, result.stderr)
     assert result.stdout.endswith(stdout_tail.format(root=tmp_path / "root")), result.stdout
     assert result.stderr == stderr
-    assert not (tmp_path / "root/var").exists()
+    # As in the fetchonly pin above: the vdb lock ensures the empty vdb
+    # dir on both managers; nothing else is written (no entries, no
+    # world, no `mtimedb`).
+    assert list((tmp_path / "root/var/db/pkg").iterdir()) == []
+    assert not (tmp_path / "root/var/cache").exists()
+    assert not (tmp_path / "root/var/lib").exists()
 
 
 @pytest.mark.parametrize("argv", [["--resume", "-f"], ["--resume", "-pf"]])
@@ -12579,7 +12686,10 @@ def test_emerge_resume_fetchonly_fetches_without_merging_like_portage(
         assert (tmp_path / "dist/probe-1.tar.gz").is_file()
     assert result.stderr == ""
     assert (tmp_path / "root/var/cache/edb/mtimedb").read_bytes() == saved
-    assert not (tmp_path / "root/var/db").exists()
+    # The resume run fetches without merging: the vdb lock ensures the
+    # empty vdb dir on both managers (see the fetchonly pin), and no
+    # entries land.
+    assert list((tmp_path / "root/var/db/pkg").iterdir()) == []
 
 
 def test_direct_ebuild_merge_refuses_an_image_path_with_a_line_ending(
@@ -12595,7 +12705,7 @@ def test_direct_ebuild_merge_refuses_an_image_path_with_a_line_ending(
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -12963,7 +13073,7 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
@@ -13035,7 +13145,7 @@ def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_pa
 
     def run(name, args):
         root = tmp_path / f"{name}-root"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -13100,7 +13210,7 @@ def test_emerge_merges_an_idepend_dep_into_the_running_root_only_when_allowed(
         root = tmp_path / f"{name}-root"
         running = tmp_path / f"{name}-running"
         for r in (root, running):
-            shutil.copytree(Path(FIXTURES_ROOT) / "var", r / "var")
+            shutil.copytree(Path(FIXTURES_ROOT) / "var", r / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env.update(
             PORTAGE_CONFIGROOT=FIXTURES_ROOT,
@@ -13229,7 +13339,7 @@ def test_emerge_binary_merge_prints_the_extract_lines_like_portage(emerge_binary
 
     def _run(tag, *args):
         root = tmp_path / f"root{tag}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
         env["ROOT"] = str(root)
@@ -13295,7 +13405,7 @@ def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
         tag = n[0]
         n[0] += 1
         root = tmp_path / f"root{tag}"
-        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+        shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         ptdir = tmp_path / f"pt{tag}"
         env = dict(os.environ)
         env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
@@ -13395,7 +13505,7 @@ def test_emerge_resume_pretend_marks_installed_entry_reinstall(emerge_binary, tm
     import shutil
 
     root = tmp_path / "root"
-    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var")
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
     env = dict(os.environ)
     env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
     env["ROOT"] = str(root)
