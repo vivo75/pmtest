@@ -1,0 +1,10 @@
+DEFINED_PHASES=-
+DESCRIPTION=global-updates fixture: slotmoved 0 -> 1
+EAPI=8
+HOMEPAGE=https://example.invalid
+IUSE=slotflag
+KEYWORDS=amd64
+LICENSE=GPL-2
+RDEPEND=dev-libs/oldpkg
+SLOT=0
+_md5_=ff31c410e83a571c24c58241a7265ee0

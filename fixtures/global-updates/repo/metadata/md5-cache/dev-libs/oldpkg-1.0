@@ -1,0 +1,10 @@
+DEFINED_PHASES=-
+DESCRIPTION=global-updates fixture: old name, moved to dev-libs/newpkg
+EAPI=8
+HOMEPAGE=https://example.invalid
+IUSE=oldflag
+KEYWORDS=amd64
+LICENSE=GPL-2
+RDEPEND=dev-libs/slotpkg:0
+SLOT=0
+_md5_=8a173f2cb51da653e8c22d0fab842d52

@@ -1,0 +1,9 @@
+DEFINED_PHASES=-
+DESCRIPTION=global-updates fixture: depends on the moved packages
+EAPI=8
+HOMEPAGE=https://example.invalid
+KEYWORDS=amd64
+LICENSE=GPL-2
+RDEPEND=dev-libs/oldpkg dev-libs/slotpkg:0
+SLOT=0
+_md5_=172e4a83feaf315b5a83c0fc44709d73
