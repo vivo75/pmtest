@@ -15608,6 +15608,61 @@ def test_repo_name_section_mismatch_drops_the_repo_with_a_warning(
     )
 
 
+def test_repos_conf_bad_sections_warn_once_in_file_order(
+    emerge_binary, tmp_path
+):
+    """Two bad `repos.conf` sections -- `[zeta-noloc]` with no `location`
+    attribute and `[alpha-badloc]` pointing at a nonexistent directory --
+    each print their `!!!` line exactly once, in file order (`zeta`
+    before `alpha`, though sorted order would be the reverse). Portage
+    `RepoConfigLoader.__init__` (`repository/config.py:1072-1106`) walks
+    the sections once, in file order, warning as it goes; the loader runs
+    once per process, so one `emerge -p` prints each line once (S0: the
+    3.0.83 loader on this same tree prints the two lines in file order,
+    once)."""
+    cfg = tmp_path / "cfg"
+    repo = tmp_path / "the-repo"
+    bad_dir = tmp_path / "does-not-exist"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (cfg / "etc/portage/repos.conf").write_text(
+        "[DEFAULT]\nmain-repo = goodrepo\n\n"
+        "[zeta-noloc]\npriority = 5\n\n"
+        "[alpha-badloc]\nlocation = " + str(bad_dir) + "\n\n"
+        "[goodrepo]\nlocation = " + str(repo) + "\n"
+    )
+    (repo / "profiles").mkdir(parents=True)
+    (repo / "metadata/md5-cache/dev-libs").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("goodrepo\n")
+    (repo / "profiles/make.defaults").write_text('ACCEPT_KEYWORDS="amd64"\n')
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles")
+    pkgdir = repo / "dev-libs/goodpkg"
+    pkgdir.mkdir(parents=True)
+    goodpkg_ebuild = 'EAPI=8\nDESCRIPTION="x"\nSLOT="0"\nKEYWORDS="amd64"\n'
+    (pkgdir / "goodpkg-1.0.ebuild").write_text(goodpkg_ebuild)
+    # A *valid* entry: #46 S3 validates `_md_` in the read path.
+    (repo / "metadata/md5-cache/dev-libs/goodpkg-1.0").write_text(
+        "DEFINED_PHASES=-\nDEPEND=\nDESCRIPTION=x\nEAPI=8\nIUSE=\n"
+        "KEYWORDS=amd64\nRDEPEND=\nSLOT=0\n"
+        f"_md5_={hashlib.md5(goodpkg_ebuild.encode()).hexdigest()}\n"
+    )
+    write_repo_categories(repo)
+    seed_updates_record(cfg)
+    env = {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+
+    rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/goodpkg"], env)
+    assert rust.returncode == 0
+    lines = [
+        line
+        for line in rust.stderr.splitlines()
+        if "missing location attribute" in line or "nonexistent directory" in line
+    ]
+    assert lines == [
+        "!!! Section 'zeta-noloc' in repos.conf is missing location attribute",
+        "!!! Section 'alpha-badloc' in repos.conf has location attribute set "
+        f"to nonexistent directory: '{bad_dir}'",
+    ]
+
+
 def test_profile_parent_resolves_an_aliased_repo_name(
     emerge_binary, tmp_path, fixtures_root
 ):
