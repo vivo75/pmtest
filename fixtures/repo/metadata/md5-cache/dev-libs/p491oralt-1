@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #491-or sibling selected over a deselected slot-operator || branch
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f2077e9a972f9b2b636211f72a2352ca

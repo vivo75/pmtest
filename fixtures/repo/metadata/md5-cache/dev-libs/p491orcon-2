@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #491-or replacement parent accepting the new child subslot (installed -1 carries the slot-operator atom in a deselected || branch)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/p491lib-1:6
+SLOT=6
+_md5_=c1138b127d971d8368a77cb45a46f33b
