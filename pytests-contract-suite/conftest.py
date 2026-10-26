@@ -1,6 +1,7 @@
 import configparser
 import fcntl
 import getpass
+import hashlib
 import json
 import os
 import shutil
@@ -273,14 +274,184 @@ def _reclaim_portuale_bin_overlays(base: Path) -> None:
         shutil.rmtree(stale, ignore_errors=True)
 
 
+# --- host guards ---------------------------------------------------------------
+#
+# Global updates run before every emerge: Portage's `run_action`
+# applies `profiles/updates/*` moves to the target root and to the
+# running root, then records each updates file's mtime under
+# `mtimedb["updates"]` and commits the running root's mtimedb. As root
+# with `PORTAGE_RUNNING_ROOT=/` (several suite tests set it on purpose,
+# and many build their env from `os.environ`), a suite run would apply
+# the host's unrecorded updates and rewrite the host's
+# `/var/cache/edb/mtimedb`. Two guards, both session-wide:
+#
+# A. Refuse to start as root unless `PMTEST_ALLOW_ROOT=1` is set,
+#    checked first in `pytest_configure` below.
+# B. Fingerprint the host paths global updates would write and compare
+#    at session end; any difference fails the session. Read-only: never
+#    writes to either path. Under xdist only the controller
+#    fingerprints (workers see `workerinput` on their config).
+
+_HOST_MTIMEDB = Path("/var/cache/edb/mtimedb")
+_HOST_VDB_DIR = Path("/var/db/pkg")
+
+
+def root_guard_message(euid, env=None) -> str | None:
+    """Why this session must not start, or `None` when it may.
+
+    Pure (takes the uid and env as arguments) so unit tests pin the
+    decision table without faking the process uid: root without
+    `PMTEST_ALLOW_ROOT=1` gets the refusal text, anything else gets
+    `None`. `env` defaults to the process environment.
+    """
+    if euid != 0:
+        return None
+    if (env if env is not None else os.environ).get("PMTEST_ALLOW_ROOT") == "1":
+        return None
+    return (
+        "refusing to run the contract suite as root: global updates run "
+        "before every emerge and would apply the host's unrecorded "
+        "profiles/updates moves and rewrite the host's "
+        "/var/cache/edb/mtimedb. Run as a normal user, or set "
+        "PMTEST_ALLOW_ROOT=1 to take responsibility for the host."
+    )
+
+
+def _sentinel_paths() -> tuple[Path, Path]:
+    """The `(mtimedb, vdb dir)` the session sentinel watches.
+
+    `PMTEST_HOST_SENTINEL_PATHS` (`"<mtimedb>:<vdb dir>"`) redirects
+    both; it exists only so the sentinel's own tests can point it at
+    scratch paths, never for normal runs.
+    """
+    override = os.environ.get("PMTEST_HOST_SENTINEL_PATHS")
+    if override:
+        parts = override.split(os.pathsep)
+        if len(parts) >= 2 and parts[0] and parts[1]:
+            return Path(parts[0]), Path(parts[1])
+    return _HOST_MTIMEDB, _HOST_VDB_DIR
+
+
+def fingerprint_host_state() -> dict:
+    """Fingerprint the `_sentinel_paths()` host paths: the mtimedb
+    file's existence, size, mtime_ns and sha256, plus the vdb
+    directory's own mtime_ns (a move or slotmove changes it).
+    Read-only; a missing file is a valid state (`exists: False`)."""
+    mtimedb, vdb_dir = _sentinel_paths()
+    try:
+        digest = hashlib.sha256()
+        with open(mtimedb, "rb") as handle:
+            for chunk in iter(lambda: handle.read(1 << 16), b""):
+                digest.update(chunk)
+        stat = os.stat(mtimedb)
+    except OSError:
+        mtimedb_state: dict = {"path": str(mtimedb), "exists": False}
+    else:
+        mtimedb_state = {
+            "path": str(mtimedb),
+            "exists": True,
+            "size": stat.st_size,
+            "mtime_ns": stat.st_mtime_ns,
+            "sha256": digest.hexdigest(),
+        }
+    try:
+        vdb_stat = os.stat(vdb_dir)
+    except OSError:
+        vdb_state: dict = {"path": str(vdb_dir), "exists": False}
+    else:
+        vdb_state = {
+            "path": str(vdb_dir),
+            "exists": True,
+            "mtime_ns": vdb_stat.st_mtime_ns,
+        }
+    return {"mtimedb": mtimedb_state, "vdb": vdb_state}
+
+
+def diff_host_state(before: dict, after: dict) -> list[str]:
+    """One human-readable line per sentinel path whose fingerprint
+    changed between session start (`before`) and end (`after`);
+    empty when nothing changed."""
+    changes = []
+    for key in ("mtimedb", "vdb"):
+        old, new = before.get(key, {}), after.get(key, {})
+        if old == new:
+            continue
+        path = new.get("path", old.get("path", key))
+        if old.get("exists") != new.get("exists"):
+            then = "missing" if not old.get("exists") else "present"
+            now = "missing" if not new.get("exists") else "present"
+            changes.append(f"{key} {path}: {then} at session start, {now} at session end")
+            continue
+        details = []
+        for field in ("size", "mtime_ns", "sha256"):
+            if old.get(field) != new.get(field):
+                old_value, new_value = old.get(field), new.get(field)
+                if (
+                    field == "sha256"
+                    and isinstance(old_value, str)
+                    and isinstance(new_value, str)
+                ):
+                    old_value, new_value = old_value[:12], new_value[:12]
+                details.append(f"{field} {old_value} -> {new_value}")
+        changes.append(f"{key} {path} changed: {'; '.join(details) or 'metadata changed'}")
+    return changes
+
+
+_host_sentinel_before: dict | None = None
+
+
+def pytest_sessionstart(session):
+    """Fingerprint the host sentinel paths (controller only under xdist)."""
+    global _host_sentinel_before
+    if hasattr(session.config, "workerinput"):
+        return
+    _host_sentinel_before = fingerprint_host_state()
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Fail the session if the host sentinel paths changed underneath
+    it (controller only under xdist). Setting `session.exitstatus`
+    here changes the process exit code, since pytest returns it after
+    running this hook."""
+    if hasattr(session.config, "workerinput"):
+        return
+    global _host_sentinel_before
+    before = _host_sentinel_before
+    _host_sentinel_before = None
+    if before is None:
+        return
+    changes = diff_host_state(before, fingerprint_host_state())
+    if not changes:
+        return
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.section("host sentinel: host paths changed during the session")
+        for line in changes:
+            reporter.line(f"  - {line}")
+    else:  # pragma: no cover - terminalreporter is always present in practice
+        print(
+            "[pmtest] host sentinel: host paths changed during the session:",
+            *changes,
+            sep="\n  - ",
+            file=sys.stderr,
+        )
+    if not session.exitstatus:
+        session.exitstatus = 1
+
+
 @pytest.hookimpl(tryfirst=True)
 def pytest_configure(config):
-    """Point pytest's own `tmp_path`/`tmp_path_factory` machinery at a
-    single, reused, real-disk directory (see the module docstring above
-    for why this has to happen here, via `config.option.basetemp`,
-    rather than via `$TMPDIR`), reclaiming it from any previous session
-    first; then fail fast on a filesystem that is already too full to
-    run on at all.
+    """Refuse a run as root first; then point pytest's own
+    `tmp_path`/`tmp_path_factory` machinery at a single, reused,
+    real-disk directory (see the module docstring above for why this
+    has to happen here, via `config.option.basetemp`, rather than via
+    `$TMPDIR`), reclaiming it from any previous session first; then
+    fail fast on a filesystem that is already too full to run on at
+    all.
+
+    The root refusal runs before the reclaim and the updates-record
+    seeding below touch anything, so a refused session leaves no
+    trace.
 
     `tryfirst=True` + module-level registration order isn't a guarantee
     pytest documents, so this doesn't *rely* on running before
@@ -290,6 +461,9 @@ def pytest_configure(config):
     alone entirely, i.e. pytest's own default `/tmp` numbered-dir
     behaviour, rather than risking a hard crash from a half-wiped fixed
     path with no retry."""
+    refusal = root_guard_message(os.geteuid())
+    if refusal is not None:
+        pytest.exit(refusal, returncode=4)
     if config.option.basetemp is None:
         _TMP_BASE_PATH = Path(_TMP_BASE)
         _TMP_BASE_PATH.mkdir(parents=True, exist_ok=True)

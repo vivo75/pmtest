@@ -256,6 +256,33 @@ misurato: circa 5,5 ms per invocazione. Self-test del filtro:
   on-disk (frammenti di directory, `DEFAULT`, alias) che gli utenti usano
   davvero, e il corpus andrebbe ri-keyato.
 
+## Guardia anti-host (backlog #586)
+
+Gli aggiornamenti globali girano prima di ogni `emerge`: Portage li
+applica alla radice target e alla radice di esecuzione, poi registra
+ogni file `profiles/updates/*` sotto `mtimedb["updates"]` e salva il
+`mtimedb` della radice di esecuzione. Una run come root con
+`PORTAGE_RUNNING_ROOT=/` (diversi test lo impostano di proposito, e
+molti costruiscono l'env da `os.environ`) applicherebbe quindi gli
+aggiornamenti non registrati dell'host e riscriverebbe il suo
+`/var/cache/edb/mtimedb`. Due guardie in
+`pytests-contract-suite/conftest.py`:
+
+- **Divieto di root.** La sessione non parte come root (`os.geteuid()
+  == 0`) a meno che `PMTEST_ALLOW_ROOT=1` sia impostato; il controllo è
+  la prima cosa in `pytest_configure`, prima che reclaim e seeding
+  tocchino alcunché.
+- **Sentinella.** A inizio e fine sessione confronta l'impronta dei path
+  dell'host che gli aggiornamenti globali scriverebbero:
+  esistenza/dimensione/mtime/sha256 di `/var/cache/edb/mtimedb` e mtime
+  della directory `/var/db/pkg` (una move o slotmove la cambia). Se
+  qualcosa differisce, la sessione fallisce con codice diverso da zero
+  e un messaggio che elenca cosa è cambiato. Non scrive mai su questi
+  path. Sotto xdist (`scripts/pytest-parallel.sh`) solo il controller
+  confronta (i worker vedono `workerinput` e non fanno nulla).
+  `PMTEST_HOST_SENTINEL_PATHS` ridirige entrambi i path ed è solo per i
+  test della sentinella stessa (`test_host_guard.py`), mai per run veri.
+
 ## Registrazioni del terminale (backlog #443)
 
 `scripts/cast_cells.py [--out DIR]` esegue 8 celle `--pretend` sotto Portage e
