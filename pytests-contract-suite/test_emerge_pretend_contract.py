@@ -5835,7 +5835,7 @@ def test_or_group_alternative_yields_to_the_next_when_backtracking_masks_it(
         f'[ebuild  N     ] dev-libs/orbtblocked-1.0 to {fixture_env["ROOT"]}',
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/orbttool:0",
+        f"dev-libs/orbttool:0{_for_root(fixture_env["ROOT"])}",
         "",
         f"  (dev-libs/orbttool-2.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    =dev-libs/orbttool-1.0 required by (dev-libs/orbtblocked-1.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
@@ -9851,7 +9851,7 @@ def test_autounmask_keep_keywords_y_falls_back_to_the_older_stable_version(
         "",
         "!!! The following update has been skipped due to unsatisfied dependencies:",
         "",
-        "dev-libs/akk0a:0",
+        f"dev-libs/akk0a:0{_for_root(fixture_env["ROOT"])}",
         "",
         "  selected: (dev-libs/akk0a-1:0/0::testrepo, ebuild scheduled for merge)",
         "  skipped: (dev-libs/akk0a-2:0/0::testrepo, ebuild scheduled for merge) (see unsatisfied dependency below)",
@@ -10020,7 +10020,7 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
         f'[ebuild  N     ] dev-libs/abk0d-1 to {env["ROOT"]}',
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/abk0a:0",
+        f"dev-libs/abk0a:0{_for_root(root)}",
         "",
         f"  (dev-libs/abk0a-3:0/0::testrepo, ebuild scheduled for merge to '{env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    <dev-libs/abk0a-3 required by (dev-libs/abk0b-1:0/0::__unknown__, installed in '{root}') USE=\"\"",
@@ -15159,7 +15159,7 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
 
     def warn(skipped_version, atom, parent):
         return [
-            "dev-libs/blk0x:0",
+            f"dev-libs/blk0x:0{_for_root(fixture_env["ROOT"])}",
             "",
             f"  (dev-libs/blk0x-{skipped_version}:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
             f"    {atom} required by (dev-libs/{parent}-1:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
@@ -15178,7 +15178,7 @@ def test_upstream_blocker_pg0_all_orders_pin_x1_and_uninstall_y1(
     # `b c a` (bed `l0-fx-20260927T125711Z`) — one `-3` block with
     # both parents inside, not one block per parent.
     warn_x3_bc = [
-        "dev-libs/blk0x:0",
+        f"dev-libs/blk0x:0{_for_root(fixture_env["ROOT"])}",
         "",
         f"  (dev-libs/blk0x-3:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    <dev-libs/blk0x-2 required by (dev-libs/blk0b-1:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
@@ -16503,7 +16503,7 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         f'[ebuild  N     ] dev-libs/btparent-1.0 to {fixture_env["ROOT"]}',
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/bttarget:0",
+        f"dev-libs/bttarget:0{_for_root(fixture_env["ROOT"])}",
         "",
         f"  (dev-libs/bttarget-2.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    <dev-libs/bttarget-2.0 required by (dev-libs/btpin-1.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
@@ -16513,7 +16513,7 @@ def test_unsolvable_slot_conflict_resolved_by_masking_a_puller_version(
         "!!! The following update(s) have been skipped due to unsatisfied dependencies",
         "!!! triggered by backtracking:",
         "",
-        "dev-libs/btconsumer:0",
+        f"dev-libs/btconsumer:0{_for_root(fixture_env["ROOT"])}",
     ]
 
     r0 = _run(
@@ -24153,7 +24153,7 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
     assert lines[at:] == [
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/btra:0",
+        f"dev-libs/btra:0{_for_root(root)}",
         "",
         f"  (dev-libs/btra-2:0/0::testrepo, ebuild scheduled for merge to '{root}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    <dev-libs/btra-2 required by (dev-libs/btrd-1:0/0::testrepo, installed in '{root}') USE=\"\"",
@@ -24163,7 +24163,7 @@ def test_oracle_backtrack_masks_are_discarded_with_their_reason(
         "!!! The following update(s) have been skipped due to unsatisfied dependencies",
         "!!! triggered by backtracking:",
         "",
-        "dev-libs/btrc:0",
+        f"dev-libs/btrc:0{_for_root(root)}",
     ]
     assert rust.stderr == ""
 
@@ -24410,13 +24410,13 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
         f'[ebuild  N     ]  dev-libs/mgxc-1 to {fixture_env["ROOT"]}',
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/mgxc:0",
+        f"dev-libs/mgxc:0{_for_root(fixture_env["ROOT"])}",
         "",
         f"  (dev-libs/mgxc-2:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    =dev-libs/mgxc-1 required by (dev-libs/mgxa-1:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
         "    ^              ^",
         "",
-        "dev-libs/mgfc:0",
+        f"dev-libs/mgfc:0{_for_root(fixture_env["ROOT"])}",
         "",
         f"  (dev-libs/mgfc-3.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    =dev-libs/mgfc-1 required by (dev-libs/mgfa-1:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
@@ -24426,8 +24426,8 @@ def test_tree_mg2top_nests_backtrack_parents_under_the_earliest_puller(
         "!!! The following update(s) have been skipped due to unsatisfied dependencies",
         "!!! triggered by backtracking:",
         "",
-        "dev-libs/mgxb:0",
-        "dev-libs/mgfb:0",
+        f"dev-libs/mgxb:0{_for_root(fixture_env["ROOT"])}",
+        f"dev-libs/mgfb:0{_for_root(fixture_env["ROOT"])}",
     ]
 
 
@@ -25758,12 +25758,12 @@ def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
             assert rust.returncode == 0, (budget, atoms)
             out = rust.stdout
             heads = [
-                line for line in out.splitlines() if line.endswith(":0")
+                line for line in out.splitlines() if line.endswith(_for_root(env["ROOT"]))
                 and line.startswith("dev-libs/")
             ]
             assert heads == [
-                "dev-libs/slotconflicttarget:0",
-                "dev-libs/whblocker:0",
+                f"dev-libs/slotconflicttarget:0{_for_root(env['ROOT'])}",
+                f"dev-libs/whblocker:0{_for_root(env['ROOT'])}",
             ], (budget, atoms, out)
 
 
@@ -28766,7 +28766,7 @@ def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
             f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {fixture_env["ROOT"]}',
             "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
             "",
-            "dev-libs/slotconflicttarget:0",
+            f"dev-libs/slotconflicttarget:0{_for_root(fixture_env["ROOT"])}",
             "",
             f"  (dev-libs/slotconflicttarget-2.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
             f"    <dev-libs/slotconflicttarget-2.0 required by (dev-libs/slotconflictoldconsumer-1.0:0/0::testrepo, ebuild scheduled for merge to '{fixture_env['ROOT']}') USE=\"\" ELIBC=\"glibc\"",
@@ -28830,7 +28830,7 @@ def test_oracle_210_slot_change_reinstall_withheld_with_a_skip_notice(
     assert result.stdout.splitlines() == [
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/reinstslottarget:0",
+        f"dev-libs/reinstslottarget:0{_for_root(root)}",
         "",
         f"  (dev-libs/reinstslottarget-1.0:0/2::testrepo, ebuild scheduled for merge to '{env["ROOT"]}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    dev-libs/reinstslottarget:0/1 required by (dev-libs/reinstslotconsumer-1.0:0/0::testrepo, installed in '{root}') USE=\"\"",
@@ -34018,7 +34018,7 @@ def test_f484_old_build_warns_the_skipped_binary_update_like_portage(
     `depgraph.py::_get_missed_updates` flags it). Portuale renders
     missed-update notices on stdout after the merge rows (the `akk0a`
     precedent), `to '<root>'` without Portage's trailing slash, no
-    `for <root>` slot-line suffix, `ELIBC="glibc"` on the binary line as
+    `for <root>/` suffix kept on the header line (#593), `ELIBC="glibc"` on the binary line as
     on every portuale conflict-selected line, and its usual blank-line
     layout instead of Portage's `^^^^^` marker. The pre-fix portuale
     printed no warning at all (it merged the binary with `[binary R]`)."""
@@ -34032,7 +34032,7 @@ def test_f484_old_build_warns_the_skipped_binary_update_like_portage(
         "Total: 1 package (1 upgrade), Size of downloads: 0 KiB",
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "app-misc/f484-mime:0",
+        f"app-misc/f484-mime:0{_for_root(root)}",
         "",
         f"  (app-misc/f484-mime-1.0-1:0/0::testrepo, binary scheduled for merge to '{root}') USE=\"-nginx\" ELIBC=\"glibc\" conflicts with",
         f"    app-misc/f484-mime[nginx] required by (www-servers/f484-ng-2.0:0/0::testrepo, ebuild scheduled for merge to '{root}') USE=\"\" ELIBC=\"glibc\"",
@@ -36232,8 +36232,8 @@ def test_skip_block_keeps_the_built_atom_and_drops_non_selected_or_branches(
     `:0/5.42=` lines, 15 portuale-only `=5.38*`/`=5.40*` lines. Before
     this slice portuale printed the three `=5.3x*` arms and no built
     form. Expected text is the oracle's block in portuale's own
-    destination convention (quoted `to '<root>'`, no `for <root>` line —
-    the same convention every other skip-block pin carries)."""
+    destination convention (quoted `to '<root>'`; the header carries
+    Portage's ` for <root>/` since #593)."""
     root = fixture_env["ROOT"]
     rust = _run([str(emerge_binary)], ["--pretend", "dev-libs/p569pull"], fixture_env)
     assert rust.returncode == 0
@@ -36243,7 +36243,7 @@ def test_skip_block_keeps_the_built_atom_and_drops_non_selected_or_branches(
         f"[ebuild  N     ] dev-libs/p569pull-1 to {root}",
         "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
         "",
-        "dev-libs/p569prov:0",
+        f"dev-libs/p569prov:0{_for_root(root)}",
         "",
         f"  (dev-libs/p569prov-5.44:0/5.44::testrepo, ebuild scheduled for merge to '{root}') USE=\"\" ELIBC=\"glibc\" conflicts with",
         f"    dev-libs/p569prov:0/5.42= required by (dev-libs/p569virt-1:0/0::testrepo, installed in '{root}') USE=\"\"",
@@ -36255,7 +36255,7 @@ def test_skip_block_keeps_the_built_atom_and_drops_non_selected_or_branches(
         "!!! The following update(s) have been skipped due to unsatisfied dependencies",
         "!!! triggered by backtracking:",
         "",
-        "dev-libs/p569pull:0",
+        f"dev-libs/p569pull:0{_for_root(root)}",
     ]
 
 
@@ -36771,3 +36771,47 @@ def test_592_use_only_miss_without_autounmask_stops_with_no_backtrack(
         f'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/{prefix}flag[r592flag]"'
         in got.stderr + got.stdout
     ), got.stderr
+
+
+def test_593_skipped_update_blocks_follow_portage_order_and_carry_the_root(
+    emerge_binary, fixture_env
+):
+    """#593: `_show_missed_update` prints the slot-conflict block, then the
+    full unsatisfied-dependency entries, then the abbreviated `triggered by
+    backtracking` block (`depgraph.py:1581-1664`), and every header carries
+    ` for <ROOT>/` whenever `ROOT != "/"` (D:1631-1632, D:1661-1662,
+    D:1678-1679; a plain test, not the running-root rule). `t8x-2` needs the
+    package.mask'd `maskeddep`, `t8x-1` needs nothing; `p569pull` takes the
+    perl-heal. Portage capture: `LLM/evidence/2026-10-26-575-residues/t8/
+    captures/g0x-trailer-order.txt` (argv `emerge -pv dev-libs/p569pull
+    dev-libs/t8x`, ROOT set). The `All ebuilds that could satisfy` suffix
+    follows the running-root rule (D:6502) and the suite pins the running
+    root to ROOT, so it stays bare here, as in every other pin."""
+    root = fixture_env["ROOT"]
+    shown = root.rstrip("/") + "/"
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/p569pull", "dev-libs/t8x"],
+        fixture_env,
+    )
+    assert rust.returncode == 0
+    lines = rust.stdout.splitlines()
+    headers = [
+        ln for ln in lines if ln.startswith("dev-libs/") and ":0" in ln and " " not in ln.split(":0")[0]
+    ]
+    assert headers == [
+        f"dev-libs/p569prov:0 for {shown}",
+        f"dev-libs/t8x:0 for {shown}",
+        f"dev-libs/p569pull:0 for {shown}",
+    ], rust.stdout
+    full = lines.index("!!! The following update has been skipped due to unsatisfied dependencies:")
+    tail = lines.index("!!! triggered by backtracking:")
+    assert lines.index(
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:"
+    ) < full < tail
+
+
+def _for_root(root):
+    """The ` for <ROOT>/` Portage appends to a skipped-update header whenever
+    `ROOT != "/"` (`depgraph.py:1631-1632`, `1661-1662`, `1678-1679`)."""
+    return f" for {str(root).rstrip('/')}/"
