@@ -14915,13 +14915,21 @@ def test_complete_graph_use_break_fails_with_world_consumer(
     `world=["x11-libs/qt-webkit"]`: the bulk translation emits no
     world entries, so the shared-world cells can never see the
     consumer. Grounded live against the Portage `ResolverPlayground`
-    (`3rdparty/portage` 3.0.82.2, EAPI-8 ebuilds mirroring the
+    (`3rdparty/portage` 3.0.83, EAPI-8 ebuilds mirroring the
     fixtures, `world=["dev-libs/cgp0q"]`, `PYTHONHASHSEED=0`): the
     `new-use=y` cell answers `success=False`,
-    `mergelist=["dev-libs/cgp0x-2.8.0"]` with empty
-    `slot_collision_solutions`, while the `new-use=n` and
+    `mergelist=["dev-libs/cgp0x-2.8.0"]`, while the `new-use=n` and
     `--ignore-world` cells answer `success=True` with the same
-    mergelist. Portage mechanism: `_complete_graph` auto-enables on the
+    mergelist. The slot-conflict handler's solution is
+    `{cgp0x-2.8.0: {icu: False}}` (host `emerge` 3.0.83 on the fixtures
+    prints `dev-libs/cgp0x-2.8.0 (Change USE: -icu)`; the playground on
+    3rdparty/portage 3.0.83 gives the same with the upstream EAPI-2
+    ebuilds). An EAPI-8 playground mirror gives empty solutions because
+    a package whose USE ends up empty is recomputed from the config
+    (`Package.py:746-754`), so the candidate fails its match check; the
+    fixtures' `ELIBC` keeps USE non-empty. The earlier "empty
+    solutions" reading was that input difference, not a 3.0.82.2
+    difference. Portage mechanism: `_complete_graph` auto-enables on the
     USE change (`lib/_emerge/depgraph.py:8592-8648`,
     `complete_if_new_use` via the node-vs-installed USE diff) and its
     end-of-walk loop fails the newly-unsatisfied dep the vdb still
@@ -14950,6 +14958,64 @@ def test_complete_graph_use_break_fails_with_world_consumer(
         assert got.returncode == 0, args
         assert got.stderr == "", args
         assert got.stdout.splitlines() == [row], args
+
+
+def test_complete_graph_use_break_prints_the_slot_conflict_explanation(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """The cgp USE keeper stops on the slot-conflict handler's USE change and
+    prints its explanation in place of the generic package.mask advice.
+
+    Oracle: host `emerge` 3.0.83 (`cmp`-identical to `3rdparty/portage`) on
+    a copy of the fixtures with world plus `dev-libs/cgp0q`, argv
+    `--pretend dev-libs/cgp0x`: rc 1, `backtrack: 0/20`, and after the
+    conflict block
+
+        It might be possible to solve this slot collision
+        by applying all of the following changes:
+           - dev-libs/cgp0x-2.8.0 (Change USE: -icu)
+
+    The handler is built on the first pass and its change ends the search
+    (`lib/_emerge/depgraph.py:11849-11865`, loop `:12401-12418`); the
+    explanation is `slot_collision.py:728-784` and `display_problems`
+    returns right after writing it (`depgraph.py:1744-1750`), so the
+    "It may be possible to solve this problem by using package.mask",
+    `--backtrack=30` and "For more information" paragraphs are absent.
+    `--quiet` skips only those paragraphs (`:1752-1753`), not the
+    explanation. With `--color=y` the flag is blue (`slot_collision.py:766`).
+    The same playground run with the upstream EAPI-2 ebuilds gives the
+    same change (see the keeper above).
+    """
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/cgp0q")
+    explanation = [
+        "It might be possible to solve this slot collision",
+        "by applying all of the following changes:",
+        "   - dev-libs/cgp0x-2.8.0 (Change USE: -icu)",
+    ]
+    for args in (["--pretend"], ["--pretend", "--quiet"]):
+        got = _run([str(emerge_binary)], [*args, "dev-libs/cgp0x"], env)
+        assert got.returncode == 1, (args, got.stdout)
+        assert got.stderr == "", (args, got.stderr)
+        assert got.stdout.rstrip("\n").splitlines()[-3:] == explanation, (
+            args,
+            got.stdout,
+        )
+        assert got.stdout.endswith("(Change USE: -icu)\n\n"), (args, got.stdout)
+        for absent in (
+            "package.mask",
+            "--backtrack=30",
+            "For more information",
+        ):
+            assert absent not in got.stdout, (args, absent)
+    plain = _run([str(emerge_binary)], ["--pretend", "dev-libs/cgp0x"], env)
+    assert "(backtrack: 0/20)" in plain.stdout, plain.stdout
+    coloured = _run(
+        [str(emerge_binary)], ["--pretend", "--color=y", "dev-libs/cgp0x"], env
+    )
+    assert coloured.stdout.rstrip("\n").splitlines()[-2:] == [
+        explanation[1],
+        "   - dev-libs/cgp0x-2.8.0 (Change USE: \x1b[34;01m-icu\x1b[39;49;00m)",
+    ], coloured.stdout
 
 
 def test_complete_graph_ver_break_fails_with_world_consumer(
