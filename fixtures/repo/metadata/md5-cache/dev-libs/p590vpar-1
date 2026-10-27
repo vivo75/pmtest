@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 Q19 sibling-virtual family installed parent of both virtuals
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=virtual/p590vva virtual/p590vvb
+SLOT=0
+_md5_=cb3944125adf21a27116b6becc99adcd

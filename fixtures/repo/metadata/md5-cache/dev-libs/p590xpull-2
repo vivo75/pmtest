@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 Q19 merge-bound parent family puller pinning the new provider, naming both virtuals
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p590vprov-5.44* virtual/p590vva virtual/p590vvb
+SLOT=0
+_md5_=1baa1a3661ed9fbc033aeffda936055b

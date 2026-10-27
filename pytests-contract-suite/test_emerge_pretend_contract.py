@@ -3128,6 +3128,11 @@ CASES = [
     ("#571: a category listed only by the overlay still merges (Portage 3.0.83, rc 0)", ["--pretend", "p571-shared/p571-shared"], 0),
     ("#571: the overlay-listed short name expands (Portage 3.0.83, rc 0)", ["--pretend", "p571-shared"], 0),
     ("#571: the listed-category control merges (Portage 3.0.83, rc 0)", ["--pretend", "p571-listed/p571-listed"], 0),
+    ("#580: a parked installed consumer's || is chosen post-merge and forms no pin, so the update merges (T1, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589apull"], 0),
+    ("#580: --deep keeps the walk's own || pick for a recursed installed consumer (T1, Portage 3.0.83, rc 0)", ["--pretend", "--deep", "dev-libs/p589apull"], 0),
+    ("#580: with the --complete-graph-if-new-* switches off the installed consumer's || is never evaluated (T3, Portage 3.0.83, rc 0)", ["--pretend", "--complete-graph-if-new-ver=n", "--complete-graph-if-new-use=n", "--rebuild-if-new-slot=n", "dev-libs/p589cpull"], 0),
+    ("#580: a first-listed || arm that matches the vdb keeps its pin and the heal skips the update (T3, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589cpull"], 0),
+    ("#580: the built slot-operator atom of an installed virtual conflicts with the update (T2, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589bpull"], 0),
 ]
 
 
@@ -36236,7 +36241,7 @@ def test_skip_block_keeps_the_built_atom_and_drops_non_selected_or_branches(
         f"    dev-libs/p569prov:0/5.42= required by (dev-libs/p569virt-1:0/0::testrepo, installed in '{root}') USE=\"\"",
         "    " + " " * 17 + "^" * 8,
         f"    =dev-libs/p569prov-5.42* required by (dev-libs/p569virt-1:0/0::testrepo, installed in '{root}') USE=\"\"",
-        "    ^                  ^^^^ ",
+        "    ^                  ^^^^^",
         "",
         "",
         "!!! The following update(s) have been skipped due to unsatisfied dependencies",
@@ -36523,3 +36528,121 @@ def test_mtimedb_stray_key_warns_once_per_root(
     one = _run([str(emerge_binary)], ["--version"], env)
     assert one.returncode == 0, one.stderr
     assert one.stderr == "Deleting invalid mtimedb key: bogus\n"
+
+
+def test_580_t1_parked_consumer_or_forms_no_pin(emerge_binary, fixture_env):
+    """#580 10b, T1: the installed `dev-libs/p589avirt-1` records
+    `|| ( =p589aprov-5.40* =p589aprov-5.42* =p589aprov-5.38* ~p589acore-1.0 )`;
+    merge-bound `p589apull-2` pulls `p589aprov-5.44` over the installed 5.42.
+
+    Oracle: Portage 3.0.83 `emerge -pv dev-libs/p589apull` on a scratch copy of the
+    fixtures (`LLM/evidence/2026-10-26-575-residues/t10b/captures/t1-plain-portage.txt`):
+    `U p589aprov-5.44`, `N p589apull-2`, `backtrack: 0/20`, no skip block. The virtual is
+    parked in `_ignored_deps`; complete mode chooses its `||` in `_graph_trees`, where
+    5.42 is replaced by the 5.44 node, so no arm is available and the first listed
+    (`=5.40*`) wins (`dep_check.py` 379-380). It matches no installed package, so
+    `_complete_graph` files it as initially unsatisfied and forms no parent atom
+    (`depgraph.py` 8803-8809)."""
+    root = fixture_env["ROOT"]
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/p589apull"], fixture_env)
+    assert got.returncode == 0, got.stdout
+    rows = [ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert rows == [
+        f"[ebuild     U  ] dev-libs/p589aprov-5.44 [5.42] to {root}",
+        f"[ebuild  N     ] dev-libs/p589apull-2 to {root}",
+    ], got.stdout
+    assert "WARNING" not in got.stdout, got.stdout
+
+
+def test_580_t1_deep_keeps_the_walkers_pick(emerge_binary, fixture_env):
+    """#580 10b, T1 with `--deep`: the walk recurses into the installed virtual
+    (`depgraph.py` 3834, 3838-3842) and chooses its `||` in `_filtered_trees`:
+    `~p589acore-1.0` is merged and `=5.42*` is never a parent atom.
+
+    Oracle: Portage 3.0.83 `emerge -pv --deep dev-libs/p589apull`
+    (`t10b/captures/t1-deep-portage.txt`): `U p589aprov-5.44`, `N p589acore-1.0`,
+    `N p589apull-2`, rc 0, `backtrack: 0/20`."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)], ["--pretend", "--deep", "dev-libs/p589apull"], fixture_env
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert rows == [
+        f"[ebuild     U  ] dev-libs/p589aprov-5.44 [5.42] to {root}",
+        f"[ebuild  N     ] dev-libs/p589acore-1.0 to {root}",
+        f"[ebuild  N     ] dev-libs/p589apull-2 to {root}",
+    ], got.stdout
+    assert "slot conflict" not in got.stdout, got.stdout
+
+
+def test_580_t3_vdb_matching_arm_keeps_its_pin(emerge_binary, fixture_env):
+    """#580 10b, T3: `p589cvirt-1` lists `=p589cprov-5.42*` first. The chosen arm
+    matches the installed 5.42, so `_complete_graph` adds the installed instance and
+    the conflict forms (`depgraph.py` 8803-8834).
+
+    Oracle: Portage 3.0.83 `emerge -pv dev-libs/p589cpull`
+    (`t10b/captures/t3-plain-portage.txt`): 4/20, `N p589cpull-1`, skip row
+    `=dev-libs/p589cprov-5.42*` required by `p589cvirt-1`."""
+    root = fixture_env["ROOT"]
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/p589cpull"], fixture_env)
+    assert got.returncode == 0, got.stdout
+    rows = [ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert rows == [f"[ebuild  N     ] dev-libs/p589cpull-1 to {root}"], got.stdout
+    assert (
+        "=dev-libs/p589cprov-5.42* required by (dev-libs/p589cvirt-1:0/0::testrepo, "
+        f"installed in '{root}')"
+    ) in got.stdout, got.stdout
+
+
+def test_580_switches_off_the_consumer_or_is_never_evaluated(
+    emerge_binary, fixture_env
+):
+    """#580 10b: with `--complete-graph-if-new-ver=n --complete-graph-if-new-use=n
+    --rebuild-if-new-slot=n` Portage never enters complete mode
+    (`depgraph.py` 8693-8694), so the installed virtual's `||` is not evaluated and
+    adds no parent atom, even for T3's first-listed `=5.42*`.
+
+    Oracle: Portage 3.0.83 with those switches
+    (`t10b/captures/t3-nocomplete-portage.txt`): `U p589cprov-5.44`,
+    `N p589cpull-2`, `backtrack: 0/20`, rc 0."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        [
+            "--pretend",
+            "--complete-graph-if-new-ver=n",
+            "--complete-graph-if-new-use=n",
+            "--rebuild-if-new-slot=n",
+            "dev-libs/p589cpull",
+        ],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert rows == [
+        f"[ebuild     U  ] dev-libs/p589cprov-5.44 [5.42] to {root}",
+        f"[ebuild  N     ] dev-libs/p589cpull-2 to {root}",
+    ], got.stdout
+    assert "WARNING" not in got.stdout, got.stdout
+
+
+def test_580_t2_built_atom_conflicts_with_the_update(emerge_binary, fixture_env):
+    """#580 10b, T2: `p589bvirt-1` records the same `||` as T1 plus the built
+    `dev-libs/p589bprov:0/5.42=`.
+
+    Oracle: Portage 3.0.83 `emerge -pv dev-libs/p589bpull`
+    (`t10b/captures/t2-plain-portage.txt`): 4/20, `N p589bpull-1`, one skip row,
+    `dev-libs/p589bprov:0/5.42=` required by `p589bvirt-1` (the `||` arm `=5.40*`
+    matches nothing installed and forms no pin; `tests_consumer_or_view.rs`
+    `t2_swap_slotop_matches_portage` is the unit twin)."""
+    root = fixture_env["ROOT"]
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/p589bpull"], fixture_env)
+    assert got.returncode == 0, got.stdout
+    rows = [ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")]
+    assert rows == [f"[ebuild  N     ] dev-libs/p589bpull-1 to {root}"], got.stdout
+    assert (
+        "dev-libs/p589bprov:0/5.42= required by (dev-libs/p589bvirt-1:0/0::testrepo, "
+        f"installed in '{root}')"
+    ) in got.stdout, got.stdout
+    assert "=dev-libs/p589bprov-5.42*" not in got.stdout, got.stdout

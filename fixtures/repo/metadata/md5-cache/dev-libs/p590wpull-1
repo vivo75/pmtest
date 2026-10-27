@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 Q19 build-time sibling-virtual family puller pinning the old provider
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p590vprov-5.42* dev-libs/p590wpar
+SLOT=0
+_md5_=08a0bc05a52e77b4e4283693e8e55cde

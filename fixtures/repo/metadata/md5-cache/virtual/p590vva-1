@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 Q19 sibling-virtual family virtual listing 5.44 first
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p590vprov-5.44* =dev-libs/p590vprov-5.42* )
+SLOT=0
+_md5_=9b67328b5faaa884112f2b873a992e53

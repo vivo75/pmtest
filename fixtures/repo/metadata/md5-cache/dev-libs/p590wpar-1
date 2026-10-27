@@ -1,0 +1,7 @@
+BDEPEND=virtual/p590vva virtual/p590vvb
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 Q19 build-time sibling-virtual family installed parent naming both virtuals in BDEPEND only
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=09eec6d50bb72624c8a10291e8f9623d

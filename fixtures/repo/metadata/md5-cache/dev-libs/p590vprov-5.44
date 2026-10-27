@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 Q19 sibling-virtual family provider, new subslot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.44
+_md5_=fca6aa34cb0fd9ebbfb194beb5844037
