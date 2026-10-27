@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: R1 S0 (#592) r592ax-2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/r592as-1
+SLOT=0
+_md5_=d8c7857477fde5fa58c3d3802b5fe2f2

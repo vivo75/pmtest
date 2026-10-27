@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: R1 S0 (#592) r592dy-2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/r592ds-2 dev-libs/r592dflag[r592flag]
+SLOT=0
+_md5_=8d6d4312eac6fccd15279ae7eeb51d50

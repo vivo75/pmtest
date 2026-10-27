@@ -3135,6 +3135,12 @@ CASES = [
     ("#580: the built slot-operator atom of an installed virtual conflicts with the update (T2, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589bpull"], 0),
     ("#598: --update --deep heals a || virtual walked as an installed consumer by rebuilding it with the provider (p569pull, Portage 3.0.83, rc 0)", ["--pretend", "--update", "--deep", "dev-libs/p569pull"], 0),
     ("#598: --update --deep rebuilds the walked installed virtual with its built slot-operator provider (p589bpull, Portage 3.0.83, rc 0)", ["--pretend", "--update", "--deep", "dev-libs/p589bpull"], 0),
+    ("#592: a plain miss stops the walk, so no slot conflict is fed back (r592atop, Portage 3.0.83, rc 0, backtrack 1/20)", ["--pretend", "--verbose", "dev-libs/r592atop"], 0),
+    ("#592: the same plain miss settles within --backtrack=1 (r592atop, Portage 3.0.83, rc 0, backtrack 1/1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/r592atop"], 0),
+    ("#592: a masked dependency stops the walk before the conflict (r592ctop, Portage 3.0.83, rc 0, backtrack 1/20)", ["--pretend", "--verbose", "dev-libs/r592ctop"], 0),
+    ("#592: the masked dependency settles within --backtrack=1 (r592ctop, Portage 3.0.83, rc 0, backtrack 1/1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/r592ctop"], 0),
+    ("#592: a USE-only miss under --autounmask=n fails with no backtrack (r592dtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r592dtop"], 1),
+    ("#592: a USE-only miss beside a conflict under --autounmask=n fails with no backtrack (r592ftop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r592ftop"], 1),
 ]
 
 
@@ -36701,3 +36707,67 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p589bpull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p589bpull-portage.txt`)."""
     _598_check(emerge_binary, fixture_env, "p589b")
+
+
+def _592_run(emerge_binary, fixture_env, extra, atom):
+    got = _run(
+        [str(emerge_binary)], ["--pretend", "--verbose", *extra, f"dev-libs/{atom}"], fixture_env
+    )
+    tries = re.search(r"\(backtrack: (\d+/\d+)\)", got.full_stdout)
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    return got, (tries.group(1) if tries else None), rows
+
+
+@pytest.mark.parametrize(
+    "extra,tries",
+    [([], "1/20"), (["--backtrack=1"], "1/1")],
+)
+@pytest.mark.parametrize("prefix", ["r592a", "r592c"])
+def test_592_unsatisfied_dep_stops_the_walk_before_slot_conflict_feedback(
+    emerge_binary, fixture_env, prefix, extra, tries
+):
+    """#592: an unsatisfied dependency stops Portage's walk (depgraph.py
+    D:3535, D:3276-3280, `_resolve` D:5691-5693), so no slot conflict is
+    processed in that pass: one try, rc 0, four rows.
+
+    Oracle: Portage 3.0.83 `emerge -pv dev-libs/r592atop` / `r592ctop` with
+    and without `--backtrack=1`
+    (`LLM/evidence/2026-10-26-575-residues/r1/captures/{A,C}{,backtrack1}-portage.txt`)."""
+    root = fixture_env["ROOT"]
+    got, got_tries, rows = _592_run(emerge_binary, fixture_env, extra, f"{prefix}top")
+    assert got.returncode == 0, got.stdout
+    assert got_tries == tries, got.stdout
+    assert rows == [
+        f"[ebuild  N     ] dev-libs/{prefix}s-1::testrepo to {root}",
+        f"[ebuild  N     ] dev-libs/{prefix}x-2::testrepo to {root}",
+        f"[ebuild  N     ] dev-libs/{prefix}y-1::testrepo to {root}",
+        f"[ebuild  N     ] dev-libs/{prefix}top-1::testrepo to {root}",
+    ], got.stdout
+
+
+@pytest.mark.parametrize("prefix", ["r592d", "r592f"])
+def test_592_use_only_miss_without_autounmask_stops_with_no_backtrack(
+    emerge_binary, fixture_env, prefix
+):
+    """#592: a USE-only miss files no backtrack info (D:3488-3497) and, under
+    `--autounmask=n`, nothing restarts the run: rc 1, `(backtrack: 0/20)`, the
+    USE block naming `r592dflag[r592flag]`. The slot-conflict block that
+    Portage's stopped graph lacks is a separate residue (#609) and not pinned.
+
+    Oracle: Portage 3.0.83 `emerge -pv --autounmask=n dev-libs/r592dtop` /
+    `r592ftop`
+    (`LLM/evidence/2026-10-26-575-residues/r1/captures/{D,F}autounmaskn-portage.txt`)."""
+    got, got_tries, rows = _592_run(
+        emerge_binary, fixture_env, ["--autounmask=n"], f"{prefix}top"
+    )
+    assert got.returncode == 1, got.stdout
+    assert got_tries == "0/20", got.stdout
+    assert rows == [], got.stdout
+    assert (
+        f'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/{prefix}flag[r592flag]"'
+        in got.stderr + got.stdout
+    ), got.stderr
