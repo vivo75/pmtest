@@ -3133,6 +3133,8 @@ CASES = [
     ("#580: with the --complete-graph-if-new-* switches off the installed consumer's || is never evaluated (T3, Portage 3.0.83, rc 0)", ["--pretend", "--complete-graph-if-new-ver=n", "--complete-graph-if-new-use=n", "--rebuild-if-new-slot=n", "dev-libs/p589cpull"], 0),
     ("#580: a first-listed || arm that matches the vdb keeps its pin and the heal skips the update (T3, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589cpull"], 0),
     ("#580: the built slot-operator atom of an installed virtual conflicts with the update (T2, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589bpull"], 0),
+    ("#598: --update --deep heals a || virtual walked as an installed consumer by rebuilding it with the provider (p569pull, Portage 3.0.83, rc 0)", ["--pretend", "--update", "--deep", "dev-libs/p569pull"], 0),
+    ("#598: --update --deep rebuilds the walked installed virtual with its built slot-operator provider (p589bpull, Portage 3.0.83, rc 0)", ["--pretend", "--update", "--deep", "dev-libs/p589bpull"], 0),
 ]
 
 
@@ -36646,3 +36648,56 @@ def test_580_t2_built_atom_conflicts_with_the_update(emerge_binary, fixture_env)
         f"installed in '{root}')"
     ) in got.stdout, got.stdout
     assert "=dev-libs/p589bprov-5.42*" not in got.stdout, got.stdout
+
+
+def _598_expect(fixture_env, prefix, pull_slot_ver="2"):
+    root = fixture_env["ROOT"]
+    return [
+        f"[ebuild  r  U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild  N     ] dev-libs/{prefix}core-1.0::testrepo to {root}",
+        f"[ebuild  rR    ] dev-libs/{prefix}virt-1::testrepo to {root}",
+        f"[ebuild  N     ] dev-libs/{prefix}pull-{pull_slot_ver}::testrepo to {root}",
+    ]
+
+
+def _598_check(emerge_binary, fixture_env, prefix):
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "--update", "--deep", f"dev-libs/{prefix}pull"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == _598_expect(fixture_env, prefix), got.stdout
+    assert (
+        f"  (dev-libs/{prefix}prov-5.44:0/5.44::testrepo, ebuild scheduled for merge to '{root}') causes rebuilds for:\n"
+        f"    (dev-libs/{prefix}virt-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+    ) in got.stdout, got.stdout
+
+
+def test_598_update_deep_rebuilds_the_walked_installed_virtual_p569(
+    emerge_binary, fixture_env
+):
+    """#598: `emerge -pvuD dev-libs/p569pull`. The `--deep` walk recurses into
+    the installed `p569virt-1`, so Portage files its `:=` rebuild with the
+    provider upgrade: 4 rows (`r U prov-5.44`, `N core`, `rR virt-1`,
+    `N pull-2`), a "causes rebuilds for:" block, rc 0.
+
+    Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p569pull`
+    (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p569pull-portage.txt`)."""
+    _598_check(emerge_binary, fixture_env, "p569")
+
+
+def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
+    emerge_binary, fixture_env
+):
+    """#598: same shape with the built `dev-libs/p589bprov:0/5.42=` atom.
+
+    Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p589bpull`
+    (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p589bpull-portage.txt`)."""
+    _598_check(emerge_binary, fixture_env, "p589b")
