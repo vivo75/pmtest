@@ -5989,6 +5989,66 @@ def test_getbinpkgonly_refuses_a_remote_binary_without_size_and_checksum(
     assert "Digest verification failed" not in r.stdout
 
 
+def test_getbinpkg_pretends_a_remote_binary_before_any_merge(emerge_binary, tmp_path):
+    """Backlog #579: a remote binary whose binhost index record carries
+    `pretend` in `DEFINED_PHASES` pretends up front, in the pass, before
+    any merge. Portage fetches and verifies the binary inside the pretend
+    pass (`lib/_emerge/Scheduler.py:1147-1180`), so the run shows
+    `>>> Running pre-merge checks`, then the verifier's `;-) ... [ ok ]`
+    line, then `>>> Emerging binary` -- captured live on Portage 3.0.83
+    with a `file://` binhost serving the `binpkgpretendpkg` fixture
+    (`LLM/evidence/2026-10-26-575-residues/t6/portage-ok.*`). The fixture
+    hook appends `pretend` to `${EROOT}/var/lib/binpkgpretendpkg.log`, so
+    the log proves the hook ran up front from the fetched metadata."""
+    import hashlib
+
+    binhost = tmp_path / "binhost"
+    (binhost / "dev-libs").mkdir(parents=True)
+    data = (Path(FIXTURES_ROOT) / "pkgdir/dev-libs/binpkgpretendpkg-1.0.tbz2").read_bytes()
+    (binhost / "dev-libs/binpkgpretendpkg-1.0.tbz2").write_bytes(data)
+    (binhost / "Packages").write_text(
+        "TIMESTAMP: 0\nVERSION: 0\nPACKAGES: 1\n\n"
+        "CPV: dev-libs/binpkgpretendpkg-1.0\n"
+        "DEFINED_PHASES: install postinst preinst pretend setup\n"
+        "EAPI: 8\nKEYWORDS: amd64\n"
+        "PATH: dev-libs/binpkgpretendpkg-1.0.tbz2\n"
+        "REPO: testrepo\n"
+        f"SIZE: {len(data)}\n"
+        f"MD5: {hashlib.md5(data).hexdigest()}\n"
+        f"SHA1: {hashlib.sha1(data).hexdigest()}\n"
+        "SLOT: 0\nUSE:\n\n"
+    )
+
+    clientetc = _clientetc_with_500_binhost(tmp_path, 0)
+    (clientetc / "etc/portage/binrepos.conf").write_text(
+        f"[t6binhost]\npriority = 1\nsync-uri = file://{binhost}\nverify-signature = false\n"
+    )
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
+    seed_updates_record(root)
+    env = _getbinpkg_500_env(tmp_path, root, clientetc, tmp_path / "pkgdir")
+    (tmp_path / "portage-tmpdir").mkdir(exist_ok=True)
+    r = subprocess.run(
+        [str(emerge_binary), "-k", "--getbinpkg", "--oneshot", "--nodeps", "dev-libs/binpkgpretendpkg"],
+        capture_output=True, text=True, check=False, env=env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    # The pass order: status line, then the verifier's success line, then
+    # the merge's `>>> Emerging binary` line.
+    status = r.stdout.find(">>> Running pre-merge checks for dev-libs/binpkgpretendpkg-1.0")
+    assert status != -1, r.stdout
+    verified = r.stdout.find("binpkgpretendpkg-1.0.tbz2 MD5 SHA1 size ;-)")
+    assert verified != -1, r.stdout
+    assert "[ ok ]" in r.stdout, r.stdout
+    emerging = r.stdout.find(">>> Emerging binary (1 of 1) dev-libs/binpkgpretendpkg-1.0::testrepo")
+    assert emerging != -1, r.stdout
+    assert status < verified < emerging, r.stdout
+    # `pretend` first: the hook ran up front in the pass, before the
+    # merge's own `setup`/`preinst`/`postinst` appends.
+    assert (root / "var/lib/binpkgpretendpkg.log").read_text().startswith("pretend\n")
+    assert (root / "var/db/pkg/dev-libs/binpkgpretendpkg-1.0/CONTENTS").is_file()
+
+
 def _hostile_gpkg(base_gpkg, dest, image_members=None, metadata_members=None):
     """Rewrite a built gpkg's image and/or metadata tar with crafted members.
 
