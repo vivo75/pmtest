@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 swap-slotop provider, new subslot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.44
+_md5_=d5cb1252920804eec9624a975f8a0e15

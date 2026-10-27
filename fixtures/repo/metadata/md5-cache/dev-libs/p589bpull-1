@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 swap-slotop puller pinning the old provider and pulling the virtual in-graph
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p589bprov-5.42* dev-libs/p589bvirt
+SLOT=0
+_md5_=0861631f1bd0c10d2ce8a51c885fdce9

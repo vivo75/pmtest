@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 swap-slotop installed virtual consumer
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p589bprov-5.40* =dev-libs/p589bprov-5.42* =dev-libs/p589bprov-5.38* ~dev-libs/p589bcore-1.0 ) dev-libs/p589bprov:=
+SLOT=0
+_md5_=a8da56137252db459dfbb3415031a108

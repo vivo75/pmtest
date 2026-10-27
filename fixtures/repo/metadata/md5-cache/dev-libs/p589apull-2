@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 swap-noslotop puller pinning the new provider and pulling the virtual in-graph
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p589aprov-5.44* dev-libs/p589avirt
+SLOT=0
+_md5_=d496f985b110e5bf2ef60b80d08f7b08

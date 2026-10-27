@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 orig-noslotop provider, new subslot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.44
+_md5_=4ebf2b370bfa5814e025305de8ccf3c8

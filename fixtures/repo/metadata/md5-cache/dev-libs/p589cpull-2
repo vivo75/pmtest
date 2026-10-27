@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 orig-noslotop puller pinning the new provider and pulling the virtual in-graph
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p589cprov-5.44* dev-libs/p589cvirt
+SLOT=0
+_md5_=794b60d1ba07a7aaa228b4f467aedec9

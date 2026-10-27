@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 swap-slotop dual-life dist alternative for the virtual's || menu
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=3e8347ae5f6eba7f380921bbb26b4c77

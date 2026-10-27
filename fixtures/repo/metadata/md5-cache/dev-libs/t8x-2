@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 G0 counter-shape, depends on the package.mask'd maskeddep
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/maskeddep
+SLOT=0
+_md5_=194c4b321dac6518cf8a402830f5617e

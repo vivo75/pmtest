@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #580 orig-noslotop installed virtual consumer
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p589cprov-5.42* =dev-libs/p589cprov-5.40* =dev-libs/p589cprov-5.38* ~dev-libs/p589ccore-1.0 )
+SLOT=0
+_md5_=d58ea50020c2d3e6981b295b53bde705
