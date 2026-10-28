@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #572 installed virtual whose || binds to the perl-shape provider (mirrors virtual/perl-Encode-3.210.0-r2)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p572prov-5.42* =dev-libs/p572prov-5.40* ~dev-libs/p572enc-3.210 )
+SLOT=0
+_md5_=53b1efa7e517adf0b761959c63e1fbf6

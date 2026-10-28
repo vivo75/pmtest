@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #572 consumer requiring the virtual (mirrors dev-perl/Encode-Locale)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=virtual/p572virt-2.0
+SLOT=0
+_md5_=95764abb0a23471b787c03bf27536496

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #572 perl-shape module provider (mirrors perl-core/Encode-3.210.0)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=c052134a4f3c33b4c81e50ca24f6829f
