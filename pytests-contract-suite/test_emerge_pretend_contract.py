@@ -3141,6 +3141,14 @@ CASES = [
     ("#592: the masked dependency settles within --backtrack=1 (r592ctop, Portage 3.0.83, rc 0, backtrack 1/1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/r592ctop"], 0),
     ("#592: a USE-only miss under --autounmask=n fails with no backtrack (r592dtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r592dtop"], 1),
     ("#592: a USE-only miss beside a conflict under --autounmask=n fails with no backtrack (r592ftop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r592ftop"], 1),
+    ("#594: a USE-only miss first in the string stops with no restart (r594ctop --autounmask=n, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r594ctop"], 1),
+    ("#594: a USE-only miss first in the string stops with no restart (r594etop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "dev-libs/r594etop"], 1),
+    ("#594: a USE-only miss first in the string stops with no restart (r594etop --autounmask=n, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r594etop"], 1),
+    ("#594: an autounmask change before the missing-dep stop ends the search (r594qtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "dev-libs/r594qtop"], 1),
+    ("#594: an autounmask change before the missing-dep stop ends the search within --backtrack=1 (r594qtop, Portage 3.0.83, rc 1, backtrack 0/1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/r594qtop"], 1),
+    ("#594: a walk stopped at a masked dep shows no residual slot conflict (p569pull + abort-masked-mid, Portage 3.0.83, rc 1)", ["--pretend", "--verbose", "dev-libs/p569pull", "dev-libs/abort-masked-mid"], 1),
+    ("#594: the same stopped walk shows no residual slot conflict within --backtrack=1 (Portage 3.0.83, rc 1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/p569pull", "dev-libs/abort-masked-mid"], 1),
+    ("#594: the same stopped walk shows no residual slot conflict within --backtrack=0 (Portage 3.0.83, rc 1)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/p569pull", "dev-libs/abort-masked-mid"], 1),
 ]
 
 
@@ -36815,3 +36823,118 @@ def _for_root(root):
     """The ` for <ROOT>/` Portage appends to a skipped-update header whenever
     `ROOT != "/"` (`depgraph.py:1631-1632`, `1661-1662`, `1678-1679`)."""
     return f" for {str(root).rstrip('/')}/"
+
+
+def _594_run(emerge_binary, fixture_env, extra, atoms):
+    got = _run(
+        [str(emerge_binary)], ["--pretend", "--verbose", *extra, *atoms], fixture_env
+    )
+    tries = re.search(r"\(backtrack: (\d+/\d+)\)", got.full_stdout)
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    return got, (tries.group(1) if tries else None), rows
+
+
+@pytest.mark.parametrize(
+    "extra,atom,use_line,change_line",
+    [
+        (
+            ["--autounmask=n"],
+            "r594ctop",
+            'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/r594vdep[r594flag]"',
+            "(Change USE: +r594flag)",
+        ),
+        (
+            [],
+            "r594etop",
+            'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/r594xdep[r594flag]"',
+            "(Missing IUSE: r594flag)",
+        ),
+        (
+            ["--autounmask=n"],
+            "r594etop",
+            'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/r594xdep[r594flag]"',
+            "(Missing IUSE: r594flag)",
+        ),
+    ],
+)
+def test_594_use_only_miss_first_in_string_stops_with_no_restart(
+    emerge_binary, fixture_env, extra, atom, use_line, change_line
+):
+    """#594: a USE-only miss Portage meets first stops the walk with no
+    restart, so no missing-dependency restart is filed for the masked dep
+    later in the same string (depgraph.py D:3494-3499 wins over D:3517;
+    within-string order is `_minimize_children` D:4766-4788): rc 1,
+    `(backtrack: 0/20)`, no merge list, the USE-flags block.
+
+    Oracle: Portage 3.0.83 `emerge -pv [--autounmask=n] dev-libs/r594ctop`
+    / `dev-libs/r594etop`
+    (`LLM/evidence/2026-10-26-575-residues/r3/captures/A-c-aun.txt`,
+    `A-e.txt`, `A-e-aun.txt`). portuale also prints the masked block past
+    Portage's stop point; that truncation belongs to #609's family and is
+    not pinned here. The `Missing IUSE` (rather than masked) header on the
+    `r594etop` shape is the r3 S0 display residue 1 (a masked instance
+    carrying the IUSE) and is pinned as-is.
+    """
+    got, got_tries, rows = _594_run(emerge_binary, fixture_env, extra, [f"dev-libs/{atom}"])
+    assert got.returncode == 1, got.stdout
+    assert got_tries == "0/20", got.stdout
+    assert rows == [], got.stdout
+    text = got.stderr + got.stdout
+    assert use_line in text, got.stderr
+    assert change_line in text, got.stderr
+
+
+@pytest.mark.parametrize("extra,tries", [([], "0/20"), (["--backtrack=1"], "0/1")])
+def test_594_autounmask_change_before_the_stop_ends_the_search(
+    emerge_binary, fixture_env, extra, tries
+):
+    """#594: a pass that recorded an autounmask change before its
+    missing-dependency stop ends the search when `--autounmask-backtrack`
+    is off: `need_config_change` breaks first (D:11865-11883, D:12407-12411)
+    even though a missing dependency was filed. rc 1, the USE-change block,
+    "backtracking has terminated early", then the masked block.
+
+    Oracle: Portage 3.0.83 `emerge -pv [--backtrack=1] dev-libs/r594qtop`
+    (`LLM/evidence/2026-10-26-575-residues/r3/captures/A-q.txt`,
+    `A-q-bt1.txt`)."""
+    got, got_tries, rows = _594_run(emerge_binary, fixture_env, extra, ["dev-libs/r594qtop"])
+    assert got.returncode == 1, got.stdout
+    assert got_tries == tries, got.stdout
+    assert rows == [], got.stdout
+    text = got.stderr + got.stdout
+    assert ">=dev-libs/r594vdep-1 r594flag" in text, got.stderr
+    assert "backtracking has terminated early" in text, got.stderr
+    assert (
+        '!!! All ebuilds that could satisfy "dev-libs/maskeddep" have been masked.'
+        in text
+    ), got.stderr
+
+
+@pytest.mark.parametrize("extra", [[], ["--backtrack=1"], ["--backtrack=0"]])
+def test_594_stopped_walk_shows_no_residual_slot_conflict(
+    emerge_binary, fixture_env, extra
+):
+    """#594: the walk stopped at the masked dep, so Portage's graph never
+    reaches the installed provider and no residual `p569prov:0`
+    slot-conflict block prints -- only the masked block. rc 1. (The
+    printed try count is still R6's: Portage says 1/20, 1/1, 0/0.)
+
+    Oracle: Portage 3.0.83 `emerge -pv [--backtrack=1] [--backtrack=0]
+    dev-libs/p569pull dev-libs/abort-masked-mid`
+    (`LLM/evidence/2026-10-26-575-residues/r3/captures/A-g0.txt`,
+    `A-g0-bt1.txt`, `A-g0-bt0.txt`)."""
+    got, _, rows = _594_run(
+        emerge_binary, fixture_env, extra, ["dev-libs/p569pull", "dev-libs/abort-masked-mid"]
+    )
+    assert got.returncode == 1, got.stdout
+    assert rows == [], got.stdout
+    text = got.stderr + got.stdout
+    assert "Multiple package instances" not in text, got.stderr
+    assert (
+        '!!! All ebuilds that could satisfy "dev-libs/maskeddep" have been masked.'
+        in text
+    ), got.stderr

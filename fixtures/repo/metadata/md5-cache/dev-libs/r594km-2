@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: R3 S0 (#594) r594km-2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/kwmaskeddep
+SLOT=0
+_md5_=e193c3c889f1eaca18b76b4d77e3f083

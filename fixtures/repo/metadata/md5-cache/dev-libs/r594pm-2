@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: R3 S0 (#594) r594pm-2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/maskeddep
+SLOT=0
+_md5_=38d99882943601a899ae9b47d6f7296c
