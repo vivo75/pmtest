@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #573 installed world member whose deep dep is only walked in complete mode
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p573real
+SLOT=0
+_md5_=fad3fe2dbc0f6fb29b82fc53d4345f3c

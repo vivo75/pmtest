@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #573 installed real-package consumer recording only the built subslot atom (no version-menu ||)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p569prov:=
+SLOT=0
+_md5_=e8399b2f015f453284e713830402bce2

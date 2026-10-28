@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #573 world member that upgrades in the same graph (v1)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p569prov:=
+SLOT=0
+_md5_=8242c1c9efd414de9f6bee30bb95621f
