@@ -3122,6 +3122,7 @@ CASES = [
     ("#507: --circular-deps-report json (space form) prints the json report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report", "json", "dev-libs/usecyclea"], 1),
     ("#507: --circular-deps-report=text keeps the text report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=text", "dev-libs/usecyclea"], 1),
     ("#568/#569: the perl-heal skip block keeps the built subslot atom and drops non-selected || branches (Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p569pull"], 0),
+    ("#573: a bare provider argument over the shared vdb resolves clean (the four-row installed-consumer block is pinned in test_skipped_update_block_names_every_installed_consumer, on its own ROOT)", ["--pretend", "dev-libs/p569prov"], 0),
     ("#571: a direct target in an unlisted category is masked (Portage 3.0.83, rc 1)", ["--pretend", "p571-hidden/p571-hidden"], 1),
     ("#571: a short name in an unlisted category has no match (Portage 3.0.83, rc 1)", ["--pretend", "p571-hidden"], 1),
     ("#571: a dependency on an unlisted category is unsatisfiable (Portage 3.0.83, rc 1)", ["--pretend", "p571-listed/p571-need"], 1),
@@ -37043,3 +37044,74 @@ def test_600_grow_flip_portage_would_not_restart_for_is_not_counted(
         f'[ebuild  N     ] dev-libs/r594vdep-1 to {root} USE="r594flag"',
         f"[ebuild  N     ] dev-libs/r594qa-2 to {root}",
     ], got.stdout
+
+
+def test_skipped_update_block_names_every_installed_consumer(
+    emerge_binary, fixture_env, tmp_path
+):
+    """The L0 `dev-lang/perl` shape (backlog #573): a bare provider argument
+    whose higher-subslot candidate is withheld, with two installed in-graph
+    consumers recording the *same* pin atoms. Portage prints one
+    `(parent, atom)` row per consumer for every parent atom that does not
+    match the skipped version (`_process_slot_conflicts`, "Record missed
+    updates", `lib/_emerge/depgraph.py:2107-2121`), so four rows: each
+    consumer's built `:0/5.42=` and its `=5.42*` menu atom.
+
+    `dev-libs/p573real-1` is installed too but records only the built atom
+    and nothing in this request reaches it (no version change turns the
+    complete-graph walk on), so it stays unlisted — the counter-example that
+    keeps a naive "scan every installed consumer" from passing. The sibling
+    hermetic cell with the settled `dev-libs/p573up` upgrade covers the
+    complete-mode half (`crates/portage-repo/src/tests/tests_p573.rs`).
+
+    Oracle: host Portage 3.0.83 on this exact scratch ROOT
+    (`LLM/evidence/2026-10-28-573/captures/portage-p569prov.stderr`: the same
+    four rows; Portage writes the block to stderr, portuale to stdout).
+    """
+    root = tmp_path / "root"
+    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True)
+    world = root / "var/lib/portage/world"
+    world.write_text(
+        world.read_text() + "dev-libs/p573world\ndev-libs/p573virt\n"
+    )
+    seed_updates_record(root)
+
+    def installed(cpv: str, rdepend: str) -> None:
+        entry = root / "var/db/pkg" / cpv
+        entry.mkdir(parents=True)
+        (entry / "CATEGORY").write_text(cpv.split("/")[0] + "\n")
+        (entry / "EAPI").write_text("8\n")
+        (entry / "SLOT").write_text("0\n")
+        (entry / "repository").write_text("testrepo\n")
+        (entry / "RDEPEND").write_text(rdepend + "\n")
+
+    atoms = "=dev-libs/p569prov-5.42* dev-libs/p569prov:0/5.42="
+    installed("dev-libs/p573world-1", atoms)
+    installed("dev-libs/p573virt-1", atoms)
+    installed("dev-libs/p573real-1", "dev-libs/p569prov:0/5.42=")
+
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    ok = _run([str(emerge_binary)], ["--pretend", "dev-libs/p569prov"], env)
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    assert ok.stdout.splitlines()[-14:] == [
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        f"dev-libs/p569prov:0{_for_root(env['ROOT'])}",
+        "",
+        f"  (dev-libs/p569prov-5.44:0/5.44::testrepo, ebuild scheduled for merge to '{env['ROOT']}') USE=\"\" ELIBC=\"glibc\" conflicts with",
+        f"    =dev-libs/p569prov-5.42* required by (dev-libs/p573virt-1:0/0::testrepo, installed in '{env['ROOT']}') USE=\"\"",
+        "    ^                  ^^^^^",
+        f"    dev-libs/p569prov:0/5.42= required by (dev-libs/p573virt-1:0/0::testrepo, installed in '{env['ROOT']}') USE=\"\"",
+        "                     ^^^^^^^^",
+        f"    =dev-libs/p569prov-5.42* required by (dev-libs/p573world-1:0/0::testrepo, installed in '{env['ROOT']}') USE=\"\"",
+        "    ^                  ^^^^^",
+        f"    dev-libs/p569prov:0/5.42= required by (dev-libs/p573world-1:0/0::testrepo, installed in '{env['ROOT']}') USE=\"\"",
+        "                     ^^^^^^^^",
+        "",
+    ]
+    assert "p573real" not in ok.stdout, (
+        "no complete-graph walk in this request: the out-of-graph consumer "
+        "must stay unlisted, as in Portage's own capture"
+    )

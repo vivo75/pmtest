@@ -195,29 +195,6 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
-- id: perl-544-stabilization-built-pin-residual
-  layer: l0
-  categories: [skipped-updates]
-  slugs: ["dev-lang_perl", "dev-perl_XML-Parser",
-    "virtual_perl-ExtUtils-MakeMaker", "dev-lang_ruby", "dev-ruby_rake",
-    "kde-apps_kdecore-meta", "app-text_texlive", "app-text_texlive-core",
-    "dev-texlive_texlive-latex", "dev-db_mariadb"]
-  match: "dev-lang/perl:0/5.42= required by"
-  reason: >
-    Post-#568/#569 residual (re-grade of l0-20261025T145359Z against
-    l0-20261025T111515Z, batch Task 4): the nine healed probes' skip
-    blocks now carry both pin forms for installed-virtual providers
-    (#569's 15 portuale-only deselected-branch lines are gone, 21
-    virtual-provider `:0/5.42=` lines now match), but the `:0/5.42=`
-    rows with real-package requirers (app-text/po4a, 24 dev-perl/*,
-    perl-core/File-Temp, virtual/perl-File-Temp -- set-identical across
-    all nine probes) stay real-only, and dev-lang_perl's block covers a
-    single provider (virtual/perl-CPAN, 23 lines vs Portage's 158).
-    Filed as backlog #573. Masking tradeoff, stated plainly: a future
-    same-substring skip divergence on these ten slugs hides here too --
-    re-tighten when #573 ships.
-  owner: portuale-bug
-
 - id: perl-544-stabilization-slot-conflict-a
   layer: l0
   categories: [error]
@@ -258,8 +235,7 @@
     availability).
     2026-10-26 re-grade (batch Task 4, log l0-20261025T145359Z):
     dev-lang_perl's "no ebuilds" + [exit] rows are gone (rc now 0/0,
-    single-provider skip block remains -- see
-    perl-544-stabilization-built-pin-residual); the slugs stay narrowed
+    single-provider skip block, since closed by #573); the slugs stay narrowed
     to MULTI, whose list is byte-identical to baseline, still rc 1.
   owner: portuale-bug
 
