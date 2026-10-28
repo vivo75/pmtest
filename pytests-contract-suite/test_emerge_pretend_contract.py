@@ -36734,14 +36734,24 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
 def test_601_masked_installed_provider_keeps_the_rebuild_display(
     emerge_binary, fixture_env
 ):
-    """#601: the cell's masked-installed provider shape. `p589dprov-5.42:0/5.42`
-    is installed, the merge-bound `p589dpull-1` pins `=p589dprov-5.44*` and pulls
-    the installed `p589dvirt-1`, whose recorded hard atom is
-    `dev-libs/p589dprov:0/5.42=`; the slot conflict masks `p589dprov-5.42` as
-    `[installed]`. Portage still force-reinstalls the provider, so its row is
-    `r U` and the "causing rebuilds" block names the consumer; portuale today
-    prints neither (the provider never joins the replace set on the settling
-    branch, so `drop_masked_pairs` wipes every display pair).
+    """#601: the `-u` conflict shape, not the bed cell's display shape.
+    `p589dprov-5.42:0/5.42` is installed, the merge-bound `p589dpull-1` pins
+    `=p589dprov-5.44*` and pulls the installed `p589dvirt-1`, whose recorded
+    hard atom is `dev-libs/p589dprov:0/5.42=`; the slot conflict masks
+    `p589dprov-5.42` as `[installed]`. Portage still force-reinstalls the
+    provider, so its row is `r U` and the "causing rebuilds" block names the
+    consumer; portuale today prints neither (the provider never joins the
+    replace set on the settling branch, so `drop_masked_pairs` wipes every
+    display pair).
+
+    Scope: this fixture pins the `--update` conflict-resolution and
+    replace-set filing path. `--update --deep` on the same tree is **green** in
+    portuale today, because the deep walk re-binds the consumer through its
+    live `:=`; and without `p589dvirt` in `p589dpull`'s RDEPEND both PMs print
+    no `r` and no block (no conflict forms). The bed cell (`-uD @world`, the
+    consumers not walked) is verified by the differential test bed, not by
+    this fixture; the display half is also pinned by the portuale-side Rust
+    twins (`tests/slot_conflict.rs`, `tests/rebuild_scan.rs`).
 
     Oracle: Portage 3.0.83 `emerge --pretend --verbose --update dev-libs/p589dpull`
     (`LLM/evidence/2026-10-28-601/captures/task1-portage.txt`). The backtrack
