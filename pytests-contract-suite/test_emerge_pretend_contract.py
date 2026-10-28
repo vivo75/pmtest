@@ -36740,9 +36740,15 @@ def test_601_masked_installed_provider_keeps_the_rebuild_display(
     hard atom is `dev-libs/p589dprov:0/5.42=`; the slot conflict masks
     `p589dprov-5.42` as `[installed]`. Portage still force-reinstalls the
     provider, so its row is `r U` and the "causing rebuilds" block names the
-    consumer; portuale today prints neither (the provider never joins the
-    replace set on the settling branch, so `drop_masked_pairs` wipes every
-    display pair).
+    consumer.
+
+    Actual red today: `p589dvirt`'s live `|| ( =p589dprov-5.44*
+    =p589dprov-5.42* ) p589dprov:=` group is flattened by
+    `slot_conflict_abi_probe`, which requires every member to accept the 5.44
+    child (`replacement_accepts` strips `||` groups instead). The probe files
+    no parent, the search masks the installed provider and settles on a branch
+    that reports a residual slot conflict: exit 1, `[ebuild U]` without `r`,
+    no `p589dvirt-1` row and no block (see the capture below).
 
     Scope: this fixture pins the `--update` conflict-resolution and
     replace-set filing path. `--update --deep` on the same tree is **green** in
