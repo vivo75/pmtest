@@ -3149,6 +3149,16 @@ CASES = [
     ("#594: a walk stopped at a masked dep shows no residual slot conflict (p569pull + abort-masked-mid, Portage 3.0.83, rc 1)", ["--pretend", "--verbose", "dev-libs/p569pull", "dev-libs/abort-masked-mid"], 1),
     ("#594: the same stopped walk shows no residual slot conflict within --backtrack=1 (Portage 3.0.83, rc 1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/p569pull", "dev-libs/abort-masked-mid"], 1),
     ("#594: the same stopped walk shows no residual slot conflict within --backtrack=0 (Portage 3.0.83, rc 1)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/p569pull", "dev-libs/abort-masked-mid"], 1),
+    ("#600: a missing-dependency abort counts Portage's try (ormissbad, Portage 3.0.83, rc 1, backtrack 1/20)", ["--pretend", "dev-libs/ormissbad"], 1),
+    ("#600: a masked-dependency abort counts Portage's try (abort-masked-mid, Portage 3.0.83, rc 1, backtrack 1/20)", ["--pretend", "dev-libs/abort-masked-mid"], 1),
+    ("#600: an unsolvable slot conflict counts every Portage try (slotconflictunsolvable, Portage 3.0.83, rc 1, backtrack 6/20)", ["--pretend", "dev-libs/slotconflictunsolvable"], 1),
+    ("#600: a USE slot conflict counts every Portage try (slotusegroup, Portage 3.0.83, rc 1, backtrack 4/20)", ["--pretend", "dev-libs/slotusegroup"], 1),
+    ("#600: the missing-dependency chain counts every Portage try (r6c0, Portage 3.0.83, rc 1, backtrack 4/20)", ["--pretend", "dev-libs/r6c0"], 1),
+    ("#600: the depth-capped chain counts the all-rejected restart (r6c0 --backtrack=2, Portage 3.0.83, rc 1, backtrack 2/2)", ["--pretend", "--backtrack=2", "dev-libs/r6c0"], 1),
+    ("#600: the depth-capped chain counts the all-rejected restart (r6c0 --backtrack=3, Portage 3.0.83, rc 1, backtrack 3/3)", ["--pretend", "--backtrack=3", "dev-libs/r6c0"], 1),
+    ("#600: the depth-capped chain counts the all-rejected restart (r6c0 --backtrack=5, Portage 3.0.83, rc 1, backtrack 4/5)", ["--pretend", "--backtrack=5", "dev-libs/r6c0"], 1),
+    ("#600: a grow USE flip Portage would not restart for is not counted (--autounmask-backtrack=y r594vdep r594qa, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594vdep", "dev-libs/r594qa"], 1),
+    ("#600: the same grow flip in the reversed order is not counted (--autounmask-backtrack=y r594qa r594vdep, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594qa", "dev-libs/r594vdep"], 1),
 ]
 
 
@@ -3609,10 +3619,11 @@ def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
     static `These are the packages...` / `Calculating dependencies...
     done!` preamble a recorded cut.
 
-    `restarts` is portuale's own pass count minus one (a failed
-    iteration with candidates left counts, #297), so it is deterministic
-    but not expected to equal Portage's `N` (the two search orders differ;
-    Portage's triangle capture is `4/20`). `max` is
+    `restarts` is Portage's `backtracked` (`_backtrack_depgraph`,
+    D:12407-12418, R6 #600): a restart always counts, any other failed pass
+    only while unexplored nodes remain, so it is deterministic and now
+    equals Portage's `N` (the triangle capture is `4/20` on both sides;
+    #297 recorded 2, R6 3). `max` is
     portuale's resolved `--backtrack` budget."""
     plain = _run(
         [str(emerge_binary)],
@@ -3621,7 +3632,7 @@ def test_json_exposes_the_backtrack_restart_count(emerge_binary, fixture_env):
     )
     assert plain.returncode == 1  # #62: the triangle records a slot conflict
     data = json.loads(plain.stdout)
-    assert data["backtrack"] == {"restarts": 3, "max": 20}  # #297: 2 before; Portage 4
+    assert data["backtrack"] == {"restarts": 4, "max": 20}  # R6 #600: Portage 4/20
 
     simple = _run(
         [str(emerge_binary)],
@@ -10021,7 +10032,8 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
         "These are the packages that would be merged, in order:",
         "",
         "Calculating dependencies ... done!",
-        "Dependency resolution took (backtrack: 2/2).",
+        # Portage prints 2/2 here (search gap, backlog #613); rows and rc are equal.
+        "Dependency resolution took (backtrack: 1/2).",
         "",
         f'[ebuild   R    ] dev-libs/abk0c-1 [1] to {env["ROOT"]} USE=\"x* y*\" ',
         f'[ebuild     U  ] dev-libs/abk0a-2 [1] to {env["ROOT"]}',
@@ -22410,9 +22422,8 @@ def test_colored_missing_dependency_block(emerge_binary, fixture_env):
 
     (`green` = `\\x1b[32;01m` wraps the missed atom, `INFORM` the chain
     nodes; `lib/_emerge/depgraph.py:7040-7043`, `:7074`.) Same two cuts as
-    the masked cell (` for <root>/`, wall-clock seconds); portuale also
-    reports its own backtrack restarts here (0/20, not Portage's 1/20 --
-    the deterministic pass count, out of scope for this slice)."""
+    the masked cell (` for <root>/`, wall-clock seconds); portuale's
+    backtrack restarts are Portage's `backtracked` here (1/20, R6 #600)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--color=y", "dev-libs/missingdep"], fixture_env
     )
@@ -22420,7 +22431,7 @@ def test_colored_missing_dependency_block(emerge_binary, fixture_env):
     assert result.stdout == (
         "\n\x1b[32mThese are the packages that would be merged, in order:\x1b[39;49;00m\n\n"
         "Calculating dependencies ... done!\n"
-        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 0/20).\n\n"
+        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 1/20).\n\n"
     )
     assert result.stderr == (
         '\nemerge: there are no ebuilds to satisfy \x1b[32;01m"dev-libs/doesnotexist-anywhere"\x1b[39;49;00m.\n'
@@ -22437,7 +22448,8 @@ def test_colored_mid_resolve_masked_dependency_block(emerge_binary, fixture_env)
     (`lib/_emerge/depgraph.py:6993-6999`, `:7074`), reached here through
     the structured `MaskedDepReport` render instead of the top-level
     report string. Uncoloured bytes are unchanged (the ` for <root>/`
-    suffix stays a recorded cut)."""
+    suffix stays a recorded cut). The count is Portage's `backtracked`
+    (1/20, R6 #600: the failed last walk ends a counted pass)."""
     result = _run(
         [str(emerge_binary)], ["--pretend", "--color=y", "dev-libs/maskneedpkg"], fixture_env
     )
@@ -22445,7 +22457,7 @@ def test_colored_mid_resolve_masked_dependency_block(emerge_binary, fixture_env)
     assert result.stdout == (
         "\n\x1b[32mThese are the packages that would be merged, in order:\x1b[39;49;00m\n\n"
         "Calculating dependencies ... done!\n"
-        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 0/20).\n\n"
+        "Dependency resolution took \x1b[32m\x1b[39;49;00m s (backtrack: 1/20).\n\n"
     )
     assert result.stderr == (
         '\n!!! \x1b[31;01mAll ebuilds that could satisfy \x1b[39;49;00m'
@@ -36938,3 +36950,96 @@ def test_594_stopped_walk_shows_no_residual_slot_conflict(
         '!!! All ebuilds that could satisfy "dev-libs/maskeddep" have been masked.'
         in text
     ), got.stderr
+
+
+def _600_run(emerge_binary, fixture_env, extra, atoms):
+    got = _run(
+        [str(emerge_binary)], ["--pretend", *extra, *atoms], fixture_env
+    )
+    tries = re.search(r"\(backtrack: (\d+/\d+)\)", got.full_stdout)
+    return got, (tries.group(1) if tries else None)
+
+
+@pytest.mark.parametrize(
+    "atoms,tries",
+    [
+        (["dev-libs/ormissbad"], "1/20"),
+        (["dev-libs/abort-masked-mid"], "1/20"),
+        (["dev-libs/slotconflictunsolvable"], "6/20"),
+        (["dev-libs/slotconfgroup"], "6/20"),
+        (["dev-libs/scuseparent"], "6/20"),
+        (["dev-libs/slotusegroup"], "4/20"),
+        (["dev-libs/p569pull", "dev-libs/abort-masked-mid"], "1/20"),
+        (["dev-libs/needer", "dev-libs/othermod"], "4/20"),
+        (["dev-libs/othermod", "dev-libs/needer"], "4/20"),
+    ],
+)
+def test_600_failed_last_walk_counts_portages_try(
+    emerge_binary, fixture_env, atoms, tries
+):
+    """#600: Portage counts every loop pass that does not end the loop
+    (depgraph.py D:12407-12418): a restart always, any other failed pass
+    while unexplored nodes remain, so the last failed walk with an empty
+    stack still ends a counted pass. rc 1.
+
+    Oracle: Portage 3.0.83 on scratch copies of the fixtures (portuale
+    `LLM/evidence/2026-10-26-575-residues/r6/captures/full-table.md`, rows
+    `fx-ormissbad`, `fx-abort-masked-mid`, `fx-slotconflictunsolvable`,
+    `fx-slotconfgroup`, `fx-scuseparent`, `fx-slotusegroup`, `fx-g0`,
+    `fx-triangle`, `fx-triangle-rev`)."""
+    got, got_tries = _600_run(emerge_binary, fixture_env, [], atoms)
+    assert got.returncode == 1, got.stdout
+    assert got_tries == tries, got.stdout
+
+
+@pytest.mark.parametrize(
+    "extra,tries",
+    [([], "4/20"), (["--backtrack=2"], "2/2"), (["--backtrack=3"], "3/3"), (["--backtrack=5"], "4/5")],
+)
+def test_600_chain_counts_like_portage(emerge_binary, fixture_env, extra, tries):
+    """#600: the `r6c0 -> r6c1 -> r6c2 -> r6c3 -> r6gone` missing-dependency
+    chain. A restart counts even when every child it adds is rejected
+    (`mask_steps>max_depth`, D:12414-12416), and the last failed walk ends a
+    counted pass. rc 1.
+
+    Oracle: Portage 3.0.83 on a scratch copy of the fixtures (portuale
+    `LLM/evidence/2026-10-26-575-residues/r6/captures/full-table.md`, rows
+    `ch-d`, `ch-b2`, `ch-b3`, `ch-b5`)."""
+    got, got_tries = _600_run(emerge_binary, fixture_env, extra, ["dev-libs/r6c0"])
+    assert got.returncode == 1, got.stdout
+    assert got_tries == tries, got.stdout
+
+
+@pytest.mark.parametrize(
+    "atoms",
+    [
+        ["dev-libs/r594vdep", "dev-libs/r594qa"],
+        ["dev-libs/r594qa", "dev-libs/r594vdep"],
+    ],
+)
+def test_600_grow_flip_portage_would_not_restart_for_is_not_counted(
+    emerge_binary, fixture_env, atoms
+):
+    """#600: with `--autounmask-backtrack=y` a grown USE config that Portage
+    would not restart for is not a Portage pass and is not counted. The flip
+    on `r594vdep` changes no flattened dependency and breaks no parent USE
+    dep, so `want_restart_for_use_change` (D:7747-7787) is false and Portage
+    stops at the first pass (`B:need_config_change`, 0/20). rc 1 with the
+    merge list and the USE-change block, like Portage. rc 0 is impossible
+    here, so the count is read off plain stdout.
+
+    Oracle: Portage 3.0.83 on scratch copies of the fixtures (portuale
+    `LLM/evidence/2026-10-26-575-residues/r6/captures/full-table.md`, rows
+    `fxq-1`, `fxq-2`; `cells/fxq-1.portage.{out,rc}` for the rows and rc)."""
+    got, got_tries = _600_run(
+        emerge_binary, fixture_env, ["--autounmask-backtrack=y"], atoms
+    )
+    assert got.returncode == 1, got.stdout
+    assert got_tries == "0/20", got.stdout
+    root = fixture_env["ROOT"]
+    assert [
+        ln.rstrip() for ln in got.stdout.splitlines() if ln.startswith("[ebuild")
+    ] == [
+        f'[ebuild  N     ] dev-libs/r594vdep-1 to {root} USE="r594flag"',
+        f"[ebuild  N     ] dev-libs/r594qa-2 to {root}",
+    ], got.stdout

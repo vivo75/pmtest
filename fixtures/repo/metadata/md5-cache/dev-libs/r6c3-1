@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: R6 (#600) r6c3-1
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/r6gone
+SLOT=0
+_md5_=7876ca5987b8fd0d88ecc5c8c8ad425a
