@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #601 installed consumer with the hard built atom
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p589dprov-5.44* =dev-libs/p589dprov-5.42* ) dev-libs/p589dprov:=
+SLOT=0
+_md5_=dca7492ed05b1fb402ea854c96fc2d8c

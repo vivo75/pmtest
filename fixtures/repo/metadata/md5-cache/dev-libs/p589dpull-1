@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #601 puller pinning the new provider and pulling the installed consumer
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p589dprov-5.44* dev-libs/p589dvirt
+SLOT=0
+_md5_=53ac575e1b6738e18b8469828176ba5d

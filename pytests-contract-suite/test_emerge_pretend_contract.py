@@ -3160,6 +3160,7 @@ CASES = [
     ("#600: the depth-capped chain counts the all-rejected restart (r6c0 --backtrack=5, Portage 3.0.83, rc 1, backtrack 4/5)", ["--pretend", "--backtrack=5", "dev-libs/r6c0"], 1),
     ("#600: a grow USE flip Portage would not restart for is not counted (--autounmask-backtrack=y r594vdep r594qa, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594vdep", "dev-libs/r594qa"], 1),
     ("#600: the same grow flip in the reversed order is not counted (--autounmask-backtrack=y r594qa r594vdep, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594qa", "dev-libs/r594vdep"], 1),
+    ("#601: a masked-installed provider keeps the rebuild display (r on the provider + the causing-rebuilds block) on its installed consumer (Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--update", "dev-libs/p589dpull"], 0),
 ]
 
 
@@ -36728,6 +36729,44 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p589bpull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p589bpull-portage.txt`)."""
     _598_check(emerge_binary, fixture_env, "p589b")
+
+
+def test_601_masked_installed_provider_keeps_the_rebuild_display(
+    emerge_binary, fixture_env
+):
+    """#601: the cell's masked-installed provider shape. `p589dprov-5.42:0/5.42`
+    is installed, the merge-bound `p589dpull-1` pins `=p589dprov-5.44*` and pulls
+    the installed `p589dvirt-1`, whose recorded hard atom is
+    `dev-libs/p589dprov:0/5.42=`; the slot conflict masks `p589dprov-5.42` as
+    `[installed]`. Portage still force-reinstalls the provider, so its row is
+    `r U` and the "causing rebuilds" block names the consumer; portuale today
+    prints neither (the provider never joins the replace set on the settling
+    branch, so `drop_masked_pairs` wipes every display pair).
+
+    Oracle: Portage 3.0.83 `emerge --pretend --verbose --update dev-libs/p589dpull`
+    (`LLM/evidence/2026-10-28-601/captures/task1-portage.txt`). The backtrack
+    counter is not asserted (#608: the harness strips it)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "--update", "dev-libs/p589dpull"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.full_stdout + got.full_stderr
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild  r  U  ] dev-libs/p589dprov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild  rR    ] dev-libs/p589dvirt-1::testrepo to {root}",
+        f"[ebuild  N     ] dev-libs/p589dpull-1::testrepo to {root}",
+    ], got.stdout
+    assert (
+        f"  (dev-libs/p589dprov-5.44:0/5.44::testrepo, ebuild scheduled for merge to '{root}') causes rebuilds for:\n"
+        f"    (dev-libs/p589dvirt-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+    ) in got.stdout, got.stdout
 
 
 def _592_run(emerge_binary, fixture_env, extra, atom):

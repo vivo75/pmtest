@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #601 masked-installed provider, new subslot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.44
+_md5_=09f4da4866102102fb67ee4678e48343
