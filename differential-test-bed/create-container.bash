@@ -11,7 +11,7 @@ if [[ ! -d ${BASEDIR} ]] ; then echo "failed discovery of workdir" ; exit 1 ; fi
 
 declare -a REPOS=( gentoo buildovl )
 declare -A LAST_COMMIT
-LAST_COMMIT["gentoo"]="350c0882200cebbdc04d67cace7c99a6725e1889"
+LAST_COMMIT["gentoo"]="e07309ba688fb12eaaebe204cc8d346e57227d1b"
 LAST_COMMIT["buildovl"]="cd571fc637a805ebde0e8497eab6f124b41c8f96"
 # The `--shallow-since` cutoff per repo for fetching its LAST_COMMIT:
 # must stay AT OR BEFORE that commit's own date (gentoo 2026-10-23,
