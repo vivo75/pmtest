@@ -85,6 +85,10 @@ def test_fingerprint_notices_a_vdb_mtime_change(tmp_path, monkeypatch):
     """Creating an entry under the watched vdb dir (what a move or
     slotmove does to `/var/db/pkg`) changes its recorded mtime."""
     _mtimedb, vdb = _point_sentinel_at(tmp_path, monkeypatch)
+    # A coarse-mtime tmpfs can hand the new entry the same nanosecond value
+    # the empty directory carried; pin "before" to an old time so mkdir's
+    # timestamp is unambiguous.
+    os.utime(vdb, ns=(1_000_000_000, 1_000_000_000))
     before = fingerprint_host_state()
     (vdb / "cat-pkg-1.0").mkdir()
     after = fingerprint_host_state()
