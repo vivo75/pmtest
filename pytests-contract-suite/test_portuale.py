@@ -3982,7 +3982,7 @@ def test_emerge_failed_build_prints_emerging_but_no_installing_line(
     assert ">>> Completed" not in result.stdout
     # Portage's failure block on stdout (backlog #426); no portuale-only stderr line.
     assert (
-        f"\n>>> Failed to emerge dev-libs/failpkg-1.0 for {root}, Log file:\n\n>>>  '"
+        f"\n>>> Failed to emerge dev-libs/failpkg-1.0 for {root}/, Log file:\n\n>>>  '"
         in result.stdout
     )
     assert "temp/build.log'" in result.stdout
@@ -5660,7 +5660,7 @@ def test_emerge_usepkgonly_fails_a_truncated_binpkg_at_merge_like_portage(
     # leading blank line. And nothing else: no resume-list notice, no
     # `emerge:` line (both absent in Portage's log for this case).
     log = tmp_path / "ptmp-merge/portage/dev-libs/packagepkg-1.0/temp/build.log"
-    assert f"\n>>> Failed to emerge dev-libs/packagepkg-1.0 for {root}, Log file:\n" in r.stdout
+    assert f"\n>>> Failed to emerge dev-libs/packagepkg-1.0 for {root}/, Log file:\n" in r.stdout
     assert f"\n>>>  '{log}'\n" in r.stdout
     assert "The resume list contains" not in r.stderr
     assert "binpkg digest verification failed" not in r.stderr
@@ -5954,8 +5954,9 @@ def test_getbinpkgonly_refuses_a_remote_binary_without_size_and_checksum(
         shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
         env = _getbinpkg_500_env(tmp_path, root, clientetc, tmp_path / "pkgdir-x")
         env["NOCOLOR"] = "true"
-        # Portage always prints ROOT with a trailing slash; portuale echoes the
-        # string it was given (a separate, older difference), so give it one.
+        # Portage always prints ROOT with a trailing slash. The display
+        # normalises it since backlog #574; this run keeps the explicit slash
+        # so the pin also covers the idempotent arm.
         env["ROOT"] = str(root) + "/"
         r = subprocess.run(
             [str(emerge_binary), "-1", "--getbinpkgonly", "--nodeps", "dev-libs/packagepkg"],
@@ -6476,7 +6477,7 @@ def test_getbinpkg_with_500ing_binhost_and_stale_index_aborts_like_portage(
         )
         # Portage's failure tail, with this run's `for <root>` and log.
         assert (
-            f">>> Failed to emerge dev-libs/packagepkg-1.0 for {root}, Log file:"
+            f">>> Failed to emerge dev-libs/packagepkg-1.0 for {root}/, Log file:"
             in result.stdout
         )
         assert ">>>  '" in result.stdout and "temp/build.log'" in result.stdout
@@ -6953,7 +6954,7 @@ def test_emerge_failed_postinst_matches_portage(emerge_binary, tmp_path):
         in out
     )
     assert (
-        f">>> Failed to install dev-util/postinstfail-1 to {root}, Log file:"
+        f">>> Failed to install dev-util/postinstfail-1 to {root}/, Log file:"
         in out
     )
     assert "Failed to emerge" not in out
@@ -6985,7 +6986,7 @@ def test_emerge_failed_postinst_matches_portage(emerge_binary, tmp_path):
         in out
     )
     assert (
-        f">>> Failed to install dev-util/postinstfail-1 to {root}, Log file:"
+        f">>> Failed to install dev-util/postinstfail-1 to {root}/, Log file:"
         in out
     )
     assert (
@@ -8196,7 +8197,7 @@ def test_emerge_resume_applies_interactive_packages_like_portage(emerge_binary, 
         "Calculating dependencies ... done!\nDependency resolution took .\n\n"
         "*** Resuming merge...\n"
         ">>> Sending package output to stdio due to interactive package(s):\n\n"
-        f"  dev-libs/interactivemergepkg-1.0 for {root}\n\n"
+        f"  dev-libs/interactivemergepkg-1.0 for {root}/\n\n"
         ">>> Setting --jobs=1 due to the above interactive package(s)\n"
         ">>> In order to temporarily mask interactive updates, you may\n"
         ">>> specify --accept-properties=-interactive\n"
@@ -9130,7 +9131,7 @@ def test_emerge_elog_save_and_save_summary_write_log_files(emerge_binary, tmp_pa
     ]
     assert len(build_logs) == 1
     assert (
-        f" * Messages for package dev-libs/elogmsgpkg-1.0 merged to {root}:\n"
+        f" * Messages for package dev-libs/elogmsgpkg-1.0 merged to {root}/:\n"
         f" * Log file: {build_logs[0]}\n\n"
         " * this package needs manual configuration\n"
     ) in r.stdout
@@ -12674,9 +12675,9 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
     the download, and exits 1 with `>>> Failed to emerge` when the fetch fails, leaving
     the vdb alone. Every expected byte was captured from Portage 3.0.82.2 on this very
     root (`LLM/evidence/2026-10-18-401-s0/portage-cells.txt` in portuale), modulo the
-    wall-clock seconds portuale cuts (and, on the failure path, the trailing `/`
-    Portage puts on `ROOT` in the `Failed to emerge` line — the `Fetching` line
-    now carries it since backlog #566).
+    wall-clock seconds portuale cuts (both the `Fetching` and the `Failed to
+    emerge` lines carry Portage's trailing `/` on `ROOT` since backlog #566 and
+    #574).
 
     Fetch-only still creates the empty vdb dir: Portage takes the vdb
     lock on every gated run including fetch (`_global_updates.py:42-46`)
@@ -12728,7 +12729,7 @@ def test_emerge_fetchonly_matches_portage(emerge_binary, tmp_path, argv, ok):
     else:
         assert result.returncode == 1
         assert result.stdout == (
-            header + fetching + downloading + f"\n>>> Failed to emerge dev-util/fetchprobe-1 for {root_dir}\n"
+            header + fetching + downloading + f"\n>>> Failed to emerge dev-util/fetchprobe-1 for {root_dir}/\n"
         )
         summary = (
             " * \n * The following package has failed to build, install, or execute postinst:\n"
@@ -12782,8 +12783,8 @@ def _fetchonly_extra_packages(root):
             "dev-util/fetchrestrict",
             "",
             1,
-            "\n\n\n\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n"
-            "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}:\n\n"
+            "\n\n\n\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}/\n"
+            "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}/:\n\n"
             " * The following files cannot be fetched for fetchrestrict:\n"
             " *    probe-1.tar.gz\n",
             "\n!!! dev-util/fetchrestrict-1 has fetch restriction turned on.\n"
@@ -12798,8 +12799,8 @@ def _fetchonly_extra_packages(root):
             "",
             1,
             "\n\n>>> Fetching (1 of 1) dev-util/fetchrestrict-1::fetchrepo for {root}/\n"
-            "\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}\n"
-            "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}:\n\n"
+            "\n>>> Failed to emerge dev-util/fetchrestrict-1 for {root}/\n"
+            "\n * Messages for package dev-util/fetchrestrict-1 merged to {root}/:\n\n"
             " * The following files cannot be fetched for fetchrestrict:\n"
             " *    probe-1.tar.gz\n",
             "\n!!! dev-util/fetchrestrict-1 has fetch restriction turned on.\n"
@@ -12827,9 +12828,9 @@ def test_emerge_fetchonly_restrict_fetch_and_mirror_match_portage(
     `Failed to emerge` block even under `-p`, and lists no URI; `FEATURES=mirror` makes
     the listing as `--fetch-all-uri` does. Captured on Portage 3.0.82.2 with the
     same root (`LLM/evidence/2026-10-19-b415/` in portuale: `setup.sh`, `cells.sh`),
-    modulo the cuts the other fetchonly pin names (the `Fetching`-line trailing
-    `/` on `ROOT` now matches since backlog #566; the `Failed to emerge` /
-    `merged to` lines still omit it); the `Messages for package` block
+    modulo the cuts the other fetchonly pin names (the `Fetching`,
+    `Failed to emerge` and `merged to` lines all carry the trailing `/` on
+    `ROOT` since backlog #566 and #574); the `Messages for package` block
     after `Failed to emerge` is `pkg_nofetch`'s elog summary (backlog #422)."""
     root = _fetchonly_root(tmp_path)
     _fetchonly_extra_packages(root)
@@ -13299,8 +13300,9 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     notice, the `dropped because` notice, the counter restarting at `(1 of 1)`, the
     elog `Messages for package` blocks of the failed and the dropped package, the
     stderr list of failed packages, and a `world` that holds only what merged. Cut
-    here: timings, `Verifying ebuild manifests`, and the trailing `/` on `ROOT`
-    everywhere but the `Emerging` line (which now matches since backlog #566)."""
+    here: timings and `Verifying ebuild manifests`. Every `ROOT` line carries
+    Portage's trailing `/` since backlog #566/#574 except the `--keep-going: …
+    dropped because` line, which #574 leaves unchanged."""
     import shutil
 
     root = tmp_path / "root"
@@ -13330,13 +13332,13 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
         )
     )
     sections = [
-        f"\n>>> Failed to emerge dev-libs/schedbad-1.0 for {root}, Log file:\n\n>>>  '{log}'\n",
+        f"\n>>> Failed to emerge dev-libs/schedbad-1.0 for {root}/, Log file:\n\n>>>  '{log}'\n",
         "*** Resuming merge...\nCalculating dependencies ... done!\nDependency resolution took .\n\n",
         dropped,
         f">>> Emerging (1 of 1) dev-libs/schedok-1.0::testrepo for {root}/\n",
-        f"\n * Messages for package dev-libs/schedbad-1.0 merged to {root}:\n\n"
+        f"\n * Messages for package dev-libs/schedbad-1.0 merged to {root}/:\n\n"
         " * ERROR: dev-libs/schedbad-1.0::testrepo failed (install phase):\n",
-        f"\n * Messages for package dev-libs/schedbaddep-1.0 merged to {root}:\n\n" + dropped,
+        f"\n * Messages for package dev-libs/schedbaddep-1.0 merged to {root}/:\n\n" + dropped,
     ]
     pos = 0
     for section in sections:
@@ -13369,9 +13371,9 @@ def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_pa
     whose only failure is one build shows that build's whole log before the elog
     blocks, with no blank lines inside the `Failed to emerge` block, unless
     `--quiet-fail`; (c) in `-jN` the elog block ends with `The complete build log is
-    located at '<build.log>'.` The `Installing`/`Completed` trailing `/` on `ROOT`
-    now matches since backlog #566 (`Failed to emerge` / `merged to` lines still
-    omit it)."""
+    located at '<build.log>'.` Every `ROOT` line (`Installing`, `Completed`,
+    `Failed to emerge`, `merged to`) carries Portage's trailing `/` since
+    backlog #566/#574."""
     import shutil
 
     def run(name, args):
@@ -13409,9 +13411,9 @@ def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_pa
     root, pt, r = run("qlone", ["-q", "dev-libs/schedbad"])
     assert r.returncode == 1
     log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
-    head = f">>> Failed to emerge dev-libs/schedbad-1.0 for {root}, Log file:\n>>>  '{log}'\n"
+    head = f">>> Failed to emerge dev-libs/schedbad-1.0 for {root}/, Log file:\n>>>  '{log}'\n"
     assert head + log.read_text() in r.stdout, r.stdout
-    assert r.stdout.index(head) < r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}:")
+    assert r.stdout.index(head) < r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}/:")
     root, pt, r = run("qfail", ["-q", "--quiet-fail", "dev-libs/schedbad"])
     log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
     assert r.returncode == 1
@@ -13420,7 +13422,7 @@ def test_emerge_failed_build_endgame_details_match_portage(emerge_binary, tmp_pa
     # (c)
     root, pt, r = run("jkg", ["--keep-going", "--jobs=2", "dev-libs/schedbaddep", "dev-libs/schedok"])
     log = pt / "portage/dev-libs/schedbad-1.0/temp/build.log"
-    elog = r.stdout[r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}:"):]
+    elog = r.stdout[r.stdout.index(f" * Messages for package dev-libs/schedbad-1.0 merged to {root}/:"):]
     assert f" * The complete build log is located at '{log}'.\n" in elog, r.stdout
 
 
@@ -13661,7 +13663,7 @@ def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
         in out
     )
     assert (
-        f">>> Failed to install dev-util/f459-postinstfail-1 to {root}, Log file:"
+        f">>> Failed to install dev-util/f459-postinstfail-1 to {root}/, Log file:"
         in out
     )
     assert "Failed to emerge" not in out
@@ -13706,7 +13708,7 @@ def test_emerge_failed_binpkg_postinst_matches_portage(emerge_binary, tmp_path):
         in out
     )
     assert (
-        f">>> Failed to install dev-util/f459-postinstfail-1 to {root}, Log file:"
+        f">>> Failed to install dev-util/f459-postinstfail-1 to {root}/, Log file:"
         in out
     )
     assert (
