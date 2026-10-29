@@ -40,7 +40,11 @@ export LC_ALL=C.UTF-8 TZ=UTC
 # adjacent pairs (e.g. `llvm-core/llvmgold` <-> `llvm-core/llvm-toolchain-
 # symlinks`). Pin the seed so the Portage reference is reproducible and the
 # comparison is against one stable target -- portuale's own order is
-# deterministic and matches Portage at `PYTHONHASHSEED=0`.
+# deterministic, and seed 0 is the order it is measured against. That is
+# not the same as matching Portage: the `@world` perl cluster is
+# seed-dependent in Portage and portuale does not copy it, so the two
+# diverge there at seed 0 too (see `compare/known-divergences.yaml`,
+# `perl-cluster-hash-order-601`).
 export PYTHONHASHSEED=0
 umask 022
 
