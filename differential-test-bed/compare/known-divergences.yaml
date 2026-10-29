@@ -285,3 +285,32 @@
     installed virtual's own `||` is doubly dead post-upgrade.
   owner: portuale-bug
 
+
+- id: perl-cluster-hash-order-601
+  layer: l0
+  category: order
+  slugs: ["MULTI_deep-update-world"]
+  match: "real virtual/perl-Test-Harness vs portuale virtual/perl-Encode"
+  reason: >
+    Portage's merge order for the independent virtual/perl-* / dev-perl/*
+    leaves is PYTHONHASHSEED-dependent: `_serialize_tasks` emits them in
+    `mygraph.order` (depgraph.py:9487), whose insertion order comes from the
+    resolver's set-backed atom iteration (`_iter_atoms_for_pkg`,
+    depgraph.py:4988, over the set-backed `InternalPackageSet`; the yielded
+    `arg_atoms` order feeds `_add_pkg`'s digraph.add calls). Measured on the
+    bed's `-puvD @world` with seeds 0-5: the same rows come out
+    Test-Harness/Encode (0/1/2), Math-BigInt/Test-Harness/Encode (3/4), or
+    Encode/Math-BigInt/Test-Harness (5); one seed can also differ between its
+    two backtracking schedules. These packages have no dependency relation,
+    so the order is an artifact, not a contract. The bed pins seed 0
+    (layers/l0/in-container.sh); portuale is deterministic and matches a
+    different seed's order for this cluster. The #10 nghttp3/libseccomp swap
+    was NOT this artifact: it was a real portuale graph-order bug, fixed by
+    counting the bias key as Portage's post-prune graph does (Portage
+    `depgraph.py:9540-9548`; portuale `merge_order/mod.rs`
+    `post_prune_parent_count`).
+    Masking tradeoff, stated plainly: this entry hides any future order
+    divergence in this cell whose first reported pair is exactly this one;
+    re-measure the seeds and re-tighten when the tree or the perl cluster
+    changes.
+  owner: deepseek-v4.1-flash
