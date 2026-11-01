@@ -36891,6 +36891,28 @@ def test_592_use_only_miss_without_autounmask_stops_with_no_backtrack(
     ), got.stderr
 
 
+def test_592_conflicted_second_instance_row_carries_the_repo(
+    emerge_binary, fixture_env
+):
+    """Backlog #610: in a conflicted graph the synthesized second-instance
+    row carries its repo -- `dev-libs/r592ds-1::testrepo`, like Portage --
+    not the repo-less `dev-libs/r592ds-1::`. The D-default shape resolves to
+    an autounmask USE-change stop on both sides (rc 1, backtrack 0/20), so
+    only the row text is pinned here.
+
+    Oracle: Portage 3.0.83 `emerge -pv dev-libs/r592dtop`
+    (`LLM/evidence/2026-10-26-575-residues/r1/captures/D-portage.txt`,
+    `[ebuild  N     ] dev-libs/r592ds-1::testrepo`)."""
+    got, tries, rows = _592_run(emerge_binary, fixture_env, [], "r592dtop")
+    assert got.returncode == 1, got.stdout
+    assert tries == "0/20", got.stdout
+    bad = [ln for ln in rows if "r592ds-1:: " in ln or ln.endswith("r592ds-1::")]
+    assert not bad, (bad, got.stdout)
+    assert any(
+        ln.startswith("[ebuild  N     ] dev-libs/r592ds-1::testrepo ") for ln in rows
+    ), got.stdout
+
+
 def test_593_skipped_update_blocks_follow_portage_order_and_carry_the_root(
     emerge_binary, fixture_env
 ):
