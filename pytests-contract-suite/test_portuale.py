@@ -13301,8 +13301,10 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     elog `Messages for package` blocks of the failed and the dropped package, the
     stderr list of failed packages, and a `world` that holds only what merged. Cut
     here: timings and `Verifying ebuild manifests`. Every `ROOT` line carries
-    Portage's trailing `/` since backlog #566/#574 except the `--keep-going: …
-    dropped because` line, which #574 leaves unchanged."""
+    Portage's trailing `/` since backlog #566/#574, including the
+    `--keep-going: … dropped because` line since backlog #622 (Portage
+    `Scheduler.py:2743-2749` prints `pkg.root`, which always carries the slash
+    via `set_root_override`)."""
     import shutil
 
     root = tmp_path / "root"
@@ -13326,7 +13328,7 @@ def test_emerge_keep_going_endgame_matches_portage(emerge_binary, tmp_path):
     dropped = "".join(
         f" * {line}\n"
         for line in textwrap.wrap(
-            f"emerge --keep-going: dev-libs/schedbaddep-1.0 for {root} dropped because"
+            f"emerge --keep-going: dev-libs/schedbaddep-1.0 for {root}/ dropped because"
             " it requires dev-libs/schedbad",
             75,
         )
