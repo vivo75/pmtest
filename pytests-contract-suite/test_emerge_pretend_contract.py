@@ -31253,6 +31253,25 @@ def test_pg359_gsblk_pubgrub_pvu_plans_new_slot_only(emerge_binary, fixture_env)
     ) == [("NS", "dev-libs/pg359-gsblk-2:2")]
 
 
+def test_pg359_gsblk_pubgrub_pvu_matches_default_solver_output(
+    emerge_binary, fixture_env
+):
+    """Backlog #446: the new-slot `[oldver]` bracket under `--solver=pubgrub`
+    carries the installed instance's sub-slot and repo from the vdb, like the
+    default solver -- `dev-libs/pg359-gsblk-2:2::testrepo [1.0:1::testrepo]`,
+    not the `[1.0:1/::]` the bridge printed from empty fields. The bridge now
+    reads both from the vdb (`read_vdb_slot`, `installed_pkg_repo`), the same
+    sources the default solver's `installed_refs` uses. Full-output equality
+    with the default solver pins the bracket and everything around it."""
+    base = ["-pvu", "--getbinpkg=n", "--usepkg=n", "dev-libs/pg359-gsblk"]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == 0
+    assert pubgrub.returncode == 0
+    assert pubgrub.stdout == default.stdout
+    assert pubgrub.stderr == default.stderr
+
+
 def test_pg34_multi_default_pv_keeps_installed_slot_out(emerge_binary, fixture_env):
     """#34 S1 default-solver lock: a single `NS` row for slot 2, the
     Portage 3.0.82.2 container plan (same shape as
