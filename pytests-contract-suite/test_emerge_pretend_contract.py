@@ -5364,6 +5364,38 @@ def test_or_group_other_installed_bin_beats_plain_other_in_the_allow_masked_pass
     )
 
 
+def test_update_deep_masked_installed_alternative_keeps_the_installed_instance(
+    emerge_binary, fixture_env
+):
+    """Backlog #615 (residue of #600 / plan 02.589 R6): `-uD[N]
+    dev-libs/omasked` exits 0 and merges `omasked-1.0`, like host Portage
+    3.0.83, instead of aborting rc 1 "All ebuilds that could satisfy
+    dev-libs/omaskedinstalled have been masked". Portage ignores
+    visibility when every match is masked
+    (`_select_pkg_highest_available_imp`, `depgraph.py:8525-8532`: "all
+    are masked, so ignore visibility") and keeps the installed
+    `omaskedinstalled-1.0`, warning "The following installed packages
+    are masked" (that warning itself is still missing: #611(d)).
+    Portuale's installed fallback (`outcome_fallbacks.rs`) skipped
+    `||`-chosen edges, and the `--update` early return is skipped when
+    an update is wanted, so the masked tree copy left
+    `NoVisibleCandidate`, the MissingDep trigger masked the parent, and
+    the pass dead-ended. The fallback now keeps the installed instance
+    for bare atoms whose tree copies are all masked. Both `-uD` and
+    `-uDN` print `(backtrack: 0/20)` and the single `N` row."""
+    for extra in ([], ["--newuse"]):
+        args = ["--pretend", "--update", "--deep", *extra, "dev-libs/omasked"]
+        rust = _run([str(emerge_binary)], args, fixture_env)
+        assert rust.returncode == 0, (extra, rust.stdout, rust.stderr)
+        assert rust.stdout.splitlines() == [
+            f'[ebuild  N     ] dev-libs/omasked-1.0 to {fixture_env["ROOT"]}'
+        ], (extra, rust.stdout)
+        assert "(backtrack: 0/20)" in rust.full_stdout, (extra, rust.full_stdout)
+        assert "omaskedmissing" not in rust.stdout, (
+            "the plain-other alternative must never be the one selected"
+        )
+
+
 def test_or_group_other_installed_some_bin_beats_plain_other(
     emerge_binary, fixture_env
 ):
