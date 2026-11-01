@@ -11,5 +11,31 @@ if [ ! -x "$venv/bin/python" ] || ! "$venv/bin/python" -c 'import xdist' 2>/dev/
   "$venv/bin/pip" install -q pytest-xdist
 fi
 cd "$here"
+# Backlog #634: the basetemp may hold root-owned residue from an earlier
+# run as root (a merge test chowns paths to root), which this user cannot
+# remove -- pytest then dies with INTERNALERROR (rc 3) instead of running
+# anything. Reclaim it up front like conftest's sudo reclaim does for its
+# own default; if it cannot be reclaimed, say exactly that (with the fix)
+# and exit 2 instead of letting pytest INTERNALERROR.
+basetemp="${PMTEST_BASETEMP:-/var/tmp/pytest-parallel}"
+prev=""
+for arg in "$@"; do
+    if [ -n "$prev" ]; then
+        basetemp="$arg"
+        prev=""
+    fi
+    case "$arg" in
+        --basetemp=*) basetemp="${arg#--basetemp=}" ;;
+        --basetemp) prev="yes" ;;
+    esac
+done
+if [ -n "$basetemp" ] && [ "$basetemp" != "/" ] && [ -e "$basetemp" ]; then
+    if ! rm -rf "$basetemp" 2>/dev/null && [ -e "$basetemp" ]; then
+        echo "pytest-parallel: cannot reclaim basetemp '$basetemp' (root-owned residue from an earlier run as root?)" >&2
+        echo "  fix with: sudo rm -rf '$basetemp'" >&2
+        echo "  or point this run elsewhere: PMTEST_BASETEMP=<fresh-dir> scripts/pytest-parallel.sh ..." >&2
+        exit 2
+    fi
+fi
 exec "$venv/bin/python" -m pytest pytests-contract-suite -q -n "${JOBS:-8}" \
   --basetemp="${PMTEST_BASETEMP:-/var/tmp/pytest-parallel}" -p no:cacheprovider "$@"
