@@ -3192,6 +3192,29 @@ def _assert_abort_preamble(stdout: str) -> None:
 _LAST_ROOT_SUFFIX = ""
 
 
+def test_quiet_abort_preamble_prints_nothing_like_portage(
+    emerge_binary, fixture_env
+):
+    """Backlog #621: `--pretend --quiet` on an aborted resolve prints no
+    resolution display at all. Portage's `_start_resolution_display`
+    (`lib/_emerge/depgraph.py:12216-12262`, vendored 3.0.83) skips the
+    banner when `--quiet` is in myopts, forces the spinner QUIET, and the
+    `backtrack_depgraph` finally only reports when `end_notice()` is true
+    (`stdout_spinner.py: end_notice` returns False with nothing pending) --
+    so neither the banner, the `Calculating dependencies ... done!`
+    completion, nor the report line prints. Expected value from live
+    Portage 3.0.83 on this host (`emerge --pretend --quiet
+    dev-libs/missingdep` with the fixture configroot: empty stdout,
+    rc 1); portuale printed the banner plus the notice before this slice.
+    Only stdout is pinned here: the stderr disclosures are unchanged."""
+    result = _run(
+        [str(emerge_binary)], ["--pretend", "--quiet", "dev-libs/missingdep"],
+        fixture_env,
+    )
+    assert result.returncode == 1
+    assert result.stdout == ""
+
+
 def _root_suffix(env: dict[str, str]) -> str:
     root = env.get("ROOT", "/").rstrip("/")
     running = env.get("PORTAGE_RUNNING_ROOT", "/").rstrip("/")
