@@ -6089,21 +6089,20 @@ def _slotbind_root(tmp_path):
 def test_slot_operator_rebuild_reinstalls_a_stale_equals_consumer(
     emerge_binary, fixture_env, tmp_path
 ):
-    """Portage depgraph's _slot_operator_trigger_reinstalls: dev-libs/
+    """Portage depgraph's _slot_operator_trigger_reinstalls shape: dev-libs/
     slotbindconsumer's vdb RDEPEND is "dev-libs/slotbindtarget:2/2="
     (bound when the target was at SLOT="2"). Emerging the target picks
     slotbindtarget-2.0 (SLOT="2/9"), so that built ABI link is stale and
-    the consumer is scheduled for a reinstall -- `[ebuild rR]` (Portage tags
-    every forced slot-op rebuild, and the triggering upgrade, with the
-    red `r` -- PkgAttrDisplay.force_reinstall), no reason annotation (a
-    slot-operator rebuild, not --newuse/--changed-*), in dependency-first
-    merge order after the target, plus Portage _show_abi_rebuild_info's "The
-    following packages are causing rebuilds:" block
-    (--verbose-slot-rebuilds, default on). dev-libs/slotbindfresh is
+    the consumer is scheduled for a reinstall -- `[ebuild rR]`, in
+    dependency-first merge order after the target, plus "The following
+    packages are causing rebuilds:" block. The upgraded provider itself
+    carries no `r`: Portage tags `r` only through a `force_reinstall`
+    arg and there is no provider-side rule (backlog #623; verified live
+    on host Portage 3.0.83, which prints a plain `U` and no rebuild at
+    all for this shape -- the `rR` rebuild row and the block are still
+    portuale-only here, tracked separately). dev-libs/slotbindfresh is
     already bound to "2/9=" -> NOT rebuilt. Both consumers are in @world
-    so the reachability gate (Portage _complete_graph's required-set
-    re-walk, which auto-enables here because the target upgrade changes
-    an installed package) lets the scan see them."""
+    so the reachability gate lets the scan see them."""
     env = dict(fixture_env)
     root = str(_slotbind_root(tmp_path))
     env["ROOT"] = root
@@ -6113,7 +6112,7 @@ def test_slot_operator_rebuild_reinstalls_a_stale_equals_consumer(
     # Portage _show_abi_rebuild_info prints each side as str(Package):
     # "(cpv:slot/sub_slot::repo, ebuild scheduled for merge to '<root>')".
     assert result.stdout.splitlines() == [
-        f'[ebuild  r  U  ] dev-libs/slotbindtarget-2.0 [1.0] to {env["ROOT"]}',
+        f'[ebuild     U  ] dev-libs/slotbindtarget-2.0 [1.0] to {env["ROOT"]}',
         f'[ebuild  rR    ] dev-libs/slotbindconsumer-1.0 to {env["ROOT"]}',
         "",
         "The following packages are causing rebuilds:",
@@ -6315,8 +6314,12 @@ def test_slot_operator_rebuild_cascades_through_a_multi_level_chain(
     when cascmid's tree ebuild has moved 0/1 -> 0/2 since it was
     installed, rebuilding it is itself a sub-slot shift that breaks
     casctail's built "cascmid:0/1=" -- a second forced rebuild. Every
-    level is tagged with the red `r`, and every provider->consumer edge
-    shows in the "causing rebuilds:" block."""
+    *rebuilt consumer* is tagged with the red `r` (`rR`), and every
+    provider->consumer edge shows in the "causing rebuilds:" block.
+    The upgraded provider itself carries no `r`: Portage tags `r` only
+    through a `force_reinstall` arg and there is no provider-side rule
+    (backlog #623; host Portage 3.0.83 prints a plain `U` here, verified
+    live on the same fixture shape)."""
     env = dict(fixture_env)
     root = str(_slotcascade_root(tmp_path))
     env["ROOT"] = root
@@ -6328,7 +6331,7 @@ def test_slot_operator_rebuild_cascades_through_a_multi_level_chain(
         return f"({cpv}:{slot}::testrepo, ebuild scheduled for merge to '{root}')"
 
     assert result.stdout.splitlines() == [
-        f'[ebuild  r  U  ] dev-libs/casctarget-2.0 [1.0] to {env["ROOT"]}',
+        f'[ebuild     U  ] dev-libs/casctarget-2.0 [1.0] to {env["ROOT"]}',
         # cascmid's tree ebuild moved 0/1 -> 0/2, so the rebuild lands at
         # a different sub-slot than the installed instance -> Portage shows
         # the `[1.0]` bracket (output.py::_get_installed_best 723-732).
@@ -24044,13 +24047,20 @@ def test_oracle_boost_subslot_upgrade(
     """023 oracle, case boost (upstream
     `test_slot_conflict_update.py::testSlotConflictUpdate`): `libcmis`
     needs `boost:=`, installed at subslot 1.52 with `boost-build-1.52.0`.
-    Portage merges `[boost-build-1.53.0, boost-1.53.0, libcmis-0.3.1]`.
+    Upstream merges `[boost-build-1.53.0, boost-1.53.0, libcmis-0.3.1]`.
     Portuale reaches the same versions via highest-first selection +
     solvable growth, without ever hitting the missed-update mask path
     this test was written for -- and since #24 S1's complete-mode gate
-    it also schedules the `libcmis` subslot rebuild Portage merges (the
-    `r`-tagged provider + `rR` consumer + "causing rebuilds" block).
-    Full mergelist MATCH (`@system` lines are fixture-profile noise)."""
+    it also schedules the `libcmis` subslot rebuild (the `rR` consumer +
+    "causing rebuilds" block). The upgraded provider itself carries no
+    `r`: Portage tags `r` only through a `force_reinstall` arg
+    (`output.py`), and there is no provider-side rule (backlog #623).
+    Verified live against host Portage 3.0.83 on the same shape
+    (`--pretend --update --deep`: plain `U` boost-1.53.0, no `r`, no
+    libcmis row at all -- the rebuild itself is a separate open item,
+    since the host runs 0 backtracks here and portuale 1). What remains
+    portuale-only is the `rR` rebuild row plus the causing-rebuilds
+    block and the extra restart; the `r` on the provider is gone."""
     root = _b1_root(
         tmp_path,
         ["dev-cpp/libcmis", "dev-libs/boost", "app-text/podofo"],
@@ -24080,7 +24090,7 @@ def test_oracle_boost_subslot_upgrade(
     )
     merges = _b1_merges(rust.stdout)
     assert f'[ebuild     U  ] dev-util/boost-build-1.53.0 [1.52.0] to {root}' in merges
-    assert f'[ebuild  r  U  ] dev-libs/boost-1.53.0 [1.52.0] to {root}' in merges
+    assert f'[ebuild     U  ] dev-libs/boost-1.53.0 [1.52.0] to {root}' in merges
     assert f'[ebuild  rR    ] dev-cpp/libcmis-0.3.1 to {root}' in merges
     assert not [ln for ln in merges if "podofo" in ln]
     # NB: the ` to <root>` suffix carries the tmp b1root path, whose
@@ -24088,7 +24098,7 @@ def test_oracle_boost_subslot_upgrade(
     # matches on the row content before the suffix, not the whole line.
     assert [ln for ln in merges if "boost" in ln.split(" to ")[0] or "libcmis" in ln] == [
         f'[ebuild     U  ] dev-util/boost-build-1.53.0 [1.52.0] to {root}',
-        f'[ebuild  r  U  ] dev-libs/boost-1.53.0 [1.52.0] to {root}',
+        f'[ebuild     U  ] dev-libs/boost-1.53.0 [1.52.0] to {root}',
         f'[ebuild  rR    ] dev-cpp/libcmis-0.3.1 to {root}',
     ]
     assert "The following packages are causing rebuilds:" in rust.stdout
@@ -24099,13 +24109,16 @@ def test_oracle_virtual_subslot_upgrade_avoids_missed_update(
 ):
     """023 oracle, case virt (upstream
     `test_slot_conflict_update_virt.py`, bug 692746): `DBD-mysql` needs
-    `virtual/libmysqlclient:=`, installed at subslot 18. Portage merges
+    `virtual/libmysqlclient:=`, installed at subslot 18. Upstream merges
     `[mysql-connector-c-8.0.17-r3, libmysqlclient-21, DBD-mysql-4.44.0]`.
     Portuale reaches the same versions via highest-first selection --
     the 692746 existing-node mask path never triggers because no slot
-    conflict arises -- and since #24 S1's complete-mode gate it also
-    schedules the `DBD-mysql` subslot rebuild Portage merges. Full
-    mergelist MATCH (`@system` noise as above)."""
+    conflict arises -- and since #24 S1 it also schedules the `DBD-mysql`
+    subslot rebuild (the `rR` consumer + "causing rebuilds" block, still
+    portuale-only: host Portage prints a plain `U` provider and no rebuild
+    here at all). The upgraded provider itself carries no `r`: Portage tags
+    `r` only through a `force_reinstall` arg and there is no provider-side
+    rule (backlog #623; verified live on host Portage 3.0.83)."""
     root = _b1_root(
         tmp_path,
         ["dev-db/mysql-connector-c", "dev-perl/DBD-mysql"],
@@ -24134,11 +24147,11 @@ def test_oracle_virtual_subslot_upgrade_avoids_missed_update(
     )
     merges = _b1_merges(rust.stdout)
     assert f'[ebuild     U  ] dev-db/mysql-connector-c-8.0.17-r3 [6.1.11-r2] to {root}' in merges
-    assert f'[ebuild  r  U  ] virtual/libmysqlclient-21 [18-r1] to {root}' in merges
+    assert f'[ebuild     U  ] virtual/libmysqlclient-21 [18-r1] to {root}' in merges
     assert f'[ebuild  rR    ] dev-perl/DBD-mysql-4.44.0 to {root}' in merges
     assert [ln for ln in merges if "mysql" in ln] == [
         f'[ebuild     U  ] dev-db/mysql-connector-c-8.0.17-r3 [6.1.11-r2] to {root}',
-        f'[ebuild  r  U  ] virtual/libmysqlclient-21 [18-r1] to {root}',
+        f'[ebuild     U  ] virtual/libmysqlclient-21 [18-r1] to {root}',
         f'[ebuild  rR    ] dev-perl/DBD-mysql-4.44.0 to {root}',
     ]
     assert "The following packages are causing rebuilds:" in rust.stdout
@@ -24271,17 +24284,19 @@ def test_oracle_no_aggressive_downgrade(
 def test_oracle_non_slot_operator_update_selects_new_slot(
     emerge_binary, fixture_env, tmp_path
 ):
-    """023 oracle, case a522084 -- MATCH, see `docs/history/023-oracle.md`
-    (upstream `test_solve_non_slot_operator_slot_conflicts.py`, bug
+    """023 oracle, case a522084 (upstream
+    `test_solve_non_slot_operator_slot_conflicts.py`, bug
     522084): `app-misc/A` 1 (`:0/1`) -> 2 (`:0/2`) with installed `B-0`
-    recording `A:0/1=`. Portage merges `[A-2, B-0]`. The version choice
-    (`A-2`, no missed update) is #23's half; the `B-0` subslot rebuild
-    arrives via #24 S1's complete-mode gate (Portage `_complete_graph` has
-    no `--deep` condition, `depgraph.py:8562-8648`, so the auto-enabled
-    pass runs under `-uD` too -- portuale re-runs the phase-1 walk with
-    the required-set seeds fed in). Portage tags both rows with the red `r`
-    (`PkgAttrDisplay.force_reinstall`) and prints the "causing rebuilds"
-    block."""
+    recording `A:0/1=`. Upstream resolves `[A-2, B-0]`; the version choice
+    (`A-2`, no missed update) is #23's half. The `B-0` subslot rebuild
+    arrived via #24 S1's complete-mode gate, but host Portage 3.0.83 does
+    not rebuild it here at all (verified live on the same fixture shape:
+    plain `U` A-2, no `B` row, no block, 0 backtracks): the `r`-tagged
+    provider is portuale-only, and tagging it would need a Portage
+    `force_reinstall` arg, which does not exist for providers (no
+    provider-side rule; backlog #623). The `rR` consumer row and the
+    "causing rebuilds" block below are likewise portuale-only here, kept
+    as the scheduled rebuild (tracked as a separate residue)."""
     root = _b1_root(
         tmp_path,
         ["app-misc/A"],
@@ -24296,10 +24311,10 @@ def test_oracle_non_slot_operator_update_selects_new_slot(
         emerge_binary,
     )
     merges = _b1_merges(rust.stdout)
-    assert f'[ebuild  r  U  ] app-misc/A-2 [1] to {root}' in merges
+    assert f'[ebuild     U  ] app-misc/A-2 [1] to {root}' in merges
     assert f'[ebuild  rR    ] app-misc/B-0 to {root}' in merges
     assert [ln for ln in merges if "app-misc/" in ln] == [
-        f'[ebuild  r  U  ] app-misc/A-2 [1] to {root}',
+        f'[ebuild     U  ] app-misc/A-2 [1] to {root}',
         f'[ebuild  rR    ] app-misc/B-0 to {root}',
     ]
     assert "The following packages are causing rebuilds:" in rust.stdout
@@ -24719,7 +24734,7 @@ def test_oracle_slotop_rebuild_order(
     # provider they are rebuilt against merges first -- Portage's
     # `[A-2, (B-0, C-0)]`. Upstream leaves the (B-0, C-0) pair itself
     # unordered, so only the provider-first edge is pinned as a sequence.
-    assert app[0].startswith("[ebuild  r  U  ] app-misc/A-2 ")
+    assert app[0].startswith("[ebuild     U  ] app-misc/A-2 ")
     assert {ln.split("] ", 1)[1].split(" ", 1)[0] for ln in app[1:]} == {
         "app-misc/B-0",
         "app-misc/Cor-0",
@@ -25079,7 +25094,7 @@ def test_oracle_slotop_revdeps(
     assert [
         ln for ln in merges if "sys-devel/" in ln or "media-libs/mesa" in ln
     ] == [
-        f'[ebuild  r  U  ] sys-devel/llvm-3.8.0-r2 [3.7.1-r2] to {root}',
+        f'[ebuild     U  ] sys-devel/llvm-3.8.0-r2 [3.7.1-r2] to {root}',
         f'[ebuild     U  ] sys-devel/clang-3.8.0-r100 [3.7.1-r100] to {root}',
         f'[ebuild  rR    ] media-libs/mesa-11.2.2 to {root}',
     ]
@@ -25267,7 +25282,7 @@ def test_oracle_slotop_conflict_rebuild(
     assert [
         ln for ln in merges if "app-misc/D-2" in ln or "app-misc/E-0" in ln
     ] == [
-        f'[ebuild  r  U  ] app-misc/D-2 [1] to {root}',
+        f'[ebuild     U  ] app-misc/D-2 [1] to {root}',
         f'[ebuild  rR    ] app-misc/E-0 to {root}',
     ]
     assert not [ln for ln in merges if "app-misc/A-2" in ln or "app-misc/B-0" in ln]
@@ -26083,7 +26098,7 @@ def test_oracle_slotop_synth_oldbest_marks_repo_drifted_rebuild(
     )
     merges = _b1_merges(rust.stdout)
     assert f'[ebuild  rR    ] dev-libs/sounneed-1.0 [1.0] to {root}' in merges, rust.stdout
-    assert f'[ebuild  r  U  ] dev-libs/souprov-2.0 [1.0] to {root}' in merges, rust.stdout
+    assert f'[ebuild     U  ] dev-libs/souprov-2.0 [1.0] to {root}' in merges, rust.stdout
     assert (
         "(dev-libs/sounneed-1.0:0/1::testrepo, ebuild scheduled for merge"
         in rust.stdout
@@ -26146,7 +26161,7 @@ def test_oracle_prune_rebuilds_restart_adds_passes(
     rust = _b1_run(args, _b1_env(fixture_env, root), emerge_binary)
     assert _b1_merges(rust.stdout) == [
         f'[ebuild  N     ] dev-libs/bttarget-1.0 to {root}',
-        f'[ebuild  r  U  ] app-misc/pprov-2 [1] to {root}',
+        f'[ebuild     U  ] app-misc/pprov-2 [1] to {root}',
         f'[ebuild  N     ] dev-libs/btconsumer-1.0 to {root}',
         f'[ebuild  N     ] dev-libs/btpin-1.0 to {root}',
         f'[ebuild  rR    ] app-misc/pcons-1 to {root}',
@@ -26243,7 +26258,7 @@ def test_oracle_prune_rebuilds_conflict_missed_updates(
     rust = _b1_run(args, _b1_env(fixture_env, root), emerge_binary)
     assert _b1_merges(rust.stdout) == [
         f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
-        f'[ebuild  r  U  ] app-misc/pprov-2 [1] to {root}',
+        f'[ebuild     U  ] app-misc/pprov-2 [1] to {root}',
         f'[ebuild  rR    ] app-misc/pcons-1 to {root}',
         f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
         f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
@@ -26586,7 +26601,7 @@ def test_oracle_290_pulled_in_provider_rebuilds_installed_consumer(
     assert result.returncode == 0
     assert _b1_merges(result.stdout) == [
         f'[ebuild  N     ] dev-libs/slotconflicttarget-1.0 to {root}',
-        f'[ebuild  r  U  ] app-misc/pprov-2 [1] to {root}',
+        f'[ebuild     U  ] app-misc/pprov-2 [1] to {root}',
         f'[ebuild  rR    ] app-misc/pcons-1 to {root}',
         f'[ebuild  N     ] dev-libs/slotconflictoldconsumer-1.0 to {root}',
         f'[ebuild  N     ] dev-libs/slotconflictnewconsumer-1.0 to {root}',
@@ -26673,7 +26688,7 @@ def test_oracle_slotop_bdeps(
             for ln in merges
             if "dev-lang/go" in ln or "app-emulation/" in ln
         ] == [
-            f'[ebuild  r  U  ] dev-lang/go-1.15.5 [1.14.12] to {root}',
+            f'[ebuild     U  ] dev-lang/go-1.15.5 [1.14.12] to {root}',
             f'[ebuild  rR    ] app-emulation/buildah-1.16.1 to {root}',
             f'[ebuild  rR    ] app-emulation/libpod-2.1.0 to {root}',
         ], extra
@@ -26814,7 +26829,7 @@ def test_oracle_slotop_rebuild_scan_honours_with_bdeps(
             if ln.startswith("[ebuild  rR") and "dev-libs/cons" in ln
         ]
 
-    provider = f'[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0] to {root}'
+    provider = f'[ebuild     U  ] dev-libs/provpkg-2.0 [1.0] to {root}'
     # @world, bdeps auto: every key rebuilds (all five consumers walked).
     out = run("--update", "--deep", "--newuse", "@world")
     assert provider in _b1_merges(out)
@@ -26946,7 +26961,7 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
             if ln.startswith("[ebuild  rR") and "dev-libs/cons" in ln
         ]
 
-    provider = f'[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0] to {root}'
+    provider = f'[ebuild     U  ] dev-libs/provpkg-2.0 [1.0] to {root}'
     # @world: the provider upgrades and every consumer rebuilds.
     out = run("--update", "--deep", "--newuse", "@world")
     assert provider in _b1_merges(out)
@@ -28490,7 +28505,7 @@ def test_oracle_slotop_undo_changed_slot_guard(
         emerge_binary,
     )
     merges = _b1_merges(rust.stdout)
-    assert f'[ebuild  r  U  ] dev-libs/souprov-2.0 [1.0] to {root}' in merges
+    assert f'[ebuild     U  ] dev-libs/souprov-2.0 [1.0] to {root}' in merges
     assert f'[ebuild  rR    ] dev-libs/souneedslot-1.0 [1.0] to {root}' in merges
     assert "The following packages are causing rebuilds:" in rust.stdout
 
@@ -28612,7 +28627,7 @@ def test_oracle_slotop_undo_cascade(
     )
     assert rust.returncode == 0
     merges = _b1_merges(rust.stdout)
-    assert f'[ebuild  r  U  ] app-misc/A-2 [1] to {root}' in merges
+    assert f'[ebuild     U  ] app-misc/A-2 [1] to {root}' in merges
     assert f'[ebuild  rR    ] app-misc/soccascb-0 [0] to {root}' in merges
     assert f'[ebuild  rR    ] app-misc/soccascc-0 to {root}' in merges
     assert rust.stdout.count("causes rebuilds for:") == 2
@@ -29400,7 +29415,11 @@ def test_236_collapsed_slot_operator_child_is_upgraded_by_the_update_probe(
     due to missed slot abi update`, then `provpkg-2.0` + `consrdep-1.0`) and
     from the fixture-oracle `slotop` list's `-uDvN --oneshot
     dev-libs/consrdep` cell. With the collapse but without the probe's
-    forcing half, portuale merged nothing here."""
+    forcing half, portuale merged nothing here. The upgraded provider
+    itself carries no `r`: Portage tags `r` only through a
+    `force_reinstall` arg and there is no provider-side rule (backlog
+    #623; verified live on host Portage 3.0.83 on the same fixture
+    shape: plain `U` provpkg-2.0, 0 backtracks)."""
     installed = [
         ("dev-libs", "provpkg", "1.0", "0/1", {"EAPI": "8"}),
         (
@@ -29420,7 +29439,7 @@ def test_236_collapsed_slot_operator_child_is_upgraded_by_the_update_probe(
     ).stdout
     merges = [ln for ln in _b1_merges(out) if "dev-libs/provpkg" in ln or "dev-libs/cons" in ln]
     assert merges == [
-        f'[ebuild  r  U  ] dev-libs/provpkg-2.0 [1.0] to {root}',
+        f'[ebuild     U  ] dev-libs/provpkg-2.0 [1.0] to {root}',
         f'[ebuild  rR    ] dev-libs/consrdep-1.0 to {root}',
     ]
 
@@ -36723,7 +36742,7 @@ def test_580_t2_built_atom_conflicts_with_the_update(emerge_binary, fixture_env)
 def _598_expect(fixture_env, prefix, pull_slot_ver="2"):
     root = fixture_env["ROOT"]
     return [
-        f"[ebuild  r  U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild     U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
         f"[ebuild  N     ] dev-libs/{prefix}core-1.0::testrepo to {root}",
         f"[ebuild  rR    ] dev-libs/{prefix}virt-1::testrepo to {root}",
         f"[ebuild  N     ] dev-libs/{prefix}pull-{pull_slot_ver}::testrepo to {root}",
@@ -36754,9 +36773,17 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p569(
     emerge_binary, fixture_env
 ):
     """#598: `emerge -pvuD dev-libs/p569pull`. The `--deep` walk recurses into
-    the installed `p569virt-1`, so Portage files its `:=` rebuild with the
-    provider upgrade: 4 rows (`r U prov-5.44`, `N core`, `rR virt-1`,
-    `N pull-2`), a "causes rebuilds for:" block, rc 0.
+    the installed `p569virt-1`, so the provider upgrade schedules its `:=`
+    rebuild: 4 rows (plain-`U` prov-5.44, `N` core, `rR` virt-1, `N` pull-2),
+    a "causes rebuilds for:" block, rc 0. NOTE: host Portage 3.0.83 prints
+    `r U` for the provider here (`puD-p569pull-portage.txt`), filed through
+    the slot-conflict backtrack (`backtracking due to missed slot abi update`
+    after the `Slot conflict handler`, `forced reinstall atoms` naming both
+    prov and virt) -- a conflict path portuale does not detect (it reports
+    0 conflicts and schedules the rebuild through the scan instead). The
+    provider-side `r` via the ABI edge alone has no Portage rule (backlog
+    #623), so portuale prints plain `U`; restoring the conflict-path `r`
+    is tracked separately.
 
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p569pull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p569pull-portage.txt`)."""
@@ -36767,6 +36794,9 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
     emerge_binary, fixture_env
 ):
     """#598: same shape with the built `dev-libs/p589bprov:0/5.42=` atom.
+    Same divergence as p569 above: host prints `r U` for the provider via
+    the conflict backtrack; portuale prints plain `U` (no conflict detected,
+    rebuild via the scan; provider-side ABI `r` has no Portage rule, #623).
 
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p589bpull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p589bpull-portage.txt`)."""
