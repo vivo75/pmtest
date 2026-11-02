@@ -36774,7 +36774,7 @@ def test_580_t2_built_atom_conflicts_with_the_update(emerge_binary, fixture_env)
 def _598_expect(fixture_env, prefix, pull_slot_ver="2"):
     root = fixture_env["ROOT"]
     return [
-        f"[ebuild     U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild  r  U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
         f"[ebuild  N     ] dev-libs/{prefix}core-1.0::testrepo to {root}",
         f"[ebuild  rR    ] dev-libs/{prefix}virt-1::testrepo to {root}",
         f"[ebuild  N     ] dev-libs/{prefix}pull-{pull_slot_ver}::testrepo to {root}",
@@ -36806,16 +36806,18 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p569(
 ):
     """#598: `emerge -pvuD dev-libs/p569pull`. The `--deep` walk recurses into
     the installed `p569virt-1`, so the provider upgrade schedules its `:=`
-    rebuild: 4 rows (plain-`U` prov-5.44, `N` core, `rR` virt-1, `N` pull-2),
-    a "causes rebuilds for:" block, rc 0. NOTE: host Portage 3.0.83 prints
-    `r U` for the provider here (`puD-p569pull-portage.txt`), filed through
-    the slot-conflict backtrack (`backtracking due to missed slot abi update`
-    after the `Slot conflict handler`, `forced reinstall atoms` naming both
-    prov and virt) -- a conflict path portuale does not detect (it reports
-    0 conflicts and schedules the rebuild through the scan instead). The
-    provider-side `r` via the ABI edge alone has no Portage rule (backlog
-    #623), so portuale prints plain `U`; restoring the conflict-path `r`
-    is tracked separately.
+    rebuild: 4 rows (`r U` prov-5.44, `N` core, `rR` virt-1, `N` pull-2),
+    a "causes rebuilds for:" block, rc 0. Matches host Portage 3.0.83
+    (`puD-p569pull-portage.txt`) row for row: the `Slot conflict handler`
+    runs, then `backtracking due to missed slot abi update` files both the
+    installed parent and the installed child into
+    `slot_operator_replace_installed`, and the final `forced reinstall
+    atoms` names both prov and virt. Portuale detects the conflict through
+    the dropped reverse-dep pin (`p569prov:0/5.42=`, kept by installed
+    virt-1 while pull-2 wants 5.44) and files the same pair through the
+    slot-conflict ABI probe (backlog #641; the probe used to veto on the
+    `||` menu arms, which never drive Portage`s probe -- only `:=`/soname
+    atoms are recorded in `_slot_operator_deps`).
 
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p569pull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p569pull-portage.txt`)."""
@@ -36826,9 +36828,8 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
     emerge_binary, fixture_env
 ):
     """#598: same shape with the built `dev-libs/p589bprov:0/5.42=` atom.
-    Same divergence as p569 above: host prints `r U` for the provider via
-    the conflict backtrack; portuale prints plain `U` (no conflict detected,
-    rebuild via the scan; provider-side ABI `r` has no Portage rule, #623).
+    Same host-`r U` mechanism as p569 above (conflict backtrack filing both
+    sides; backlog #641).
 
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p589bpull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p589bpull-portage.txt`)."""
