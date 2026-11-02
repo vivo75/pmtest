@@ -3135,6 +3135,7 @@ CASES = [
     ("#580: a first-listed || arm that matches the vdb keeps its pin and the heal skips the update (T3, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589cpull"], 0),
     ("#580: the built slot-operator atom of an installed virtual conflicts with the update (T2, Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p589bpull"], 0),
     ("#598: --update --deep heals a || virtual walked as an installed consumer by rebuilding it with the provider (p569pull, Portage 3.0.83, rc 0)", ["--pretend", "--update", "--deep", "dev-libs/p569pull"], 0),
+    ("#608: the plain -D walk reports the same rebuild with a 1/20 backtrack (p569pull, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--deep", "dev-libs/p569pull"], 0),
     ("#598: --update --deep rebuilds the walked installed virtual with its built slot-operator provider (p589bpull, Portage 3.0.83, rc 0)", ["--pretend", "--update", "--deep", "dev-libs/p589bpull"], 0),
     ("#592: a plain miss stops the walk, so no slot conflict is fed back (r592atop, Portage 3.0.83, rc 0, backtrack 1/20)", ["--pretend", "--verbose", "dev-libs/r592atop"], 0),
     ("#592: the same plain miss settles within --backtrack=1 (r592atop, Portage 3.0.83, rc 0, backtrack 1/1)", ["--pretend", "--verbose", "--backtrack=1", "dev-libs/r592atop"], 0),
@@ -36834,6 +36835,41 @@ def test_598_update_deep_rebuilds_the_walked_installed_virtual_p589b(
     Oracle: Portage 3.0.83 `emerge -pv --update --deep dev-libs/p589bpull`
     (`LLM/evidence/2026-10-26-575-residues/r5/captures/puD-p589bpull-portage.txt`)."""
     _598_check(emerge_binary, fixture_env, "p589b")
+
+
+def test_608_plain_deep_reports_the_same_rebuild_with_a_backtrack(
+    emerge_binary, fixture_env
+):
+    """#608: `emerge -pvD dev-libs/p569pull` (no `--update`). Same four rows
+    as the `-pvuD` oracle (`r U` prov-5.44, `N` core, `rR` virt-1, `N`
+    pull-2), same "causing rebuilds" block, rc 0 -- plus the `1/20`
+    backtrack line. The provider `r` used to be missing: the rebuild scan
+    filed the logic replace set while the conflict-ABI probe vetoed without
+    `--update`, and the display mirror (`probe_replaced`) tracked only probe
+    filings, so the upgrade row printed a plain `U`.
+
+    Oracle: Portage 3.0.83 `emerge --pretend --verbose --deep
+    dev-libs/p569pull`
+    (`LLM/evidence/2026-10-26-575-residues/r5/captures/D-p569pull-portage.txt`)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "--deep", "dev-libs/p569pull"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    assert "Dependency resolution took (backtrack: 1/20)." in got.full_stdout, got.full_stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == _598_expect(fixture_env, "p569"), got.stdout
+    assert (
+        "  (dev-libs/p569prov-5.44:0/5.44::testrepo, ebuild scheduled for merge to "
+        f"'{root}') causes rebuilds for:\n"
+        f"    (dev-libs/p569virt-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+    ) in got.stdout, got.stdout
 
 
 def test_601_masked_installed_provider_keeps_the_rebuild_display(
