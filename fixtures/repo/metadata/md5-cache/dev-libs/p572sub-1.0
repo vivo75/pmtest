@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #572 p03 fall-through leaf (mirrors dev-perl/Sub-Name-0.280.0-r1)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=1cc7193b29516266dd23ba8954fd73ab

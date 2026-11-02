@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #572 p03 merge-bound consumer whose || names the installed virtual first (mirrors dev-perl/Try-Tiny-0.320.0)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( >=virtual/p572slu-1.0 =dev-libs/p572sub-1.0 )
+SLOT=0
+_md5_=4e46d7d6128ce3633087ed025d4ff333

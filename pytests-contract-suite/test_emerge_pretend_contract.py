@@ -3162,6 +3162,7 @@ CASES = [
     ("#600: a grow USE flip Portage would not restart for is not counted (--autounmask-backtrack=y r594vdep r594qa, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594vdep", "dev-libs/r594qa"], 1),
     ("#600: the same grow flip in the reversed order is not counted (--autounmask-backtrack=y r594qa r594vdep, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594qa", "dev-libs/r594vdep"], 1),
     ("#601: a masked-installed provider keeps the rebuild display (r on the provider + the causing-rebuilds block) on its installed consumer (Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--update", "dev-libs/p589dpull"], 0),
+    ("#572: a co-scheduled upgrade replaces the installed virtual's || arm, so the fall-through arm merges (p02: =p572prov-5.44 + p572leaf, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "=dev-libs/p572prov-5.44", "dev-libs/p572leaf"], 0),
 ]
 
 
@@ -36870,6 +36871,46 @@ def test_608_plain_deep_reports_the_same_rebuild_with_a_backtrack(
         f"'{root}') causes rebuilds for:\n"
         f"    (dev-libs/p569virt-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
     ) in got.stdout, got.stdout
+
+
+def test_572_bound_or_falls_through_to_the_next_arm(
+    emerge_binary, fixture_env
+):
+    """#572 p02: `emerge -pv =dev-libs/p572prov-5.44 dev-libs/p572leaf` (no
+    `--update`). The installed `virtual/p572virt-2.0`'s `||` binds `=5.42*`,
+    but the co-scheduled 5.42 -> 5.44 upgrade replaces that arm, so Portage
+    falls through to `dev-libs/p572enc-3.210` and merges it as a child of the
+    kept virtual -- three rows (`N` enc, `U` prov, `N` leaf), no skip block,
+    no conflict, rc 0. Portuale files the fall-through arm as an expansion
+    seed owned by the virtual and merges the same three rows.
+
+    Oracle: Portage 3.0.83 on the same fixture cell (rows + `Total:`
+    byte-identical modulo the `ROOT` path and the timing line; the virtual
+    stays silent on both sides). Deliberately unasserted: the backtrack
+    counter -- Portage expands inline (0/20) while portuale re-walks on a
+    RevDep feed for the seeds (1/20). The merge list is identical; only the
+    pass count differs."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "=dev-libs/p572prov-5.44", "dev-libs/p572leaf"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild  N     ] dev-libs/p572enc-3.210::testrepo to {root}",
+        f"[ebuild     U  ] dev-libs/p572prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild  N     ] dev-libs/p572leaf-1.0::testrepo to {root}",
+    ], got.stdout
+    assert (
+        "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
+        in got.stdout
+    ), got.stdout
 
 
 def test_601_masked_installed_provider_keeps_the_rebuild_display(
