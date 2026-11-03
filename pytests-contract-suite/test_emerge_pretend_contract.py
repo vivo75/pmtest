@@ -3163,6 +3163,7 @@ CASES = [
     ("#600: the same grow flip in the reversed order is not counted (--autounmask-backtrack=y r594qa r594vdep, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask-backtrack=y", "dev-libs/r594qa", "dev-libs/r594vdep"], 1),
     ("#601: a masked-installed provider keeps the rebuild display (r on the provider + the causing-rebuilds block) on its installed consumer (Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--update", "dev-libs/p589dpull"], 0),
     ("#572: a co-scheduled upgrade replaces the installed virtual's || arm, so the fall-through arm merges (p02: =p572prov-5.44 + p572leaf, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "=dev-libs/p572prov-5.44", "dev-libs/p572leaf"], 0),
+    ("#643: a co-scheduled upgrade kills both arms of the nested installed virtual's ||, so the consumer falls through to the next arm (p03: p572try + =p572prov-5.44, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p572try", "=dev-libs/p572prov-5.44"], 0),
 ]
 
 
@@ -36906,6 +36907,50 @@ def test_572_bound_or_falls_through_to_the_next_arm(
         f"[ebuild  N     ] dev-libs/p572enc-3.210::testrepo to {root}",
         f"[ebuild     U  ] dev-libs/p572prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
         f"[ebuild  N     ] dev-libs/p572leaf-1.0::testrepo to {root}",
+    ], got.stdout
+    assert (
+        "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
+        in got.stdout
+    ), got.stdout
+
+
+def test_643_nested_virtual_falls_through_to_the_next_arm(
+    emerge_binary, fixture_env
+):
+    """#643 p03: `emerge -pv dev-libs/p572try =dev-libs/p572prov-5.44` (no
+    `--update`). Try-Tiny-shaped `dev-libs/p572try-1.0`'s `||` names the
+    installed `virtual/p572slu-1.0` first, but the co-scheduled 5.42 ->
+    5.44 upgrade kills both arms of the virtual's own `||`
+    (`=p572prov-5.42*` replaced, `~p572slucore-1.0` unmatched), so Portage
+    drops the virtual arm and falls through to `dev-libs/p572sub-1.0` --
+    three rows (`N` sub, `U` prov, `N` try), the virtual kept (silent),
+    no skip block, no conflict, rc 0.
+
+    Oracle: the ResolverPlayground probe
+    `LLM/evidence/2026-10-28-572/probe572_p03.py` in portuale
+    (mergelist `[Sub-Name, perl-5.44, Try-Tiny]`, virtual nomerge). The
+    playground runs that shape as `@world --update --deep`, which is not a
+    CASES shape; this test pins the hermetic two-atom request the Rust
+    test `or_group_of_a_nested_installed_virtual_falls_through_to_the_next_arm`
+    uses instead -- same graph, same three rows in the same order.
+    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
+    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "dev-libs/p572try", "=dev-libs/p572prov-5.44"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild  N     ] dev-libs/p572sub-1.0::testrepo to {root}",
+        f"[ebuild     U  ] dev-libs/p572prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild  N     ] dev-libs/p572try-1.0::testrepo to {root}",
     ], got.stdout
     assert (
         "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
