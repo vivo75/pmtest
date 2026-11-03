@@ -3165,6 +3165,8 @@ CASES = [
     ("#572: a co-scheduled upgrade replaces the installed virtual's || arm, so the fall-through arm merges (p02: =p572prov-5.44 + p572leaf, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "=dev-libs/p572prov-5.44", "dev-libs/p572leaf"], 0),
     ("#643: a co-scheduled upgrade kills both arms of the nested installed virtual's ||, so the consumer falls through to the next arm (p03: p572try + =p572prov-5.44, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p572try", "=dev-libs/p572prov-5.44"], 0),
     ("#646: without a co-scheduled upgrade both legs of the nested installed virtual's || stay satisfied, so the consumer keeps the virtual and only it merges new (p572try alone, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p572try"], 0),
+    ("#647: a co-scheduled upgrade kills every tree version's RDEPEND of the multi-version installed virtual, so the wrapped consumer falls through to the next arm (M6b: p647try + =p647prov-5.44.0, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p647try", "=dev-libs/p647prov-5.44.0"], 0),
+    ("#647: a co-scheduled upgrade kills the installed virtual's =prov arm, so the plain consumer's seed feed surfaces the ~ arm while the virtual stays kept (M5: p647enclocale + =p647prov-5.44.0, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p647enclocale", "=dev-libs/p647prov-5.44.0"], 0),
 ]
 
 
@@ -36998,6 +37000,117 @@ def test_646_no_upgrade_nested_virtual_keeps_the_consumer_bound(
     ], got.stdout
     assert (
         "Total: 1 package (1 new), Size of downloads: 0 KiB"
+        in got.stdout
+    ), got.stdout
+
+
+def test_647_multi_version_virtual_falls_through_the_wrapped_arm(
+    emerge_binary, fixture_env
+):
+    """#647 leg A (M6b): `emerge -pv dev-libs/p647try =dev-libs/p647prov-5.44.0`
+    (no `--update`). The wrapped `!minimal? ( || ( ... ) )` consumer names the
+    installed multi-version `virtual/p647slu-1.680.100_rc` first, but the
+    co-scheduled 5.42 -> 5.44 upgrade kills every tree version's RDEPEND
+    (`=p647prov-5.42*` replaced, `~` pins unmatched), so the walk falls
+    through to `dev-libs/p647sub-0.280.0-r1` -- three rows (`N` sub, `U`
+    prov, `N` try), the virtual kept (silent), no skip block, no conflict,
+    rc 0. `USE="-minimal"` on the try row: `minimal` defaults off by
+    profile-chain absence, so the conditional is live.
+
+    Oracle: the M6b playground run in
+    `LLM/evidence/2026-11-03-647/probe647_oracle.py` (portuale)
+    (`SUCCESS True`, `MERGELIST ['dev-perl/Sub-Name-0.280.0-r1',
+    'dev-lang/perl-5.44.0', 'dev-perl/Try-Tiny-0.320.0']` -- the
+    fall-through leaf plus the perl upgrade plus the requested leaf, the
+    virtual kept nomerge at installed `1.680.100_rc`), minuend of the S0
+    `probe645_mutations.py` M6b block (S0 REPORT
+    `LLM/evidence/2026-11-03-645/REPORT.md` §6: the 4-version tree tripped
+    the single-tree-version cut). This test pins the hermetic two-atom
+    request the Rust test
+    `multi_version_installed_virtual_falls_through_the_wrapped_arm`
+    (`crates/portage-repo/src/tests/tests_p647.rs`) uses instead -- same
+    graph, same three rows in the same order.
+    MUST NOT be `@world --update --deep`: the M4 shape upgrades the
+    virtual to `1.700.0` instead of falling through (the not-the-cell
+    boundary pinned by the Rust test
+    `update_deep_upgrades_the_multi_version_virtual_instead_of_falling_through`).
+    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
+    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "dev-libs/p647try", "=dev-libs/p647prov-5.44.0"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild  N     ] dev-libs/p647sub-0.280.0-r1::testrepo to {root}",
+        f"[ebuild     U  ] dev-libs/p647prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root}",
+        # Trailing space: strip_zero_size_suffix keeps one space after a
+        # closing '"' (#469), so the USE row ends with '" ' here.
+        f'[ebuild  N     ] dev-libs/p647try-0.320.0::testrepo to {root} USE="-minimal" ',
+    ], got.stdout
+    assert (
+        "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
+        in got.stdout
+    ), got.stdout
+
+
+def test_647_multi_version_virtual_feeds_the_plain_consumer_arm(
+    emerge_binary, fixture_env
+):
+    """#647 leg B (M5): `emerge -pv dev-libs/p647enclocale
+    =dev-libs/p647prov-5.44.0` (no `--update`). The plain top-level
+    `>=virtual/p647enc-2.0.0` consumer never reaches the consumer expander
+    by design -- it is seed-feed territory only. With the co-scheduled
+    5.42 -> 5.44 upgrade killing the installed virtual's `=p647prov-5.42*`
+    arm, the seed walk surfaces `dev-libs/p647enccore-3.210.0` while the
+    virtual stays kept -- three rows (`U` prov, `N` enccore, `N`
+    enclocale), the virtual kept (silent), no skip block, no conflict,
+    rc 0.
+
+    Oracle: the M5 playground run in
+    `LLM/evidence/2026-11-03-647/probe647_oracle.py` (portuale)
+    (`SUCCESS True`, `MERGELIST ['dev-lang/perl-5.44.0',
+    'perl-core/Encode-3.210.0', 'dev-perl/Encode-Locale-1.50.0-r1']` -- the
+    `~` arm plus the perl upgrade plus the requested leaf, the virtual kept
+    nomerge at installed `3.210.0-r2`), minuend of the S0
+    `probe645_mutations.py` M5 block (S0 REPORT
+    `LLM/evidence/2026-11-03-645/REPORT.md` §6: the 2-version tree tripped
+    the `:706` cut). This test pins the hermetic two-atom request the Rust
+    test `multi_version_installed_virtual_feeds_the_plain_consumer_arm`
+    (`crates/portage-repo/src/tests/tests_p647.rs`) uses instead -- same
+    graph, same three rows in the same order.
+    MUST NOT be `@world --update --deep`: the M5b shape upgrades the
+    virtual to `3.240.0` with the `~` arm absent (the not-the-cell boundary
+    pinned by the Rust test
+    `update_deep_upgrades_the_plain_consumer_virtual_without_feeding_the_arm`).
+    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
+    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "dev-libs/p647enclocale", "=dev-libs/p647prov-5.44.0"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild     U  ] dev-libs/p647prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root}",
+        f"[ebuild  N     ] dev-libs/p647enccore-3.210.0::testrepo to {root}",
+        f"[ebuild  N     ] dev-libs/p647enclocale-1.50.0-r1::testrepo to {root}",
+    ], got.stdout
+    assert (
+        "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
         in got.stdout
     ), got.stdout
 
