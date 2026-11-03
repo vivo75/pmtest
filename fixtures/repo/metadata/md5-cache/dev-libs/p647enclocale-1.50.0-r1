@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (dev-perl/Encode-Locale-1.50.0-r1 (plain versioned consumer))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=virtual/p647enc-2.0.0
+SLOT=0
+_md5_=f90233b0449e9796177f83cc719d82f0

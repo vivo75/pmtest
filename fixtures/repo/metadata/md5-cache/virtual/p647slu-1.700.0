@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (virtual/perl-Scalar-List-Utils-1.700.0 (names =perl-5.44*))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p647prov-5.44* ~dev-libs/p647slucore-1.700.0 ) dev-libs/p647prov:= !<dev-libs/p647slucore-1.700.0 !>dev-libs/p647slucore-1.700.0-r999
+SLOT=0
+_md5_=2816026c5ec0142652096feec0e995c9

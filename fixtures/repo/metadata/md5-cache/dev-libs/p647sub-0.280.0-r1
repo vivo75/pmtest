@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (dev-perl/Sub-Name-0.280.0-r1 (fall-through arm of leg A))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=6f3b1e3ed241aca4dd4c0df165adb915

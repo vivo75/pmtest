@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (dev-perl/Try-Tiny-0.320.0 (wrapped nested ||; Carp/Exporter/Except conjuncts omitted as non-interacting, per the M4 probe note))
+EAPI=8
+IUSE=minimal
+KEYWORDS=amd64
+RDEPEND=!minimal? ( || ( >=virtual/p647slu-1.400.0 dev-libs/p647sub ) )
+SLOT=0
+_md5_=d3a52c780b7d28218360cf59410a2019

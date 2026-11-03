@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (virtual/perl-Scalar-List-Utils-1.630.0-r1 (verbatim real RDEPEND, ${PN#perl-}/${PV} expanded))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p647prov-5.40* =dev-libs/p647prov-5.38* ~dev-libs/p647slucore-1.630.0-r1 ) dev-libs/p647prov:= !<dev-libs/p647slucore-1.630.0-r1 !>dev-libs/p647slucore-1.630.0-r999
+SLOT=0
+_md5_=3a4d3e7121cc69e98f3340d278ec04f0

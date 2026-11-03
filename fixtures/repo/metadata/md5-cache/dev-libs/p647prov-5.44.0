@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (dev-lang/perl-5.44.0:0/5.44 (co-scheduled upgrade target))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.44
+_md5_=52e9b38aaf549d76a755360c8207c9a0

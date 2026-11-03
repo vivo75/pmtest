@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (perl-core/Scalar-List-Utils-1.680.0 (~> arm of the 1.680.0 virtual))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=b31716da2bebe0aa94ef91037525445e

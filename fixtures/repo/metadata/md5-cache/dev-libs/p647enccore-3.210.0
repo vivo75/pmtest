@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #647 (perl-core/Encode-3.210.0 (fall-through arm of leg B))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f6a64c1d728aa0538d0ec7230f7500a1
