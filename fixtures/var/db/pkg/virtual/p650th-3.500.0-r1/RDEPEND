@@ -1,0 +1,1 @@
+|| ( =dev-libs/p650prov-5.42* ~dev-libs/p650thcore-3.500.0-r1 ) dev-libs/p650prov:= !<dev-libs/p650thcore-3.500.0-r1 !>dev-libs/p650thcore-3.500.0-r999

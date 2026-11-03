@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #650 (background subslot pin-holder; the cell's dev-lang/perl:0/5.42= reverse edge, plain-pin form: the trailing-= rebuild syntax is rejected in tree RDEPEND context)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p650prov:0/5.42
+SLOT=0
+_md5_=65ed3e19115e1beda91f4691f17d8aaa

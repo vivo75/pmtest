@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #650 (perl-core/Encode-3.190.0 (dead tree version, as in the real tree))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=c2f0293c168a591a0108de1d4e12ed4b

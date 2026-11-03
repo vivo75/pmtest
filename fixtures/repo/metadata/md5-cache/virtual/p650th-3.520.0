@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #650 (virtual/perl-Test-Harness-3.520.0 (names =perl-5.44*))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p650prov-5.44* ~dev-libs/p650thcore-3.520.0 ) dev-libs/p650prov:= !<dev-libs/p650thcore-3.520.0 !>dev-libs/p650thcore-3.520.0-r999
+SLOT=0
+_md5_=ee3b7059f2c2a04790583ac62fddac6e

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #650 (perl-core/Encode-3.210.0 (fall-through arm of the N1 leg))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=70c745061aa90f138cd82492669a4725

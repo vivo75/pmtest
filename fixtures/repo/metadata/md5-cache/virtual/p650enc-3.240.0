@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #650 (virtual/perl-Encode-3.240.0 (names =perl-5.44*))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p650prov-5.44* ~dev-libs/p650enccore-3.240.0 ) dev-libs/p650prov:= !<dev-libs/p650enccore-3.240.0 !>dev-libs/p650enccore-3.240.0-r999
+SLOT=0
+_md5_=4a44e57a07dca9350ba8804491db1842
