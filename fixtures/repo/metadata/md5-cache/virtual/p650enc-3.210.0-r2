@@ -2,6 +2,6 @@ DEFINED_PHASES=-
 DESCRIPTION=fixture package: #650 (virtual/perl-Encode-3.210.0-r2 (installed; verbatim))
 EAPI=8
 KEYWORDS=amd64
-RDEPEND=|| ( =dev-libs/p650prov-5.42* =dev-libs/p650prov-5.40* ~dev-libs/p650enccore-3.210.0-r2 ) dev-libs/p650prov:= !<dev-libs/p650enccore-3.210.0-r2 !>dev-libs/p650enccore-3.210.0-r999
+RDEPEND=|| ( =dev-libs/p650prov-5.42* =dev-libs/p650prov-5.40* ~dev-libs/p650enccore-3.210.0 ) dev-libs/p650prov:= !<dev-libs/p650enccore-3.210.0 !>dev-libs/p650enccore-3.210.0-r999
 SLOT=0
-_md5_=3295d52791168c8766d4cf8163312b14
+_md5_=4d7e1356b5fbe9ec12176189321159e3
