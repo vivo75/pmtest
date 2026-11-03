@@ -3164,6 +3164,7 @@ CASES = [
     ("#601: a masked-installed provider keeps the rebuild display (r on the provider + the causing-rebuilds block) on its installed consumer (Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--update", "dev-libs/p589dpull"], 0),
     ("#572: a co-scheduled upgrade replaces the installed virtual's || arm, so the fall-through arm merges (p02: =p572prov-5.44 + p572leaf, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "=dev-libs/p572prov-5.44", "dev-libs/p572leaf"], 0),
     ("#643: a co-scheduled upgrade kills both arms of the nested installed virtual's ||, so the consumer falls through to the next arm (p03: p572try + =p572prov-5.44, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p572try", "=dev-libs/p572prov-5.44"], 0),
+    ("#646: without a co-scheduled upgrade both legs of the nested installed virtual's || stay satisfied, so the consumer keeps the virtual and only it merges new (p572try alone, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p572try"], 0),
 ]
 
 
@@ -36954,6 +36955,49 @@ def test_643_nested_virtual_falls_through_to_the_next_arm(
     ], got.stdout
     assert (
         "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
+        in got.stdout
+    ), got.stdout
+
+
+def test_646_no_upgrade_nested_virtual_keeps_the_consumer_bound(
+    emerge_binary, fixture_env
+):
+    """#646: `emerge -pv dev-libs/p572try` (no `--update`, no second atom).
+    The #643 no-upgrade tie: both legs of the installed
+    `virtual/p572slu-1.0`'s own `||` (`=p572prov-5.42*` satisfied,
+    `~p572slucore-1.0` matched) stay alive with nothing co-scheduled, so
+    the consumer's `||` keeps binding the virtual arm and never falls
+    through to `dev-libs/p572sub-1.0` -- one row (`N` try), the virtual
+    kept (silent), no skip block, no conflict, rc 0.
+
+    Oracle: the ResolverPlayground probe
+    `LLM/evidence/2026-11-03-646/probe646_noupgrade.py` in portuale
+    (mergelist `[dev-perl/Try-Tiny-0.320.0]`, the one uninstalled
+    requested package; the virtual kept/nomerge, `Sub-Name` absent).
+    The playground runs that shape as the bare consumer with no options,
+    which is the same request shape this CASES test pins (only the
+    harness differs: playground vs `emerge -pv`); it is NOT the `@world`
+    spell, whose world member `dev-lang/perl` still resolves to 5.44.0
+    without `--update`.
+    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
+    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "dev-libs/p572try"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild  N     ] dev-libs/p572try-1.0::testrepo to {root}",
+    ], got.stdout
+    assert (
+        "Total: 1 package (1 new), Size of downloads: 0 KiB"
         in got.stdout
     ), got.stdout
 
