@@ -195,40 +195,6 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
-- id: perl-544-stabilization-version-selection-encode
-  layer: l0
-  categories: [missing]
-  slugs: ["gnome-base_gnome-shell", "app-office_libreoffice",
-    "media-gfx_gimp"]
-  match: "perl-core/Encode-3.210.0 present for real, absent for portuale"
-  reason: >
-    The perl-5.44.0 stabilization co-schedules a perl-5.42.2 to 5.44.0
-    upgrade that kills the installed 5.42-era virtuals' nested `||`
-    5.42-bound branches; Portage re-resolves them post-upgrade and
-    falls through to ~perl-core/Encode-3.210.0 while portuale keeps the
-    dead branches (backlog #567 S0, LLM/evidence/2026-10-25-567/;
-    transition-specific -- a future vdb with perl-5.44.0 installed
-    binds the same `||`s to 5.44 branches on both managers and the rows
-    vanish with no code change). The portuale half is filed as backlog
-    #572. Scoped to this exact ebuild row on these three probes, so any
-    other missing row resurfaces.
-  owner: portuale-bug
-
-- id: perl-544-stabilization-version-selection-sub-name
-  layer: l0
-  categories: [missing]
-  slugs: ["gnome-base_gnome-shell", "app-office_libreoffice",
-    "media-gfx_gimp"]
-  match: "dev-perl/Sub-Name-0.280.0-r1 present for real, absent for portuale"
-  reason: >
-    Same adjudication as
-    perl-544-stabilization-version-selection-encode (same trigger, same
-    S0, same #572 follow-up); split because the comparator grades
-    findings per row. Try-Tiny's `|| ( >=virtual/perl-SLU-1.400.0
-    dev-perl/Sub-Name )` falls through to Sub-Name because the
-    installed virtual's own `||` is doubly dead post-upgrade.
-  owner: portuale-bug
-
 - id: perl-cluster-hash-order-601
   layer: l0
   categories: [order]
