@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #651 (perl-core/Encode-3.190.0 (older arm, non-winning))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=5b7dbb9344eb2f24f9b311da1e2a461a

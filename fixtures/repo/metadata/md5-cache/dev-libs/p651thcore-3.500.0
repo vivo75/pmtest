@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #651 (perl-core/Test-Harness-3.500.0 (fall-through arm))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=6b318b20c8c7950bfa18ebb3ebc982cd

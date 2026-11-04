@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #651 (dev-lang/perl-5.44.0:0/5.44 (transient twin; PDEPEND textually identical)))
+EAPI=8
+IUSE=minimal
+KEYWORDS=amd64
+PDEPEND=!minimal? ( >=virtual/p651enc-3.120.0 virtual/p651th )
+SLOT=0/5.44
+_md5_=2ab593d12b474eac765bbdc0da61065b

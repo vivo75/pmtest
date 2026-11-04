@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #651 (virtual/perl-Test-Harness-3.520.0 (tree-newer 5.44 arm))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p651prov-5.44* ~dev-libs/p651thcore-3.520.0 ) dev-libs/p651prov:= !<dev-libs/p651thcore-3.520.0 !>dev-libs/p651thcore-3.520.0-r999
+SLOT=0
+_md5_=4e5d1ff50855308cf0f9831e2d9fee30

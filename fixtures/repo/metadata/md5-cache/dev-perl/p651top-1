@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #651 (requested top pulling the pin-holder transitively (commit-before-conflict closure))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-perl/p651holder
+SLOT=0
+_md5_=90e72a760e4339b6c865f6bf0ce216a0
