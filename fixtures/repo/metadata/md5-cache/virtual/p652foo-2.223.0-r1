@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #652 (fresh-only driver virtual (no installed instance; 5.44-first-arm || with a ~pin at a version with no ebuild, 5.42 fallback arm like the live new-text virtuals)))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p651prov-5.44* =dev-libs/p651prov-5.42* ~dev-libs/p652foocore-2.223.0 ) dev-libs/p651prov:= !<dev-libs/p652foocore-2.223.0 !>dev-libs/p652foocore-2.223.0-r999
+SLOT=0
+_md5_=4a8118f8e403e129b45c964b8dc17bf6

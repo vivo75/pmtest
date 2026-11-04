@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #652 (dev-perl/Sub-Name-0.280.0-r1 (consumer fall-through leaf; RDEPEND omitted like the p651 core leaves)))
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=cbcb0fb39f37af5517ad2da8aa1eea37

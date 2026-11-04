@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #652 (early fresh consumer of the TH virtual (libreoffice-cell libwww-perl-chain shape: pulls installed TH before the transient lands)))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=virtual/p651th
+SLOT=0
+_md5_=1a9a2a15f660b36a583f2479b179f22b
