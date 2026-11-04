@@ -3171,6 +3171,8 @@ CASES = [
     ("#650: with the transient skipped under the referenced holder pin both seeds are withheld, so only the provider and the holder reinstall (H1: p650prov + p650holder, R + R with the skip WARNING, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p650prov", "dev-perl/p650holder"], 0),
     ("#651: the bare provider request merges the transient, so its upgrade-demotion still seeds both fall-through arms (bare p651prov: N enccore + N thcore + U prov, virtuals kept; Portage N1 holds via the skip this leg does not render -- guard leg, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov"], 0),
     ("#651: with the transient skipped under the chained holder pin both commit-before-conflict seeds are voided, so only the provider and the top reinstall (C1: p651prov + p651top, R + R with the skip WARNING, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov", "dev-perl/p651top"], 0),
+    ("#652: the N-form consumer request holds the dead virtual after post-skip re-resolution, so no Sub-Name fall-through merges (N p652foo + N p652try, R top under the holder pin with the skip WARNING, virtuals kept; Portage NF oracle + texlive bed cell, rc 0)", ["--pretend", "--verbose", "dev-perl/p651top", "dev-perl/p652try"], 0),
+    ("#652: under the live merging transient the Encode fall-through merges while TH stays held with the early consumer in the request (N enccore + U prov + N early, no TH pin, virtuals kept; libreoffice/gimp bed cells, rc 0)", ["--pretend", "--verbose", "dev-perl/p652early", "dev-libs/p651prov"], 0),
 ]
 
 
@@ -37349,6 +37351,124 @@ def test_651_chained_holder_skips_the_transient_and_holds_the_installed_binding(
         "    ^                  ^^^^^",
         "",
     ], got.stdout
+
+
+def test_652_nform_consumer_holds_the_virtual_no_subname(
+    emerge_binary, fixture_env
+):
+    """#652 leg A (N-form): `emerge -pv dev-perl/p651top dev-perl/p652try`
+    (no `--update`). The Try-Tiny-shaped consumer binds the dead installed
+    SLU virtual while the chained holder keeps the transient's slot
+    conflict open past the seed commit; post-skip re-resolution holds the
+    virtual instead of latching the pre-skip flat choice, so no
+    `dev-perl/p652subname` fall-through merges: three rows (`N` p652foo,
+    `R` top, `N` p652try), the installed SLU virtual kept-silent, the skip WARNING
+    block, rc 0. `USE="-minimal"` on the try row: `minimal` defaults off
+    by profile-chain absence (C1 precedent).
+
+    Oracle: the NF playground run in
+    `LLM/evidence/2026-11-04-652b/probe652b_oracle.py`
+    (`SUCCESS True`, `MERGELIST ['virtual/perl-s652foo-2.223.0-r1',
+    'dev-perl/s652try-1']` -- driver + consumer, no perl row, no
+    fall-through) plus the bed ground truth (L0 `l0-20261104T075942Z`
+    real `app-text_texlive.txt` carries no Sub-Name row -- the 5
+    Sub-Name `[extra]` rows are portuale-only), both recorded in the
+    Task-1 report (`.superpowers/sdd/02.652-postskip-reresolve.opus/task-1-report.md`
+    §2) and cited against the #652 entry (`LLM/backlog-tasks.md` #652)
+    and the S0 novel-demoter refutation
+    (`LLM/evidence/2026-11-04-652/` REPORT + `probe652_oracle.py` N1/N2
+    `['dev-lang/perl-5.42.2']`). This test pins the hermetic request the
+    Rust test `nform_consumer_holds_the_virtual_no_subname`
+    (`crates/portage-repo/src/tests/tests_p652b.rs`) uses -- same graph,
+    same rows in the same order. The provider outcome stays unasserted
+    (the C1-bare selection-side divergence: portuale upgrades the
+    indirect provider where Portage skips it -- out of #652's scope, same
+    posture note as the Rust test).
+    MUST NOT be `@world --update --deep`: the M4/M5b shapes upgrade the
+    virtual instead of holding the binding (the not-the-cell boundary
+    pinned by the Rust `-uD` tests in `tests_p647.rs`).
+    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
+    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "dev-perl/p651top", "dev-perl/p652try"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    # Full-stdout pin (the #129 precedent): the WARNING block is the
+    # load-bearing proof of the R+skip posture, so every line is pinned.
+    # Trailing space on the try row: strip_zero_size_suffix keeps one
+    # space after a closing '"' (#469).
+    assert got.stdout.splitlines() == [
+        f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
+        f"[ebuild   R    ] dev-perl/p651top-1::testrepo to {root}",
+        f'[ebuild  N     ] dev-perl/p652try-1::testrepo to {root} USE="-minimal" ',
+        "",
+        "Total: 3 packages (2 new, 1 reinstall), Size of downloads: 0 KiB",
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
+        "",
+        f"dev-libs/p651prov:0 for {root}/",
+        "",
+        f"  (dev-libs/p651prov-5.44.0:0/5.44::testrepo, ebuild scheduled for merge to '{root}') USE=\"-minimal\" ELIBC=\"glibc\" conflicts with",
+        f"    dev-libs/p651prov:0/5.42 required by (dev-perl/p651holder-1:0/0::testrepo, installed in '{root}') USE=\"\"",
+        "                     ^^^^^^^",
+        "",
+    ], got.stdout
+
+
+def test_652_hform_upgrade_holds_th_while_encode_merges(
+    emerge_binary, fixture_env
+):
+    """#652 leg B (H-form): `emerge -pv dev-perl/p652early dev-libs/p651prov`
+    (no `--update`). The transient `p651prov-5.44.0` merges here (the
+    upgrade posture, not the skip), and under it Portage merges the Encode
+    fall-through but holds TH: three rows (`N` enccore, `U` prov, `N`
+    early), neither virtual upgraded, no TH pin, no skip block, no
+    conflict, rc 0. `USE="-minimal%"` on the prov row: `minimal` defaults
+    off by profile-chain absence while the installed 5.42.2 records no
+    USE, so the fresh resolution marks the flag changed (`%`).
+
+    Oracle: the bed ground truth (L0 `l0-20261104T075942Z` real
+    `app-office_libreoffice.txt` merges `perl-core/Encode-3.210.0` at row
+    33 and carries NO `perl-core/Test-Harness` row and NO virtual rows --
+    gimp identical), recorded in the Task-1 report
+    (`.superpowers/sdd/02.652-postskip-reresolve.opus/task-1-report.md`
+    §2; the HF playground run merges both pins, so the bed -- not the
+    playground -- is this leg's oracle) and cited against the #652 entry
+    (`LLM/backlog-tasks.md` #652) and the S0 evidence
+    (`LLM/evidence/2026-11-04-652/`). This test pins the hermetic request
+    the Rust test `hform_upgrade_holds_th_while_encode_merges`
+    (`crates/portage-repo/src/tests/tests_p652b.rs`) uses -- same graph,
+    same rows in the same order.
+    MUST NOT be `@world --update --deep`: the M4/M5b shapes upgrade the
+    virtual instead of seeding the fall-through (the not-the-cell boundary
+    pinned by the Rust `-uD` tests in `tests_p647.rs`).
+    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
+    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    root = fixture_env["ROOT"]
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--verbose", "dev-perl/p652early", "dev-libs/p651prov"],
+        fixture_env,
+    )
+    assert got.returncode == 0, got.stdout
+    rows = [
+        ln.removesuffix(" 0 KiB")
+        for ln in got.stdout.splitlines()
+        if ln.startswith("[ebuild")
+    ]
+    assert rows == [
+        f"[ebuild  N     ] dev-libs/p651enccore-3.210.0::testrepo to {root}",
+        # Trailing space: strip_zero_size_suffix keeps one space after a
+        # closing '"' (#469), so the USE row ends with '" ' here.
+        f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
+        f"[ebuild  N     ] dev-perl/p652early-1::testrepo to {root}",
+    ], got.stdout
+    assert (
+        "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
+        in got.stdout
+    ), got.stdout
 
 
 def test_601_masked_installed_provider_keeps_the_rebuild_display(
