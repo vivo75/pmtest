@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #656 (bed-holder twin 1 of 3: installed + tree-present unrequested requirer carrying =dev-libs/p651prov-5.42*; treeless p651pin must not trip the enforcement gate (N2 oracle), tree-present ones must (bed dev-lang_perl oracle))
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p651prov-5.42*
+SLOT=0
+_md5_=8c42b34af5d3c434d2da05b4a6f97d39
