@@ -3167,7 +3167,7 @@ CASES = [
     ("#646: without a co-scheduled upgrade both legs of the nested installed virtual's || stay satisfied, so the consumer keeps the virtual and only it merges new (p572try alone, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p572try"], 0),
     ("#647: a co-scheduled upgrade kills every tree version's RDEPEND of the multi-version installed virtual, so the wrapped consumer falls through to the next arm (M6b: p647try + =p647prov-5.44.0, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p647try", "=dev-libs/p647prov-5.44.0"], 0),
     ("#647: a co-scheduled upgrade kills the installed virtual's =prov arm, so the plain consumer's seed feed surfaces the ~ arm while the virtual stays kept (M5: p647enclocale + =p647prov-5.44.0, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p647enclocale", "=dev-libs/p647prov-5.44.0"], 0),
-    ("#650: the bare provider request merges the transient, so its upgrade-demotion still seeds both fall-through arms (bare p650prov: N enccore + N thcore + U prov, virtuals kept; Portage N1 holds via the skip this leg does not render -- guard leg, rc 0)", ["--pretend", "--verbose", "dev-libs/p650prov"], 0),
+    ("#650/#657: the bare provider request merges the transient with no fresh puller outside it, so the replacing parent keeps both installed arms and neither fall-through arm merges (bare p650prov: U prov only, virtuals kept; bed libreoffice/gimp hold Test-Harness the same way; Portage N1 holds via the skip this leg does not render, rc 0)", ["--pretend", "--verbose", "dev-libs/p650prov"], 0),
     ("#650: with the transient skipped under the referenced holder pin both seeds are withheld, so only the provider and the holder reinstall (H1: p650prov + p650holder, R + R with the skip WARNING, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p650prov", "dev-perl/p650holder"], 0),
     ("#656 leg (a): the bare provider request with installed+tree holders skips the transient, so only the provider reinstalls (bare p651prov: R prov with the skip WARNING, virtuals kept; supersedes the #651 guard description -- same argv, the world changed under it when enforcement-open landed; Portage H0/P2 reinstall with no fall-through, the skip block itself bed-oracled -- enforcement-open gate, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov"], 0),
     ("#651: with the transient skipped under the chained holder pin both commit-before-conflict seeds are voided, so only the provider and the top reinstall (C1: p651prov + p651top, R + R with the skip WARNING, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov", "dev-perl/p651top"], 0),
@@ -37122,36 +37122,35 @@ def test_647_multi_version_virtual_feeds_the_plain_consumer_arm(
     ), got.stdout
 
 
-def test_650_bare_request_with_transient_merging_seeds_the_fall_through(
+def test_650_bare_request_with_transient_merging_holds_the_fall_through(
     emerge_binary, fixture_env
 ):
-    """#650 guard leg (N1-form): `emerge -pv dev-libs/p650prov` (no
-    `--update`). The transient `p650prov-5.44.0` merges here where the cell
-    skips it -- the recorded selection-side divergence (S0 REPORT
-    `LLM/evidence/2026-11-03-649/REPORT.md` §6 "N1 vs N2 perl-row
-    divergence"), NOT #650's scope. Given the merge, the demotion is
-    upgrade-demotion, and upgrade-demoted seeds must still fire (the
-    M6b/M5 precedent Task 2 preserves): three rows (`N` enccore, `N`
-    thcore, `U` prov), both virtuals kept (silent), no skip block, no
-    conflict, rc 0. `USE="-minimal%"` on the prov row: `minimal` defaults
-    off by profile-chain absence while the installed 5.42.2 records no
-    USE, so the fresh resolution marks the flag changed (`%`).
+    """#650 guard leg (N1-form), re-pinned for #657: `emerge -pv
+    dev-libs/p650prov` (no `--update`). The transient `p650prov-5.44.0`
+    merges here where the cell skips it -- the recorded selection-side
+    divergence (S0 REPORT `LLM/evidence/2026-11-03-649/REPORT.md` §6 "N1 vs
+    N2 perl-row divergence"), NOT #650's scope. The virtuals' only
+    re-evaluating parent is the replacing transient itself, so Portage keeps
+    the installed arms (`dep_check.py:480/:531`, the `if not replacing`
+    bypass) and neither fall-through arm merges: one `U` row, both virtuals
+    kept (silent), no skip block, rc 0. `USE="-minimal%"` on the prov row:
+    `minimal` defaults off by profile-chain absence while the installed
+    5.42.2 records no USE, so the fresh resolution marks the flag changed.
 
-    Oracle: Portage N1/N2 hold `['dev-lang/perl-5.42.2']` (the virtual
-    kept, no fall-through merged --
-    `LLM/evidence/2026-11-03-650/probe650_oracle.py`, portuale), but that
-    hold rides the skip this bare leg does not render -- so this leg pins
-    NO CHANGE, guarding the fix against over-blunting (a fix green here
-    by dropping the seeds while still merging the transient would confuse
-    the two demotions). Same graph, same rows in the same order as the
-    Rust guard test
-    `bare_request_with_transient_merging_seeds_the_fall_through`
+    Re-pinned 2026-11-05: this leg used to pin three rows (`N` enccore, `N`
+    thcore, `U` prov) as a "no change" guard. The bed disproves the two
+    fall-through rows for the no-fresh-puller shape: L0 real
+    `app-office_libreoffice.txt` / `media-gfx_gimp.txt` (run
+    `l0-20261105T191358Z`) merge perl-5.44.0 and carry no
+    `perl-core/Test-Harness` row, while Encode, which a fresh
+    `dev-perl/Archive-Zip` outside the transient pulls, does merge (that
+    shape stays pinned by the #656 tests and M6b/M5). Same graph as the Rust
+    test `bare_request_with_transient_merging_holds_the_fall_through`
     (`crates/portage-repo/src/tests/tests_p650.rs`).
     MUST NOT be `@world --update --deep`: the M4/M5b shapes upgrade the
-    virtual instead of seeding the fall-through (the not-the-cell boundary
-    pinned by the Rust `-uD` tests in `tests_p647.rs`).
-    Deliberately unasserted: the backtrack counter (the #572 feed-vs-inline
-    precedent is 1/20 vs 0/20; the merge list is identical either way)."""
+    virtual instead (the not-the-cell boundary pinned by the Rust `-uD`
+    tests in `tests_p647.rs`).
+    Deliberately unasserted: the backtrack counter."""
     root = fixture_env["ROOT"]
     got = _run(
         [str(emerge_binary)],
@@ -37165,15 +37164,12 @@ def test_650_bare_request_with_transient_merging_seeds_the_fall_through(
         if ln.startswith("[ebuild")
     ]
     assert rows == [
-        f"[ebuild  N     ] dev-libs/p650enccore-3.210.0::testrepo to {root}",
-        f"[ebuild  N     ] dev-libs/p650thcore-3.500.0::testrepo to {root}",
         # Trailing space: strip_zero_size_suffix keeps one space after a
         # closing '"' (#469), so the USE row ends with '" ' here.
         f'[ebuild     U  ] dev-libs/p650prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
     ], got.stdout
     assert (
-        "Total: 3 packages (1 upgrade, 2 new), Size of downloads: 0 KiB"
-        in got.stdout
+        "Total: 1 package (1 upgrade), Size of downloads: 0 KiB" in got.stdout
     ), got.stdout
 
 
