@@ -37443,6 +37443,77 @@ def test_652_nform_consumer_holds_the_virtual_no_subname(
     ), got.stdout
 
 
+def test_654_bare_try_and_foo_merge_no_seed_cores(
+    emerge_binary, fixture_env
+):
+    """#654 evidence: bare `dev-perl/p652try` and bare `virtual/p652foo`
+    merge ZERO seed cores. This test IS the committed evidence behind the
+    "#654 gap has no material" claim: the mechanism in one sentence is
+    that enforcement-open skips the transient on bare #652-atom requests
+    too, so `p651thcore`/`p651enccore` never merge and `--tree` vs
+    `required_by` have nothing to disagree about (`LLM/backlog-tasks.md`
+    #654: the 4 violations were `--tree` nesting genuinely-merged cores
+    under the request root while `required_by` chained them through the
+    hidden installed virtuals).
+
+    Verbatim transcript (fixed binary, fixture configroot, live capture
+    during #656 Task-4; the assertions below pin the same output through
+    the harness):
+    `$ emerge --pretend --verbose dev-perl/p652try` → rc 0,
+      `[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo`,
+      `[ebuild  N     ] dev-perl/p652try-1::testrepo USE="-minimal"`,
+      `Total: 2 packages (2 new)` + skip WARNING, no core rows.
+    `$ emerge --pretend --verbose virtual/p652foo` → rc 0,
+      `[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo`,
+      `Total: 1 package (1 new)` + skip WARNING, no core rows.
+    MUST NOT be `@world --update --deep` (same not-the-cell boundary as
+    the neighboring pins). Deliberately unasserted: the backtrack counter
+    and the skip-block parent list/order (structural-only precedent of
+    the neighboring #656 pins)."""
+    root = fixture_env["ROOT"]
+    for args, expected_rows, expected_total in (
+        (
+            ["--pretend", "--verbose", "dev-perl/p652try"],
+            [
+                f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
+                f'[ebuild  N     ] dev-perl/p652try-1::testrepo to {root} USE="-minimal" ',
+            ],
+            "Total: 2 packages (2 new), Size of downloads: 0 KiB",
+        ),
+        (
+            ["--pretend", "--verbose", "virtual/p652foo"],
+            [
+                f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
+            ],
+            "Total: 1 package (1 new), Size of downloads: 0 KiB",
+        ),
+    ):
+        got = _run([str(emerge_binary)], args, fixture_env)
+        assert got.returncode == 0, got.stdout
+        rows = [
+            ln.removesuffix(" 0 KiB")
+            for ln in got.stdout.splitlines()
+            if ln.startswith("[ebuild")
+        ]
+        assert rows == expected_rows, got.stdout
+        assert expected_total in got.stdout, got.stdout
+        # The load-bearing assertion for #654: no seed core merges on
+        # either bare request, so the tree-vs-required_by attribution gap
+        # has no material.
+        assert not any(
+            "p651thcore" in ln or "p651enccore" in ln
+            for ln in got.stdout.splitlines()
+        ), got.stdout
+        # The --tree half of the same gap, pinned because it runs green:
+        # the tree nests only the requester (no cores to mis-nest).
+        tree = _run([str(emerge_binary)], ["--pretend", "--tree", args[-1]], fixture_env)
+        assert tree.returncode == 0, tree.stdout
+        assert not any(
+            "p651thcore" in ln or "p651enccore" in ln
+            for ln in tree.stdout.splitlines()
+        ), tree.stdout
+
+
 def test_652_hform_upgrade_holds_th_while_encode_merges(
     emerge_binary, fixture_env
 ):
