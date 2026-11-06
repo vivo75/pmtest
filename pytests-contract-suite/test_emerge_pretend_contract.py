@@ -12864,6 +12864,122 @@ def test_update_rebuilds_a_stale_consumer_instead_of_downgrading_its_provider(
     ]
 
 
+def _libc_noebuild_tree(tmp_path, orphan_rdepend, orphan_ebuild):
+    """A hermetic config root for backlog #625(a) (the #624 libc edge):
+    installed `sys-libs/glibc-2.0` (also in the tree, `BDEPEND=dev-libs/y`)
+    provides `virtual/libc`; installed `dev-libs/orphan-1` records
+    `RDEPEND=orphan_rdepend` and has an ebuild only when `orphan_ebuild`;
+    installed `dev-libs/x-0.5` depends on it and the tree carries `x-1`.
+    World is `dev-libs/orphan dev-libs/x`. Returns the env dict."""
+    cfg = tmp_path / "cfg"
+    repo = tmp_path / "repo"
+    (cfg / "etc/portage").mkdir(parents=True)
+    (repo / "profiles/default").mkdir(parents=True)
+    (repo / "profiles/repo_name").write_text("main\n")
+    (repo / "profiles/arch.list").write_text("amd64\n")
+    (repo / "profiles/default/eapi").write_text("8\n")
+    (repo / "profiles/default/make.defaults").write_text(
+        'ARCH="amd64"\nACCEPT_KEYWORDS="amd64"\n'
+    )
+    tree = [
+        ("sys-libs/glibc-2.0", "2.2", "", "dev-libs/y"),
+        ("virtual/libc-1", "0", "sys-libs/glibc", ""),
+        ("dev-libs/x-1", "0", "dev-libs/orphan", ""),
+        ("dev-libs/y-1", "0", "", ""),
+    ]
+    if orphan_ebuild:
+        tree.append(("dev-libs/orphan-1", "0", "", ""))
+    for cpv, slot, rdepend, bdepend in tree:
+        cat, pf = cpv.split("/")
+        pn = pf.rsplit("-", 1)[0]
+        (repo / cat / pn).mkdir(parents=True, exist_ok=True)
+        ebuild = (
+            f'EAPI=8\nDESCRIPTION="libc edge"\nSLOT="{slot}"\nKEYWORDS="amd64"\n'
+            + (f'RDEPEND="{rdepend}"\n' if rdepend else "")
+            + (f'BDEPEND="{bdepend}"\n' if bdepend else "")
+        )
+        (repo / cat / pn / f"{pf}.ebuild").write_text(ebuild)
+        (repo / "metadata/md5-cache" / cat).mkdir(parents=True, exist_ok=True)
+        (repo / "metadata/md5-cache" / cat / pf).write_text(
+            f"DEFINED_PHASES=-\nEAPI=8\nIUSE=\nKEYWORDS=amd64\nSLOT={slot}\n"
+            + (f"RDEPEND={rdepend}\n" if rdepend else "")
+            + (f"BDEPEND={bdepend}\n" if bdepend else "")
+            + f"_md5_={hashlib.md5(ebuild.encode()).hexdigest()}\n"
+        )
+    for cpv, slot, rdepend in (
+        ("sys-libs/glibc-2.0", "2.2", ""),
+        ("virtual/libc-1", "0", "sys-libs/glibc"),
+        ("dev-libs/x-0.5", "0", "dev-libs/orphan"),
+        ("dev-libs/orphan-1", "0", orphan_rdepend),
+    ):
+        cat, pf = cpv.split("/")
+        vdb = cfg / "var/db/pkg" / cat / pf
+        vdb.mkdir(parents=True)
+        (vdb / "CATEGORY").write_text(f"{cat}\n")
+        (vdb / "PF").write_text(f"{pf}\n")
+        (vdb / "SLOT").write_text(f"{slot}\n")
+        (vdb / "repository").write_text("main\n")
+        (vdb / "EAPI").write_text("8\n")
+        (vdb / "KEYWORDS").write_text("amd64\n")
+        (vdb / "USE").write_text("\n")
+        (vdb / "IUSE").write_text("\n")
+        if rdepend:
+            (vdb / "RDEPEND").write_text(f"{rdepend}\n")
+    (cfg / "var/lib/portage").mkdir(parents=True)
+    (cfg / "var/lib/portage/world").write_text("dev-libs/orphan\ndev-libs/x\n")
+    (cfg / "etc/portage/repos.conf").write_text(
+        f"[DEFAULT]\nmain-repo = main\n\n[main]\nlocation = {repo}\n"
+    )
+    (cfg / "etc/portage/make.conf").write_text(
+        f'PKGDIR="{tmp_path / "pkgdir"}"\nFEATURES="-news"\n'
+    )
+    (cfg / "etc/portage/make.profile").symlink_to(repo / "profiles/default")
+    write_repo_categories(repo)
+    return {"PORTAGE_CONFIGROOT": str(cfg), "ROOT": str(cfg)}
+
+
+@pytest.mark.parametrize(
+    ("orphan_rdepend", "orphan_ebuild", "order"),
+    [
+        (">=sys-libs/glibc-2.0", False, ["y", "glibc", "x"]),
+        ("", False, ["y", "x", "glibc"]),
+        (">=sys-libs/glibc-2.0", True, ["y", "x", "glibc"]),
+    ],
+    ids=["noebuild-libc", "noebuild-plain", "ebuild-libc"],
+)
+def test_625a_installed_package_without_ebuild_keeps_its_libc_edge(
+    emerge_binary, tmp_path, orphan_rdepend, orphan_ebuild, order
+):
+    """Backlog #625(a), the fixture-level pin of #624. An installed
+    package with no ebuild keeps its vdb dependencies (Portage
+    `FakeVartree._aux_get_wrapper`, `FakeVartree.py:132-159`: no ebuild,
+    so no dynamic deps replace them), so `dev-libs/orphan`'s
+    `>=sys-libs/glibc-2.0` is a runtime edge that puts the glibc
+    reinstall before the `x` upgrade that needs `orphan`. The libc-first
+    rule does not move an `R` libc (`depgraph.py:9639-9668` only seeds a
+    libc version not yet installed), so without that edge, or once an
+    ebuild replaces the vdb deps, glibc merges last.
+
+    Expected orders from Portage 3.0.83's own ResolverPlayground
+    (`3rdparty/portage`, same tree, installed set and world, request
+    `dev-libs/x dev-libs/y sys-libs/glibc`, no options), recorded in
+    `LLM/evidence/2026-11-06-sweep/625a/` (probe script + output):
+    `[y-1, glibc-2.0, x-1]`, `[y-1, x-1, glibc-2.0]`, `[y-1, x-1, glibc-2.0]`."""
+    env = _libc_noebuild_tree(tmp_path, orphan_rdepend, orphan_ebuild)
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/x", "dev-libs/y", "sys-libs/glibc"],
+        env,
+    )
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    rows = {
+        "y": f'[ebuild  N     ] dev-libs/y-1 to {env["ROOT"]}',
+        "glibc": f'[ebuild   R    ] sys-libs/glibc-2.0 to {env["ROOT"]}',
+        "x": f'[ebuild     U  ] dev-libs/x-1 [0.5] to {env["ROOT"]}',
+    }
+    assert rust.stdout.splitlines() == [rows[name] for name in order]
+
+
 def _slotop_new_slot_tree(tmp_path):
     """A hermetic config root for backlog #304 (`LLM/backlog-tasks-2026-10.md`):
     `dev-libs/mislot` is installed in slot 0 only (`0/1`, 1.0) while the
