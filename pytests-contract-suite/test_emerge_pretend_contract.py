@@ -13462,7 +13462,7 @@ def test_use_expand_implicit_flag_is_valid_iuse_even_when_unlisted(
     elibc_glibc in its own IUSE, and elibc_glibc is enabled globally
     (ELIBC="glibc"), so the dep resolves. dev-libs/implicitiusepkgmusl's
     own [elibc_musl] dep is valid but unsatisfiable (elibc_musl not
-    enabled), so it's reported as an unresolvable dependency."""
+    enabled), so Portage proposes enabling it through autounmask (#663)."""
     ok = _run([str(emerge_binary)], ["--pretend", "dev-libs/implicitiusepkg"], fixture_env)
     assert ok.returncode == 0
     assert ok.stdout == (
@@ -13475,20 +13475,23 @@ def test_use_expand_implicit_flag_is_valid_iuse_even_when_unlisted(
     bad = _run([str(emerge_binary)], ["--pretend", "dev-libs/implicitiusepkgmusl"], fixture_env)
     assert bad.returncode == 1  # abort path: unsatisfiable dep of a merge-bound parent
     _assert_abort_preamble(bad.stdout)
-    # Backlog #20: the block, not the bare line. Divergence note: Portage
-    # resolves this one through --autounmask-use (its blocked-change
-    # suggestion names `>=dev-libs/implicitiuseprov-1.0 elibc_musl`),
-    # because Portage treats implicit IUSE flags as flippable; portuale's
-    # autounmask suggestion does not cover implicit flags yet, so its
-    # display falls back to this disclosure. The pinned text is
-    # portuale's,
+    # Backlog #663: Portage treats implicit IUSE flags as flippable
+    # (`Package._iuse.get_flag` accepts `_iuse_implicit_match`), so it
+    # suggests `elibc_musl` instead of the "no ebuilds built with USE
+    # flags" disclosure; the real Gentoo tree avoids this only because
+    # `profiles/base/use.mask` masks `elibc_musl`. Captured from Portage
+    # 3.0.83 (fixture oracle, `LLM/evidence/2026-11-06-663/` in portuale).
+    assert bad.stdout.splitlines()[-2:] == [
+        f'[ebuild  N     ] dev-libs/implicitiuseprov-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/implicitiusepkgmusl-1.0 to {fixture_env["ROOT"]}',
+    ]
     assert bad.stderr.splitlines() == [
         "",
-        'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/implicitiuseprov[elibc_musl]".',
-        "!!! One of the following packages is required to complete your request:",
-        "- dev-libs/implicitiuseprov-1.0::testrepo (Change USE: +elibc_musl)",
-        '(dependency required by "dev-libs/implicitiusepkgmusl-1.0::testrepo" [ebuild])',
-        '(dependency required by "dev-libs/implicitiusepkgmusl" [argument])',
+        "The following USE changes are necessary to proceed:",
+        ' (see "package.use" in the portage(5) man page for more details)',
+        "# required by dev-libs/implicitiusepkgmusl-1.0::testrepo",
+        "# required by dev-libs/implicitiusepkgmusl (argument)",
+        ">=dev-libs/implicitiuseprov-1.0 elibc_musl",
     ]
 
 
