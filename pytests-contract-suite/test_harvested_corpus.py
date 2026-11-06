@@ -79,3 +79,27 @@ def test_harvest_records_a_renamed_test_and_drops_its_old_entries(tmp_path, monk
         "suite/t.py::test_renamed#0",
         "suite/t.py::test_still_runs#0",  # stale test: its orphan is re-recorded
     }
+
+
+def test_blessing_from_several_xdist_workers_keeps_every_workers_rows(tmp_path, monkeypatch):
+    """Backlog #612: under xdist each worker runs `write_blessed` at the end
+    of its own session, starting from the corpus it loaded at its start. A
+    worker that wrote from that stale copy dropped the rows an earlier
+    worker had just blessed, so a parallel bless cleared only the last
+    worker's drift. Each write must start from what is on disk."""
+    rec = {"rc": 0, "stdout": "old\n", "stderr": ""}
+    base = {f"t.py::test_{n}#0": {"args": [n], "env": {}, **rec} for n in "abc"}
+    path = tmp_path / "contract.json.xz"
+    corpus.save(path, base)
+    monkeypatch.setattr(corpus, "CONTRACT_CORPUS", path)
+    monkeypatch.setattr(corpus, "BLESS", True)
+    for n in "ab":  # two workers, each blessing its own row from the same start
+        monkeypatch.setattr(corpus, "_contract_cases", dict(base))
+        monkeypatch.setattr(corpus, "blessed", {
+            f"t.py::test_{n}#0": {"args": [n], "env": {}, "rc": 0, "stdout": "new\n", "stderr": ""},
+        })
+        corpus.write_blessed()
+    got = corpus.load(path)
+    assert got["t.py::test_a#0"]["stdout"] == "new\n"
+    assert got["t.py::test_b#0"]["stdout"] == "new\n"
+    assert got["t.py::test_c#0"]["stdout"] == "old\n"

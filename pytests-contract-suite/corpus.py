@@ -21,7 +21,9 @@ temp becomes `<TMP>`, the repo root becomes `<REPO>`.
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
+import fcntl
 import hashlib
 import json
 import lzma
@@ -137,8 +139,25 @@ def save(path: Path, cases: dict[str, dict]) -> None:
         {"version": 1, "blobs": dict(sorted(blobs.items())), "cases": packed},
         indent=0, sort_keys=True, ensure_ascii=False,
     )
-    with lzma.open(path, "wt", encoding="utf-8", preset=9) as fh:
+    # Write beside the target and rename, so a reader never sees half a file.
+    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    with lzma.open(tmp, "wt", encoding="utf-8", preset=9) as fh:
         fh.write(payload)
+    os.replace(tmp, path)
+
+
+@contextlib.contextmanager
+def _corpus_dir_lock(path: Path):
+    """Serialise read-modify-write of a corpus file across processes (the
+    xdist workers all bless at the end of their own session). Locks the
+    directory, so no lock file is left in the tree."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(path.parent, os.O_RDONLY)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(fd)
 
 
 # --------------------------------------------------------------------------
@@ -342,11 +361,15 @@ def write_harvest() -> None:
 def write_blessed() -> None:
     if not BLESS:
         return
+    # Start from the file as it is now, never from the copy loaded at the
+    # session start: another xdist worker may have blessed rows since.
     if blessed:
-        cases = dict(_contract())
-        cases.update(blessed)
-        save(CONTRACT_CORPUS, cases)
+        with _corpus_dir_lock(CONTRACT_CORPUS):
+            cases = load(CONTRACT_CORPUS)
+            cases.update(blessed)
+            save(CONTRACT_CORPUS, cases)
     if blessed_expanded:
-        cases = load(EXPANDED_CORPUS)
-        cases.update(blessed_expanded)
-        save(EXPANDED_CORPUS, cases)
+        with _corpus_dir_lock(EXPANDED_CORPUS):
+            cases = load(EXPANDED_CORPUS)
+            cases.update(blessed_expanded)
+            save(EXPANDED_CORPUS, cases)
