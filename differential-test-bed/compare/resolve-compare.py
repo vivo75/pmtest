@@ -403,6 +403,10 @@ def parse(path: Path) -> tuple[list[Pkg], list[str], int | None, set[str], bool,
                 advice.add("use-change: " + canon.strip())
                 continue
             in_use_block = False
+        # A `#` line is a package.mask comment dump Portage prints under a
+        # masked package (fixtures quote the message in prose): not a block.
+        if stripped.startswith("#"):
+            continue
         if MASKED.search(line):
             advice.add("masked: " + re.sub(r"\s+", " ", stripped))
         if REQUSE.search(line):
