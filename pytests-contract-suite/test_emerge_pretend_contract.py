@@ -28822,8 +28822,21 @@ def test_oracle_209_backtrack_zero_enforces_a_satisfiable_consumer_pin_in_pass(
     assert json.loads(rj.stdout)["backtrack"] == {"restarts": 0, "max": 0}
 
 
+@pytest.mark.parametrize(
+    "extra,inst_atoms,more",
+    [
+        ([], ["<dev-libs/r25lib-2.0:0/1="], 1),
+        (
+            ["--verbose-conflicts"],
+            ["<dev-libs/r25lib-2.0:0/1=", "<dev-libs/r25lib-2.0:="],
+            0,
+        ),
+        (["--verbose-conflicts", "--dynamic-deps=n"], ["<dev-libs/r25lib-2.0:0/1="], 0),
+    ],
+    ids=["default", "verbose-conflicts", "verbose-conflicts-dynamic-deps-n"],
+)
 def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
-    emerge_binary, fixture_env, tmp_path, fixtures_root
+    emerge_binary, fixture_env, tmp_path, fixtures_root, extra, inst_atoms, more
 ):
     """Backlog #209 S0: a pin that cannot be satisfied when backtracking
     is off is reported, not skipped and not warned away. Same r25 world
@@ -28840,10 +28853,16 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
     `3rdparty/portage` 3.0.82.2) carries no `_allow_backtracking` gate
     on any link, so the pin lands as a slot-collision report): the 2.0
     merge row, then the residual block pairing it (the `(Argument)`
-    puller) against installed 1.0 (the consumer pin), rc 1. One display
-    nit vs the probe: Portage renders the consumer's `:=` bound form
-    first, portuale the normalised `<2.0` form (same two parents, order
-    only; the `(and 1 more ...)` tail agrees)."""
+    puller) against installed 1.0 (the consumer pin), rc 1.
+
+    Backlog #607: the installed side's parents are the consumer's atoms
+    verbatim, never the stripped `<dev-libs/r25lib-2.0`. Portage 3.0.83 on
+    this host, same staging and argv (captures
+    `LLM/evidence/2026-11-06-sweep/607/o209*-portage.txt`): the vdb's built
+    `<dev-libs/r25lib-2.0:0/1=` then, through dynamic deps, the ebuild's
+    `<dev-libs/r25lib-2.0:=` (`(and 1 more with the same problem)`
+    without `--verbose-conflicts`); `--dynamic-deps=n` keeps only the
+    built atom (`FakeVartree.py:179-195`)."""
     env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/r25consumer")
     args = [
         "--pretend",
@@ -28852,6 +28871,7 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
         "--deep",
         "--newuse",
         "--oneshot",
+        *extra,
         "=dev-libs/r25lib-2.0",
     ]
     rust = _run([str(emerge_binary)], args, env)
@@ -28859,6 +28879,7 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
     assert strip_pretend_preamble(rust.stdout).splitlines()[:1] == [
         f'[ebuild     U  ] dev-libs/r25lib-2.0 [1.0] to {env["ROOT"]}',
     ]
+    consumer = "dev-libs/r25consumer-1.0:0/0::testrepo"
     _assert_residual_slot_conflict_block(
         rust.stdout,
         env["ROOT"],
@@ -28866,14 +28887,13 @@ def test_oracle_209_backtrack_zero_reports_an_unsatisfiable_consumer_pin(
         "dev-libs/r25lib-2.0:0/2::testrepo",
         [(None, "=dev-libs/r25lib-2.0", False)],
         "dev-libs/r25lib-1.0:0/1::testrepo",
-        [
-            (
-                "dev-libs/r25consumer-1.0:0/0::testrepo",
-                "<dev-libs/r25lib-2.0",
-                True,
-            ),
-        ],
+        [(consumer, atom, True) for atom in inst_atoms],
     )
+    inst_header = f"  (dev-libs/r25lib-1.0:0/1::testrepo, installed in '{env['ROOT']}') USE=\"\" pulled in by\n"
+    block = rust.stdout.split(inst_header, 1)[1].split("\n\n", 1)[0].splitlines()
+    assert [ln.split(" required by ", 1)[0].strip() for ln in block if " required by " in ln] == inst_atoms
+    tail = [ln.strip() for ln in block if ln.strip().startswith("(and ")]
+    assert tail == ([f"(and {more} more with the same problem)"] if more else [])
 
 
 def test_oracle_90_reversed_two_targets_withhold_with_a_skip_notice(
