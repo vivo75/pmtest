@@ -22638,10 +22638,15 @@ def _run_on_pty(argv, env, err_path=None, timeout=120):
                 out += chunk
         if proc.poll() is not None and not ready:
             break
-    if proc.poll() is None:
+    # EIO/EOF on the master only says the child closed the slave: it may
+    # still be exiting (a single `poll()` here raced that window under
+    # load -- backlog #633). Wait out what is left of the deadline.
+    try:
+        proc.wait(timeout=max(1.0, deadline - _time.time()))
+    except subprocess.TimeoutExpired:
         proc.kill()
-        raise AssertionError(f"pty child timed out; got so far: {out!r}")
-    proc.wait()
+        proc.wait()
+        raise AssertionError(f"pty child timed out; got so far: {out!r}") from None
     os.close(master)
     err_bytes = Path(err_path).read_bytes() if err_path is not None else None
     return proc.returncode, out, err_bytes
