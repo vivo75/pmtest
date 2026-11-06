@@ -889,10 +889,10 @@ def _write_tmp_binhost(tmp_path):
     return binhost
 
 
-def _write_tmp_clientetc(tmp_path, binhost, name="clientetc"):
+def _write_tmp_clientetc(tmp_path, binhost=None, name="clientetc"):
     """A client `/etc/portage` copy of the fixture config, repointed at
-    the tmp binhost (absolute repo locations so the copy resolves
-    anywhere). Returns the config-root dir."""
+    the tmp binhost when one is given (absolute repo locations so the
+    copy resolves anywhere). Returns the config-root dir."""
     import shutil as _shutil
 
     clientetc = tmp_path / name
@@ -906,14 +906,15 @@ def _write_tmp_clientetc(tmp_path, binhost, name="clientetc"):
     profile_link = clientetc / "etc/portage/make.profile"
     profile_link.unlink(missing_ok=True)
     profile_link.symlink_to(Path(FIXTURES_ROOT) / "repo/profiles/default")
-    (clientetc / "etc/portage/binrepos.conf").write_text(
-        "[tmpbinhost]\n"
-        f"sync-uri = file://{binhost}\n"
-        "priority = 1\n"
-        # Unsigned test binhost (backlog #511): opt out of the verifying
-        # default so the `.tbz2` entry is served.
-        "verify-signature = false\n"
-    )
+    if binhost is not None:
+        (clientetc / "etc/portage/binrepos.conf").write_text(
+            "[tmpbinhost]\n"
+            f"sync-uri = file://{binhost}\n"
+            "priority = 1\n"
+            # Unsigned test binhost (backlog #511): opt out of the verifying
+            # default so the `.tbz2` entry is served.
+            "verify-signature = false\n"
+        )
     repos_conf = clientetc / "etc/portage/repos.conf"
     for conf in repos_conf.iterdir():
         if not conf.is_file():
@@ -929,6 +930,15 @@ def _write_tmp_clientetc(tmp_path, binhost, name="clientetc"):
             lines.append(line)
         conf.write_text("\n".join(lines) + "\n")
     return clientetc
+
+
+def _client_etc_args(tmp_path):
+    """`--remote-etc-portage` argv that points the client config at a tmp
+    copy of the fixture config. Without it `mrg` pulls `client:/etc/portage`,
+    the machine's own tree, which a host with a root-only directory in it
+    makes `tar` fail on (backlog #661)."""
+    clientetc = _write_tmp_clientetc(tmp_path, name="clientetc-pulled")
+    return ["--remote-etc-portage", f"client:{clientetc / 'etc/portage'}"]
 
 
 def test_mrg_remote_resolve_merges_a_binhost_binary(
@@ -1527,7 +1537,7 @@ def _remote_binpkg_args(sshd_client, binpkg):
 
 
 def test_mrg_remote_bundle_unpacks_over_loopback_ssh(
-    mrg_binary, fixture_env, loopback_sshd, fixtures_root
+    mrg_binary, fixture_env, loopback_sshd, tmp_path, fixtures_root
 ):
     """Slice-2 wire, ssh transport: the fixture tbz2 is bundled
     server-side, streamed over stdin, unpacked and verified client-side
@@ -1536,7 +1546,8 @@ def test_mrg_remote_bundle_unpacks_over_loopback_ssh(
     manifest, and the streamed tarball is removed afterwards."""
     binpkg = str(fixtures_root / "pkgdir/dev-libs/packagepkg-1.0.tbz2")
     result = subprocess.run(
-        [str(mrg_binary), *_remote_binpkg_args(loopback_sshd, binpkg)],
+        [str(mrg_binary), *_remote_binpkg_args(loopback_sshd, binpkg),
+         *_client_etc_args(tmp_path)],
         capture_output=True, text=True, check=False,
         env=_remote_env(fixture_env, loopback_sshd),
     )
@@ -1570,6 +1581,7 @@ def test_mrg_remote_bundle_unpacks_over_local_transport(
          "--remote-transport", "local",
          "--remote-root", str(root),
          "--remote-workdir", str(work),
+         *_client_etc_args(tmp_path),
          "--remote-binpkg", str(binpkg)],
         capture_output=True, text=True, check=False,
         env=fixture_env,
@@ -1590,7 +1602,7 @@ def _remote_rmpkg_args(sshd_client):
 
 
 def test_mrg_remote_phases_run_setup_then_preinst_on_the_client(
-    mrg_binary, fixture_env, loopback_sshd
+    mrg_binary, fixture_env, loopback_sshd, tmp_path
 ):
     """Slice-3 hooks over loopback ssh, now followed by the slice-4
     merge: the fixture's pkg_setup + pkg_preinst run on the client in
@@ -1598,7 +1610,8 @@ def test_mrg_remote_phases_run_setup_then_preinst_on_the_client(
     `setup-1.0\\npreinst-1.0\\npostinst-1.0\\n`), DEFINED_PHASES-gated,
     exit 0 with the phase report."""
     result = subprocess.run(
-        [str(mrg_binary), *_remote_rmpkg_args(loopback_sshd)],
+        [str(mrg_binary), *_remote_rmpkg_args(loopback_sshd),
+         *_client_etc_args(tmp_path)],
         capture_output=True, text=True, check=False,
         env=_remote_env(fixture_env, loopback_sshd),
     )
@@ -1625,6 +1638,7 @@ def test_mrg_remote_phases_run_over_local_transport(
          "--remote-transport", "local",
          "--remote-root", str(root),
          "--remote-workdir", str(tmp_path / "work"),
+         *_client_etc_args(tmp_path),
          "--remote-binpkg", str(binpkg)],
         capture_output=True, text=True, check=False,
         env=fixture_env,
@@ -1656,6 +1670,7 @@ def test_mrg_remote_merge_installs_a_fresh_package(
          "--remote-transport", "local",
          "--remote-root", str(root),
          "--remote-workdir", str(tmp_path / "work"),
+         *_client_etc_args(tmp_path),
          "--remote-binpkg", str(binpkg)],
         capture_output=True, text=True, check=False,
         env=fixture_env,
@@ -1683,7 +1698,8 @@ def test_mrg_remote_merge_replaces_a_same_slot_version(
     base = [str(mrg_binary),
             "--remote-hostname", "localtest",
             "--remote-transport", "local",
-            "--remote-root", str(root)]
+            "--remote-root", str(root),
+            *_client_etc_args(tmp_path)]
     first = subprocess.run(
         [*base, "--remote-workdir", str(tmp_path / "work1"),
          "--remote-binpkg", str(pkgdir / "binpkgrmpkg-1.0.tbz2")],
@@ -1706,13 +1722,14 @@ def test_mrg_remote_merge_replaces_a_same_slot_version(
     )
 
 def test_mrg_remote_merge_installs_over_loopback_ssh(
-    mrg_binary, fixture_env, loopback_sshd
+    mrg_binary, fixture_env, loopback_sshd, tmp_path
 ):
     """Slice-4 fresh merge over real SSH (light: unpack + phases + merge
     + vdb, no replace)."""
     binpkg = str(Path(FIXTURES_ROOT) / "pkgdir/dev-libs/binpkgrmpkg-1.0.tbz2")
     result = subprocess.run(
-        [str(mrg_binary), *_remote_binpkg_args(loopback_sshd, binpkg)],
+        [str(mrg_binary), *_remote_binpkg_args(loopback_sshd, binpkg),
+         *_client_etc_args(tmp_path)],
         capture_output=True, text=True, check=False,
         env=_remote_env(fixture_env, loopback_sshd),
     )
