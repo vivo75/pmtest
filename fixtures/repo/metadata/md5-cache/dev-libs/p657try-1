@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #657 (Try-Tiny with the Carp/Exporter plain virtual conjuncts)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=virtual/p657mm virtual/p657exp
+SLOT=0
+_md5_=0f40169ad77697be2d49816b48efba98

@@ -1,0 +1,1 @@
+|| ( =dev-libs/p647prov-5.42* ~dev-libs/p657mmcore-1 ) dev-libs/p647prov:= !<dev-libs/p657mmcore-1 !>dev-libs/p657mmcore-1-r999

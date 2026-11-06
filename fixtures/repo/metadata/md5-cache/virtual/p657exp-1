@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #657 (virtual/perl-Exporter shape: names =prov-5.44* first, then =prov-5.42*)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p647prov-5.44* =dev-libs/p647prov-5.42* ~dev-libs/p657expcore-1 ) dev-libs/p647prov:= !<dev-libs/p657expcore-1 !>dev-libs/p657expcore-1-r999
+SLOT=0
+_md5_=219638de792a36d74f95e261de9c6ed6
