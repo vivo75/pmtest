@@ -3174,6 +3174,9 @@ CASES = [
     ("#652: the N-form consumer request holds the dead virtual after post-skip re-resolution, so no Sub-Name fall-through merges (N p652foo + N p652try, R top under the holder pin with the skip WARNING, virtuals kept; Portage NF oracle + texlive bed cell, rc 0)", ["--pretend", "--verbose", "dev-perl/p651top", "dev-perl/p652try"], 0),
     ("#652: under the live merging transient the Encode fall-through merges while TH stays held with the early consumer in the request (N enccore + U prov + N early, no TH pin, virtuals kept; libreoffice/gimp bed cells, rc 0)", ["--pretend", "--verbose", "dev-perl/p652early", "dev-libs/p651prov"], 0),
     ("#656 leg (b): the pinned transient with the fresh Encode consumer merges the transient and the Encode fall-through while TH stays held, but the residual slot conflict still fails the resolve (p656zip + pinned p651prov-5.44.0: N enccore + U prov + N zip, no TH pin, virtuals kept; Portage P1 merges the same three rows and also fails -- parent-posture hold gate, rc 1)", ["--pretend", "--verbose", "dev-perl/p656zip", "=dev-libs/p651prov-5.44.0"], 1),
+    ("#611(a): a masked version carrying the required IUSE turns a Missing IUSE miss into the all-masked block (r594xtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "dev-libs/r594xtop"], 1),
+    ("#611(a): the same all-masked block with --autounmask=n (r594xtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask=n", "dev-libs/r594xtop"], 1),
+    ("#611(a): the same all-masked block with --backtrack=0 (r594xtop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--backtrack=0", "dev-libs/r594xtop"], 1),
 ]
 
 
@@ -38081,14 +38084,14 @@ def _594_run(emerge_binary, fixture_env, extra, atoms):
         (
             [],
             "r594etop",
-            'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/r594xdep[r594flag]"',
-            "(Missing IUSE: r594flag)",
+            '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]"',
+            "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)",
         ),
         (
             ["--autounmask=n"],
             "r594etop",
-            'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/r594xdep[r594flag]"',
-            "(Missing IUSE: r594flag)",
+            '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]"',
+            "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)",
         ),
     ],
 )
@@ -38106,9 +38109,11 @@ def test_594_use_only_miss_first_in_string_stops_with_no_restart(
     (`LLM/evidence/2026-10-26-575-residues/r3/captures/A-c-aun.txt`,
     `A-e.txt`, `A-e-aun.txt`). portuale also prints the masked block past
     Portage's stop point; that truncation belongs to #609's family and is
-    not pinned here. The `Missing IUSE` (rather than masked) header on the
-    `r594etop` shape is the r3 S0 display residue 1 (a masked instance
-    carrying the IUSE) and is pinned as-is.
+    not pinned here. On the `r594etop` shape the block is the all-masked
+    one, as in the captures: the keyword-masked `r594xdep-2` declares the
+    required flag, so Portage's `masked_with_iuse` (D:6918-6929) hands the
+    miss to the masked block (backlog #611(a); was the `Missing IUSE`
+    block before).
     """
     got, got_tries, rows = _594_run(emerge_binary, fixture_env, extra, [f"dev-libs/{atom}"])
     assert got.returncode == 1, got.stdout
@@ -38117,6 +38122,45 @@ def test_594_use_only_miss_first_in_string_stops_with_no_restart(
     text = got.stderr + got.stdout
     assert use_line in text, got.stderr
     assert change_line in text, got.stderr
+
+
+@pytest.mark.parametrize(
+    "extra,tries",
+    [([], "0/20"), (["--autounmask=n"], "0/20"), (["--backtrack=0"], "0/0")],
+    ids=["default", "autounmask-n", "backtrack-0"],
+)
+def test_611a_masked_version_with_the_iuse_prints_the_all_masked_block(
+    emerge_binary, fixture_env, extra, tries
+):
+    """Backlog #611(a): `r594xm-2` needs `dev-libs/r594xdep[r594flag]`; the
+    visible `r594xdep-1` lacks the flag, the keyword-masked `r594xdep-2`
+    declares it. Portage's `masked_with_iuse` (`_show_unsatisfied_dep`,
+    D:6918-6929) drops the `Missing IUSE` rows, so the all-masked block
+    prints (D:7015-7043), and the miss stays USE-only (D:3494-3499: no
+    backtrack filed). rc 1, no merge list.
+
+    Oracle: Portage 3.0.83 on this host, the fixture tree staged like the
+    bed, `emerge -p [--autounmask=n|--backtrack=0] dev-libs/r594xtop`
+    (portuale `LLM/evidence/2026-11-06-sweep/611a/`): the three runs print
+    the same block below."""
+    got, got_tries, rows = _594_run(emerge_binary, fixture_env, extra, ["dev-libs/r594xtop"])
+    assert got.returncode == 1, got.stdout
+    assert got_tries == tries, got.stdout
+    assert rows == [], got.stdout
+    # The contract env prints no ` for <ROOT>/` suffix (the bed adds it).
+    block = "\n".join([
+        '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]" have been masked.',
+        "!!! One of the following masked packages is required to complete your request:",
+        "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)",
+        "",
+        '(dependency required by "dev-libs/r594xm-2::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/r594xtop-1::testrepo" [ebuild])',
+        '(dependency required by "dev-libs/r594xtop" [argument])',
+        "For more information, see the MASKED PACKAGES section in the emerge",
+        "man page or refer to the Gentoo Handbook.",
+    ])
+    assert block in got.stderr, got.stderr
+    assert "no ebuilds built with USE flags" not in got.stderr, got.stderr
 
 
 @pytest.mark.parametrize("extra,tries", [([], "0/20"), (["--backtrack=1"], "0/1")])
