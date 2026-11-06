@@ -5349,6 +5349,43 @@ def test_deep_walk_visits_every_installed_slot_of_a_dependency(
     ]
 
 
+
+# Backlog #662: Portage's `display_problems` block for the installed
+# `omaskedinstalled-1.0` that `profiles/package.mask` hides but the
+# resolve keeps. Captured from Portage 3.0.83 (fixture oracle, see
+# `LLM/evidence/2026-11-06-662/` in portuale): header, the `- cpv::repo
+# (masked by: package.mask)` line, the masking file with its comment
+# block, a blank line, then the MASKED PACKAGES pointer.
+_OMASKED_INSTALLED_MASKED_BLOCK = (
+    "\n!!! The following installed packages are masked:\n"
+    "- dev-libs/omaskedinstalled-1.0::testrepo (masked by: package.mask)\n"
+    + "{root}/repo/profiles/package.mask:\n"
+    + "".join(
+        line + "\n"
+        for line in [
+            "# repo-level package.mask (the real Gentoo tree's own security/arch-mask",
+            "# mechanism) -- stacked ahead of the profile chain's own package.mask",
+            "# files and the user-level /etc/portage/package.mask, with -atom removal",
+            "# applying across all three sources, not just within one file.",
+            '# masters: an overlay with no explicit "masters =" implicitly masters',
+            "# this (the main) repo alone -- these two entries mask packages that",
+            "# exist ONLY in the overlay (never in this repo), so the only way",
+            "# either can end up masked is via that implicit master inheritance,",
+            "# not an ordinary same-repo mask.",
+            "# explicit masters= (repos.conf): independentoverlay declares",
+            '# "masters = overlay", NOT this (the main) repo -- this entry must NOT',
+            "# mask independentmastermainonlypkg (which exists only there), proving",
+            '# masters is no longer an unconditional "every overlay masters main"',
+            "# blanket rule.",
+            "# fixture: backlog #22 slice 4 (other_installed bin) -- masked despite",
+            "# being genuinely installed; see dev-libs/omasked's || group.",
+        ]
+    )
+    + "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
+    "man page or refer to the Gentoo Handbook.\n\n"
+)
+
+
 def test_or_group_other_installed_bin_beats_plain_other_in_the_allow_masked_pass(
     emerge_binary, fixture_env
 ):
@@ -5371,7 +5408,7 @@ def test_or_group_other_installed_bin_beats_plain_other_in_the_allow_masked_pass
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
     assert rust.stdout.splitlines() == [f'[ebuild  N     ] dev-libs/omasked-1.0 to {fixture_env["ROOT"]}']
-    assert rust.stderr == ""
+    assert rust.stderr == _OMASKED_INSTALLED_MASKED_BLOCK.format(root=fixture_env["ROOT"]), rust.stderr
     assert "omaskedmissing" not in rust.stdout, (
         "the plain-other alternative must never be the one selected"
     )
@@ -5388,7 +5425,7 @@ def test_update_deep_masked_installed_alternative_keeps_the_installed_instance(
     (`_select_pkg_highest_available_imp`, `depgraph.py:8525-8532`: "all
     are masked, so ignore visibility") and keeps the installed
     `omaskedinstalled-1.0`, warning "The following installed packages
-    are masked" (that warning itself is still missing: #611(d)).
+    are masked" (printed since #662: `_OMASKED_INSTALLED_MASKED_BLOCK`).
     Portuale's installed fallback (`outcome_fallbacks.rs`) skipped
     `||`-chosen edges, and the `--update` early return is skipped when
     an update is wanted, so the masked tree copy left
@@ -5406,6 +5443,10 @@ def test_update_deep_masked_installed_alternative_keeps_the_installed_instance(
         assert "(backtrack: 0/20)" in rust.full_stdout, (extra, rust.full_stdout)
         assert "omaskedmissing" not in rust.stdout, (
             "the plain-other alternative must never be the one selected"
+        )
+        assert rust.stderr == _OMASKED_INSTALLED_MASKED_BLOCK.format(root=fixture_env["ROOT"]), (
+            extra,
+            rust.stderr,
         )
 
 
