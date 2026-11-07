@@ -251,3 +251,77 @@ def test_refusal_names_why_portuale_would_not_run_the_plan():
     doc["slot_conflicts"] = [{}]
     doc["autounmask_use_changes"] = [{}]
     assert hc.refusal(doc) == "slot conflict, needs configuration changes"
+
+
+# --- blind spots found by mutating real plans (differential-test-bed/compare/health-mutants.py)
+
+def vdb_package(root, cpv, slot="0", rdepend=""):
+    cat, pkg, version = split(cpv)
+    d = root / cat / f"{pkg}-{version}"
+    d.mkdir(parents=True)
+    (d / "SLOT").write_text(slot + "\n")
+    (d / "RDEPEND").write_text(rdepend + "\n")
+
+
+def test_installed_package_missing_from_kept_breaks_its_dependants(tmp_path):
+    """delete_needed_kept: the VDB, not `kept`, says what was installed."""
+    vdb_package(tmp_path, "app-misc/k-1", rdepend="acct-group/adm")
+    vdb_package(tmp_path, "acct-group/adm-0")
+    doc = {"entries": [], "aborted": None,
+           "kept": [{"category": "app-misc", "package": "k", "version": "1", "slot": "0"}]}
+    found = hc.check_plan(doc, tmp_path)
+    assert [(f.property, f.atom, f.pre_existing) for f in found] == [
+        ("runtime-deps", "acct-group/adm", False)]
+
+
+def test_runtime_dep_of_a_build_dep_merged_too_late_is_flagged():
+    """late_runtime_of_build_dep (PMS 8.1: a DEPEND must be usable)."""
+    doc = plan([entry("dev-libs/y-1", 0, deps={"RDEPEND": "dev-libs/z"}),
+                entry("app-misc/x-1", 1, deps={"DEPEND": "dev-libs/y"}),
+                entry("dev-libs/z-1", 2)])
+    assert failures(doc) == [("build-order", "app-misc/x-1", "dev-libs/z")]
+
+
+def test_two_levels_of_runtime_deps_of_a_build_dep_are_followed():
+    """two_level_runtime_of_build_dep."""
+    doc = plan([entry("dev-libs/y-1", 0, deps={"RDEPEND": "dev-libs/z"}),
+                entry("dev-libs/z-1", 1, deps={"RDEPEND": "dev-libs/w"}),
+                entry("app-misc/x-1", 2, deps={"DEPEND": "dev-libs/y"}),
+                entry("dev-libs/w-1", 3)])
+    assert failures(doc) == [("build-order", "app-misc/x-1", "dev-libs/w")]
+
+
+def test_build_against_a_stale_slot_operator_consumer_is_flagged(tmp_path):
+    """stale_build_dep: x builds while the installed y is still bound to
+    the lib sub-slot the upgrade just removed; y is rebuilt only later."""
+    vdb_package(tmp_path, "dev-libs/lib-1", slot="0/1")
+    vdb_package(tmp_path, "dev-libs/y-1", rdepend="dev-libs/lib:0/1=")
+    doc = plan([entry("dev-libs/lib-2", 0, outcome="upgrade", from_version="1", sub_slot="2"),
+                entry("app-misc/x-1", 1, deps={"DEPEND": "dev-libs/y"}),
+                entry("dev-libs/y-1", 2, outcome="reinstall", deps={"RDEPEND": "dev-libs/lib:0/2="})])
+    found = [f for f in hc.check_plan(doc, tmp_path) if f.is_failure]
+    assert [(f.property, f.package, f.atom) for f in found] == [
+        ("build-order", "app-misc/x-1", "dev-libs/lib:0/1=")]
+    assert "met only by dev-libs/y-1, merged later" in found[0].reason
+
+
+def test_runtime_cycle_through_a_build_dep_is_noted_not_failed():
+    doc = plan([entry("app-misc/x-1", 0, deps={"DEPEND": "dev-libs/y", "RDEPEND": "dev-libs/y"}),
+                entry("dev-libs/y-1", 1, deps={"RDEPEND": "app-misc/x"})])
+    found = hc.check_plan(doc)
+    assert [(f.property, f.package) for f in found] == [("cycle-noted", "app-misc/x-1")]
+
+
+def test_build_time_blocker_is_checked_when_the_package_builds():
+    """keep_what_build_blocks: a DEPEND blocker does not outlive the build,
+    but must hold while it runs."""
+    doc = plan([entry("app-misc/a-1", 0, deps={"DEPEND": "!dev-libs/old"})],
+               [kept("dev-libs/old-1")])
+    assert failures(doc) == [("blocker", "app-misc/a-1", "!dev-libs/old")]
+
+
+def test_no_sub_slot_means_the_sub_slot_is_the_slot():
+    """drop_sub_slot (PMS 7.2)."""
+    doc = plan([entry("dev-libs/b-2", 0, outcome="upgrade", from_version="1")],
+               [kept("app-misc/k-1", deps={"RDEPEND": "dev-libs/b:0/1="})])
+    assert failures(doc) == [("runtime-deps", "app-misc/k-1", "dev-libs/b:0/1=")]

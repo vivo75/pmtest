@@ -1,0 +1,215 @@
+# L0 health, wide sample: varied invocations for run/l0-health.sh.
+# Portage is not run; every probe adds --ignore-default-opts --json.
+# A line starting with '-' is a whole argument list; any other line is
+# one or more atoms planned with `-pv`. `#:family NAME` starts a group
+# (health-report.py prints one table row per group).
+# The random atoms were drawn from the bed's gentoo md5-cache (stable
+# amd64 keyword, not installed), seed 20261107, 16 per stratum.
+
+#:family whole-graph
+-puvDN @world
+-puvD @world
+-pv --newuse @world
+-pvu --changed-use @world
+-pve @world
+-pve @system
+-puvD --with-bdeps=y @world
+-puvDN --with-bdeps=n @world
+-puv @system
+-puvD @system
+-puvD --complete-graph @world
+-pv --selective=n @world
+-puvDN --backtrack=0 @world
+-puvDN --exclude sys-devel/gcc @world
+
+#:family binpkg
+-puvDN --usepkg @world
+-pvk app-misc/tmux
+-puvDN --getbinpkg @world
+-pvg app-editors/vim
+-pvG dev-libs/libxml2
+
+#:family selective-nodeps
+-pv --selective=n sys-apps/portage
+-pv --selective=n app-misc/tmux dev-libs/blake3
+-pv --nodeps app-editors/vim
+-pv --nodeps kde-plasma/kwin
+-pv --nodeps dev-lang/python:3.14
+-pv --onlydeps app-editors/vim
+-pv --onlydeps kde-plasma/kwin
+-pv --onlydeps media-video/ffmpeg
+-pvD --with-bdeps=y media-video/ffmpeg
+-pve app-misc/tmux
+-pv --noreplace app-misc/tmux sys-apps/portage
+
+#:family remove
+-pvc
+-pvc app-portage/eix
+-pvC app-misc/tmux
+-pv --unmerge dev-libs/blake3
+-pv --prune sys-kernel/linux-headers
+
+#:family multi-atom
+dev-lang/python:3.13 dev-lang/python:3.14
+dev-qt/qtbase:6 dev-qt/qtdeclarative:6 kde-frameworks/kcoreaddons:6
+sys-apps/systemd sys-apps/openrc
+media-video/ffmpeg media-libs/x264 media-video/mpv
+dev-lang/rust dev-lang/rust-bin
+llvm-core/clang:19 llvm-core/clang:20
+app-editors/vim app-editors/gvim
+dev-lang/perl dev-perl/DBI dev-perl/libwww-perl
+dev-python/numpy dev-python/scipy dev-python/pandas
+x11-base/xorg-server gui-libs/wlroots dev-libs/wayland
+mail-mta/postfix mail-mta/exim
+net-misc/openssh net-misc/dropbear
+app-admin/sudo app-admin/doas
+sys-process/cronie sys-process/fcron
+net-misc/ntp net-misc/chrony
+sys-libs/ncurses sys-libs/readline app-shells/bash
+dev-libs/openssl dev-libs/libressl
+app-arch/xz-utils app-arch/zstd app-arch/lz4 sys-apps/kmod
+www-client/firefox www-client/firefox-bin
+dev-db/postgresql:17 dev-db/postgresql:18 dev-perl/DBD-Pg
+
+#:family slot-op-hand
+llvm-core/clang
+llvm-core/lld
+dev-lang/rust
+app-shells/fish
+dev-qt/qtdeclarative:6
+dev-qt/qtwebengine:6
+kde-frameworks/kio:6
+dev-python/cryptography
+dev-python/pillow
+dev-lang/perl
+dev-perl/XML-LibXML
+media-libs/mesa
+dev-libs/boost
+dev-libs/icu
+dev-lang/ruby
+
+#:family random-large
+media-sound/ardour
+net-irc/konversation
+kde-apps/kdepim-addons
+kde-plasma/plasma-desktop
+app-editors/retext
+dev-perl/Mail-DMARC
+sci-mathematics/octave
+media-video/handbrake
+dev-tex/biber
+dev-ruby/mail
+dev-ruby/console
+net-misc/spice-gtk
+app-misc/hivex
+media-libs/xine-lib
+app-i18n/uim
+dev-perl/PDL
+
+#:family random-small
+app-emulation/hercules-sdl-softfloat
+dev-libs/libigloo
+app-dicts/aspell-ny
+app-text/docbook-xml-simple-dtd
+sec-keys/openpgp-keys-libssh
+app-emacs/protbuf
+app-xemacs/zenirc
+app-emacs/keywiz
+media-fonts/gidole
+app-i18n/tegaki-zinnia-japanese
+x11-themes/xapp-symbolic-icon-theme
+app-text/libexttextcat
+net-mail/postfix-logwatch
+sec-keys/openpgp-keys-knot-resolver
+app-emacs/navi2ch
+dev-libs/tree-sitter-java
+
+#:family random-virtual
+virtual/pwsh
+virtual/ruby-ssl
+virtual/perl-parent
+virtual/commonlisp
+virtual/fortran
+virtual/perl-Term-ANSIColor
+virtual/perl-Term-Table
+virtual/ldb
+virtual/libelf
+virtual/dotnet-sdk
+virtual/podofo-build
+virtual/perl-Digest-SHA
+virtual/dist-kernel
+virtual/perl-IO-Socket-IP
+virtual/inetd
+virtual/perl-threads
+
+#:family random-slot-op
+dev-perl/DBD-Pg
+dev-perl/Crypt-Simple
+dev-perl/Template-Plugin-Latex
+dev-perl/CPAN-Perl-Releases
+dev-perl/Proc-Simple
+dev-perl/syntax
+dev-perl/Net-SSH-Perl
+dev-perl/XML-Filter-BufferText
+dev-perl/Test-Command
+dev-perl/Color-Library
+dev-perl/Readonly
+dev-perl/XML-DTDParser
+dev-perl/PPI-HTML
+dev-perl/Error
+dev-perl/Curses-UI
+dev-perl/CGI-Application-Server
+
+#:family random-required-use
+media-libs/libplacebo
+dev-ruby/mime-types
+dev-python/jaraco-itertools
+dev-libs/tree-sitter-cmake
+app-antivirus/clamav
+dev-python/netifaces
+dev-python/python-tlsh
+dev-python/pyqt-builder
+sec-policy/selinux-acct
+dev-python/rarfile
+sci-electronics/nvc
+gnome-extra/cinnamon-screensaver
+dev-ruby/facter
+sci-electronics/systemc
+app-dicts/myspell-de
+dev-python/py-cpuinfo
+
+#:family random-blocker
+kde-plasma/kwin
+kde-apps/kde-dev-utils
+app-admin/salt
+app-admin/fam
+gui-apps/waybar
+dev-python/gfloat
+dev-util/ruff
+dev-perl/Math-Random-ISAAC-XS
+media-sound/apulse
+media-gfx/fig2dev
+dev-libs/pocl
+kde-apps/artikulate
+dev-util/patchutils
+media-libs/mesa-amber
+app-admin/checksec
+dev-java/openjdk-bin
+
+#:family random-any-of
+sci-chemistry/gromacs
+app-admin/qtpass
+net-libs/libnetfilter_queue
+dev-tcltk/itcl
+net-news/alligator
+games-puzzle/gnome-tetravex
+dev-python/jeepney
+net-libs/meanwhile
+app-i18n/ibus-pinyin
+mail-client/evolution
+media-gfx/gimp
+gui-libs/libhandy
+dev-libs/ivykis
+net-dialup/mwavem
+net-libs/nghttp2
+www-client/uget

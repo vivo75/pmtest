@@ -33,5 +33,5 @@ podman_run_pm "porttest-l0-health-$$" "${MIRROR_ENV[@]}" \
   --entrypoint /bin/bash "$IMAGE" \
   /TEST/layers/l0-health/in-container.sh "$REL_ATOMLIST" "/TEST/logs/$RUN"
 
-python3 "$TEST_DIR/compare/health-report.py" "$OUT/health.jsonl" | tee "$OUT/health-report.txt"
+python3 "$TEST_DIR/compare/health-report.py" "$OUT/health.jsonl" "$OUT/meta.tsv" | tee "$OUT/health-report.txt"
 exit "${PIPESTATUS[0]}"

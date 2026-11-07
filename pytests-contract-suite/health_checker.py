@@ -14,8 +14,14 @@ Properties, from portuale's charter (PMS-based, no Portage involved):
    slot holds two packages.
 2. Order is legal: every DEPEND/BDEPEND/IDEPEND atom of a merged package is
    matched by a package present when it is merged (installed, or merged
-   earlier). An atom only a later package of the same build-time cycle can
-   match is noted as an unserializable cycle, not reported as a failure.
+   earlier), and that package is usable (PMS 8.1): its RDEPEND closure is
+   met by then too, and no DEPEND/BDEPEND blocker matches a package present
+   at that moment. A need only a later package of the same cycle can meet
+   (build-time and runtime edges between merges) is noted as an
+   unserializable cycle, not reported as a failure.
+
+With a VDB, the system before the plan is the VDB itself, not the plan's
+`kept` list, so an installed package the plan silently drops is seen.
 
 The atom matcher, version comparison and dependency-string evaluator below
 are written from PMS and share no code with portuale or Portage.
@@ -33,6 +39,7 @@ import functools
 import json
 import re
 import sys
+import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -241,8 +248,8 @@ def matches(atom: Atom, pkg: Package, parent_use: frozenset = frozenset()) -> bo
         return False
     if atom.slot and atom.slot != pkg.slot:
         return False
-    if atom.subslot and pkg.subslot and atom.subslot != pkg.subslot:
-        return False
+    if atom.subslot and atom.subslot != (pkg.subslot or pkg.slot):
+        return False  # PMS 7.2: no sub-slot means the sub-slot is the slot
     return _use_deps_hold(atom, pkg, parent_use)
 
 
@@ -402,8 +409,10 @@ def _split_slot(slot: str) -> tuple[str, str]:
     return main, sub
 
 
+@functools.lru_cache(maxsize=None)
 def read_vdb(vdb: Path | None, category: str, package: str, version: str) -> dict | None:
-    """One installed package's VDB record as a `kept`-style dict, or None."""
+    """One installed package's VDB record as a `kept`-style dict, or None.
+    Cached: callers must not mutate the result."""
     if vdb is None:
         return None
     d = vdb / category / f"{package}-{version}"
@@ -424,6 +433,17 @@ def read_vdb(vdb: Path | None, category: str, package: str, version: str) -> dic
     }
 
 
+@functools.lru_cache(maxsize=None)
+def installed_cpvs(vdb: Path) -> tuple[tuple[str, str, str], ...]:
+    """(category, package, version) of every package in the VDB."""
+    out = []
+    for d in sorted(vdb.glob("*/*")):
+        m = re.match(r"^(.+?)-(\d[^-]*(?:-r\d+)?)$", d.name)
+        if d.is_dir() and m and is_version(m.group(2)):
+            out.append((d.parent.name, m.group(1), m.group(2)))
+    return tuple(out)
+
+
 def _package(category, package, version, slot, data: dict | None, binary=False) -> Package:
     known = data is not None and "dependencies" in data
     data = data or {}
@@ -441,6 +461,7 @@ class Plan:
     merges: list[tuple[int, Package]]  # (merge order, package)
     kept: list[Package]
     replaced: list[tuple[int, Package]]  # installed, removed at that merge order
+    dropped: list[Package] = field(default_factory=list)  # in the VDB, not kept or replaced
 
     @property
     def final(self) -> list[Package]:
@@ -448,7 +469,7 @@ class Plan:
 
     @property
     def initial(self) -> list[Package]:
-        return self.kept + [p for _, p in self.replaced]
+        return self.kept + [p for _, p in self.replaced] + self.dropped
 
     def available_at(self, order: int) -> list[Package]:
         """What is installed when the merge at `order` starts."""
@@ -472,7 +493,11 @@ def load_plan(doc: dict, vdb: Path | None = None) -> Plan:
     kept = [_package(k["category"], k["package"], k["version"], k["slot"],
                      k if "dependencies" in k else read_vdb(vdb, k["category"], k["package"], k["version"]))
             for k in doc.get("kept", [])]
-    return Plan(merges, kept, replaced)
+    known = {p.cpv for p in kept} | {p.cpv for _, p in replaced}
+    dropped = [] if vdb is None else [
+        _package(c, p, v, "", read_vdb(vdb, c, p, v)) for c, p, v in installed_cpvs(vdb)
+        if f"{c}/{p}-{v}" not in known]
+    return Plan(merges, kept, replaced, dropped)
 
 
 # --- the checks --------------------------------------------------------------
@@ -518,16 +543,31 @@ def _build_atoms(pkg: Package) -> list:
     return [(c, node) for c in classes for node in _reduced(pkg, c)]
 
 
-def _build_graph(plan: Plan) -> dict[int, set[int]]:
-    """order -> orders of merged packages one of its build-time atoms names."""
-    merges: dict = {}
+def _merges_by_cp(plan: Plan) -> dict:
+    out: dict = {}
     for order, pkg in plan.merges:
-        merges.setdefault(pkg.cp, []).append((order, pkg))
+        out.setdefault(pkg.cp, []).append((order, pkg))
+    return out
+
+
+def _matching_merges(by_cp: dict, nodes: list, parent: Package) -> set[int]:
+    """Orders of the merges matching any plain atom of `nodes`."""
+    return {o for a in _plain_atoms(nodes) for o, p in by_cp.get(a.cp, ())
+            if matches(a, p, parent.use)}
+
+
+def _build_graph(plan: Plan) -> dict[int, set[int]]:
+    """order -> orders of the merges that must be usable before it: those its
+    build-time atoms name (to build it) and those its RDEPEND names (for it
+    to be usable), unless an installed package meets the atom already. A
+    cycle in this graph cannot be serialized."""
+    by_cp, initial = _merges_by_cp(plan), index(plan.initial)
     graph = {}
     for order, pkg in plan.merges:
-        atoms = [a for _, node in _build_atoms(pkg) for a in _plain_atoms([node])]
-        graph[order] = {o for a in atoms for o, other in merges.get(a.cp, ())
-                        if o != order and matches(a, other, pkg.use)}
+        nodes = [n for _, n in _build_atoms(pkg)] + _reduced(pkg, "RDEPEND")
+        needs = [[("atom", a) for a in atoms] for atoms in _choices(nodes)
+                 if not any(matches(a, p, pkg.use) for a in atoms for p in initial.get(a.cp, ()))]
+        graph[order] = {o for n in needs for o in _matching_merges(by_cp, n, pkg)} - {order}
     return graph
 
 
@@ -567,31 +607,121 @@ def _components(graph: dict[int, set[int]]) -> dict[int, int]:
     return comp
 
 
+def _order_finding(plan: Plan, component, order: int, pkg: Package, node,
+                   what: str, owner: Package | None = None, later=None) -> Finding:
+    """A build-time need of `pkg` (merged at `order`) that is not met when it
+    starts: noted as a cycle when a later package of its cycle meets it.
+    `owner` is the package whose dependency `node` is (default: `pkg`);
+    `later` the merges that would meet it (default: those matching `node`)."""
+    if later is None:
+        later = sorted((o, p) for o, p in plan.merges if o > order
+                       and o in _matching_merges(_merges_by_cp(plan), [node], owner or pkg))
+    if any(component.get(o) == component[order] for o, _ in later):
+        return Finding("cycle-noted", pkg.cpv, render(node),
+                       f"{what} is only met by a later package of the same cycle")
+    if later:
+        return Finding("build-order", pkg.cpv, render(node),
+                       f"{what} is met only by {later[0][1].cpv}, merged later "
+                       f"(#{later[0][0]} > #{order}): merge it first")
+    return Finding("build-order", pkg.cpv, render(node),
+                   f"{what} is not matched by anything installed or merged before it")
+
+
+def _choices(nodes: list) -> list[list[Atom]]:
+    """The atoms of a reduced tree as lists of alternatives, one of each
+    list to be met (an `all` group splits, an `any` group is one list)."""
+    out = []
+    for node in nodes:
+        if node[0] == "atom":
+            out += [] if node[1].blocker else [[node[1]]]
+        elif node[0] == "all":
+            out += _choices(node[1])
+        else:
+            out.append(_plain_atoms([node]))
+    return out
+
+
+@dataclass
+class _Moment:
+    """The system when one merge starts, for the usability walk."""
+
+    available: Index
+    initial: Index
+    merged: set  # id() of the packages the plan merges
+    gaps: dict = field(default_factory=dict)  # id(package) -> its gap, or None
+
+    def providers(self, atoms: list[Atom], parent: Package) -> list[Package]:
+        return [p for a in atoms for p in self.available.get(a.cp, ()) if matches(a, p, parent.use)]
+
+    def gap(self, pkg: Package) -> tuple[Package, tuple] | None:
+        """Why `pkg` is not usable now (PMS 8.1): the first package in its
+        RDEPEND closure with an RDEPEND atom the plan left unmet, and that
+        atom. An atom an installed package already missed before the plan
+        does not count; a runtime cycle counts as usable."""
+        if id(pkg) in self.gaps:
+            return self.gaps[id(pkg)]
+        self.gaps[id(pkg)] = None  # a cycle back here counts as usable
+        found = None
+        for node in _reduced(pkg, "RDEPEND"):
+            if not _satisfied(node, self.available, pkg):
+                if id(pkg) in self.merged or _satisfied(node, self.initial, pkg):
+                    found = (pkg, node)
+                    break
+                continue
+            for atoms in _choices([node]):
+                sub = [self.gap(p) for p in self.providers(atoms, pkg)]
+                if sub and all(sub):
+                    found = sub[0]
+                    break
+            if found:
+                break
+        self.gaps[id(pkg)] = found
+        return found
+
+
+def _unusable(node, moment: _Moment, pkg: Package) -> tuple[Package, tuple] | None:
+    """When no package meeting build-time `node` of `pkg` is usable: the
+    first gap found."""
+    for atoms in _choices([node]):
+        gaps = [moment.gap(p) for p in moment.providers(atoms, pkg)]
+        if gaps and all(gaps):
+            return gaps[0]
+    return None
+
+
+def _build_blockers(pkg: Package, available: Index) -> list[tuple[Atom, Package]]:
+    """DEPEND/BDEPEND blockers of `pkg` matching a package present when it builds."""
+    return [hit for c in BUILD_CLASSES for hit in _blocker_hits(_reduced(pkg, c), available, pkg)]
+
+
 def check_order(plan: Plan) -> list[Finding]:
-    """Property 2: build-time atoms are matched when each merge starts."""
+    """Property 2: build-time atoms are matched, by usable packages, when
+    each merge starts."""
     component = _components(_build_graph(plan))
+    merged = {id(p) for _, p in plan.merges}
+    initial = index(plan.initial)
     findings = []
     for order, pkg in plan.merges:
         available = index(plan.available_at(order))
+        moment = _Moment(available, initial, merged)
+        if not pkg.binary:
+            findings += [Finding("blocker", pkg.cpv, atom.text,
+                                 f"build-time blocker: {hit.cpv} is installed when it builds")
+                         for atom, hit in _build_blockers(pkg, available)]
         for dep_class, node in _build_atoms(pkg):
-            if _satisfied(node, available, pkg):
+            if not _satisfied(node, available, pkg):
+                findings.append(_order_finding(plan, component, order, pkg, node, dep_class))
                 continue
-            atoms = _plain_atoms([node])
-            later = [(o, p) for o, p in plan.merges
-                     if o > order and any(matches(a, p, pkg.use) for a in atoms)]
-            if any(component.get(o) == component[order] for o, _ in later):
-                findings.append(Finding(
-                    "cycle-noted", pkg.cpv, render(node),
-                    f"{dep_class} is only met by a later package of the same build-time cycle"))
-            elif later:
-                findings.append(Finding(
-                    "build-order", pkg.cpv, render(node),
-                    f"{dep_class} is met only by {later[0][1].cpv}, merged later "
-                    f"(#{later[0][0]} > #{order}): merge it first"))
-            else:
-                findings.append(Finding(
-                    "build-order", pkg.cpv, render(node),
-                    f"{dep_class} is not matched by anything installed or merged before it"))
+            hit = _unusable(node, moment, pkg)
+            if hit:
+                provider, unmet = hit
+                # An installed copy the plan rebuilds later is fixed by that rebuild.
+                rebuild = [(o, p) for o, p in plan.merges if o > order and any(
+                    r is provider and ro == o for ro, r in plan.replaced)]
+                findings.append(_order_finding(
+                    plan, component, order, pkg, unmet,
+                    f"{dep_class} {render(node)} is not usable yet: RDEPEND of {provider.cpv}",
+                    provider, rebuild or None))
     return findings
 
 
@@ -643,7 +773,9 @@ def main(argv: list[str]) -> int:
         elif doc.get("aborted"):
             record["skipped"] = f"plan aborted: {doc['aborted'].get('reason')}"
         else:
+            start = time.monotonic()
             findings = check_plan(doc, vdb)
+            record["seconds"] = round(time.monotonic() - start, 3)
             record["findings"] = [asdict(f) for f in findings]
             record["refused"] = refusal(doc)
             failed |= not record["refused"] and any(
