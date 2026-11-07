@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #609 LIFO stop r594hb-2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/maskeddep
+SLOT=0
+_md5_=4b41cf546fa81cceb638fef26b3c13e5

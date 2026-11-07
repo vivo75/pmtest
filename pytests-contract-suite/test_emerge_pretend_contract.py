@@ -3177,6 +3177,12 @@ CASES = [
     ("#611(a): a masked version carrying the required IUSE turns a Missing IUSE miss into the all-masked block (r594xtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "dev-libs/r594xtop"], 1),
     ("#611(a): the same all-masked block with --autounmask=n (r594xtop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--autounmask=n", "dev-libs/r594xtop"], 1),
     ("#611(a): the same all-masked block with --backtrack=0 (r594xtop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--backtrack=0", "dev-libs/r594xtop"], 1),
+    ("#609: --backtrack=0 stops at the first unsatisfied dependency, so the slot conflict behind it never prints (r592atop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r592atop"], 1),
+    ("#609: Portage's walk stops at the USE miss of the last-listed dependency, so the masked dependency of the first never prints (r594qtop --autounmask=n, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r594qtop"], 1),
+    ("#609: the masked dependency of the last-listed parent stops the walk before the other masked dependency (r594htop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "dev-libs/r594htop"], 1),
+    ("#609: the same stop with --autounmask=n (r594htop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r594htop"], 1),
+    ("#609: the same stop with --backtrack=0 (r594htop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594htop"], 1),
+    ("#609: the masked dependency first in the string stops the walk with --backtrack=0 (r594etop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594etop"], 1),
 ]
 
 
@@ -38107,9 +38113,9 @@ def test_594_use_only_miss_first_in_string_stops_with_no_restart(
     Oracle: Portage 3.0.83 `emerge -pv [--autounmask=n] dev-libs/r594ctop`
     / `dev-libs/r594etop`
     (`LLM/evidence/2026-10-26-575-residues/r3/captures/A-c-aun.txt`,
-    `A-e.txt`, `A-e-aun.txt`). portuale also prints the masked block past
-    Portage's stop point; that truncation belongs to #609's family and is
-    not pinned here. On the `r594etop` shape the block is the all-masked
+    `A-e.txt`, `A-e-aun.txt`). Nothing past Portage's stop point prints:
+    the `maskeddep` block the same string names is absent (backlog #609,
+    the fail-fast cut of the final result). On the `r594etop` shape the block is the all-masked
     one, as in the captures: the keyword-masked `r594xdep-2` declares the
     required flag, so Portage's `masked_with_iuse` (D:6918-6929) hands the
     miss to the masked block (backlog #611(a); was the `Missing IUSE`
@@ -38122,6 +38128,7 @@ def test_594_use_only_miss_first_in_string_stops_with_no_restart(
     text = got.stderr + got.stdout
     assert use_line in text, got.stderr
     assert change_line in text, got.stderr
+    assert "dev-libs/maskeddep" not in text, got.stderr
 
 
 @pytest.mark.parametrize(
@@ -38161,6 +38168,95 @@ def test_611a_masked_version_with_the_iuse_prints_the_all_masked_block(
     ])
     assert block in got.stderr, got.stderr
     assert "no ebuilds built with USE flags" not in got.stderr, got.stderr
+
+
+_609_CHAIN = '(dependency required by "dev-libs/{top}-1::testrepo" [ebuild])\n(dependency required by "dev-libs/{top}" [argument])'
+
+
+@pytest.mark.parametrize(
+    "extra,atom,tries,head,parent",
+    [
+        (
+            ["--backtrack=0"],
+            "r592atop",
+            "0/0",
+            'emerge: there are no ebuilds to satisfy "dev-libs/r592agone".',
+            "r592ay-2",
+        ),
+        (
+            ["--autounmask=n"],
+            "r594qtop",
+            "0/20",
+            'emerge: there are no ebuilds built with USE flags to satisfy "dev-libs/r594vdep[r594flag]".\n'
+            "!!! One of the following packages is required to complete your request:\n"
+            "- dev-libs/r594vdep-1::testrepo (Change USE: +r594flag)",
+            "r594qa-2",
+        ),
+        (
+            [],
+            "r594htop",
+            "0/20",
+            '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]" have been masked.\n'
+            "!!! One of the following masked packages is required to complete your request:\n"
+            "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)\n",
+            "r594ha-2",
+        ),
+        (
+            ["--autounmask=n"],
+            "r594htop",
+            "0/20",
+            '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]" have been masked.\n'
+            "!!! One of the following masked packages is required to complete your request:\n"
+            "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)\n",
+            "r594ha-2",
+        ),
+        (
+            ["--backtrack=0"],
+            "r594htop",
+            "0/0",
+            '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]" have been masked.\n'
+            "!!! One of the following masked packages is required to complete your request:\n"
+            "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)\n",
+            "r594ha-2",
+        ),
+        (
+            ["--backtrack=0"],
+            "r594etop",
+            "0/0",
+            '!!! All ebuilds that could satisfy "dev-libs/r594xdep[r594flag]" have been masked.\n'
+            "!!! One of the following masked packages is required to complete your request:\n"
+            "- dev-libs/r594xdep-2::testrepo (masked by: ~amd64 keyword)\n",
+            "r594em-2",
+        ),
+    ],
+    ids=["r592a-bt0", "r594q-aun", "r594h", "r594h-aun", "r594h-bt0", "r594e-bt0"],
+)
+def test_609_final_result_stops_at_portages_first_failure(
+    emerge_binary, fixture_env, extra, atom, tries, head, parent
+):
+    """Backlog #609: Portage's `_create_graph` pops `_dep_stack` LIFO and
+    returns 0 at the first failing dependency (depgraph.py D:3269-3284,
+    `_add_dep` D:3535), so only that dependency is reported, with one
+    chain, and nothing the walk would have met later prints: no slot
+    conflict (`r592atop`: `ay-2` is popped before `ax-2` and fails on
+    `r592agone`), no second masked block (`r594qtop`/`r594htop` list the
+    `maskeddep` parent first, so it is popped last). A missing-dependency
+    restart is filed only for the dependency the walk stopped at; a
+    USE-only stop files none (D:3488-3499), hence `0/20`.
+
+    Oracle: Portage 3.0.83 on this host, the fixture tree staged like the
+    bed (`emerge -pv [--backtrack=0|--autounmask=n] dev-libs/<atom>`,
+    captures `LLM/evidence/2026-11-06-sweep/609/` in portuale): each run
+    prints exactly the block below, rc 1, no merge list."""
+    got, got_tries, rows = _594_run(emerge_binary, fixture_env, extra, [f"dev-libs/{atom}"])
+    assert got.returncode == 1, got.stdout
+    assert got_tries == tries, got.stdout
+    assert rows == [], got.stdout
+    chain = f'(dependency required by "dev-libs/{parent}::testrepo" [ebuild])\n' + _609_CHAIN.format(top=atom)
+    assert head + "\n" + chain in got.stderr, got.stderr
+    assert "dev-libs/maskeddep" not in got.stderr, got.stderr
+    assert "Multiple package instances" not in got.stderr + got.stdout, got.stderr
+    assert got.stderr.count("(dependency required by") == 3, got.stderr
 
 
 @pytest.mark.parametrize("extra,tries", [([], "0/20"), (["--backtrack=1"], "0/1")])

@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #609 LIFO stop r594ha-1
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=d3cadb66fde1548ac4d27f86898191bb
