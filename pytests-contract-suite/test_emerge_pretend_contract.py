@@ -3187,6 +3187,7 @@ CASES = [
     ("#603: the w603 fixtures resolve in the shared ROOT, where nothing of them is installed (the world-only consumer shape needs its own ROOT: test_603_*)", ["--pretend", "dev-libs/w603lib"], 0),
     ("#603: the consumer's plain atom picks the oldest w603lib in the shared ROOT", ["--pretend", "app-misc/w603cons"], 0),
     ("#602: the w602 slot conflict with the complete-graph switches off, in the shared ROOT where no consumer is installed (the world-consumer shape needs its own ROOT: test_602_*)", ["--pretend", "--complete-graph-if-new-ver=n", "--complete-graph-if-new-use=n", "--rebuild-if-new-slot=n", "=dev-libs/w602prov-2", "dev-libs/w602s", "app-misc/w602a"], 0),
+    ("#605/#671: the w605 fixtures in the shared ROOT, where no w605 consumer is installed (the consumer shapes need their own ROOT: test_605_*)", ["--pretend", "--verbose", "=dev-libs/w605x-2"], 0),
 ]
 
 
@@ -38818,3 +38819,74 @@ def test_602_slot_conflict_while_backtracking_enters_complete_mode(
         f"ebuild scheduled for merge to '{root}')"
     )
     assert (skip_row in got.stdout) is ("dev-libs/w602s" in args), got.stdout
+
+
+_605_X1 = ("dev-libs", "w605x", "1", "0", {"EAPI": "8", "IUSE": "w605flag", "USE": "w605flag"})
+
+
+@pytest.mark.parametrize(
+    "installed,world,conflict",
+    [
+        (
+            [("dev-libs", "w605y", "1", "0", {"EAPI": "8"}),
+             ("app-misc", "w605cona", "1", "0",
+              {"EAPI": "8", "RDEPEND": "|| ( dev-libs/w605x[w605flag] dev-libs/w605y )"})],
+            "app-misc/w605cona",
+            None,
+        ),
+        (
+            [("app-misc", "w605conb", "1", "0",
+              {"EAPI": "8", "RDEPEND": "|| ( dev-libs/w605x[w605flag] dev-libs/w605w )"})],
+            "app-misc/w605conb",
+            "w605conb",
+        ),
+        (
+            [("app-misc", "w605conc", "1", "0",
+              {"EAPI": "8", "RDEPEND": "dev-libs/w605x[w605flag]"})],
+            "app-misc/w605conc",
+            "w605conc",
+        ),
+    ],
+    ids=["A-or-kept-installed-arm", "B-or-no-other-arm", "C-plain"],
+)
+def test_605_unwalked_consumer_use_dep_broken_by_an_upgrade(
+    emerge_binary, fixture_env, tmp_path, installed, world, conflict
+):
+    """#605 + #671: installed `w605x-1` built with `w605flag`; `w605x-2` merges
+    with the flag off (profile default); one world consumer per cell, in an
+    ad-hoc ROOT.
+
+    Oracle: host Portage 3.0.83 `emerge -pv =dev-libs/w605x-2` with the same argv
+    on a scratch copy of the fixtures (portuale
+    `LLM/evidence/2026-11-06-sweep/605/`, `A-pv`, `B-pv`, `C-pv`). Complete mode
+    walks the consumer. Its `[use]` atom still matches the installed `w605x-1`,
+    so `_complete_graph` pulls it back in: a slot conflict, rc 1, with
+    "Change USE: +w605flag" (`depgraph.py` 8807-8834; #671, cells B and C;
+    portuale printed a plain `U` and rc 0). In cell A the post-merge `||` view
+    judges `w605x[w605flag]` against the `w605x-2` node's own USE
+    (`dep_check.py` 492-495, #605), so the installed `w605y` arm is taken and
+    there is no conflict. The conflict-block header and the merge instance's
+    line are not pinned: portuale drops their ` for <ROOT>` / ` to '<ROOT>'`
+    suffix there (backlog #672)."""
+    root = _b1_root(tmp_path, [world], [_605_X1, *installed])
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", "--verbose", "=dev-libs/w605x-2"], env)
+    rows = [ln.removesuffix(" 0 KiB").rstrip() for ln in _b1_merges(got.stdout)]
+    assert rows == [
+        f'[ebuild     U  ] dev-libs/w605x-2::testrepo [1::testrepo] to {root} USE="-w605flag*"'
+    ], got.stdout
+    assert "(backtrack: 0/20)" in got.full_stdout, got.full_stdout
+    if conflict is None:
+        assert got.returncode == 0, got.stdout
+        assert "Multiple package instances" not in got.stdout, got.stdout
+        return
+    assert got.returncode == 1, got.stdout
+    for line in [
+        "!!! Multiple package instances within a single package slot have been pulled",
+        "    =dev-libs/w605x-2 (Argument)",
+        f"  (dev-libs/w605x-1:0/0::testrepo, installed in '{root}') USE=\"w605flag\" pulled in by",
+        f"    dev-libs/w605x[w605flag] required by (app-misc/{conflict}-1:0/0::testrepo, "
+        f"installed in '{root}') USE=\"\"",
+        "   - dev-libs/w605x-2 (Change USE: +w605flag)",
+    ]:
+        assert line in got.stdout.splitlines(), (line, got.stdout)

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #605 [use] of an unwalked installed consumer w605x-2
+EAPI=8
+IUSE=w605flag
+KEYWORDS=amd64
+SLOT=0
+_md5_=b5fe0b5e6f2dfeb496e7cfc6d5abf087
