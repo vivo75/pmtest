@@ -3184,6 +3184,8 @@ CASES = [
     ("#609: the same stop with --backtrack=0 (r594htop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594htop"], 1),
     ("#609: the masked dependency first in the string stops the walk with --backtrack=0 (r594etop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594etop"], 1),
     ("#611(e): the USE change prints before the masked dependency block (r594qtop --backtrack=0, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594qtop"], 1),
+    ("#603: the w603 fixtures resolve in the shared ROOT, where nothing of them is installed (the world-only consumer shape needs its own ROOT: test_603_*)", ["--pretend", "dev-libs/w603lib"], 0),
+    ("#603: the consumer's plain atom picks the oldest w603lib in the shared ROOT", ["--pretend", "app-misc/w603cons"], 0),
 ]
 
 
@@ -38668,3 +38670,62 @@ def test_skipped_update_block_names_every_installed_consumer(
         "no complete-graph walk in this request: the out-of-graph consumer "
         "must stay unlisted, as in Portage's own capture"
     )
+
+
+_603_SWITCHES_OFF = [
+    "--complete-graph-if-new-ver=n",
+    "--complete-graph-if-new-use=n",
+    "--rebuild-if-new-slot=n",
+]
+
+
+@pytest.mark.parametrize(
+    "lib,world,args,rows,tries,skipped",
+    [
+        ("3", ["app-misc/w603cons"], ["dev-libs/w603lib"],
+         ["[ebuild     U  ] dev-libs/w603lib-3.1 [3] to {root}"], "0/20", False),
+        ("3", ["app-misc/w603cons", "dev-libs/w603lib"], ["--update", "@world"],
+         ["[ebuild     U  ] dev-libs/w603lib-3.1 [3] to {root}"], "0/20", False),
+        ("3", ["app-misc/w603cons"], [*_603_SWITCHES_OFF, "dev-libs/w603lib"],
+         ["[ebuild     U  ] dev-libs/w603lib-3.1 [3] to {root}"], "0/20", False),
+        ("1", ["app-misc/w603cons"], ["dev-libs/w603lib"],
+         ["[ebuild   R    ] dev-libs/w603lib-1 to {root}"], "1/20", True),
+    ],
+    ids=["plain", "update-world", "switches-off", "installed-match-pins"],
+)
+def test_603_unwalked_consumer_atom_matching_nothing_installed_does_not_pin(
+    emerge_binary, fixture_env, tmp_path, lib, world, args, rows, tries, skipped
+):
+    """#603: installed `w603lib-<lib>` and the world-only installed consumer
+    `w603cons-1` (`RDEPEND="<dev-libs/w603lib-2"`), in an ad-hoc ROOT.
+
+    Oracle: host Portage 3.0.83 with the same argv on a scratch copy of the
+    fixtures (portuale `LLM/evidence/2026-11-06-sweep/603/`, `plain`,
+    `pu-world`, `nocomplete`, `matching`). Complete mode walks the consumer
+    from @world; with `w603lib-3` installed its atom matches no installed
+    package, so `_complete_graph` files it as initially unsatisfied and it
+    never pins (`depgraph.py` 8797-8806): `U w603lib-3.1`, 0/20, no skip
+    block. With `w603lib-1` installed the atom matches, the installed instance
+    is added and the conflict forms (8807-8834): `R w603lib-1`, 1/20, skip row.
+    portuale used to print `UD w603lib-1 [3]` and the skip block for the
+    first three cells."""
+    root = _b1_root(
+        tmp_path,
+        world,
+        [
+            ("dev-libs", "w603lib", lib, "0", {"EAPI": "8"}),
+            ("app-misc", "w603cons", "1", "0", {"EAPI": "8", "RDEPEND": "<dev-libs/w603lib-2"}),
+        ],
+    )
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", *args], env)
+    assert got.returncode == 0, got.stderr
+    assert f"(backtrack: {tries})" in got.full_stdout, got.full_stdout
+    w603 = [ln for ln in _b1_merges(got.stdout) if "w603" in ln]
+    assert w603 == [r.format(root=root) for r in rows], got.stdout
+    skip_row = (
+        "<dev-libs/w603lib-2 required by (app-misc/w603cons-1:0/0::testrepo, "
+        f"installed in '{root}')"
+    )
+    assert (skip_row in got.stdout) is skipped, got.stdout
+    assert ("WARNING: One or more updates/rebuilds have been skipped" in got.stdout) is skipped

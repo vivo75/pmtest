@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #603 unwalked consumer, no installed match w603lib-3
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=20fbb7fa66afed3eec3f98cb7c84f2d5
