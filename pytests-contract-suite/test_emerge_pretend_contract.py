@@ -3212,6 +3212,135 @@ def _assert_abort_preamble(stdout: str) -> None:
 # root from `PORTAGE_RUNNING_ROOT` (default `/`). The `_all_masked*` helpers
 # read it so a test with its own ROOT pins the full Portage line.
 _LAST_ROOT_SUFFIX = ""
+# The config root of the last `_run` call: the `package.mask` file a masked
+# row's note names is printed under it (backlog #611(c)).
+_LAST_CONFIG_ROOT = ""
+
+
+# Backlog #611(c): the `package.mask` file (relative to the config root) and
+# the comment above the matching entry that Portage's `show_masked_packages`
+# (`lib/_emerge/depgraph.py:12632-12690`) prints under a `package.mask` row.
+# Copied from host Portage 3.0.83's output on a copy of this fixture tree
+# (portuale `LLM/evidence/2026-11-06-sweep/611c/`), not derived here.
+_MASK_NOTES = {
+    'dev-libs/maskeddep-1.0::testrepo': (
+        'etc/portage/package.mask',
+        [
+            '# fixture package.mask: two atoms stay masked, one is added then removed',
+            '# again via "-atom" to exercise removal within this same source, and a',
+            '# fourth "-atom" line removes an entry the repo-level',
+            '# repo/profiles/package.mask added, not this file -- proving -atom',
+            '# removal now applies across all three real sources (repo, profile',
+            '# chain, user), not just within the user-level file alone.',
+            '# fixture package.mask for the masked-dependency disclosure slice:',
+            '# dev-libs/maskeddep stays masked so a dependency on it reports the',
+            '# "All ebuilds ... have been masked" block (never unmasked anywhere).',
+        ],
+    ),
+    'dev-libs/hardmaskedpkg-1.0::testrepo': (
+        'etc/portage/package.mask',
+        [
+            '# fixture package.mask: two atoms stay masked, one is added then removed',
+            '# again via "-atom" to exercise removal within this same source, and a',
+            '# fourth "-atom" line removes an entry the repo-level',
+            '# repo/profiles/package.mask added, not this file -- proving -atom',
+            '# removal now applies across all three real sources (repo, profile',
+            '# chain, user), not just within the user-level file alone.',
+        ],
+    ),
+    'dev-libs/independentmasteroverlaypkg-1.0::independentoverlay': (
+        'overlay/profiles/package.mask',
+        [
+            '# fixture overlay package.mask: masks dev-libs/overlaymaskedpkg, but',
+            '# ONLY the overlay\'s own copy -- this line has no explicit "::repo"',
+            '# constraint, so it must be scoped to "::overlay" automatically (real',
+            '# append_repo), never masking the identically-named package in the main',
+            '# repo too.',
+            '# also masks overlaymaskedthenunmaskedpkg, cancelled below by this same',
+            "# overlay's own package.unmask -- proving mask+unmask still stack",
+            '# correctly once both get the identical "::overlay" auto-scoping.',
+            '# explicit masters= (repos.conf): independentoverlay declares',
+            '# "masters = overlay" -- this entry MUST mask',
+            '# independentmasteroverlaypkg (which exists only there), proving an',
+            '# explicit, non-main masters chain actually applies, not just an',
+            '# on/off switch for the main repo alone.',
+        ],
+    ),
+    'dev-libs/layoutmasterpkg-1.0::layoutrenamed': (
+        'overlay/profiles/package.mask',
+        [
+            '# fixture overlay package.mask: masks dev-libs/overlaymaskedpkg, but',
+            '# ONLY the overlay\'s own copy -- this line has no explicit "::repo"',
+            '# constraint, so it must be scoped to "::overlay" automatically (real',
+            '# append_repo), never masking the identically-named package in the main',
+            '# repo too.',
+            '# also masks overlaymaskedthenunmaskedpkg, cancelled below by this same',
+            "# overlay's own package.unmask -- proving mask+unmask still stack",
+            '# correctly once both get the identical "::overlay" auto-scoping.',
+            '# explicit masters= (repos.conf): independentoverlay declares',
+            '# "masters = overlay" -- this entry MUST mask',
+            '# independentmasteroverlaypkg (which exists only there), proving an',
+            '# explicit, non-main masters chain actually applies, not just an',
+            '# on/off switch for the main repo alone.',
+            '# layout.conf masters= (middle tier): layoutmasteroverlay declares',
+            '# "masters = overlay" in its OWN metadata/layout.conf (NOT repos.conf),',
+            '# and is loaded under its layout.conf "repo-name = layoutrenamed". This',
+            '# entry MUST mask dev-libs/layoutmasterpkg (exists only there), proving',
+            '# the layout.conf masters tier feeds package.mask stacking.',
+        ],
+    ),
+    'dev-libs/mastermaskedpkg-1.0::overlay': (
+        'repo/profiles/package.mask',
+        [
+            "# repo-level package.mask (the real Gentoo tree's own security/arch-mask",
+            "# mechanism) -- stacked ahead of the profile chain's own package.mask",
+            '# files and the user-level /etc/portage/package.mask, with -atom removal',
+            '# applying across all three sources, not just within one file.',
+            '# masters: an overlay with no explicit "masters =" implicitly masters',
+            '# this (the main) repo alone -- these two entries mask packages that',
+            '# exist ONLY in the overlay (never in this repo), so the only way',
+            '# either can end up masked is via that implicit master inheritance,',
+            '# not an ordinary same-repo mask.',
+        ],
+    ),
+    'dev-libs/overlaymaskedpkg-1.0::overlay': (
+        'overlay/profiles/package.mask',
+        [
+            '# fixture overlay package.mask: masks dev-libs/overlaymaskedpkg, but',
+            '# ONLY the overlay\'s own copy -- this line has no explicit "::repo"',
+            '# constraint, so it must be scoped to "::overlay" automatically (real',
+            '# append_repo), never masking the identically-named package in the main',
+            '# repo too.',
+        ],
+    ),
+    'dev-libs/profilemaskedpkg-1.0::testrepo': (
+        'repo/profiles/base/package.mask',
+        [
+            '# profile-level package.mask: masks a candidate for anyone inheriting',
+            '# this profile level, stacked in chain order alongside the repo-level',
+            '# and user-level sources.',
+        ],
+    ),
+    'dev-libs/repomaskedpkg-1.0::testrepo': (
+        'repo/profiles/package.mask',
+        [
+            "# repo-level package.mask (the real Gentoo tree's own security/arch-mask",
+            "# mechanism) -- stacked ahead of the profile chain's own package.mask",
+            '# files and the user-level /etc/portage/package.mask, with -atom removal',
+            '# applying across all three sources, not just within one file.',
+        ],
+    ),
+}
+
+
+def _mask_note(cpv_repo: str, reason: str) -> str:
+    """The note block Portage prints under one masked row: the masking file
+    and its comment, then the blank line ending the comment. Empty for a
+    row with no `package.mask` reason or no recorded note."""
+    if "package.mask" not in reason or cpv_repo not in _MASK_NOTES:
+        return ""
+    rel, comment = _MASK_NOTES[cpv_repo]
+    return f"{_LAST_CONFIG_ROOT}/{rel}:\n" + "".join(c + "\n" for c in comment) + "\n"
 
 
 def test_quiet_abort_preamble_prints_nothing_like_portage(
@@ -3267,8 +3396,9 @@ def _rows_view(args: list[str], result: subprocess.CompletedProcess) -> subproce
 
 
 def _run(cmd: list[str], args: list[str], env: dict[str, str]) -> subprocess.CompletedProcess:
-    global _LAST_ROOT_SUFFIX
+    global _LAST_ROOT_SUFFIX, _LAST_CONFIG_ROOT
     _LAST_ROOT_SUFFIX = _root_suffix(env)
+    _LAST_CONFIG_ROOT = env.get("PORTAGE_CONFIGROOT", "").rstrip("/")
     result = subprocess.run(
         [*cmd, *args], capture_output=True, text=True, env=env, check=False
     )
@@ -3310,7 +3440,8 @@ def _all_masked(atom: str, cpv_repo: str, reason: str, binary: bool = False) -> 
         f'!!! All {what} that could satisfy "{atom}"{_LAST_ROOT_SUFFIX} have been masked.\n'
         "!!! One of the following masked packages is required to complete your request:\n"
         f"- {cpv_repo} (masked by: {reason})\n"
-        "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
+        + _mask_note(cpv_repo, reason)
+        + "\nFor more information, see the MASKED PACKAGES section in the emerge\n"
         "man page or refer to the Gentoo Handbook."
     )
 
@@ -21032,7 +21163,10 @@ def test_masked_dependency_is_disclosed_with_its_mask_reasons(
     _assert_masked_dep_block(
         rust.stderr,
         "dev-libs/maskeddep",
-        ["- dev-libs/maskeddep-1.0::testrepo (masked by: package.mask)"],
+        # Backlog #611(c): the user package.mask file and its comment follow
+        # the row (Portage 3.0.83 `show_masked_packages`).
+        ["- dev-libs/maskeddep-1.0::testrepo (masked by: package.mask)"]
+        + _mask_note("dev-libs/maskeddep-1.0::testrepo", "package.mask").splitlines(),
         [
             '(dependency required by "dev-libs/maskneedpkg-1.0::testrepo" [ebuild])',
             '(dependency required by "dev-libs/maskneedpkg" [argument])',
@@ -22707,7 +22841,9 @@ def test_colored_mid_resolve_masked_dependency_block(emerge_binary, fixture_env)
         '\x1b[31;01m have been masked.\x1b[39;49;00m\n'
         "!!! One of the following masked packages is required to complete your request:\n"
         "- dev-libs/maskeddep-1.0::testrepo (masked by: package.mask)\n"
-        "\n"
+        # Backlog #611(c): the masking file and comment print uncoloured.
+        + _mask_note("dev-libs/maskeddep-1.0::testrepo", "package.mask")
+        + "\n"
         '(dependency required by "\x1b[32mdev-libs/maskneedpkg-1.0::testrepo\x1b[39;49;00m" [ebuild])\n'
         '(dependency required by "\x1b[32mdev-libs/maskneedpkg\x1b[39;49;00m" [argument])\n'
         "For more information, see the MASKED PACKAGES section in the emerge\n"
