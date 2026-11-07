@@ -3192,6 +3192,8 @@ CASES = [
     ("#602 regression: the same with --complete-graph (bare p651enc: R 3.210.0-r2; Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--complete-graph", "virtual/p651enc"], 0),
     ("#604: Q19 intern key, the plain-atom parent beside virtual/w604va in the shared ROOT, where nothing w604 is installed: the w604prov slot conflict (Portage 3.0.83 rc 1, 4/20; the installed shapes need their own ROOT: test_604_*)", ["--pretend", "dev-libs/w604force", "dev-libs/w604par"], 1),
     ("#604: the same with the parent picking =w604prov-5.42* in its own || (Portage 3.0.83 rc 1, 4/20)", ["--pretend", "dev-libs/w604force", "dev-libs/w604paror"], 1),
+    ("#613: abk0d with default options in the shared ROOT, where abk0b is not in world (A-3 plus the x USE change, Portage 3.0.83 rc 1, 0/20; the world-B shape needs its own ROOT: test_613_*)", ["--pretend", "dev-libs/abk0d"], 1),
+    ("#613: the same with --backtrack=1 (Portage 3.0.83 rc 1, 0/1)", ["--pretend", "--backtrack=1", "dev-libs/abk0d"], 1),
 ]
 
 
@@ -10282,7 +10284,14 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
     skipped row carries Portage's `ELIBC="glibc"` group while the
     installed consumer stays bare `USE=""`, both byte-for-byte from
     the probe (the staged vdb has no USE file, so Portage shows no expand
-    group there either)."""
+    group there either).
+
+    Backlog #613: the count is Portage 3.0.83's `2/2` (host probe on this
+    ROOT shape, same argv on both managers; captures
+    `LLM/evidence/2026-11-07-613/aby-bt2.{portage,portuale}.txt` in
+    portuale): the `A-3`/installed `A-1` conflict yields two mask choices,
+    the `{A-1}`-masked one restarts first, then the `{A-3}`-masked one
+    settles."""
     env = dict(fixture_env)
     env["ROOT"] = str(_abk0_worldb_root(tmp_path))
     env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
@@ -10295,8 +10304,7 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
         "These are the packages that would be merged, in order:",
         "",
         "Calculating dependencies ... done!",
-        # Portage prints 2/2 here (search gap, backlog #613); rows and rc are equal.
-        "Dependency resolution took (backtrack: 1/2).",
+        "Dependency resolution took (backtrack: 2/2).",
         "",
         f'[ebuild   R    ] dev-libs/abk0c-1 [1] to {env["ROOT"]} USE=\"x* y*\" ',
         f'[ebuild     U  ] dev-libs/abk0a-2 [1] to {env["ROOT"]}',
@@ -10317,6 +10325,148 @@ def test_autounmask_use_backtrack_world_bound_falls_back_to_the_older(
         "# required by dev-libs/abk0d (argument)\n"
         ">=dev-libs/abk0c-1 x y\n"
     )
+
+
+_ABK0_CONFLICT_HINT = [
+    "It may be possible to solve this problem by using package.mask to",
+    "prevent one of those packages from being selected. However, it is also",
+    "possible that conflicting dependencies exist such that they are",
+    "impossible to satisfy simultaneously.  If such a conflict exists in",
+    "the dependencies of two different packages, then those packages can",
+]
+
+
+@pytest.mark.parametrize(
+    "extra,count,note,more",
+    [
+        ([], "0/20", True, False),
+        (["--backtrack=0"], "0/0", False, False),
+        (["--backtrack=1"], "0/1", True, False),
+        (["--backtrack=2"], "0/2", True, False),
+        (["--autounmask-backtrack=y", "--backtrack=1"], "1/1", False, True),
+    ],
+    ids=["default", "bt0", "bt1", "bt2", "aby-bt1"],
+)
+def test_613_world_bound_reports_the_slot_conflict(
+    emerge_binary, fixture_env, tmp_path, extra, count, note, more
+):
+    """Backlog #613: the world-B `abk0d` shape of
+    `test_autounmask_use_backtrack_world_bound_falls_back_to_the_older`
+    where Portage reports the first pass: `A-3` with the `x` USE change and
+    the `A-3` / installed `A-1` slot-conflict block, rc 1. With
+    `--autounmask-backtrack` off the `x` change stops the search before any
+    backtracking (`need_config_change`, `depgraph.py:11865-11883`), and the
+    stop prints the "terminated early" notice except at `--backtrack=0`,
+    where nothing was cut short. With `--autounmask-backtrack=y
+    --backtrack=1` the one restart is spent on the `{A-1}`-masked choice,
+    so the best run is reported again with backtracking off (`1/1`, the
+    `--backtrack=30` advice in the block). The installed `A-1` misses
+    `abk0d`'s `>=dev-libs/abk0a-2`, so both packages conflict
+    (`_process_slot_conflict`, `depgraph.py:2150-2205`).
+
+    Expected text: host Portage 3.0.83 on this ROOT shape, same argv on
+    both managers (captures `LLM/evidence/2026-11-07-613/*.portage.txt` in
+    portuale), minus Portage's `to '<root>'` / ` for <root>` suffixes in
+    the conflict block, which no portuale conflict pin carries; trailing
+    blanks are stripped (the caret line pads to the parent's width)."""
+    env = dict(fixture_env)
+    env["ROOT"] = str(_abk0_worldb_root(tmp_path))
+    env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
+    root = env["ROOT"]
+    rust = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/abk0d"], env)
+    assert rust.returncode == 1
+    tail = [
+        "not be installed simultaneously. You may want to try a larger value of",
+        "the --backtrack option, such as --backtrack=30, in order to see if",
+        "that will solve this conflict automatically.",
+    ] if more else ["not be installed simultaneously."]
+    assert [ln.rstrip() for ln in rust.stdout.splitlines()] == [
+        "",
+        "These are the packages that would be merged, in order:",
+        "",
+        "Calculating dependencies ... done!",
+        f"Dependency resolution took (backtrack: {count}).",
+        "",
+        f'[ebuild   R    ] dev-libs/abk0c-1 [1] to {root} USE="x*"',
+        f"[ebuild     U  ] dev-libs/abk0a-3 [1] to {root}",
+        f"[ebuild  N     ] dev-libs/abk0d-1 to {root}",
+        "",
+        "!!! Multiple package instances within a single package slot have been pulled",
+        "!!! into the dependency graph, resulting in a slot conflict:",
+        "",
+        "dev-libs/abk0a:0",
+        "",
+        '  (dev-libs/abk0a-3:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc" pulled in by',
+        '    >=dev-libs/abk0a-2 required by (dev-libs/abk0d-1:0/0::testrepo, ebuild scheduled for merge) USE="" ELIBC="glibc"',
+        "    ^^               ^",
+        "",
+        f"  (dev-libs/abk0a-1:0/0::__unknown__, installed in '{root}') USE=\"\" pulled in by",
+        f"    <dev-libs/abk0a-3 required by (dev-libs/abk0b-1:0/0::__unknown__, installed in '{root}') USE=\"\"",
+        "    ^               ^",
+        "",
+        *_ABK0_CONFLICT_HINT,
+        *tail,
+        "",
+        "For more information, see MASKED PACKAGES section in the emerge man",
+        "page or refer to the Gentoo Handbook.",
+        "",
+    ]
+    expected_err = (
+        "\nThe following USE changes are necessary to proceed:\n"
+        ' (see "package.use" in the portage(5) man page for more details)\n'
+        "# required by dev-libs/abk0d-1::testrepo\n"
+        "# required by dev-libs/abk0d (argument)\n"
+        ">=dev-libs/abk0c-1 x\n"
+    )
+    if note:
+        expected_err += (
+            "\n * In order to avoid wasting time, backtracking has terminated early\n"
+            " * due to the above autounmask change(s). The --autounmask-backtrack=y\n"
+            " * option can be used to force further backtracking, but there is no\n"
+            " * guarantee that it will produce a solution.\n"
+        )
+    assert rust.stderr == expected_err
+
+
+@pytest.mark.parametrize(
+    "extra,count",
+    [
+        (["--autounmask-backtrack=y"], "2/20"),
+        (["--autounmask-backtrack=y", "--backtrack=3"], "2/3"),
+    ],
+    ids=["aby", "aby-bt3"],
+)
+def test_613_world_bound_backtracks_over_both_choices(
+    emerge_binary, fixture_env, tmp_path, extra, count
+):
+    """Backlog #613: the same world-B `abk0d` shape with
+    `--autounmask-backtrack=y` and a budget above 2: two restarts, as at
+    `--backtrack=2`
+    (`test_autounmask_use_backtrack_world_bound_falls_back_to_the_older`).
+    The `{A-1}`-masked choice restarts first (the backtracker pops the
+    last choice, `backtracking.py:126`, `:185-195`), then the
+    `{A-3}`-masked one folds `y` in its own pass and stops on the config
+    change. Host Portage 3.0.83, same argv on both managers (captures
+    `LLM/evidence/2026-11-07-613/aby*.portage.txt` in portuale): rows
+    `C-1 x* y*`, `A-2`, `D-1`, the skipped `A-3` warning, rc 1."""
+    env = dict(fixture_env)
+    env["ROOT"] = str(_abk0_worldb_root(tmp_path))
+    env["PORTAGE_RUNNING_ROOT"] = env["ROOT"]
+    root = env["ROOT"]
+    rust = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/abk0d"], env)
+    assert rust.returncode == 1
+    lines = rust.stdout.splitlines()
+    assert f"Dependency resolution took (backtrack: {count})." in lines
+    assert [ln.rstrip() for ln in lines if ln.startswith("[ebuild")] == [
+        f'[ebuild   R    ] dev-libs/abk0c-1 [1] to {root} USE="x* y*"',
+        f"[ebuild     U  ] dev-libs/abk0a-2 [1] to {root}",
+        f"[ebuild  N     ] dev-libs/abk0d-1 to {root}",
+    ]
+    assert (
+        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:"
+        in lines
+    )
+    assert rust.stderr.endswith(">=dev-libs/abk0c-1 x y\n")
 
 
 def test_use_dep_enforcement_plain_flag_declared_and_enabled_matches(
