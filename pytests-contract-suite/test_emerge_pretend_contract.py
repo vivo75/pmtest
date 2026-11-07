@@ -39344,3 +39344,39 @@ def test_680_slot_operator_rebuild_merges_before_the_builds_that_use_it(
         f for f in health_checker.check_plan(doc, root / "var" / "db" / "pkg") if f.is_failure
     ]
     assert findings == [], (order, findings)
+
+
+def test_depclean_pretend_keeps_sub_slot_dependencies_and_idepend_targets(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #681: a kept package's `:0/8=` dependency keeps the installed
+    `SLOT=0/8` copy, and a kept package's `IDEPEND` keeps its target. Expected
+    behaviour from the PMS (slot operators, EAPI 8 `IDEPEND`), not from
+    Portage's output; before the fix the first edge never matched (the
+    sub-slot was dropped from the installed match string) and the second was
+    never followed, so a real depclean would have removed both."""
+    (tmp_path / "var" / "lib" / "portage").mkdir(parents=True)
+    (tmp_path / "var" / "lib" / "portage" / "world").write_text("dev-libs/sworld\n")
+
+    def install(package, slot, rdepend="", idepend=""):
+        d = tmp_path / "var" / "db" / "pkg" / "dev-libs" / f"{package}-1.0"
+        d.mkdir(parents=True)
+        (d / "CATEGORY").write_text("dev-libs\n")
+        (d / "SLOT").write_text(f"{slot}\n")
+        if rdepend:
+            (d / "RDEPEND").write_text(rdepend + "\n")
+        if idepend:
+            (d / "IDEPEND").write_text(idepend + "\n")
+
+    install("sworld", "0", rdepend="dev-libs/slib:0/8=", idepend="dev-libs/sinstaller")
+    install("slib", "0/8")
+    install("sinstaller", "0")
+    install("sorphan", "0/3")
+    seed_updates_record(tmp_path)
+    env = dict(fixture_env)
+    env["ROOT"] = str(tmp_path)
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean"], env)
+    assert result.returncode == 0
+    out = result.stdout.splitlines()
+    assert [ln for ln in out if ln.startswith(" dev-libs/")] == [" dev-libs/sorphan"]
+    assert out[-2:] == ["Required packages:    3", "Number to remove:     1"]
