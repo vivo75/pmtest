@@ -1,12 +1,12 @@
-# pmtest — confronto tra package manager
+# pmtest — testing and comparing package managers
 
-> **Agenti LLM: leggete prima [`USAGE.AGENTS.md`](USAGE.AGENTS.md)** —
-> comandi, cosa è ammesso e cosa è vietato, come misurare l'efficienza
-> di un PM. Le sezioni di questo README restano il riferimento di
-> dettaglio (layout, immagini, provenienza).
+> **LLM agents: read [`USAGE.AGENTS.md`](USAGE.AGENTS.md) first.** It has the
+> commands, what is allowed and what is forbidden, and how to measure the
+> efficiency of a package manager. This README stays the detailed reference
+> (layout, images, provenance).
 
-Repository dedicato a **testare e confrontare tra loro varie versioni e
-tipologie di package manager** (portuale, Portage, altri PM).
+This repository **tests and compares package managers** of several versions
+and kinds (portuale, Portage, others).
 
 Role (portuale charter, `../portuale/docs/charter.md`): portuale is an
 independent Gentoo package manager, not a Portage fork. Portage is a
@@ -21,36 +21,35 @@ and the Portage-vs-portuale comparisons record what Portage printed: use
 them as a regression and comparison tool, not as a statement of what is
 right.
 
-Contenuto attuale: **l'infrastruttura di test costruita per portuale**
-(estratta da `../portuale`, commit
-`f8c2142508cf1ec942d0902c6689d6fc0cfeec5e`), che da
-`portuale@f982876` vive **solo qui**: l'albero del PM ha cancellato le
-proprie copie di `tests/`, `TEST/`, `bench/` e `python/` (tiene
-`fixtures/`, che serve anche ai test unitari Rust, e `scripts/`).
-Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
-(`../2p` era solo un clone temporaneo di lavoro, non è più sorgente.)
+Current content: **the test infrastructure built for portuale** (extracted
+from `../portuale`, commit `f8c2142508cf1ec942d0902c6689d6fc0cfeec5e`). Since
+`portuale@f982876` it lives **only here**: the package manager's tree deleted
+its own copies of `tests/`, `TEST/`, `bench/` and `python/` (it keeps
+`fixtures/`, which the Rust unit tests also need, and `scripts/`).
+No package-manager logic lives here: only harnesses, fixtures and oracles.
+(`../2p` was only a temporary working clone and is no longer a source.)
 
 ## Layout
 
-| Dir | Origine | Cosa contiene |
+| Dir | Origin | Contents |
 |---|---|---|
-| `pytests-contract-suite/` | `portuale/tests/` | contract suite pytest (black-box via CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark-gate, musl-smoke; `health_checker.py` (+ `test_health_checker.py`) checks a plan against the charter's health properties 1 and 2. The pinned outputs record what Portage printed. |
-| `fixtures/` | `portuale/fixtures/` | alberi sintetici (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) contro cui gira la suite. **Copia unica**: dal 2026-09-18 l'albero del PM non ne ha una sua, `portuale/fixtures` è un symlink a questa (`portuale@335543e`), quindi la leggono sia la contract suite sia i test Rust `#[cfg(test)]`. Ogni aggiunta o correzione si fa qui. |
-| `differential-test-bed/` | `portuale/TEST/` | container test bed: Portage-vs-portuale comparison layers (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source build) as regression and comparison tool, plus the portuale-only health layer (`run/l0-health.sh`, `compare/health-mutants.py`, `compare/health-report.py`) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
-| `bench/` | `portuale/bench/` | benchmark harness (batch-mode) + snapshot reale Gentoo (`gentoo_snapshot.json`) |
+| `pytests-contract-suite/` | `portuale/tests/` | pytest contract suite (black-box through the CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark gate, musl smoke; `health_checker.py` (+ `test_health_checker.py`) checks a plan against the charter's health properties 1 and 2. The pinned outputs record what Portage printed. |
+| `fixtures/` | `portuale/fixtures/` | synthetic trees (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) the suite runs against. **Single copy**: since 2026-09-18 the package manager's tree has none of its own, and `portuale/fixtures` is a symlink to this one (`portuale@335543e`), so both the contract suite and the Rust `#[cfg(test)]` tests read it. Every addition or fix is made here. |
+| `differential-test-bed/` | `portuale/TEST/` | container test bed: Portage-vs-portuale comparison layers (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source build) as a regression and comparison tool, plus the portuale-only health layer (`run/l0-health.sh`, `compare/health-mutants.py`, `compare/health-report.py`) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
+| `bench/` | `portuale/bench/` | benchmark harness (batch mode) + a real Gentoo snapshot (`gentoo_snapshot.json`) |
 | `scripts/` | `portuale/scripts/` | primitive-tree-differential, repin-review, md5-cache-audit, upstream-resolver-translate |
-| `python-harness/` | `portuale/python/` | harness Python lato riferimento (`versions`/`atom`/`use_reduce`/`required_use`) |
-| `managers/` | nuovo | registry + adapter per ogni PM sotto test (vedi `managers/README.md`) |
-| `3rdparty` | symlink → `../portuale/3rdparty` | checkout pinned upstream (portage per gli harness/reference, chiavi gpg di test); materiale del PM, mai committato dentro pmtest — il symlink sì. Richiede `../portuale` con `3rdparty/` popolato (vedi `setup.sh` lì). |
+| `python-harness/` | `portuale/python/` | Python harness on the reference side (`versions`/`atom`/`use_reduce`/`required_use`) |
+| `managers/` | new | registry + adapter for each package manager under test (see `managers/README.md`) |
+| `3rdparty` | symlink → `../portuale/3rdparty` | pinned upstream checkouts (Portage for the harnesses and as a reference, test gpg keys); package-manager material, never committed inside pmtest — the symlink is. Needs `../portuale` with `3rdparty/` populated (see `setup.sh` there). |
 
-Esclusi dalla copia (rigenerabili / scratch host-specifico): `differential-test-bed/logs/`,
+Left out of the copy (regenerable or host-specific scratch): `differential-test-bed/logs/`,
 `differential-test-bed/WORKDIR/`, `differential-test-bed/repos/`, `differential-test-bed/stage3-*.tar.xz`,
 `fixtures/var/cache/`, `__pycache__/`, `.pytest_cache/`, `target/`.
 
-## Uso
+## Usage
 
 ```sh
-# suite fixture-based contro il PM attivo (vedi managers/)
+# fixture-based suite against the active package manager (see managers/)
 python3 -m pytest pytests-contract-suite -q
 PMTEST_PM=portage python3 -m pytest pytests-contract-suite -q
 
@@ -62,59 +61,62 @@ differential-test-bed/run/l0-resolver.sh
 differential-test-bed/run/l1-merge-from-binpkg.sh
 ```
 
-Quale binario viene testato è deciso dal **registry** (`managers/`),
-non da path hardcoded: i test puntano a symlink `emerge`/`ebuild`/`mrg`
-risolti dal PM attivo. Come aggiungere o modificare un PM è spiegato in
-[`managers/README.md`](managers/README.md).
+Which binary is tested is decided by the **registry** (`managers/`), not by
+hardcoded paths: the tests point at `emerge`/`ebuild`/`mrg` symlinks
+resolved by the active package manager. How to add or change a package
+manager is explained in [`managers/README.md`](managers/README.md).
 
-## Creare l'immagine container (`localhost/test-portuale:latest`)
+## Building the container image (`localhost/test-portuale:latest`)
 
-Tutto il codice necessario è già in `differential-test-bed/`: `create-container.bash`,
-`init.c` (il PID 1 che esegue `differential-test-bed/scripts/` in ordine lessicografico),
-`images/overlay/porttest/` (l'overlay sintetico per L1/L2) e `net/`.
-L'immagine non contiene i binari del PM: vengono montati a run-time da
-`differential-test-bed/run/lib.sh`. Da fornire sull'host (mai committati, cfr.
-`differential-test-bed/.gitignore`):
+All the needed code is already in `differential-test-bed/`:
+`create-container.bash`, `init.c` (the PID 1 that runs
+`differential-test-bed/scripts/` in lexicographic order),
+`images/overlay/porttest/` (the synthetic overlay for L1/L2) and `net/`.
+The image does not contain the package manager's binaries: they are mounted
+at run time by `differential-test-bed/run/lib.sh`. To provide on the host
+(never committed, see `differential-test-bed/.gitignore`):
 
 - `podman` + `buildah`, `gcc`, `python3` + `PyYAML`;
-- i mirror git locali in `differential-test-bed/repos/{gentoo,buildovl}` — lo script li
-  usa come remote `file://` e fa `git fetch --shallow-since=<data>
-  <LAST_COMMIT>` ai pin dichiarati in testa allo script; in pratica
-  symlink ai checkout già sincronizzati dell'host;
-- lo stage3 (`stage3-amd64-systemd-<ts>.tar.xz`): se manca in `differential-test-bed/`,
-  lo script lo scarica da `distfiles.gentoo.org`.
+- the local git mirrors in `differential-test-bed/repos/{gentoo,buildovl}`.
+  The script uses them as `file://` remotes and runs
+  `git fetch --shallow-since=<date> <LAST_COMMIT>` at the pins declared at
+  the top of the script; in practice they are symlinks to the host's
+  already synchronized checkouts;
+- the stage3 (`stage3-amd64-systemd-<ts>.tar.xz`): if it is missing from
+  `differential-test-bed/`, the script downloads it from
+  `distfiles.gentoo.org`.
 
-Comando (deve girare come root; dentro usa `sudo -su vivo` per
-podman/buildah, con subuid/subgid configurati):
+Command (must run as root; inside it uses `sudo -su vivo` for
+podman/buildah, with subuid/subgid configured):
 
 ```sh
 sudo differential-test-bed/create-container.bash
 ```
 
-Lo script: compila `init`, scompatta lo stage3 in `WORKDIR/`, clona i
-repo ai pin, copia l'overlay `porttest` (commit automatico), scrive
-`resolv.conf`/`make.conf`/`repos.conf`, rimappa gli uid per il
-userpriv-container e committa l'immagine `localhost/test-portuale:latest`
-con entrypoint `/init`. Verifica con `podman images` e, se serve,
-con i comandi commentati in fondo allo script.
+The script: builds `init`, unpacks the stage3 into `WORKDIR/`, clones the
+repos at the pins, copies the `porttest` overlay (automatic commit), writes
+`resolv.conf`/`make.conf`/`repos.conf`, remaps the uids for the userpriv
+container and commits the image `localhost/test-portuale:latest` with
+entrypoint `/init`. Check with `podman images` and, if needed, with the
+commented commands at the bottom of the script.
 
-## Provenienza
+## Provenance
 
-Estratto da `PORTUALE/portuale` al commit sopra indicato. Non c'è più
-un sync da rifare: da `portuale@f982876` quelle directory non esistono
-più nell'albero del PM, e pmtest è l'unica copia. Le aggiunte e le
-correzioni all'infrastruttura si fanno **qui**.
+Extracted from `PORTUALE/portuale` at the commit above. There is no sync to
+redo: since `portuale@f982876` those directories no longer exist in the
+package manager's tree, and pmtest is the only copy. Additions and fixes to
+the infrastructure are made **here**.
 
-Quello che pmtest continua a leggere dall'albero del PM, e che quindi
-deve esistere accanto a lui:
+What pmtest still reads from the package manager's tree, and which must
+therefore exist next to it:
 
-- la voce di registry del PM (`managers/managers.yaml`) — sorgente e
-  binari, ricostruiti a ogni run;
-- `3rdparty/` (symlink a `../portuale/3rdparty`) — il checkout di
-  portage al pin, riferimento degli harness Python e portatore del
-  keyring gpg di test. Se manca, gli harness si rifiutano di partire
-  invece di ricadere sul portage installato sull'host.
+- the package manager's registry entry (`managers/managers.yaml`) — source
+  and binaries, rebuilt on every run;
+- `3rdparty/` (symlink to `../portuale/3rdparty`) — the Portage checkout at
+  its pin, the reference of the Python harnesses and the carrier of the
+  test gpg keyring. If it is missing, the harnesses refuse to start instead
+  of falling back to the Portage installed on the host.
 
-Non si modifica l'infrastruttura per far passare un PM: i bug vanno
-fissati nel PM, le divergenze attese in
+The infrastructure is not changed to make a package manager pass: bugs are
+fixed in the package manager, and expected divergences go in
 `differential-test-bed/compare/known-divergences.yaml`.

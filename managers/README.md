@@ -6,7 +6,7 @@ Nessun path di PM è hardcoded nell'infrastruttura: i run (pytest e
 registry, selezionata con la variabile d'ambiente `PMTEST_PM`.
 
 ```sh
-PMTEST_PM=portage python3 -m pytest pytests-contract-suite -q   # testate il portage reale
+PMTEST_PM=portage python3 -m pytest pytests-contract-suite -q   # test Portage
 PMTEST_PM=portuale python3 -m pytest pytests-contract-suite -q  # testate portuale (default)
 ```
 
@@ -48,9 +48,9 @@ Campi opzionali per i PM costruiti da sorgente (come portuale):
   `mrg` né harness neutrali, e il suo `ebuild` è lo shim
   `managers/shims/portage-cli/ebuild` (`em ebuild "$@"`), perché `em`
   non fa dispatch su `argv[0]`.
-- `type: reference` — il PM oracolo (oggi il portage reale). Il suo
-  output è il comportamento atteso; non si modifica mai il test per
-  farlo passare, si fissa il PM sotto test.
+- `type: reference` — Portage. Il suo output è il riferimento del
+  confronto; non si modifica mai il test per farlo passare, si fissa il
+  PM sotto test.
 - `type: portage-compatible` — un PM alternativo che deve replicare il
   comportamento del reference (oggi portuale).
 - `emerge` / `ebuild` / `mrg` — per i multicall (portuale) puntano tutti
@@ -137,8 +137,8 @@ Tre cose che il registry impone, e che valgono per ogni PM:
   proprio path host, perché un binario può risolvere i propri dati di
   runtime (portuale: `bin/`, `3rdparty/portage`) da un path inciso a
   compile-time, che esiste solo dentro il suo albero. Una voce senza
-  `repo` viene rifiutata con quel messaggio: il portage reale con cui si
-  confronta è già dentro il container.
+  `repo` viene rifiutata con quel messaggio: Portage, con cui si
+  confronta, è già dentro il container.
 - **I path dei binari non vengono canonicalizzati.** `/usr/sbin/emerge`
   è un symlink verso un wrapper e la dispatch dei multicall guarda il
   basename di `argv[0]`: risolvere il symlink cambierebbe quale applet
