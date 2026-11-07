@@ -3188,6 +3188,8 @@ CASES = [
     ("#603: the consumer's plain atom picks the oldest w603lib in the shared ROOT", ["--pretend", "app-misc/w603cons"], 0),
     ("#602: the w602 slot conflict with the complete-graph switches off, in the shared ROOT where no consumer is installed (the world-consumer shape needs its own ROOT: test_602_*)", ["--pretend", "--complete-graph-if-new-ver=n", "--complete-graph-if-new-use=n", "--rebuild-if-new-slot=n", "=dev-libs/w602prov-2", "dev-libs/w602s", "app-misc/w602a"], 0),
     ("#605/#671: the w605 fixtures in the shared ROOT, where no w605 consumer is installed (the consumer shapes need their own ROOT: test_605_*)", ["--pretend", "--verbose", "=dev-libs/w605x-2"], 0),
+    ("#602 regression: the slot conflict met while backtracking turns complete mode on, and the complete walk keeps the masks the first walk settled under, so the virtual reinstalls instead of upgrading (bare p651th: R 3.500.0-r1 with the skip WARNING and the backtracking notice; Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "virtual/p651th"], 0),
+    ("#602 regression: the same with --complete-graph (bare p651enc: R 3.210.0-r2; Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--complete-graph", "virtual/p651enc"], 0),
 ]
 
 
@@ -38890,3 +38892,54 @@ def test_605_unwalked_consumer_use_dep_broken_by_an_upgrade(
         "   - dev-libs/w605x-2 (Change USE: +w605flag)",
     ]:
         assert line in got.stdout.splitlines(), (line, got.stdout)
+
+
+@pytest.mark.parametrize(
+    "args,virtual",
+    [
+        (["virtual/p651th"], "p651th-3.500.0-r1"),
+        (["virtual/p651enc"], "p651enc-3.210.0-r2"),
+        (["--complete-graph", "virtual/p651th"], "p651th-3.500.0-r1"),
+        (["--complete-graph", "virtual/p651enc"], "p651enc-3.210.0-r2"),
+    ],
+    ids=["th", "enc", "th-complete-graph", "enc-complete-graph"],
+)
+def test_602_complete_walk_keeps_the_settled_backtrack_masks(
+    emerge_binary, fixture_env, args, virtual
+):
+    """#602 regression (bed `l0-20261107T041916Z`,
+    `virtual/perl-ExtUtils-MakeMaker`): a bare request for an installed
+    perl-style virtual whose newest version needs the next provider
+    (`|| ( =dev-libs/p651prov-5.44* ~core )`) while installed virtuals hold
+    `=p651prov-5.42*`. The first walk meets the provider slot conflict,
+    masks `p651prov-5.44.0`, then the new virtual (its `=5.44*` arm is left
+    unsatisfiable), and reinstalls the installed one. The conflict turns
+    complete mode on (#602, `depgraph.py` `_resolve_conflicts`), and
+    Portage runs `_complete_graph` inside that same depgraph, under its
+    `runtime_pkg_mask`. portuale's complete walk used to start without the
+    masks and printed `U` to the newest virtual; with `--complete-graph`
+    it did so before #602 too.
+
+    Oracle: host Portage 3.0.83, same argv, `PORTAGE_CONFIGROOT` and `ROOT`
+    a copy of the fixtures: `[ebuild   R    ]` the installed virtual, the
+    skip WARNING for `dev-libs/p651prov:0`, and `!!! The following
+    update(s) have been skipped due to unsatisfied dependencies triggered by
+    backtracking:` naming the virtual, rc 0, for all four cells. The
+    backtrack count is not pinned (Portage 4/20, portuale 5/20, and 0/20
+    with `--complete-graph`: backlog #670, #674)."""
+    root = fixture_env["ROOT"]
+    got = _run([str(emerge_binary)], ["--pretend", "--verbose", *args], fixture_env)
+    assert got.returncode == 0, got.stdout
+    cp, ver = virtual.split("-", 1)
+    assert got.stdout.splitlines()[0] == (
+        f"[ebuild   R    ] virtual/{virtual}::testrepo to {root}"
+    ), got.stdout
+    assert "Total: 1 package (1 reinstall), Size of downloads: 0 KiB" in got.stdout
+    assert f"dev-libs/p651prov:0 for {root}/" in got.stdout, got.stdout
+    assert (
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies\n"
+        "!!! triggered by backtracking:\n"
+        "\n"
+        f"virtual/{cp}:0 for {root}/"
+    ) in got.stdout, got.stdout
+
