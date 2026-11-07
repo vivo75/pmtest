@@ -103,3 +103,40 @@ def test_blessing_from_several_xdist_workers_keeps_every_workers_rows(tmp_path, 
     assert got["t.py::test_a#0"]["stdout"] == "new\n"
     assert got["t.py::test_b#0"]["stdout"] == "new\n"
     assert got["t.py::test_c#0"]["stdout"] == "old\n"
+
+
+def test_nodekey_ignores_the_suite_dir_whatever_the_cwd_and_param_slashes():
+    """Backlog #678: pytest run from inside the suite dir yields ids with no
+    directory prefix; a `/` in a parameter id (`y/n`) was then taken for the
+    path separator and the corpus row never matched, so drift passed
+    silently. Expected values are the keys pytest itself builds from the
+    pmtest root (`pytests-contract-suite/...`) and from the suite dir."""
+    for param in ("", "[plain]", "[rejects a non-y/n value]"):
+        root = f"pytests-contract-suite/t.py::test_x{param}"
+        inside = f"t.py::test_x{param}"
+        harvested = f"tests/t.py::test_x{param}"
+        assert corpus._nodekey(root) == corpus._nodekey(inside) == corpus._nodekey(harvested)
+        assert corpus._nodekey(inside) == inside
+
+
+def test_drift_is_detected_for_a_slash_param_id_from_the_suite_dir(monkeypatch):
+    """Backlog #678, end to end: a drifted output for a test whose id has a
+    `/` in its parameter is flagged when the node id has no dir prefix."""
+    class R:
+        returncode, stdout, stderr = 0, "changed\n", ""
+
+    ident = {"args": ["--pretend", "a/b"], "env": {}}
+    rec = {"rc": 0, "stdout": "old\n", "stderr": ""}
+    stored = {"pytests-contract-suite/t.py::test_x[y/n]#0": {**ident, **rec}}
+    monkeypatch.setattr(corpus, "_contract_cases", stored)
+    monkeypatch.setattr(corpus, "_nodeid_index", None)
+    monkeypatch.setattr(corpus, "drifted", [])  # keep the session report clean
+    monkeypatch.setattr(corpus, "blessed", {})
+    monkeypatch.setattr(corpus, "case_identity", lambda a, e: ident)
+    token = corpus.current_nodeid.set("t.py::test_x[y/n]")
+    try:
+        key, message = corpus.check_contract_call(["--pretend", "a/b"], {}, R())
+    finally:
+        corpus.current_nodeid.reset(token)
+        monkeypatch.setattr(corpus, "_nodeid_index", None)
+    assert key is not None and message, "drift must be detected"

@@ -179,8 +179,15 @@ def _nodekey(nodeid: str) -> str:
     """Corpus keys embed the suite dir name (`tests/` at harvest time,
     `pytests-contract-suite/` now): the first path segment is checkout
     layout, not case identity, so it is ignored when matching. This keeps
-    a harvested corpus valid across renames and re-syncs from portuale."""
-    return nodeid.split("/", 1)[1] if "/" in nodeid else nodeid
+    a harvested corpus valid across renames and re-syncs from portuale.
+
+    Only a `/` before the `::` is a path separator: a parameter id may
+    contain one too (`[... y/n ...]`), and pytest run from inside the
+    suite dir has no directory prefix at all (#678)."""
+    path, sep, rest = nodeid.partition("::")
+    if "/" not in path:
+        return nodeid
+    return path.split("/", 1)[1] + sep + rest
 
 
 def _contract() -> dict[str, dict]:
