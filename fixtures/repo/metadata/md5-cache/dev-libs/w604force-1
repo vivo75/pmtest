@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #604 Q19 intern-key puller of the new provider
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/w604prov-5.44*
+SLOT=0
+_md5_=f5c84683be31b781da7f183ea6a58d37

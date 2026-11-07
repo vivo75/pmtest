@@ -3190,6 +3190,8 @@ CASES = [
     ("#605/#671: the w605 fixtures in the shared ROOT, where no w605 consumer is installed (the consumer shapes need their own ROOT: test_605_*)", ["--pretend", "--verbose", "=dev-libs/w605x-2"], 0),
     ("#602 regression: the slot conflict met while backtracking turns complete mode on, and the complete walk keeps the masks the first walk settled under, so the virtual reinstalls instead of upgrading (bare p651th: R 3.500.0-r1 with the skip WARNING and the backtracking notice; Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "virtual/p651th"], 0),
     ("#602 regression: the same with --complete-graph (bare p651enc: R 3.210.0-r2; Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "--complete-graph", "virtual/p651enc"], 0),
+    ("#604: Q19 intern key, the plain-atom parent beside virtual/w604va in the shared ROOT, where nothing w604 is installed: the w604prov slot conflict (Portage 3.0.83 rc 1, 4/20; the installed shapes need their own ROOT: test_604_*)", ["--pretend", "dev-libs/w604force", "dev-libs/w604par"], 1),
+    ("#604: the same with the parent picking =w604prov-5.42* in its own || (Portage 3.0.83 rc 1, 4/20)", ["--pretend", "dev-libs/w604force", "dev-libs/w604paror"], 1),
 ]
 
 
@@ -38943,3 +38945,86 @@ def test_602_complete_walk_keeps_the_settled_backtrack_masks(
         f"virtual/{cp}:0 for {root}/"
     ) in got.stdout, got.stdout
 
+
+
+_604_PROV = ("dev-libs", "w604prov", "5.42", "0/5.42", {"EAPI": "8"})
+_604_VIRT = (
+    "virtual", "w604va", "1", "0",
+    {"EAPI": "8", "RDEPEND": "|| ( =dev-libs/w604prov-5.44* =dev-libs/w604prov-5.42* )"},
+)
+
+
+def _604_block(stdout):
+    """The `w604prov` conflict block as {instance version: set of (parent, atom version)}."""
+    out, ver = {}, None
+    for ln in stdout.splitlines():
+        m = re.match(r"  \(dev-libs/w604prov-([0-9.]+):", ln)
+        if m:
+            ver = m.group(1)
+            out[ver] = set()
+            continue
+        m = re.match(r"    =dev-libs/w604prov-([0-9.]+)\* required by \(([^:]+):", ln)
+        if m and ver:
+            out[ver].add((m.group(2), m.group(1)))
+    return out
+
+
+@pytest.mark.parametrize(
+    "virtual_installed,parent,expected",
+    [
+        (True, "w604par", {
+            "5.42": {("dev-libs/w604par-1", "5.42")},
+            "5.44": {("dev-libs/w604force-1", "5.44"), ("virtual/w604va-1", "5.44")},
+        }),
+        (False, "w604par", {
+            "5.42": {("dev-libs/w604par-1", "5.42")},
+            "5.44": {("dev-libs/w604force-1", "5.44"), ("virtual/w604va-1", "5.44")},
+        }),
+        (True, "w604paror", {
+            "5.42": {("dev-libs/w604paror-1", "5.42")},
+            "5.44": {("dev-libs/w604force-1", "5.44"), ("virtual/w604va-1", "5.44")},
+        }),
+        (False, "w604paror", {
+            "5.42": {("dev-libs/w604paror-1", "5.42"), ("virtual/w604va-1", "5.42")},
+            "5.44": {("dev-libs/w604force-1", "5.44"), ("virtual/w604va-1", "5.44")},
+        }),
+    ],
+    ids=["A-installed-virtual-plain", "B-merged-virtual-plain",
+         "C-installed-virtual-or", "D-merged-virtual-or"],
+)
+def test_604_virtual_leak_follows_the_atom_intern_key(
+    emerge_binary, fixture_env, tmp_path, virtual_installed, parent, expected
+):
+    """#604, quirk Q19: Portage keeps a virtual's child atom when its `id()` is
+    among the atoms chosen in the parent's disjunctive `dep_check`
+    (`depgraph.py` 6122-6167); interning makes atoms with one intern key one
+    object (`dep/__init__.py` 1577-1595: text, EAPI, ...). Only the parent's
+    `||` groups and virtual atoms share that call (`depgraph.py` 4872-4904);
+    the parent's atoms carry its EAPI, an installed virtual's carry none
+    (`dep_check.py` 866-871), a merge-bound virtual's its own. So the leak
+    reaches only shape D, the merge-bound virtual of the parent's EAPI under a
+    parent that picks `=w604prov-5.42*` in its own `||`. portuale leaked the
+    parent's atoms into the installed virtual (A, C; plus a second conflict
+    block) and missed D.
+
+    Oracle: host Portage 3.0.83, `emerge -p --backtrack=0 --verbose-conflicts
+    dev-libs/w604force dev-libs/<parent>` on an ad-hoc ROOT holding the same
+    vdb entries, rc 1, one block. Rows inside one instance print in set order
+    (`slot_collision.py` `selected_for_display`), so they are compared as sets.
+    The installed virtual's own `=5.44*` row (A, C) is backlog #606."""
+    installed = [_604_PROV, _604_VIRT] if virtual_installed else [_604_PROV]
+    root = _b1_root(tmp_path, [], installed)
+    env = _b1_env(fixture_env, root)
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "--verbose-conflicts",
+         "dev-libs/w604force", f"dev-libs/{parent}"],
+        env,
+    )
+    assert got.returncode == 1, got.stdout
+    assert got.stdout.count("!!! Multiple package instances") == 1, got.stdout
+    assert sum(ln.startswith("dev-libs/w604prov:0") for ln in got.stdout.splitlines()) == 1
+    if virtual_installed:
+        # #606: the installed virtual's own choice is not yet recorded as a parent.
+        expected = {v: rows - {("virtual/w604va-1", "5.44")} for v, rows in expected.items()}
+    assert _604_block(got.stdout) == expected, got.stdout

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #604 Q19 intern-key parent: old provider picked in its own || beside the virtual
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/w604prov-5.42* dev-libs/w604none ) virtual/w604va
+SLOT=0
+_md5_=ab059738638ec1cddd65958b53cfd0b8

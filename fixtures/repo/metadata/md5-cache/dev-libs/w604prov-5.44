@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #604 Q19 intern-key provider, new
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/5.44
+_md5_=6920b956b1786553a9ce8eb2db835ed3

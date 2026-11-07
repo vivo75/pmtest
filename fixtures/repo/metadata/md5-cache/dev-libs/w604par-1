@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #604 Q19 intern-key parent: plain old-provider atom beside the virtual
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/w604prov-5.42* virtual/w604va
+SLOT=0
+_md5_=d625086c600c52a61b0a3082db3ac5b0

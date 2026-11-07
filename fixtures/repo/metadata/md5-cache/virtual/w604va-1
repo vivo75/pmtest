@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #604 Q19 intern-key virtual preferring the new provider
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/w604prov-5.44* =dev-libs/w604prov-5.42* )
+SLOT=0
+_md5_=60291c30c61365cd84ccd2aaf9c52924
