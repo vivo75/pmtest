@@ -39011,7 +39011,7 @@ def test_604_virtual_leak_follows_the_atom_intern_key(
     dev-libs/w604force dev-libs/<parent>` on an ad-hoc ROOT holding the same
     vdb entries, rc 1, one block. Rows inside one instance print in set order
     (`slot_collision.py` `selected_for_display`), so they are compared as sets.
-    The installed virtual's own `=5.44*` row (A, C) is backlog #606."""
+    The installed virtual's own `=5.44*` row (A, C) came with #606."""
     installed = [_604_PROV, _604_VIRT] if virtual_installed else [_604_PROV]
     root = _b1_root(tmp_path, [], installed)
     env = _b1_env(fixture_env, root)
@@ -39024,7 +39024,71 @@ def test_604_virtual_leak_follows_the_atom_intern_key(
     assert got.returncode == 1, got.stdout
     assert got.stdout.count("!!! Multiple package instances") == 1, got.stdout
     assert sum(ln.startswith("dev-libs/w604prov:0") for ln in got.stdout.splitlines()) == 1
-    if virtual_installed:
-        # #606: the installed virtual's own choice is not yet recorded as a parent.
-        expected = {v: rows - {("virtual/w604va-1", "5.44")} for v, rows in expected.items()}
     assert _604_block(got.stdout) == expected, got.stdout
+
+
+_606_Q19 = [
+    ("dev-libs", "p590vprov", "5.42", "0/5.42", {"EAPI": "8"}),
+    ("dev-libs", "p590vpar", "1", "0", {"EAPI": "8", "RDEPEND": "virtual/p590vva virtual/p590vvb"}),
+    ("virtual", "p590vva", "1", "0",
+     {"EAPI": "8", "RDEPEND": "|| ( =dev-libs/p590vprov-5.44* =dev-libs/p590vprov-5.42* )"}),
+    ("virtual", "p590vvb", "1", "0",
+     {"EAPI": "8", "RDEPEND": "|| ( =dev-libs/p590vprov-5.42* =dev-libs/p590vprov-5.38* )"}),
+]
+
+
+def test_606_q19_installed_virtual_selecting_the_merge_is_its_parent(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#606, Q19 shape: `p590vpar` (installed, in world) names `virtual/p590vva`
+    (`|| ( =p590vprov-5.44* =5.42* )`) and `virtual/p590vvb` (`|| ( =5.42*
+    =5.38* )`), both installed; `p590vpull-2` needs `=p590vprov-5.44*`. In
+    complete mode `p590vva` picks `=5.44*`, which the graph satisfies, so it is
+    a parent of the 5.44 node (`depgraph.py` 8799-8809 sends only
+    graph-unsatisfied dependencies to the vdb test); it keeps `=5.42*` through
+    the Q19 leak. Both conflict choices then carry two atoms, 5.42 is masked
+    first, and the search takes 6 tries. portuale dropped the `=5.44*` row and
+    printed 2/20.
+
+    Oracle: host Portage 3.0.83, same argv, ad-hoc ROOT with the same vdb
+    entries and world (portuale `LLM/evidence/2026-11-06-sweep/606/`):
+    `emerge -p` prints `N p590vpull-1`, `backtrack: 6/20`, the skip block with
+    both virtuals' `=5.42*`, rc 0; `-p --backtrack=0 --verbose-conflicts`
+    prints the block with `p590vpull-2` and `p590vva-1` under 5.44 and both
+    virtuals under 5.42, rc 1. Rows inside one instance are compared as sets;
+    the block header's ROOT suffix is not pinned (#672)."""
+    root = _b1_root(tmp_path, ["dev-libs/p590vpar"], _606_Q19)
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/p590vpull"], env)
+    assert got.returncode == 0, got.stdout
+    assert "(backtrack: 6/20)" in got.full_stdout, got.full_stdout
+    assert _b1_merges(got.stdout) == [
+        f"[ebuild  N     ] dev-libs/p590vpull-1 to {root}"
+    ], got.stdout
+    for vv in ("p590vva", "p590vvb"):
+        line = (
+            f"    =dev-libs/p590vprov-5.42* required by (virtual/{vv}-1:0/0::testrepo, "
+            f"installed in '{root}') USE=\"\""
+        )
+        assert line in got.stdout.splitlines(), (line, got.stdout)
+
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--backtrack=0", "--verbose-conflicts", "dev-libs/p590vpull"],
+        env,
+    )
+    assert got.returncode == 1, got.stdout
+    block, ver = {}, None
+    for ln in got.stdout.splitlines():
+        m = re.match(r"  \(dev-libs/p590vprov-([0-9.]+):", ln)
+        if m:
+            ver = m.group(1)
+            block[ver] = set()
+            continue
+        m = re.match(r"    =dev-libs/p590vprov-([0-9.]+)\* required by \(([^:]+):", ln)
+        if m and ver:
+            block[ver].add((m.group(2), m.group(1)))
+    assert block == {
+        "5.44": {("dev-libs/p590vpull-2", "5.44"), ("virtual/p590vva-1", "5.44")},
+        "5.42": {("virtual/p590vva-1", "5.42"), ("virtual/p590vvb-1", "5.42")},
+    }, got.stdout
