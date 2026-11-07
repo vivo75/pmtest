@@ -2,8 +2,9 @@
 """Summarise health_checker.py output (one JSON object per plan).
 
 A plan is clean when it has no failure of its own: findings marked
-`pre_existing` (already broken before the plan), `cycle-noted` notes and
-`checker-limitation` records do not count. Plans portuale itself refuses
+`pre_existing` (already broken before the plan) and the findings the
+checker marks as no failure (`cycle-noted` notes, `checker-limitation`
+records, `removal-deps` warnings) do not count. Plans portuale itself refuses
 (`refused`: slot conflict, needed configuration change, unsolvable blocker)
 are listed apart and do not fail the run. Per property, the report gives
 how many plans and distinct (package, atom) pairs are affected, and up to
@@ -70,7 +71,8 @@ def main(path: str, meta_path: str | None = None) -> int:
         plan = label(r)
         for f in r["findings"]:
             origin = "pre-existing" if f["pre_existing"] else "plan"
-            if f["property"] not in ("cycle-noted", "checker-limitation") and origin == "plan":
+            failure = f.get("failure", f["property"] not in ("cycle-noted", "checker-limitation"))
+            if failure and origin == "plan":
                 dirty.add(plan)
             by_key[(f["property"], origin)][(f["package"], f["atom"], f["reason"])].add(plan)
     refused = {label(r): r["refused"]

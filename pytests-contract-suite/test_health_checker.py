@@ -8,6 +8,8 @@ manager's output.
 
 from __future__ import annotations
 
+import subprocess
+
 import pytest
 
 import health_checker as hc
@@ -325,3 +327,247 @@ def test_no_sub_slot_means_the_sub_slot_is_the_slot():
     doc = plan([entry("dev-libs/b-2", 0, outcome="upgrade", from_version="1")],
                [kept("app-misc/k-1", deps={"RDEPEND": "dev-libs/b:0/1="})])
     assert failures(doc) == [("runtime-deps", "app-misc/k-1", "dev-libs/b:0/1=")]
+
+
+# --- property 4: removals keep linked libraries ------------------------------
+
+def installed_root(tmp_path, packages):
+    """A root with `packages`: cpv -> {path: soname-or-needed spec}. A spec
+    `("lib", soname, needed)` installs a library and its soname link, `("bin",
+    needed)` a program. Returns the VDB path."""
+    vdb = tmp_path / "var/db/pkg"
+    for cpv, files in packages.items():
+        cat, pkg, version = split(cpv)
+        d = vdb / cat / f"{pkg}-{version}"
+        d.mkdir(parents=True)
+        contents, needed = [], []
+        for path, spec in files.items():
+            (tmp_path / path.lstrip("/")).parent.mkdir(parents=True, exist_ok=True)
+            (tmp_path / path.lstrip("/")).write_bytes(b"\x7fELF")
+            contents.append(f"obj {path} 0 0")
+            if spec[0] == "lib":
+                link = f"{path.rsplit('/', 1)[0]}/{spec[1]}"
+                (tmp_path / link.lstrip("/")).symlink_to(path.rsplit("/", 1)[1])
+                contents.append(f"sym {link} -> {path.rsplit('/', 1)[1]} 0")
+                needed.append(f"X86_64;{path};{spec[1]};;{spec[2]};x86_64")
+            else:
+                needed.append(f"X86_64;{path};;;{spec[1]};x86_64")
+        (d / "SLOT").write_text("0\n")
+        (d / "CONTENTS").write_text("\n".join(contents) + "\n")
+        (d / "NEEDED.ELF.2").write_text("\n".join(needed) + "\n")
+    return vdb
+
+
+def removal(cpvs, preserved=()):
+    return {"removal": [dict(zip(("category", "package", "version"), split(c)), slot="0")
+                        for c in cpvs], "preserved": list(preserved)}
+
+
+ZLIB = {"sys-libs/z-1": {"/usr/lib64/libz.so.1.3": ("lib", "libz.so.1", "")},
+        "app-misc/tool-1": {"/usr/bin/tool": ("bin", "libz.so.1")}}
+
+
+def test_removed_library_still_linked_is_flagged(tmp_path):
+    vdb = installed_root(tmp_path, ZLIB)
+    found = hc.check_removal_plan(removal(["sys-libs/z-1"]), vdb)
+    assert [(f.property, f.package, f.atom) for f in found if f.is_failure] == [
+        ("linked-library", "app-misc/tool-1", "libz.so.1")]
+
+
+def test_preserved_library_keeps_the_program_working(tmp_path):
+    vdb = installed_root(tmp_path, ZLIB)
+    doc = removal(["sys-libs/z-1"], ["/usr/lib64/libz.so.1", "/usr/lib64/libz.so.1.3"])
+    assert [f.property for f in hc.check_removal_plan(doc, vdb) if f.is_failure] == []
+
+
+def test_preserving_the_file_but_not_its_soname_link_is_flagged(tmp_path):
+    vdb = installed_root(tmp_path, ZLIB)
+    doc = removal(["sys-libs/z-1"], ["/usr/lib64/libz.so.1.3"])
+    assert [f.property for f in hc.check_removal_plan(doc, vdb)] == ["linked-library"]
+
+
+def test_removing_the_consumers_too_needs_no_preservation(tmp_path):
+    vdb = installed_root(tmp_path, ZLIB)
+    assert hc.check_removal_plan(removal(["sys-libs/z-1", "app-misc/tool-1"]), vdb) == []
+
+
+def test_preserved_library_needs_its_own_libraries(tmp_path):
+    """A preserved library linking another removed library keeps it too."""
+    vdb = installed_root(tmp_path, {
+        "sys-libs/z-1": {"/usr/lib64/libz.so.1.3": ("lib", "libz.so.1", "")},
+        "dev-libs/png-1": {"/usr/lib64/libpng.so.16.0": ("lib", "libpng.so.16", "libz.so.1")},
+        "app-misc/view-1": {"/usr/bin/view": ("bin", "libpng.so.16")}})
+    doc = removal(["sys-libs/z-1", "dev-libs/png-1"],
+                  ["/usr/lib64/libpng.so.16", "/usr/lib64/libpng.so.16.0"])
+    assert [(f.property, f.package, f.atom) for f in hc.check_removal_plan(doc, vdb)] == [
+        ("linked-library", "dev-libs/png-1", "libz.so.1")]
+
+
+def test_unmatched_dependency_after_removal_is_only_a_warning(tmp_path):
+    vdb = installed_root(tmp_path, {"sys-libs/z-1": {}, "app-misc/tool-1": {}})
+    (vdb / "app-misc/tool-1/RDEPEND").write_text("sys-libs/z\n")
+    [finding] = hc.check_removal_plan(removal(["sys-libs/z-1"]), vdb)
+    assert (finding.property, finding.atom, finding.is_failure) == ("removal-deps", "sys-libs/z", False)
+
+
+def test_removal_document_is_found_in_the_output():
+    text = 'junk\n{"removal":[],"preserved":[]}\nNumber removed: 0\n'
+    assert hc.parse_json_output(text) == {"removal": [], "preserved": []}
+
+
+def test_portuale_removal_document_passes_the_checker(tmp_path, emerge_binary, fixture_env):
+    """End to end: `-pC --json` on a root where a program links the removed
+    library prints the removal document, with the library preserved."""
+    vdb = installed_root(tmp_path, ZLIB)
+    (tmp_path / "etc").mkdir()
+    (tmp_path / "etc/ld.so.conf").write_text("/usr/lib64\n")
+    env = dict(fixture_env, ROOT=str(tmp_path), PORTAGE_RUNNING_ROOT=str(tmp_path),
+               FEATURES="preserve-libs")
+    run = subprocess.run([str(emerge_binary), "--pretend", "-C", "sys-libs/z", "--json"],
+                         capture_output=True, text=True, env=env, check=False)
+    doc = hc.parse_json_output(run.stdout)
+    assert doc == {"removal": [{
+        "category": "sys-libs", "package": "z", "version": "1", "slot": "0",
+        "needed_libraries": ["/usr/lib64/libz.so.1", "/usr/lib64/libz.so.1.3"],
+        "preserve_libs": True}],
+        "preserved": ["/usr/lib64/libz.so.1", "/usr/lib64/libz.so.1.3"]}, run.stdout + run.stderr
+    assert [f for f in hc.check_removal_plan(doc, vdb) if f.is_failure] == []
+
+
+# --- property 3: best visible version ------------------------------------------
+
+def config_root(tmp_path, ebuilds, make_conf="", package_files=None):
+    """A root with one repository `test` and its profile. `ebuilds`: cpv ->
+    md5-cache keys (KEYWORDS defaults to amd64, LICENSE to GPL-2)."""
+    repo = tmp_path / "var/db/repos/test"
+    prof = repo / "profiles/prof"
+    prof.mkdir(parents=True)
+    (prof / "make.defaults").write_text('ARCH="amd64"\nACCEPT_KEYWORDS="${ARCH}"\n'
+                                        'ACCEPT_LICENSE="-* @FREE"\n')
+    (repo / "profiles/license_groups").write_text("FREE GPL-2 @OSI\nOSI MIT\n")
+    for cpv, meta in ebuilds.items():
+        cat, pkg, version = split(cpv)
+        (repo / cat / pkg).mkdir(parents=True, exist_ok=True)
+        (repo / cat / pkg / f"{pkg}-{version}.ebuild").write_text("")
+        cache = repo / "metadata/md5-cache" / cat
+        cache.mkdir(parents=True, exist_ok=True)
+        meta = {"SLOT": "0", "KEYWORDS": "amd64", "LICENSE": "GPL-2", "EAPI": "8", **meta}
+        (cache / f"{pkg}-{version}").write_text("".join(f"{k}={v}\n" for k, v in meta.items()))
+    etc = tmp_path / "etc/portage"
+    (etc / "repos.conf").mkdir(parents=True)
+    (etc / "repos.conf/test.conf").write_text("[test]\nlocation = /var/db/repos/test\n")
+    (etc / "make.profile").symlink_to("../../var/db/repos/test/profiles/prof")
+    (etc / "make.conf").write_text(make_conf)
+    for name, text in (package_files or {}).items():
+        (etc / name).write_text(text)
+    (tmp_path / "var/db/pkg").mkdir(parents=True, exist_ok=True)
+    hc.visibility.cache_clear()
+    return tmp_path
+
+
+def reason(root, cpv, use=()):
+    cat, pkg, version = split(cpv)
+    [cand] = [c for c in hc.visibility(root).candidates((cat, pkg)) if c.pkg.version == version]
+    return hc.visibility(root).mask_reason(cand, frozenset(use))
+
+
+@pytest.mark.parametrize("keywords, accept, package_keywords, visible", [
+    ("amd64", "", "", True),
+    ("~amd64", "", "", False),
+    ("~amd64", "~amd64", "", True),
+    ("-* amd64", "", "", True),
+    ("-amd64 ~x86", "", "", False),
+    ("", "", "", False),
+    ("~amd64", "", "app-misc/a\n", True),  # no keyword given: ~ARCH
+    ("", "", "app-misc/a **\n", True),
+    ("~x86", "", "app-misc/a ~*\n", True),
+    ("x86", "", "app-misc/a *\n", True),
+    ("~amd64", "-amd64 ~amd64", "", True),
+])
+def test_keyword_visibility(tmp_path, keywords, accept, package_keywords, visible):
+    """PMS 7.3 KEYWORDS and the Devmanual's `~arch`, `-arch`, `-*`, `*`, `~*`, `**`."""
+    root = config_root(tmp_path, {"app-misc/a-1": {"KEYWORDS": keywords}},
+                       f'ACCEPT_KEYWORDS="{accept}"\n' if accept else "",
+                       {"package.accept_keywords": package_keywords})
+    assert (reason(root, "app-misc/a-1") == "") is visible
+
+
+@pytest.mark.parametrize("license, use, make_conf, visible", [
+    ("GPL-2", (), "", True),
+    ("MIT", (), "", True),  # @FREE includes @OSI
+    ("EULA", (), "", False),
+    ("|| ( EULA MIT )", (), "", True),
+    ("foo? ( EULA )", ("foo",), "", False),
+    ("foo? ( EULA )", (), "", True),
+    ("EULA", (), 'ACCEPT_LICENSE="EULA"\n', True),
+    ("MIT", (), 'ACCEPT_LICENSE="-@OSI"\n', False),
+    ("EULA", (), 'ACCEPT_LICENSE="* -EULA"\n', False),
+])
+def test_license_visibility(tmp_path, license, use, make_conf, visible):
+    root = config_root(tmp_path, {"app-misc/a-1": {"LICENSE": license}}, make_conf)
+    assert (reason(root, "app-misc/a-1", use) == "") is visible
+
+
+def test_package_mask_and_unmask(tmp_path):
+    root = config_root(tmp_path, {"app-misc/a-1": {}, "app-misc/a-2": {}},
+                       package_files={"package.mask": ">=app-misc/a-2\n"})
+    assert (reason(root, "app-misc/a-1"), reason(root, "app-misc/a-2")) == ("", "package.mask")
+    (root / "etc/portage/package.unmask").write_text("=app-misc/a-2\n")
+    hc.visibility.cache_clear()
+    assert reason(root, "app-misc/a-2") == ""
+
+
+def best(root, entries, kept_items=(), request=("app-misc/a",)):
+    doc = dict(plan(entries, kept_items), request=list(request))
+    return [(f.property, f.package, f.atom) for f in hc.check_best_versions(doc, root / "var/db/pkg")]
+
+
+A12 = {"app-misc/a-1": {}, "app-misc/a-2": {}, "app-misc/a-3": {"KEYWORDS": "~amd64"}}
+
+
+def test_older_version_than_the_best_visible_is_flagged(tmp_path):
+    root = config_root(tmp_path, A12)
+    assert best(root, [entry("app-misc/a-1", 0)]) == [("best-version", "app-misc/a-1", "=app-misc/a-2")]
+    assert best(root, [entry("app-misc/a-2", 0)]) == []
+
+
+def test_a_constraint_of_another_package_explains_the_older_version(tmp_path):
+    root = config_root(tmp_path, A12)
+    consumer = kept("app-misc/k-1", deps={"RDEPEND": "<app-misc/a-2"})
+    assert best(root, [entry("app-misc/a-1", 0)], [consumer]) == []
+
+
+def test_the_requested_version_is_not_flagged(tmp_path):
+    root = config_root(tmp_path, A12)
+    assert best(root, [entry("app-misc/a-1", 0)], request=["=app-misc/a-1"]) == []
+
+
+def test_masked_version_in_the_plan_is_flagged(tmp_path):
+    root = config_root(tmp_path, A12)
+    assert best(root, [entry("app-misc/a-3", 0)]) == [("visibility", "app-misc/a-3", "")]
+
+
+def test_a_higher_version_needing_other_packages_is_only_a_limitation(tmp_path):
+    root = config_root(tmp_path, {"app-misc/a-1": {}, "app-misc/a-2": {"RDEPEND": "dev-libs/new"}})
+    assert best(root, [entry("app-misc/a-1", 0)]) == [
+        ("checker-limitation", "app-misc/a-1", "=app-misc/a-2")]
+
+
+def test_other_slot_counts_only_when_the_slot_is_free(tmp_path):
+    root = config_root(tmp_path, {"app-misc/a-1": {}, "app-misc/a-2": {"SLOT": "2"}})
+    assert best(root, [entry("app-misc/a-1", 0)]) == [("best-version", "app-misc/a-1", "=app-misc/a-2")]
+    consumer = kept("app-misc/k-1", deps={"RDEPEND": "app-misc/a:0"})
+    assert best(root, [entry("app-misc/a-1", 0)], [consumer]) == []
+
+
+def test_rebuild_at_the_installed_version_is_not_flagged_for_a_set(tmp_path):
+    root = config_root(tmp_path, A12)
+    rebuild = [entry("app-misc/a-1", 0, outcome="reinstall")]
+    assert best(root, rebuild, request=["@world"]) == []
+    assert best(root, rebuild) == [("best-version", "app-misc/a-1", "=app-misc/a-2")]
+
+
+def test_masked_rebuild_is_flagged_even_for_a_set(tmp_path):
+    root = config_root(tmp_path, A12)
+    rebuild = [entry("app-misc/a-3", 0, outcome="reinstall")]
+    assert best(root, rebuild, request=["@world"]) == [("visibility", "app-misc/a-3", "")]

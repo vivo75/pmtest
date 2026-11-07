@@ -1,8 +1,9 @@
 #!/bin/bash
 # L0 health -- portuale only: check every L0 plan against the charter's
-# properties 1 (dependencies hold) and 2 (order is legal) with
+# properties 1 (dependencies hold), 2 (order is legal), 3 (best visible
+# version) and, for removals, 4 (linked libraries kept) with
 # pytests-contract-suite/health_checker.py, inside the container so it can
-# read the VDB. Portage is not run.
+# read the VDB, the repositories and the configuration. Portage is not run.
 #
 #   differential-test-bed/run/l0-health.sh [atomlist]
 #

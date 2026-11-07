@@ -5,8 +5,10 @@ check that the checker notices.
 Each operator looks at a clean `--json` plan and offers changes that break a
 charter property by construction (drop a needed package, swap two merges
 across a build-time edge, flip a flag REQUIRED_USE needs, ...), each with the
-finding it expects. One offer per operator and plan is drawn at random
-(fixed seed). A mutant is killed when the checker reports a new finding of an
+finding it expects; two swap a merged version for an older visible one or a
+newer masked one (property 3). Removal plans (property 4) get their own
+operators: drop a library from the preserved list, remove a library's
+package too. One offer per operator and plan is drawn at random (fixed seed). A mutant is killed when the checker reports a new finding of an
 expected property; otherwise it survives and marks a blind spot. Portage is
 not involved.
 
@@ -423,6 +425,35 @@ def two_level_runtime_of_build_dep(doc, plan):
                         return
 
 
+def _versions(plan, older: bool):
+    """(merged package, visible?, candidate) for the candidates in its slot
+    below (`older`) or above its version."""
+    if VDB is None:
+        return
+    world = hc.visibility(VDB.parents[2])
+    for _, m in plan.merges:
+        for c in [] if m.binary else world.candidates(m.cp) or ():
+            if c.pkg.slot == m.slot and (hc.vercmp(c.pkg.version, m.version) < 0) is older \
+                    and c.pkg.version != m.version:
+                yield m, not world.mask_reason(c, hc.candidate_use(c, m)), c
+
+
+def older_visible_version(doc, plan):
+    """Merge an older visible version than the plan picked (property 3)."""
+    for m, visible, c in _versions(plan, older=True):
+        if visible and outcome(doc, m) in ("new", "upgrade"):
+            yield (f"merge {c.pkg.cpv} instead of {m.version}", mutant(doc, lambda d, m=m, v=c.pkg.version:
+                   entry_for(d, m).update(version=v)), {"best-version"})
+
+
+def masked_newer_version(doc, plan):
+    """Merge a newer version that is not visible (property 3)."""
+    for m, visible, c in _versions(plan, older=False):
+        if not visible:
+            yield (f"merge masked {c.pkg.cpv} instead of {m.version}", mutant(doc, lambda d, m=m, v=c.pkg.version:
+                   entry_for(d, m).update(version=v)), {"visibility"})
+
+
 def harmless_move(doc, plan):
     """Control, must NOT be flagged: move to the end a new package nothing
     needs while building (nor at run time while something else builds)."""
@@ -445,7 +476,60 @@ OPERATORS = [drop_needed_merge, drop_needed_upgrade, swap_build_edge, break_requ
              drop_slot_rebuild, bump_sub_slot, break_use_dep, wrong_slot,
              enable_missing_conditional, drop_any_of_provider, add_build_cycle,
              add_late_build_dep, late_runtime_of_build_dep, lower_version, stale_build_dep,
-             keep_what_build_blocks, drop_sub_slot, two_level_runtime_of_build_dep, harmless_move]
+             keep_what_build_blocks, drop_sub_slot, two_level_runtime_of_build_dep,
+             older_visible_version, masked_newer_version, harmless_move]
+
+
+# --- removal operators (property 4): each yields like the plan operators --------
+
+LINKED = {"linked-library"}
+
+
+def removal_world(doc, vdb):
+    removed = {f"{r['category']}/{r['package']}-{r['version']}" for r in doc["removal"]}
+    return removed, hc.Removal(vdb.parents[2], hc.read_installed(vdb), removed, set(doc["preserved"]))
+
+
+def unpreserve_library(doc, vdb):
+    """Drop one library from the preserved list."""
+    for path in doc["preserved"]:
+        yield f"do not preserve {path}", mutant(doc, lambda d, p=path: d.update(
+            preserved=[x for x in d["preserved"] if x != p])), LINKED
+
+
+def remove_linked_provider(doc, vdb):
+    """Also remove, without preserving anything of it, an installed package
+    whose library a program staying installed links against."""
+    removed, world = removal_world(doc, vdb)
+    installed = hc.read_installed(vdb)
+    owner = {world.canon(f): c for c, p in installed.items() if c not in removed for f in p.files}
+    seen = set()
+    for cpv, pkg in sorted(installed.items()):
+        for elf in pkg.elfs if cpv not in removed else ():
+            for soname in elf.needed:
+                path = world.lookup(elf.runpaths, elf.abi, soname, False)
+                provider = owner.get(path)
+                if provider and provider != cpv and provider not in seen:
+                    seen.add(provider)
+                    cat, pkg_name, version = hc.split_cpv(provider)
+                    yield (f"also remove {provider} ({elf.path} needs {soname})",
+                           mutant(doc, lambda d, c=cat, p=pkg_name, v=version: d["removal"].append(
+                               {"category": c, "package": p, "version": v, "slot": "0",
+                                "needed_libraries": [], "preserve_libs": False})), LINKED)
+
+
+def remove_unlinked_package(doc, vdb):
+    """Control, must NOT be flagged: also remove a package that installs no
+    ELF file at all."""
+    removed, _ = removal_world(doc, vdb)
+    for cpv, pkg in sorted(hc.read_installed(vdb).items()):
+        if cpv not in removed and not pkg.elfs:
+            cat, pkg_name, version = hc.split_cpv(cpv)
+            yield f"also remove {cpv} (no ELF file)", mutant(doc, lambda d, c=cat, p=pkg_name, v=version: d[
+                "removal"].append({"category": c, "package": p, "version": v, "slot": "0"})), CONTROL
+
+
+REMOVAL_OPERATORS = [unpreserve_library, remove_linked_provider, remove_unlinked_package]
 
 
 def new_findings(base, findings, props):
@@ -454,7 +538,11 @@ def new_findings(base, findings, props):
     return sorted(keys(findings) - keys(base))
 
 
+VDB: Path | None = None  # set by main, for the property 3 operators
+
+
 def main(argv: list[str]) -> int:
+    global VDB
     vdb, per_op, seed = None, 4, 20261107
     while argv and argv[0].startswith("--"):
         opt, value, argv = argv[0], argv[1], argv[2:]
@@ -464,6 +552,7 @@ def main(argv: list[str]) -> int:
             per_op = int(value)
         elif opt == "--seed":
             seed = int(value)
+    VDB = vdb
     rng = random.Random(seed)
     names = sorted(argv)
     rng.shuffle(names)  # spread the mutants over many plans
@@ -471,25 +560,30 @@ def main(argv: list[str]) -> int:
     plans_used = set()
     for name in names:
         doc = hc.parse_json_output(Path(name).read_text(errors="replace"))
-        if not doc or doc.get("aborted") or hc.refusal(doc) or not any(
+        check = hc.check_document
+        if doc and "removal" in doc and vdb:
+            operators, context = REMOVAL_OPERATORS, vdb
+        elif doc and "entries" in doc and not doc.get("aborted") and not hc.refusal(doc) and any(
                 e["outcome"] in hc.MERGE_BOUND for e in doc["entries"]):
+            operators, context = OPERATORS, None
+        else:
             continue
-        base = hc.check_plan(doc, vdb)
+        base = check(doc, vdb)
         if any(f.is_failure and not f.pre_existing for f in base):
             continue  # only clean plans are mutated
-        plan = hc.load_plan(doc, vdb)
-        for op in OPERATORS:
+        context = context or hc.load_plan(doc, vdb)
+        for op in operators:
             if sum(counts[op.__name__]) >= per_op:
                 continue
             offers = []
-            for offer in op(doc, plan):
+            for offer in op(doc, context):
                 offers.append(offer)
                 if len(offers) >= MAX_OFFERS:
                     break
             if not offers:
                 continue
             desc, make, expected = rng.choice(offers)
-            new = new_findings(base, hc.check_plan(make(), vdb), expected)
+            new = new_findings(base, check(make(), vdb), expected)
             counts[op.__name__][0 if new else 1] += 1
             if expected is CONTROL:
                 desc = ("FALSE ALARM: " if new else "control ok: ") + desc
@@ -498,10 +592,11 @@ def main(argv: list[str]) -> int:
                               "killed": bool(new), "by": new[:2]}))
     print(f"\n{'operator':32} killed survived   ({len(plans_used)} plans mutated;"
           " for the control, killed = false alarm)")
-    for op in OPERATORS:
+    controls = ("harmless_move", "remove_unlinked_package")
+    for op in OPERATORS + REMOVAL_OPERATORS:
         print(f"{op.__name__:32} {counts[op.__name__][0]:6} {counts[op.__name__][1]:8}")
-    survivors = sum(s for name, (_, s) in counts.items() if name != "harmless_move")
-    return 1 if survivors or counts["harmless_move"][0] else 0
+    survivors = sum(s for name, (_, s) in counts.items() if name not in controls)
+    return 1 if survivors or any(counts[c][0] for c in controls) else 0
 
 
 if __name__ == "__main__":

@@ -48,6 +48,16 @@
 -pvC app-misc/tmux
 -pv --unmerge dev-libs/blake3
 -pv --prune sys-kernel/linux-headers
+# installed packages, so these remove something (property 4)
+-pvC sys-libs/zlib
+-pvC dev-libs/libpcre2
+-pv --unmerge dev-libs/expat app-arch/xz-utils
+-pvC dev-libs/openssl
+-pvC dev-libs/libffi
+-pv --depclean app-portage/portage-utils
+-pv --depclean app-misc/pax-utils
+-pv --prune app-text/docbook-xml-dtd
+-pv --prune --nodeps app-text/docbook-xml-dtd
 
 #:family multi-atom
 dev-lang/python:3.13 dev-lang/python:3.14

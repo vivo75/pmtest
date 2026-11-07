@@ -14,8 +14,8 @@ teacher, no longer the oracle. Correctness is judged by five health
 properties (dependencies hold, legal order, newest visible versions,
 removal keeps libraries, helpful messages), checked by the standalone
 health checker `pytests-contract-suite/health_checker.py`, not by
-matching Portage's output. Today the checker covers the first two
-properties; the others have no checker in this tree yet. pmtest also
+matching Portage's output. The checker covers properties 1 to 4; property 5
+(helpful messages) has no checker yet. pmtest also
 supports Portage's development. The pinned outputs, the harvested corpus
 and the Portage-vs-portuale comparisons record what Portage printed: use
 them as a regression and comparison tool, not as a statement of what is
@@ -33,7 +33,7 @@ No package-manager logic lives here: only harnesses, fixtures and oracles.
 
 | Dir | Origin | Contents |
 |---|---|---|
-| `pytests-contract-suite/` | `portuale/tests/` | pytest contract suite (black-box through the CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark gate, musl smoke; `health_checker.py` (+ `test_health_checker.py`) checks a plan against the charter's health properties 1 and 2. The pinned outputs record what Portage printed. |
+| `pytests-contract-suite/` | `portuale/tests/` | pytest contract suite (black-box through the CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark gate, musl smoke; `health_checker.py` (+ `test_health_checker.py`) checks a plan against the charter's health properties 1 to 4. The pinned outputs record what Portage printed. |
 | `fixtures/` | `portuale/fixtures/` | synthetic trees (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) the suite runs against. **Single copy**: since 2026-09-18 the package manager's tree has none of its own, and `portuale/fixtures` is a symlink to this one (`portuale@335543e`), so both the contract suite and the Rust `#[cfg(test)]` tests read it. Every addition or fix is made here. |
 | `differential-test-bed/` | `portuale/TEST/` | container test bed: Portage-vs-portuale comparison layers (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source build) as a regression and comparison tool, plus the portuale-only health layer (`run/l0-health.sh`, `compare/health-mutants.py`, `compare/health-report.py`) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
 | `bench/` | `portuale/bench/` | benchmark harness (batch mode) + a real Gentoo snapshot (`gentoo_snapshot.json`) |

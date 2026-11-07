@@ -19,6 +19,12 @@ Properties, from portuale's charter (PMS-based, no Portage involved):
    at that moment. A need only a later package of the same cycle can meet
    (build-time and runtime edges between merges) is noted as an
    unserializable cycle, not reported as a failure.
+4. A removal (the `{"removal": ...}` document of `-C`, `--depclean`,
+   `--prune` with `--pretend --json`) keeps every shared library that an
+   ELF file staying installed still links against: the dynamic linker
+   still finds it after the removal, or it is in the `preserved` list.
+   Dependencies the removal leaves unmatched are warnings (`removal-deps`),
+   since the charter lets the user remove them. Needs the VDB.
 
 With a VDB, the system before the plan is the VDB itself, not the plan's
 `kept` list, so an installed package the plan silently drops is seen.
@@ -35,8 +41,10 @@ would run has a failure it introduces.
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import json
+import os
 import re
 import sys
 import time
@@ -49,11 +57,16 @@ BUILD_CLASSES = ("DEPEND", "BDEPEND")
 DEP_CLASSES = ("DEPEND", "BDEPEND", "RDEPEND", "PDEPEND", "IDEPEND")
 
 
+# Notes and warnings: recorded, never a failure. `removal-deps` is a
+# dependency a removal leaves unmatched, which the charter allows.
+NOT_FAILURES = frozenset({"cycle-noted", "checker-limitation", "removal-deps"})
+
+
 @dataclass(frozen=True)
 class Finding:
     """One broken property: which package, which atom, and why."""
 
-    property: str  # runtime-deps, blocker, required-use, slot, build-order, cycle-noted
+    property: str  # runtime-deps, blocker, required-use, slot, build-order, linked-library, ...
     package: str
     atom: str
     reason: str
@@ -61,7 +74,7 @@ class Finding:
 
     @property
     def is_failure(self) -> bool:
-        return self.property != "cycle-noted"
+        return self.property not in NOT_FAILURES
 
 
 # --- versions (PMS 3.2, 3.3) ------------------------------------------------
@@ -433,15 +446,22 @@ def read_vdb(vdb: Path | None, category: str, package: str, version: str) -> dic
     }
 
 
+def split_pv(pv: str) -> tuple[str, str] | None:
+    """`name-1.0-r1` -> (`name`, `1.0-r1`), or None."""
+    m = re.match(r"^(.+?)-(\d[^-]*(?:-r\d+)?)$", pv)
+    return (m.group(1), m.group(2)) if m and is_version(m.group(2)) else None
+
+
+def split_cpv(cpv: str) -> tuple[str, str, str]:
+    category, _, pv = cpv.partition("/")
+    return (category, *split_pv(pv))
+
+
 @functools.lru_cache(maxsize=None)
 def installed_cpvs(vdb: Path) -> tuple[tuple[str, str, str], ...]:
     """(category, package, version) of every package in the VDB."""
-    out = []
-    for d in sorted(vdb.glob("*/*")):
-        m = re.match(r"^(.+?)-(\d[^-]*(?:-r\d+)?)$", d.name)
-        if d.is_dir() and m and is_version(m.group(2)):
-            out.append((d.parent.name, m.group(1), m.group(2)))
-    return tuple(out)
+    return tuple((d.parent.name, *split_pv(d.name)) for d in sorted(vdb.glob("*/*"))
+                 if d.is_dir() and split_pv(d.name))
 
 
 def _package(category, package, version, slot, data: dict | None, binary=False) -> Package:
@@ -725,6 +745,522 @@ def check_order(plan: Plan) -> list[Finding]:
     return findings
 
 
+# --- property 3: each merged package is the best visible version ------------
+# Visibility (PMS 5.2, 7.3; Devmanual "Keywording"): a version is visible when
+# no package.mask atom matches it (unless package.unmask does), one of its
+# KEYWORDS is accepted, and its LICENSE is.
+
+_ASSIGN = re.compile(r"""^[ \t]*(?:export[ \t]+)?(\w+)=("(?:[^"\\]|\\.)*"|'[^']*'|\S*)"""
+                     r"""|^[ \t]*(?:source|\.)[ \t]+(\S+)""", re.M | re.S)
+
+
+def read_make_vars(path: Path, env: dict, root: Path) -> dict:
+    """The assignments of a make.conf-style file, `${VAR}` expanded against
+    `env` and the file itself; `source` lines are followed."""
+    out = {}
+    text = path.read_text(errors="replace") if path.is_file() else ""
+    for m in _ASSIGN.finditer(text):
+        if m.group(3):
+            out.update(read_make_vars(root / m.group(3).lstrip("/"), {**env, **out}, root))
+            continue
+        value = m.group(2)
+        if value[:1] in "\"'":
+            value = value[1:-1]
+        both = {**env, **out}
+        out[m.group(1)] = re.sub(r"\$\{(\w+)\}|\$(\w+)",
+                                 lambda v: both.get(v.group(1) or v.group(2), ""), value)
+    return out
+
+
+def stack(tokens: list[str], text: str) -> list[str]:
+    """Apply one incremental layer (`-*` clears, `-x` removes)."""
+    for t in text.split():
+        if t == "-*":
+            tokens = []
+        elif t.startswith("-"):
+            tokens = [x for x in tokens if x != t[1:]]
+        elif t not in tokens:
+            tokens = tokens + [t]
+    return tokens
+
+
+def read_lines(path: Path) -> list[str]:
+    """The non-comment lines of a config file, or of every file under a
+    config directory (hidden and backup files skipped)."""
+    if path.is_dir():
+        return [ln for f in sorted(path.rglob("*")) if f.is_file()
+                and not f.name.startswith(".") and not f.name.endswith("~") for ln in read_lines(f)]
+    lines = path.read_text(errors="replace").splitlines() if path.is_file() else []
+    return [ln.split("#")[0].strip() for ln in lines if ln.split("#")[0].strip()]
+
+
+@dataclass
+class Candidate:
+    """One ebuild of the repositories, with what visibility needs."""
+
+    pkg: Package
+    keywords: list[str]
+    license: str
+    iuse_raw: list[str]
+    repo: str
+
+
+class Visibility:
+    """An independent model of which ebuilds are visible on a system, read
+    from its repositories and configuration (no package manager involved)."""
+
+    def __init__(self, root: Path):
+        self.root = root
+        etc = root / "etc/portage"
+        self.repos = self._repos(etc)
+        chain = self._profile_chain((etc / "make.profile").resolve()) + [etc / "profile"]
+        env: dict = {}
+        layers = [root / "usr/share/portage/config/make.globals"] + [
+            d / "make.defaults" for d in chain] + [etc / "make.conf"]
+        values = []
+        for layer in layers:
+            values.append(read_make_vars(layer, env, root))
+            env.update(values[-1])
+        values.append(os.environ)
+        self.accept_keywords = []
+        for v in values:
+            self.accept_keywords = stack(self.accept_keywords, v.get("ACCEPT_KEYWORDS", ""))
+        # Incremental too, but with groups: kept as written, see `_license_ok`.
+        self.accept_license = [t for v in values for t in v.get("ACCEPT_LICENSE", "").split()]
+        self.masks = []  # (atom text, the repo it applies to or "")
+        for name, location in self.repos.items():
+            own = "" if name == "gentoo" else name
+            self.masks += [(a, own) for a in read_lines(location / "profiles/package.mask")]
+        for d in chain + [etc]:
+            for line in read_lines(d / "package.mask"):
+                self.masks = ([m for m in self.masks if m[0] != line[1:]] if line.startswith("-")
+                              else self.masks + [(line, "")])
+        self.unmasks = [a for d in chain + [etc] for a in read_lines(d / "package.unmask")]
+        self.package_keywords = [ln.split() for d in chain + [etc] for f in (
+            "package.accept_keywords", "package.keywords") for ln in read_lines(d / f)]
+        self.package_license = [ln.split() for ln in read_lines(etc / "package.license")]
+        self.groups = {}
+        for location in self.repos.values():
+            for line in read_lines(location / "profiles/license_groups"):
+                name, *members = line.split()
+                self.groups.setdefault(name, members)
+
+    def _repos(self, etc: Path) -> dict[str, Path]:
+        out, name = {}, None
+        for line in read_lines(etc / "repos.conf"):
+            if line.startswith("["):
+                name = line.strip("[]")
+            elif name and name != "DEFAULT" and line.replace(" ", "").startswith("location="):
+                out[name] = self.root / line.split("=", 1)[1].strip().lstrip("/")
+        return out
+
+    def _profile_chain(self, profile: Path) -> list[Path]:
+        chain = []
+        for parent in read_lines(profile / "parent"):
+            repo, sep, rel = parent.partition(":")
+            base = (self.repos[repo] / "profiles") if sep and repo in self.repos else profile
+            chain += self._profile_chain((base / (rel if sep else parent)).resolve())
+        return chain + [profile]
+
+    @functools.lru_cache(maxsize=None)
+    def candidates(self, cp: tuple[str, str]) -> list[Candidate] | None:
+        """Every ebuild of `cp` in the repositories, or None when one has
+        ebuilds without a metadata cache (not modelled)."""
+        out = []
+        for name, location in self.repos.items():
+            if not (location / cp[0] / cp[1]).is_dir():
+                continue
+            cache = location / "metadata/md5-cache" / cp[0]
+            ebuilds = list((location / cp[0] / cp[1]).glob("*.ebuild"))
+            entries = [cache / e.name.removesuffix(".ebuild") for e in ebuilds]
+            if any(not e.is_file() for e in entries):
+                return None
+            for e in entries:
+                meta = dict(ln.split("=", 1) for ln in e.read_text(errors="replace").splitlines() if "=" in ln)
+                main, sub = _split_slot(meta.get("SLOT", "0"))
+                iuse = meta.get("IUSE", "").split()
+                pkg = Package(cp[0], cp[1], split_pv(e.name)[1], main, sub,
+                              iuse=frozenset(f.lstrip("+-") for f in iuse),
+                              dependencies={c: meta[c] for c in DEP_CLASSES if meta.get(c)},
+                              required_use=meta.get("REQUIRED_USE", ""))
+                out.append(Candidate(pkg, meta.get("KEYWORDS", "").split(), meta.get("LICENSE", ""),
+                                     iuse, name))
+        return out
+
+    def _matching(self, lines: list[list[str]], pkg: Package) -> list[str]:
+        """The tokens of the per-package lines whose atom matches `pkg`."""
+        out = []
+        for atom, *tokens in lines:
+            try:
+                if matches(parse_atom(atom), pkg):
+                    out.append(tokens)
+            except ValueError:
+                pass
+        return out
+
+    def _masked(self, cand: Candidate) -> bool:
+        def hit(text: str) -> bool:
+            try:
+                return matches(parse_atom(text), cand.pkg) and (
+                    "::" not in text or text.split("::")[1].split("[")[0] == cand.repo)
+            except ValueError:
+                return False
+        return (any(hit(a) for a, repo in self.masks if repo in ("", cand.repo))
+                and not any(hit(a) for a in self.unmasks))
+
+    def _keyword_ok(self, cand: Candidate) -> bool:
+        accepted = self.accept_keywords
+        for tokens in self._matching(self.package_keywords, cand.pkg):
+            default = [f"~{k}" for k in self.accept_keywords if k[:1] not in "~-"]
+            accepted = stack(accepted, " ".join(tokens or default))
+        if "**" in accepted:
+            return True
+        return any(k in accepted or (k.startswith("~") and "~*" in accepted)
+                   or (k[:1] not in "~-" and "*" in accepted)
+                   for k in cand.keywords if not k.startswith("-"))
+
+    def _license_ok(self, cand: Candidate, use: frozenset) -> bool:
+        tokens = self.accept_license + [
+            t for ts in self._matching(self.package_license, cand.pkg) for t in ts]
+        allowed, denied, everything = set(), set(), False
+        for token in tokens:
+            names = self._group(token.lstrip("-"))
+            if token == "-*":
+                allowed, denied, everything = set(), set(), False
+            elif token == "*":
+                everything, denied = True, set()
+            elif token.startswith("-"):
+                allowed, denied = allowed - names, denied | names
+            else:
+                allowed, denied = allowed | names, denied - names
+
+        def holds(node) -> bool:
+            if node[0] == "flag":
+                return node[1] in allowed or (everything and node[1] not in denied)
+            values = [holds(c) for c in node[1]]
+            return any(values) if node[0] == "any" else all(values)
+        try:
+            nodes = reduce_use(parse_dep_string(cand.license, required_use=True), use)
+        except ValueError:
+            return False
+        return all(holds(n) for n in nodes)
+
+    def _group(self, token: str, depth: int = 0) -> set[str]:
+        if not token.startswith("@") or depth > 8:
+            return {token}
+        return {x for m in self.groups.get(token[1:], ()) for x in self._group(m, depth + 1)}
+
+    def mask_reason(self, cand: Candidate, use: frozenset) -> str:
+        """Why `cand` is not visible ("" when it is)."""
+        if self._masked(cand):
+            return "package.mask"
+        if not self._keyword_ok(cand):
+            return "keywords"
+        return "" if self._license_ok(cand, use) else "license"
+
+
+@functools.lru_cache(maxsize=None)
+def visibility(root: Path) -> Visibility:
+    return Visibility(root)
+
+
+def candidate_use(cand: Candidate, merged: Package) -> frozenset:
+    """The USE a candidate would get in place of `merged`: its flags as the
+    plan set them on `merged`, IUSE defaults for new ones, and the implicit
+    flags (`elibc_*`, `kernel_*`, ...) of `merged`."""
+    own = {f.lstrip("+-") for f in cand.iuse_raw if (
+        f.lstrip("+-") in merged.use if f.lstrip("+-") in merged.iuse else f.startswith("+"))}
+    return frozenset(own | (merged.use - merged.iuse))
+
+
+def _constraints(plan: Plan, merged: Package, request: list[Atom]) -> tuple[list, list]:
+    """The atoms other packages (and the request) place on `merged`'s
+    package that `merged` meets, with their owners, and the blockers of
+    the others."""
+    needs, blockers = [], []
+    for pkg in plan.final:
+        if pkg is merged:
+            continue
+        classes = DEP_CLASSES if any(pkg is m for _, m in plan.merges) else RUNTIME_CLASSES
+        for c in classes:
+            for node in _reduced(pkg, c):
+                for atom in _all_atoms([node]):
+                    if atom.cp != merged.cp:
+                        continue
+                    if atom.blocker:
+                        blockers.append((atom, pkg))
+                    elif matches(atom, merged, pkg.use):
+                        needs.append((atom, pkg))
+    needs += [(a, None) for a in request if a.cp == merged.cp and matches(a, merged)]
+    return needs, blockers
+
+
+def _all_atoms(nodes: list) -> list[Atom]:
+    """Every atom of a reduced tree, alternatives and blockers included."""
+    return [a for n in nodes for a in ([n[1]] if n[0] == "atom" else _all_atoms(n[1]))]
+
+
+def _fits(cand: Candidate, use: frozenset, merged: Package, plan: Plan, needs, blockers) -> str:
+    """"yes" when `cand` can take `merged`'s place with nothing else in the
+    plan changed, "no" when the others' atoms or blockers forbid it,
+    "unknown" when it would need more changes (its own dependencies)."""
+    pkg = dataclasses.replace(cand.pkg, use=use)
+    if any(not matches(a, pkg, owner.use if owner else frozenset()) for a, owner in needs):
+        return "no"
+    if any(matches(a, pkg, owner.use) for a, owner in blockers):
+        return "no"
+    others = index([p for p in plan.final if p is not merged] + [pkg])
+    if _blocker_hits([n for c in DEP_CLASSES for n in _reduced(pkg, c)], others, pkg):
+        return "no"
+    unmet = [n for c in DEP_CLASSES for n in _reduced(pkg, c) if not _satisfied(n, others, pkg)]
+    broken = pkg.required_use and required_use_holds(pkg.required_use, use)
+    return "unknown" if unmet or broken else "yes"
+
+
+def request_atoms(doc: dict, root: Path) -> list[Atom]:
+    """The plain atoms of the request, with `@world`/`@selected` read from
+    the world file (other sets name no versions worth modelling)."""
+    out = []
+    for arg in doc.get("request", ()):
+        texts = read_lines(root / "var/lib/portage/world") if arg in ("@world", "@selected") else [arg]
+        for text in texts:
+            try:
+                out.append(parse_atom(text))
+            except ValueError:
+                pass
+    return out
+
+
+def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
+    """Property 3: no merged package has a higher visible version (in its
+    slot, or in any slot for a new package nothing pins to one) that every
+    constraint of the plan also allows."""
+    if vdb is None or "request" not in doc:
+        return [Finding("checker-limitation", "", "", "property 3 needs the VDB and `-v --json`")]
+    root = vdb.parents[2]
+    world = visibility(root)
+    plan = load_plan(doc, vdb)
+    request = request_atoms(doc, root)
+    sets = [a for a in doc["request"] if a.startswith("@")]
+    named = {a.cp for a in request_atoms({"request": [a for a in doc["request"] if a not in sets]}, root)}
+    findings = []
+    for order, merged in plan.merges:
+        entry = next(e for e in doc["entries"] if e["merge_order"] == order)
+        if merged.binary or not merged.known:
+            continue
+        cands = world.candidates(merged.cp)
+        mine = [c for c in cands or () if c.pkg.version == merged.version]
+        if cands is None or not mine:
+            findings.append(Finding("checker-limitation", merged.cpv, "",
+                                    "property 3: the repositories' metadata cache does not have it"))
+            continue
+        reasons = {world.mask_reason(c, merged.use) for c in mine}
+        if "" not in reasons:
+            findings.append(Finding("visibility", merged.cpv, "",
+                                    f"not visible: masked by {', '.join(sorted(reasons))}"))
+            continue
+        # A rebuild at the installed version is what a request without
+        # --update means, unless the package was named on the command line.
+        if entry["outcome"] == "reinstall" and merged.cp not in named:
+            continue
+        needs, blockers = _constraints(plan, merged, request)
+        free = entry["outcome"] == "new" and all(not a.slot for a, _ in needs) and \
+            sum(p.cp == merged.cp for p in plan.final + plan.initial) == 1
+        findings += _better_version(world, plan, merged, cands, needs, blockers, free)
+    return findings
+
+
+def _better_version(world, plan, merged, cands, needs, blockers, free) -> list[Finding]:
+    """A finding for the highest visible candidate above `merged` that fits
+    the plan; a limitation record when one might, but needs other changes."""
+    unknown = None
+    higher = [c for c in cands if vercmp(c.pkg.version, merged.version) > 0
+              and (c.pkg.slot == merged.slot or free)]
+    for cand in sorted(higher, key=functools.cmp_to_key(lambda a, b: vercmp(b.pkg.version, a.pkg.version))):
+        use = candidate_use(cand, merged)
+        if world.mask_reason(cand, use):
+            continue
+        fit = _fits(cand, use, merged, plan, needs, blockers)
+        if fit == "yes":
+            return [Finding("best-version", merged.cpv, f"={cand.pkg.cpv}",
+                            f"{cand.pkg.version} (slot {cand.pkg.slot}) is visible and meets every "
+                            f"atom the plan places on {merged.category}/{merged.package}")]
+        unknown = unknown or (fit == "unknown" and cand)
+    if unknown:
+        return [Finding("checker-limitation", merged.cpv, f"={unknown.pkg.cpv}",
+                        "property 3: a higher visible version would need other changes")]
+    return []
+
+
+# --- property 4: a removal keeps the libraries remaining programs link -------
+
+@dataclass(frozen=True)
+class Elf:
+    """One `NEEDED.ELF.2` line: an ELF file, its soname, where it looks for
+    libraries and which ones it needs, and its ABI (multilib category)."""
+
+    path: str
+    soname: str
+    runpaths: tuple[str, ...]
+    needed: tuple[str, ...]
+    abi: str
+
+
+@dataclass
+class Installed:
+    """What the VDB records about one installed package's files."""
+
+    files: set[str]  # every non-directory path of CONTENTS
+    elfs: list[Elf]
+
+
+def read_elfs(text: str) -> list[Elf]:
+    out = []
+    for line in text.splitlines():
+        f = line.split(";")
+        if len(f) < 5:
+            continue
+        origin = str(Path(f[1]).parent)
+        runpaths = tuple(r.replace("${ORIGIN}", origin).replace("$ORIGIN", origin)
+                         for r in f[3].split(":") if r)
+        abi = f[5] if len(f) > 5 and f[5] else f[0]
+        out.append(Elf(f[1], f[2], runpaths, tuple(n for n in f[4].split(",") if n), abi))
+    return out
+
+
+def read_files(text: str) -> set[str]:
+    """Paths of the `obj` and `sym` lines of a CONTENTS text."""
+    out = set()
+    for line in text.splitlines():
+        if line.startswith("obj "):
+            out.add(line[4:].rsplit(" ", 2)[0])
+        elif line.startswith("sym "):
+            out.add(line[4:].split(" -> ")[0])
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def read_installed(vdb: Path) -> dict[str, Installed]:
+    """cpv -> files and ELF data of every installed package."""
+    out = {}
+    for cat, pkg, version in installed_cpvs(vdb):
+        d = vdb / cat / f"{pkg}-{version}"
+        text = {k: (d / k).read_text(errors="replace") if (d / k).is_file() else ""
+                for k in ("CONTENTS", "NEEDED.ELF.2")}
+        out[f"{cat}/{pkg}-{version}"] = Installed(read_files(text["CONTENTS"]),
+                                                  read_elfs(text["NEEDED.ELF.2"]))
+    return out
+
+
+def ld_paths(root: Path) -> list[str]:
+    """The dynamic linker's search directories: /etc/ld.so.conf (with its
+    `include` globs), then the default ones."""
+    def read(conf: Path) -> list[str]:
+        out = []
+        lines = conf.read_text(errors="replace").splitlines() if conf.is_file() else []
+        for line in (ln.split("#")[0].strip() for ln in lines):
+            if line.startswith("include "):
+                for pattern in line.split()[1:]:
+                    base = conf.parent if not pattern.startswith("/") else root
+                    for inc in sorted(base.glob(pattern.lstrip("/"))):
+                        out += read(inc)
+            elif line.startswith("/"):
+                out.append(line)
+        return out
+    return read(root / "etc/ld.so.conf") + ["/lib64", "/usr/lib64", "/lib", "/usr/lib"]
+
+
+class Removal:
+    """The file system before and after a removal, as the VDB and the disk
+    describe it. Paths are compared with their directories resolved, so a
+    `/lib64 -> usr/lib64` link names one file twice."""
+
+    def __init__(self, root: Path, installed: dict[str, Installed], removed: set[str],
+                 preserved: set[str]):
+        self.root, self.real_root = root, root.resolve()
+        self.dirs = ld_paths(root)
+        self.abi = {self.canon(e.path): e.abi for p in installed.values() for e in p.elfs}
+        staying = {self.canon(f) for c, p in installed.items() if c not in removed for f in p.files}
+        self.gone = {self.canon(f) for c in removed for f in installed[c].files} - staying
+        self.gone -= {self.canon(f) for f in preserved}
+        self.owner = {self.canon(f): c for c in removed for f in installed[c].files}
+
+    def inside(self, disk: Path) -> str:
+        """An absolute path on this machine, as a path under the root."""
+        try:
+            rel = str(disk.relative_to(self.real_root))
+        except ValueError:
+            return str(disk)  # a link leaving the root: keep it as written
+        return "/" if rel == "." else "/" + rel
+
+    @functools.lru_cache(maxsize=None)
+    def canon(self, path: str) -> str:
+        head, _, tail = path.rpartition("/")
+        return self.inside((self.root / head.lstrip("/")).resolve()).rstrip("/") + "/" + tail
+
+    def exists(self, path: str, after: bool, depth: int = 0) -> bool:
+        """Whether `path` (and the links it goes through) is there."""
+        if after and path in self.gone:
+            return False
+        disk = self.root / path.lstrip("/")
+        if not disk.is_symlink():
+            return disk.exists()
+        target = self.canon(str(Path(path).parent / disk.readlink()))
+        return depth < 16 and self.exists(target, after, depth + 1)
+
+    @functools.lru_cache(maxsize=None)
+    def lookup(self, runpaths: tuple, abi: str, soname: str, after: bool) -> str | None:
+        """Where the dynamic linker finds `soname` for an ELF file of `abi`
+        with these runpaths: the first search directory holding a file of
+        that ABI by that name."""
+        for d in runpaths + tuple(self.dirs):
+            path = self.canon(f"{d.rstrip('/')}/{soname}")
+            if self.exists(path, after):
+                real = self.inside((self.root / path.lstrip("/")).resolve())
+                if self.abi.get(real, abi) == abi:
+                    return path
+        return None
+
+
+def check_removal_plan(doc: dict, vdb: Path | None) -> list[Finding]:
+    """Property 4 on a pretend removal (`-C`, `--depclean`, `--prune` with
+    `--json`): every library a remaining ELF file needs is still found after
+    the removal, or preserved; a dependency the removal leaves unmatched is
+    only a warning (the charter allows it)."""
+    if vdb is None:
+        return [Finding("checker-limitation", "", "", "a removal is checked against the VDB")]
+    installed = read_installed(vdb)
+    removed = {f"{r['category']}/{r['package']}-{r['version']}" for r in doc["removal"]}
+    preserved = set(doc.get("preserved", ()))
+    world = Removal(vdb.parents[2], installed, removed, preserved)
+    kept_files = {world.canon(p) for p in preserved}
+    findings = []
+    for cpv, pkg in sorted(installed.items()):
+        for elf in pkg.elfs:
+            if cpv in removed and world.canon(elf.path) not in kept_files:
+                continue
+            for soname in elf.needed:
+                before = world.lookup(elf.runpaths, elf.abi, soname, False)
+                if before and not world.lookup(elf.runpaths, elf.abi, soname, True):
+                    findings.append(Finding(
+                        "linked-library", cpv, soname,
+                        f"{elf.path} needs {soname}: {before} goes with "
+                        f"{world.owner.get(before, 'the removal')} and is not preserved"))
+    return findings + removal_dependency_warnings(vdb, removed)
+
+
+def removal_dependency_warnings(vdb: Path, removed: set[str]) -> list[Finding]:
+    """Run-time dependencies the removal leaves unmatched (allowed, warned)."""
+    before = [_package(c, p, v, "", read_vdb(vdb, c, p, v)) for c, p, v in installed_cpvs(vdb)]
+    after = [p for p in before if p.cpv not in removed]
+    initial, final = index(before), index(after)
+    return [Finding("removal-deps", pkg.cpv, render(node),
+                    f"{dep_class} no longer matched after the removal")
+            for pkg in after for dep_class in RUNTIME_CLASSES
+            for node in _reduced(pkg, dep_class)
+            if _satisfied(node, initial, pkg) and not _satisfied(node, final, pkg)]
+
+
 def check_plan(doc: dict, vdb: Path | None = None) -> list[Finding]:
     """Every finding for one `--pretend -v --json` document."""
     plan = load_plan(doc, vdb)
@@ -737,6 +1273,13 @@ def check_plan(doc: dict, vdb: Path | None = None) -> list[Finding]:
             except ValueError as err:
                 limits.append(Finding("checker-limitation", pkg.cpv, dep_class, f"cannot parse: {err}"))
     return limits + check_final_state(plan) + check_order(plan)
+
+
+def check_document(doc: dict, vdb: Path | None = None) -> list[Finding]:
+    """Every finding for one document: a removal, or a merge plan."""
+    if "removal" in doc:
+        return check_removal_plan(doc, vdb)
+    return check_plan(doc, vdb) + check_best_versions(doc, vdb)
 
 
 def refusal(doc: dict) -> str:
@@ -755,7 +1298,7 @@ def refusal(doc: dict) -> str:
 def parse_json_output(text: str) -> dict | None:
     """The `--json` document in a captured stdout, or None."""
     for line in text.splitlines():
-        if line.startswith('{"entries":'):
+        if line.startswith(('{"entries":', '{"removal":')):
             return json.loads(line)
     return None
 
@@ -774,10 +1317,10 @@ def main(argv: list[str]) -> int:
             record["skipped"] = f"plan aborted: {doc['aborted'].get('reason')}"
         else:
             start = time.monotonic()
-            findings = check_plan(doc, vdb)
+            findings = check_document(doc, vdb)
             record["seconds"] = round(time.monotonic() - start, 3)
-            record["findings"] = [asdict(f) for f in findings]
-            record["refused"] = refusal(doc)
+            record["findings"] = [dict(asdict(f), failure=f.is_failure) for f in findings]
+            record["refused"] = "" if "removal" in doc else refusal(doc)
             failed |= not record["refused"] and any(
                 f.is_failure and not f.pre_existing for f in findings)
         print(json.dumps(record, sort_keys=True))
