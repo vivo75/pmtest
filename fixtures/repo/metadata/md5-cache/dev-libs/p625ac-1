@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #625(b) installed-slot arm of the walk-chosen || branch
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p625late
+SLOT=1
+_md5_=81bb566d3d1e82e6af3b7f4d449adb1d

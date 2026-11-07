@@ -39092,3 +39092,34 @@ def test_606_q19_installed_virtual_selecting_the_merge_is_its_parent(
         "5.44": {("dev-libs/p590vpull-2", "5.44"), ("virtual/p590vva-1", "5.44")},
         "5.42": {("virtual/p590vva-1", "5.42"), ("virtual/p590vvb-1", "5.42")},
     }, got.stdout
+
+
+def test_625b_walk_chosen_or_branch_owns_the_merge_order_edge(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#625(b): `emerge -pe dev-libs/p625r`. p625r's `|| ( p625ac:2
+    p625ac:1 )` is decided while only the installed slot 1 exists, so the
+    walk takes `p625ac:1`; p625ac-1's own `p625late` then pulls `p625ac:2`
+    in. Both arms are merge-bound afterwards, and the merge order must keep
+    the edge on the arm the walk chose (p625r after p625ac-1), not re-pick
+    the first all-merge-bound branch (which floated p625ac-1 after p625r).
+
+    Oracle: Portage 3.0.83 ResolverPlayground (3rdparty/portage
+    ae324a809), portuale `LLM/evidence/2026-11-06-sweep/625b/probe625b_oracle.py`
+    on this shape: `--emptytree` `MERGELIST ['dev-libs/p625ac-2',
+    'dev-libs/p625late-1', 'dev-libs/p625ac-1', 'dev-libs/p625r-1']`.
+    Portage adds edges only for the atoms the walk selected
+    (`depgraph.py:4508-4515` `_select_atoms`, `:4536` -> `_add_dep`)."""
+    root = _b1_root(
+        tmp_path, [], [("dev-libs", "p625ac", "1", "1", {"EAPI": "8", "RDEPEND": "dev-libs/p625late"})]
+    )
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", "--emptytree", "dev-libs/p625r"], env)
+    assert got.returncode == 0, got.stdout
+    rows = [line for line in got.stdout.splitlines() if line.startswith("[ebuild")]
+    assert rows == [
+        f"[ebuild  NS    ] dev-libs/p625ac-2 [1] to {root}",
+        f"[ebuild  N     ] dev-libs/p625late-1 to {root}",
+        f"[ebuild   R    ] dev-libs/p625ac-1 to {root}",
+        f"[ebuild  N     ] dev-libs/p625r-1 to {root}",
+    ], got.stdout

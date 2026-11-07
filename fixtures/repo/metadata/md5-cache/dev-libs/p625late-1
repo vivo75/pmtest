@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #625(b) chain from the chosen arm to the first arm
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p625ac:2
+SLOT=0
+_md5_=77c6b0878fc10023412692838240f9eb

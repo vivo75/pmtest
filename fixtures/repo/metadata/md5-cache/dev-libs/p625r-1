@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #625(b) consumer whose walk picks the second || arm
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-libs/p625ac:2 dev-libs/p625ac:1 )
+SLOT=0
+_md5_=ddb16a4946f8650bcfe97a08abe59700

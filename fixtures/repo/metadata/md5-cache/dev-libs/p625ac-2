@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #625(b) first || arm, pulled later through the chosen arm
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=9c126662111af8c4f766e2f239fbab18
