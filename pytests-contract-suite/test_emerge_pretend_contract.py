@@ -3183,6 +3183,7 @@ CASES = [
     ("#609: the same stop with --autounmask=n (r594htop, Portage 3.0.83, rc 1, backtrack 0/20)", ["--pretend", "--verbose", "--autounmask=n", "dev-libs/r594htop"], 1),
     ("#609: the same stop with --backtrack=0 (r594htop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594htop"], 1),
     ("#609: the masked dependency first in the string stops the walk with --backtrack=0 (r594etop, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594etop"], 1),
+    ("#611(e): the USE change prints before the masked dependency block (r594qtop --backtrack=0, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594qtop"], 1),
 ]
 
 
@@ -21279,6 +21280,64 @@ def _world_extra_env(fixture_env, tmp_path, fixtures_root, *atoms):
     env["PORTAGE_RUNNING_ROOT"] = str(dest)
     env["DISTDIR"] = str(dest / "distfiles")
     return env
+
+
+@pytest.mark.parametrize(
+    "setarg,tail",
+    [
+        ("@world", ['(dependency required by "@selected" [set])', '(dependency required by "@world" [argument])']),
+        ("@selected", ['(dependency required by "@selected" [argument])']),
+    ],
+)
+def test_611e_world_member_chain_names_the_nested_selected_set(
+    emerge_binary, fixture_env, tmp_path, fixtures_root, setarg, tail
+):
+    """Backlog #611(e): a world-file atom reached through `@world` is a
+    member of the nested `@selected` set, so Portage's `_get_dep_chain`
+    (depgraph.py D:6272-6470) prints `"@selected" [set]` before
+    `"@world" [argument]`, and `_get_dep_chain_as_comment` prints
+    `# required by @selected` before `# required by @world (argument)`.
+    Given `@selected` itself, it is the argument.
+
+    Oracle: Portage 3.0.83 on this host, a copy of the fixture tree with
+    `dev-libs/maskneedpkg` (masked dependency) or `dev-libs/r594qa` (USE
+    change) appended to the world file, `emerge -p --backtrack=0 @world` /
+    `@selected` (portuale `LLM/evidence/2026-11-06-sweep/611e/`)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "dev-libs/maskneedpkg")
+    got = _run([str(emerge_binary)], ["--pretend", "--backtrack=0", setarg], env)
+    assert got.returncode == 1, got.stdout
+    chain = ['(dependency required by "dev-libs/maskneedpkg-1.0::testrepo" [ebuild])', *tail]
+    assert "\n".join(chain) + "\nFor more information" in got.stderr, got.stderr
+    env = _world_extra_env(fixture_env, tmp_path / "q", fixtures_root, "dev-libs/r594qa")
+    got = _run([str(emerge_binary)], ["--pretend", "--backtrack=0", setarg], env)
+    assert got.returncode == 1, got.stdout
+    comments = ["# required by dev-libs/r594qa-2::testrepo"] + [
+        "# required by " + (t.split('"')[1] if "[set]" in t else t.split('"')[1] + " (argument)")
+        for t in tail
+    ]
+    assert "\n".join(comments) + "\n>=dev-libs/r594vdep-1 r594flag" in got.stderr, got.stderr
+
+
+@pytest.mark.parametrize("extra", [[], ["--backtrack=0"]])
+def test_611e_autounmask_block_prints_before_the_masked_block(
+    emerge_binary, fixture_env, extra
+):
+    """Backlog #611 display order: Portage's `display_problems` runs
+    `_display_autounmask` (depgraph.py D:11296) before the
+    `_unsatisfied_deps_for_display` loop (D:11435), so on `r594qtop` the
+    `r594vdep` USE change prints before the `maskeddep` all-masked block
+    (and before it, with backtracking on, the "terminated early" notice).
+
+    Oracle: Portage 3.0.83 `emerge -pv [--backtrack=0] dev-libs/r594qtop`
+    on a copy of the fixture tree (portuale
+    `LLM/evidence/2026-11-06-sweep/609/q.portage.txt`, `q0.portage.txt`)."""
+    got, _, _ = _594_run(emerge_binary, fixture_env, extra, ["dev-libs/r594qtop"])
+    assert got.returncode == 1, got.stdout
+    use = got.stderr.index(">=dev-libs/r594vdep-1 r594flag")
+    masked = got.stderr.index('!!! All ebuilds that could satisfy "dev-libs/maskeddep"')
+    assert use < masked, got.stderr
+    if not extra:
+        assert use < got.stderr.index("backtracking has terminated early") < masked, got.stderr
 
 
 def test_unreachable_installed_pin_does_not_block_a_plain_update(
