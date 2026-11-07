@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #602 complete mode from a slot conflict while backtracking w602s-1
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=1963fd0f126c4898e3dbb4acb78e1883

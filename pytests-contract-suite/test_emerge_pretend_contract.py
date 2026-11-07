@@ -3186,6 +3186,7 @@ CASES = [
     ("#611(e): the USE change prints before the masked dependency block (r594qtop --backtrack=0, Portage 3.0.83, rc 1, backtrack 0/0)", ["--pretend", "--verbose", "--backtrack=0", "dev-libs/r594qtop"], 1),
     ("#603: the w603 fixtures resolve in the shared ROOT, where nothing of them is installed (the world-only consumer shape needs its own ROOT: test_603_*)", ["--pretend", "dev-libs/w603lib"], 0),
     ("#603: the consumer's plain atom picks the oldest w603lib in the shared ROOT", ["--pretend", "app-misc/w603cons"], 0),
+    ("#602: the w602 slot conflict with the complete-graph switches off, in the shared ROOT where no consumer is installed (the world-consumer shape needs its own ROOT: test_602_*)", ["--pretend", "--complete-graph-if-new-ver=n", "--complete-graph-if-new-use=n", "--rebuild-if-new-slot=n", "=dev-libs/w602prov-2", "dev-libs/w602s", "app-misc/w602a"], 0),
 ]
 
 
@@ -38729,3 +38730,91 @@ def test_603_unwalked_consumer_atom_matching_nothing_installed_does_not_pin(
     )
     assert (skip_row in got.stdout) is skipped, got.stdout
     assert ("WARNING: One or more updates/rebuilds have been skipped" in got.stdout) is skipped
+
+
+_602_ARGS = ["=dev-libs/w602prov-2", "dev-libs/w602s", "app-misc/w602a"]
+_602_REBUILD = (
+    "  (dev-libs/w602prov-2:0/2::testrepo, ebuild scheduled for merge to '{root}') causes rebuilds for:\n"
+    "    (app-misc/w602cons-1:0/0::testrepo, ebuild scheduled for merge to '{root}')"
+)
+
+
+@pytest.mark.parametrize(
+    "world,args,rows,rebuild",
+    [
+        (
+            ["app-misc/w602cons"],
+            [*_603_SWITCHES_OFF, *_602_ARGS],
+            [
+                "[ebuild  r  U  ] dev-libs/w602prov-2 [1] to {root}",
+                "[ebuild  N     ] dev-libs/w602s-1 to {root}",
+                "[ebuild  N     ] app-misc/w602a-1 to {root}",
+                "[ebuild  rR    ] app-misc/w602cons-1 to {root}",
+            ],
+            True,
+        ),
+        (
+            [],
+            [*_603_SWITCHES_OFF, *_602_ARGS],
+            [
+                "[ebuild  N     ] dev-libs/w602s-1 to {root}",
+                "[ebuild     U  ] dev-libs/w602prov-2 [1] to {root}",
+                "[ebuild  N     ] app-misc/w602a-1 to {root}",
+            ],
+            False,
+        ),
+        (
+            ["app-misc/w602cons"],
+            [*_603_SWITCHES_OFF, "=dev-libs/w602prov-2"],
+            ["[ebuild     U  ] dev-libs/w602prov-2 [1] to {root}"],
+            False,
+        ),
+        (
+            ["app-misc/w602cons"],
+            ["--backtrack=0", *_603_SWITCHES_OFF, *_602_ARGS],
+            [
+                "[ebuild  N     ] dev-libs/w602s-1 to {root}",
+                "[ebuild     U  ] dev-libs/w602prov-2 [1] to {root}",
+                "[ebuild  N     ] app-misc/w602a-1 to {root}",
+            ],
+            False,
+        ),
+    ],
+    ids=["conflict-enters-complete", "no-world-consumer", "one-atom-no-conflict", "backtrack-0"],
+)
+def test_602_slot_conflict_while_backtracking_enters_complete_mode(
+    emerge_binary, fixture_env, tmp_path, world, args, rows, rebuild
+):
+    """#602: installed `w602prov-1` (`SLOT=0/1`) and `w602cons-1`
+    (`RDEPEND="dev-libs/w602prov:0/1="`) in an ad-hoc ROOT, the three
+    `--complete-graph-if-new-*`/`--rebuild-if-new-slot` switches off.
+    `dev-libs/w602s` (picks 2) and `app-misc/w602a` (`<dev-libs/w602s-2`) form
+    a slot conflict.
+
+    Oracle: host Portage 3.0.83 with the same argv on a scratch copy of the
+    fixtures (portuale `LLM/evidence/2026-11-06-sweep/602/`). A slot conflict
+    while backtracking is allowed turns complete mode on
+    (`depgraph.py` 9473-9480, `_resolve_conflicts`), so the world consumer is
+    walked and its built `:0/1=` atom asks for a rebuild: `r U w602prov-2`,
+    `rR w602cons-1`, the rebuild block. Without the consumer in world, with
+    no conflict (one atom), or with `--backtrack=0` (`_allow_backtracking`
+    false) there is no rebuild. The backtrack count is not pinned: Portage
+    says 3/20 on the first cell, portuale 1/20 (backlog #670)."""
+    root = _b1_root(
+        tmp_path,
+        world,
+        [
+            ("dev-libs", "w602prov", "1", "0/1", {"EAPI": "8"}),
+            ("app-misc", "w602cons", "1", "0", {"EAPI": "8", "RDEPEND": "dev-libs/w602prov:0/1="}),
+        ],
+    )
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", *args], env)
+    assert got.returncode == 0, got.stderr
+    assert _b1_merges(got.stdout) == [r.format(root=root) for r in rows], got.stdout
+    assert (_602_REBUILD.format(root=root) in got.stdout) is rebuild, got.stdout
+    skip_row = (
+        "    <dev-libs/w602s-2 required by (app-misc/w602a-1:0/0::testrepo, "
+        f"ebuild scheduled for merge to '{root}')"
+    )
+    assert (skip_row in got.stdout) is ("dev-libs/w602s" in args), got.stdout
