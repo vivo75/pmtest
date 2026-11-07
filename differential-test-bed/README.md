@@ -3,20 +3,29 @@
 Scaffolding for running `portuale` (and Portage's `emerge`) against a real
 Gentoo tree inside container images.
 
+Role (portuale charter, `../../portuale/docs/charter.md`): portuale is an
+independent Gentoo package manager, not a Portage fork, and Portage is no
+longer the oracle. Correctness is judged by the health properties, checked
+by `pytests-contract-suite/health_checker.py` (see "L0 health" below). The
+Portage-vs-portuale layers (L0 resolver, L0 fixture oracle, L1, L2, L3)
+record where the two differ. They are a regression and comparison tool
+that also helps Portage's development; a difference is not by itself a
+portuale bug, and agreement with Portage is not a proof of correctness.
+
 Two things live here:
 
 1. **The legacy `/init` probes** (`scripts/`, `create-container.bash`) —
    ad-hoc reproducers from earlier slices, run in lexicographic order by
    the container's PID-1 `/init`.
-2. **The differential test bed** (`run/`, `compare/`, `layers/`,
-   `atomlists/`, `net/`, `images/`) — the structured Portuale-vs-Portage
-   comparison described in
+2. **The test bed** (`run/`, `compare/`, `layers/`,
+   `atomlists/`, `net/`, `images/`) — the portuale health check plus the
+   structured Portuale-vs-Portage comparison described in
    [`docs/history/real-world-testing.md`](../docs/history/real-world-testing.md). Built
    slice by slice; **slice 1 = infra + L0**.
 
 ---
 
-## The differential test bed
+## The test bed
 
 ### Prerequisites
 
@@ -33,7 +42,30 @@ Check them all in one shot: `../scripts/check-prereqs.sh`.
   (`cargo build --release -p portuale`, plus the `emerge`/`ebuild`/`mrg`
   multicall symlinks).
 
-### L0 — resolver parity at real-tree scale
+### L0 health — the charter's properties on real-tree plans
+
+```sh
+differential-test-bed/run/l0-health.sh [atomlist]     # default atomlists/l0-resolve.txt
+```
+
+Portuale only; Portage is not run. For every atom list entry, inside the
+container (so it can read the VDB), portuale plans with `emerge --pretend
+-v --json` and `pytests-contract-suite/health_checker.py` checks the plan
+for charter property 1 (dependencies hold) and 2 (order is legal).
+`compare/health-report.py` summarises the findings per property and per
+family. Green (exit 0) iff no plan portuale would run has a failure the
+plan itself introduced; findings already present before the plan, cycle
+notes and plans portuale refuses do not count. Exit 2 is a setup error.
+
+Output: `differential-test-bed/logs/l0-health-<timestamp>/` (`plans/`,
+`health.jsonl`, `health-report.txt`).
+
+`compare/health-mutants.py --vdb VDB PLAN.json...` tests the checker
+itself: it breaks clean plans on purpose and exits 1 when the checker
+misses a mutant. Unit tests: `pytests-contract-suite/test_health_checker.py`.
+The checker covers properties 1 and 2 only.
+
+### L0 — resolver comparison at real-tree scale
 
 ```sh
 differential-test-bed/run/l0-resolver.sh                       # full atom list
@@ -62,7 +94,7 @@ step), `L0_SKIP_MULTI=1` (skip the `@system`/`@world` whole-graph runs),
 
 `L0_PORTUALE_OPTS` (default empty) appends extra flags to portuale's
 argv only — Portage's argv is unchanged, and empty leaves portuale's
-argv byte-identical to the default run. Backlog #34's pubgrub parity
+argv byte-identical to the default run. Backlog #34's pubgrub comparison
 mode uses `L0_PORTUALE_OPTS=--solver=pubgrub` (with
 `L0_SKIP_INVARIANTS=1`, since the invariant runs pin the default
 resolver) and grades the run with
@@ -70,7 +102,7 @@ resolver) and grades the run with
 which counts only the package-set/action findings against the
 `l0-pubgrub` allowlist layer.
 
-### L0 fixture oracle — Portage's `emerge` on the checked-in fixture tree
+### L0 fixture comparison — Portage's `emerge` on the checked-in fixture tree
 
 ```sh
 differential-test-bed/run/l0-fixture-oracle.sh        # differential-test-bed/atomlists/l0-fixture-oracle.txt
@@ -85,7 +117,7 @@ portuale on the same cases through the same comparator as L0, against
 no contract `CASES` entry, no Python mirror. Findings and their
 adjudication: `differential-test-bed/findings/l0-fixture-oracle.md` (backlog #49).
 
-### L1 — merge parity from an identical prebuilt binpkg set
+### L1 — merge comparison from an identical prebuilt binpkg set
 
 ```sh
 differential-test-bed/run/l1-merge-from-binpkg.sh                       # the default set
@@ -184,7 +216,7 @@ Host-only self-tests (no container): `compare/test-gpkg-structure.sh`,
 
 ### L3+ (not yet implemented)
 
-L3 source parity (`run/l3-source-parity.sh` + `layers/l3/build-and-merge.sh`)
+L3 source-build comparison (`run/l3-source-parity.sh` + `layers/l3/build-and-merge.sh`)
 builds one atom list from source under both PMs and diffs the snapshots.
 The per-slice smoke is `atomlists/l3-smoke.txt` (tree, pv, dmidecode plus
 glibc + bash — the two packages whose files every process maps, so the
@@ -345,16 +377,17 @@ PM_NO_CHECKOUT=1 differential-test-bed/run/l1-merge-from-binpkg.sh \
 ### Layout
 
 ```
-run/          host orchestrators (l0-resolver.sh, l0-fixture-oracle.sh,
+run/          host orchestrators (l0-health.sh, l0-resolver.sh, l0-fixture-oracle.sh,
               l1-merge-from-binpkg.sh, l2-portuale-builder.sh,
               l3-source-parity.sh, l31-remote-merge.sh,
               l31b-two-container.sh, nopy-build.sh, z326-closeout.sh,
               lib.sh)
 layers/l0/    in-container.sh — the per-atom probe driver
+layers/l0-health/  in-container.sh — plan every atom, run health_checker.py
 layers/l0-fixture-oracle/  stage.sh + in-container.sh (Portage emerge on fixtures)
 layers/l1/    build.sh (Portage, from source) + consume.sh (one PM, merge + snapshot)
 layers/l2/    build-portage.sh + build-portuale.sh (archive-only / deep)
-layers/l3/    source-build parity (build-and-merge.sh)
+layers/l3/    source-build comparison (build-and-merge.sh)
 layers/l31/   consume-remote.sh (one-container remote merge over loopback sshd)
 layers/l31b/  client-init.sh + server-merge.sh + client-snapshot.sh
               (two-container remote merge over a dedicated network)
@@ -362,7 +395,7 @@ layers/z326/  merged-snapshot-lib.sh (shared restricted snapshot) +
               ref-build-merge-snapshot.sh (reference from-source build
               + snapshot for the #326 Z close-out)
 atomlists/    curated atom / package lists (incl. z326-nopy.txt)
-compare/      resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
+compare/      health-report.py + health-mutants.py (L0 health), resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
               gpkg-structure.sh + gpkg-diff.sh (L2), z326-audit.py (the #326 Z
               phase-env audit), test-*.sh, normalize.md,
               known-divergences.yaml, known-divergences-fixture-oracle.yaml

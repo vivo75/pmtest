@@ -8,13 +8,23 @@ Istruzioni operative per agenti e umani. Dettagli in `README.md`
 - Root del repo: pmtest. Sorgente di sync: `../portuale` (mai `../2p`).
 - PM sotto test: voce di `managers/managers.yaml`, attiva via
   `PMTEST_PM=<nome>` (default `portuale`).
+- Correctness is judged by the charter's health properties
+  (`../portuale/docs/charter.md`), checked by
+  `pytests-contract-suite/health_checker.py` and
+  `differential-test-bed/run/l0-health.sh`. Portage is no longer the
+  oracle: the pins, the corpus and the L0/L1/L2/L3 comparisons record
+  what Portage printed and serve as regression and comparison tools.
 - Correttezza prima dei numeri: suite verde + L0/L1 senza finding
   inspiegati, poi benchmark. Un PM veloce e sbagliato vale zero.
 
 ## Usa così
 
 1. `PMTEST_PM=<nome> python3 -m pytest pytests-contract-suite -q` — suite fixture-based (seriale, ~8 min). Il comando normale è `scripts/pytest-parallel.sh` (8 worker, ~90 s).
-2. `differential-test-bed/run/l0-resolver.sh` e `differential-test-bed/run/l1-merge-from-binpkg.sh` —
+2. `differential-test-bed/run/l0-health.sh [atomlist]` — checks portuale's
+   L0 plans with the health checker inside the container (Portage is not
+   run); `differential-test-bed/compare/health-mutants.py` mutation-tests
+   the checker. Then the comparison cells:
+   `differential-test-bed/run/l0-resolver.sh` e `differential-test-bed/run/l1-merge-from-binpkg.sh` —
    differential su albero reale (serve `localhost/test-portuale:latest`;
    poi `l0-fixture-oracle.sh`, `l2-portuale-builder.sh`,
    `l3-source-parity.sh`). L1: `L1_CONSUME_REINSTALL=1` forza il re-merge
@@ -100,8 +110,9 @@ coppia, divise per contenuto, mai duplicate:
   `../portuale/AGENTS.md` copre entrambi i repo insieme salvo indicazione
   contraria; prima portuale, poi pmtest, riportando entrambi gli sha. Mai
   pushare metà coppia lasciando l'altra in locale.
-- Resta F1: i pin qui si aggiornano solo contro un oracle reale, mai per
-  far passare un PM — la libertà di re-pinnare a costo zero non è una
+- Resta F1: pins record what Portage printed (a reference, no longer the
+  oracle). They are updated only after reviewing the drift, never to
+  make a PM pass — la libertà di re-pinnare a costo zero non è una
   licenza per il bless di massa senza verifica.
 
 ## Spazio /tmp

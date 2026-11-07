@@ -6,7 +6,20 @@
 > dettaglio (layout, immagini, provenienza).
 
 Repository dedicato a **testare e confrontare tra loro varie versioni e
-tipologie di package manager** (portuale, portage reale, altri PM).
+tipologie di package manager** (portuale, Portage, altri PM).
+
+Role (portuale charter, `../portuale/docs/charter.md`): portuale is an
+independent Gentoo package manager, not a Portage fork. Portage is a
+teacher, no longer the oracle. Correctness is judged by five health
+properties (dependencies hold, legal order, newest visible versions,
+removal keeps libraries, helpful messages), checked by the standalone
+health checker `pytests-contract-suite/health_checker.py`, not by
+matching Portage's output. Today the checker covers the first two
+properties; the others have no checker in this tree yet. pmtest also
+supports Portage's development. The pinned outputs, the harvested corpus
+and the Portage-vs-portuale comparisons record what Portage printed: use
+them as a regression and comparison tool, not as a statement of what is
+right.
 
 Contenuto attuale: **l'infrastruttura di test costruita per portuale**
 (estratta da `../portuale`, commit
@@ -21,9 +34,9 @@ Nessuna logica di PM vive qui: solo harness, fixture e oracoli.
 
 | Dir | Origine | Cosa contiene |
 |---|---|---|
-| `pytests-contract-suite/` | `portuale/tests/` | contract suite pytest (black-box via CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark-gate, musl-smoke |
+| `pytests-contract-suite/` | `portuale/tests/` | contract suite pytest (black-box via CLI): `emerge --pretend`, merge/unmerge, `output_invariants`, corpus, benchmark-gate, musl-smoke; `health_checker.py` (+ `test_health_checker.py`) checks a plan against the charter's health properties 1 and 2. The pinned outputs record what Portage printed. |
 | `fixtures/` | `portuale/fixtures/` | alberi sintetici (`repo/`, `overlay/`, `etc/portage/`, `var/db`, `pkgdir/`, `binhost/`, `distfiles/`) contro cui gira la suite. **Copia unica**: dal 2026-09-18 l'albero del PM non ne ha una sua, `portuale/fixtures` è un symlink a questa (`portuale@335543e`), quindi la leggono sia la contract suite sia i test Rust `#[cfg(test)]`. Ogni aggiunta o correzione si fa qui. |
-| `differential-test-bed/` | `portuale/TEST/` | differential test bed su container (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source parity) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
+| `differential-test-bed/` | `portuale/TEST/` | container test bed: Portage-vs-portuale comparison layers (L0 resolver, L1 merge-from-binpkg, L2 builder, L3 source build) as regression and comparison tool, plus the portuale-only health layer (`run/l0-health.sh`, `compare/health-mutants.py`, `compare/health-report.py`) + `atomlists/`, `compare/`, `layers/`, `images/overlay/porttest/`, `create-container.bash` |
 | `bench/` | `portuale/bench/` | benchmark harness (batch-mode) + snapshot reale Gentoo (`gentoo_snapshot.json`) |
 | `scripts/` | `portuale/scripts/` | primitive-tree-differential, repin-review, md5-cache-audit, upstream-resolver-translate |
 | `python-harness/` | `portuale/python/` | harness Python lato riferimento (`versions`/`atom`/`use_reduce`/`required_use`) |
@@ -41,7 +54,10 @@ Esclusi dalla copia (rigenerabili / scratch host-specifico): `differential-test-
 python3 -m pytest pytests-contract-suite -q
 PMTEST_PM=portage python3 -m pytest pytests-contract-suite -q
 
-# differential su albero reale (serve l'immagine del § sotto)
+# health check of portuale's L0 plans (no Portage run; needs the image below)
+differential-test-bed/run/l0-health.sh
+
+# Portage-vs-portuale comparison on a real tree (needs the image below)
 differential-test-bed/run/l0-resolver.sh
 differential-test-bed/run/l1-merge-from-binpkg.sh
 ```
