@@ -43,6 +43,7 @@ from pathlib import Path
 import pytest
 
 import corpus
+import health_checker
 from conftest import (
     configroot_updates_dirs,
     fixtures_copytree_ignore,
@@ -39291,3 +39292,55 @@ def test_625b_walk_chosen_or_branch_owns_the_merge_order_edge(
         f"[ebuild   R    ] dev-libs/p625ac-1 to {root}",
         f"[ebuild  N     ] dev-libs/p625r-1 to {root}",
     ], got.stdout
+
+
+def test_680_slot_operator_rebuild_merges_before_the_builds_that_use_it(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#680: `emerge -pvuD app-misc/p680meta` upgrades `dev-lang/p680perl`
+    to a new sub-slot, so the installed XS module `dev-perl/p680xs` (built
+    against `p680perl:0/1.0=`) stops working until its slot-operator
+    rebuild merges. `app-text/p680doc` needs it to build (DEPEND), and
+    `sys-devel/p680build` needs it through its build tool
+    `dev-util/p680tool` (BDEPEND, whose RDEPEND is the module). The
+    `p680cyca`/`p680cycb` build-time cycle behind `p680xs`'s own DEPEND
+    keeps the scheduler busy breaking cycles while `p680xs` waits.
+
+    Expected value from the charter's property 2 and PMS 8.1 (a build-time
+    dependency must be usable: its RDEPEND closure met), checked by
+    `health_checker.py`, not from Portage. Before the fix portuale merged
+    `p680build` and `p680doc` before `p680xs`."""
+    root = _b1_root(
+        tmp_path,
+        [],
+        [
+            ("dev-lang", "p680perl", "1.0", "0/1.0", {"EAPI": "8"}),
+            ("dev-perl", "p680xs", "1.0", "0", {
+                "EAPI": "8",
+                "DEPEND": "dev-lang/p680perl:0/1.0= sys-devel/p680gettext",
+                "RDEPEND": "dev-lang/p680perl:0/1.0=",
+            }),
+            ("sys-devel", "p680gettext", "1.0", "0", {"EAPI": "8", "DEPEND": "dev-libs/p680cyca"}),
+            ("dev-libs", "p680cyca", "1.0", "0", {"EAPI": "8"}),
+            ("app-text", "p680doc", "1.0", "0", {
+                "EAPI": "8",
+                "DEPEND": "dev-perl/p680xs",
+                "RDEPEND": "dev-lang/p680perl:0/1.0= dev-perl/p680xs",
+            }),
+            ("dev-util", "p680tool", "1.0", "0", {"EAPI": "8", "RDEPEND": "dev-perl/p680xs"}),
+        ],
+    )
+    env = _b1_env(fixture_env, root)
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--json", "-v", "--update", "--deep", "app-misc/p680meta"],
+        env,
+    )
+    assert got.returncode == 0, got.stderr
+    doc = json.loads(got.stdout)
+    order = [f"{e['category']}/{e['package']}" for e in doc["entries"]]
+    assert {"dev-perl/p680xs", "app-text/p680doc", "sys-devel/p680build"} <= set(order), order
+    findings = [
+        f for f in health_checker.check_plan(doc, root / "var" / "db" / "pkg") if f.is_failure
+    ]
+    assert findings == [], (order, findings)

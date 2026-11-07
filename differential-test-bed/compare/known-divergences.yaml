@@ -199,7 +199,7 @@
   layer: l0
   categories: [order]
   slugs: ["MULTI_deep-update-world"]
-  match: "real virtual/perl-Test-Harness vs portuale virtual/perl-Encode"
+  match: "real virtual/perl-Test-Harness vs portuale virtual/perl-CPAN"
   reason: >
     Portage's merge order for the independent virtual/perl-* / dev-perl/*
     leaves is PYTHONHASHSEED-dependent: `_serialize_tasks` (depgraph.py:9487)
@@ -225,4 +225,9 @@
     divergence in this cell whose first reported pair is exactly this one;
     re-measure the seeds and re-tighten when the tree or the perl cluster
     changes.
+    2026-11-07: portuale's side of the pair moved from virtual/perl-Encode to
+    virtual/perl-CPAN after the #680 merge-order fix (a rebuild now waits for
+    the run-time needs of its build-time dependencies). The two virtuals are
+    still independent of each other, so the pair is still an ordering
+    artifact; only the match text was updated.
   owner: deepseek-v4.1-flash

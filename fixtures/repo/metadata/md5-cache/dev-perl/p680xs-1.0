@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=dev-lang/p680perl:= sys-devel/p680gettext
+DESCRIPTION=#680 fixture: XS module rebuilt before the builds that use it
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-lang/p680perl:=
+SLOT=0
+_md5_=4a92093e50e8be432508f65fbfc3c4f3

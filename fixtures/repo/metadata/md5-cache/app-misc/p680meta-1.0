@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=#680 fixture: XS module rebuilt before the builds that use it
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=app-text/p680doc sys-devel/p680build
+SLOT=0
+_md5_=1febd43d355b16b6ad7873b215a5f4b7

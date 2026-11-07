@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=dev-perl/p680xs
+DESCRIPTION=#680 fixture: XS module rebuilt before the builds that use it
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-lang/p680perl:= dev-perl/p680xs
+SLOT=0
+_md5_=03581bd78d85ecbd7943109466091af3
