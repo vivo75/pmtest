@@ -38906,6 +38906,39 @@ def test_603_unwalked_consumer_atom_matching_nothing_installed_does_not_pin(
     assert ("WARNING: One or more updates/rebuilds have been skipped" in got.stdout) is skipped
 
 
+def test_669_downgrade_through_an_arguments_dependency_is_ud_not_new(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#669: installed `w603lib-3` and `w603cons-1` (`RDEPEND="<dev-libs/w603lib-2"`),
+    both named as arguments, so the consumer is walked and pins the library.
+
+    Oracle: host Portage 3.0.83, same argv (portuale
+    `LLM/evidence/2026-11-06-sweep/603/side-N-vs-UD.portage.txt`): the slot
+    holds `w603lib-3`, so the picked `w603lib-1` is `UD`, not `N`. portuale
+    printed `N` because the slot-conflict keeper was always marked New."""
+    root = _b1_root(
+        tmp_path,
+        ["app-misc/w603cons"],
+        [
+            ("dev-libs", "w603lib", "3", "0", {"EAPI": "8"}),
+            ("app-misc", "w603cons", "1", "0", {"EAPI": "8", "RDEPEND": "<dev-libs/w603lib-2"}),
+        ],
+    )
+    env = _b1_env(fixture_env, root)
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "dev-libs/w603lib", "app-misc/w603cons"],
+        env,
+    )
+    assert got.returncode == 0, got.stderr
+    w603 = [ln for ln in _b1_merges(got.stdout) if "w603" in ln]
+    assert w603 == [
+        f"[ebuild     UD ] dev-libs/w603lib-1 [3] to {root}",
+        f"[ebuild   R    ] app-misc/w603cons-1 to {root}",
+    ], got.stdout
+    assert "WARNING: One or more updates/rebuilds have been skipped" in got.stdout
+
+
 _602_ARGS = ["=dev-libs/w602prov-2", "dev-libs/w602s", "app-misc/w602a"]
 _602_REBUILD = (
     "  (dev-libs/w602prov-2:0/2::testrepo, ebuild scheduled for merge to '{root}') causes rebuilds for:\n"
