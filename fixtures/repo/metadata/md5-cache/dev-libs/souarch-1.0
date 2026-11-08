@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=elimination fixture: := consumer whose deps hide behind an arch flag and a USE-dependency conditional
+EAPI=8
+IUSE=soflag
+KEYWORDS=amd64
+RDEPEND=amd64? ( dev-libs/souprov:= ) dev-libs/soulib[soflag?]
+SLOT=0/1
+_md5_=fcb56f9be21c67eb702845a6c2a0a74d
