@@ -51,7 +51,9 @@ differential-test-bed/run/l0-health.sh [atomlist]     # default atomlists/l0-res
 Portuale only; Portage is not run. For every atom list entry, inside the
 container (so it can read the VDB), portuale plans with `emerge --pretend
 -v --json` and `pytests-contract-suite/health_checker.py` checks the plan
-for charter property 1 (dependencies hold) and 2 (order is legal).
+for charter property 1 (dependencies hold), 2 (order is legal) and 3 (newest
+visible versions); a removal plan (`-C`, `--depclean`, `--prune`) is checked for
+property 4 (linked libraries are kept).
 `compare/health-report.py` summarises the findings per property and per
 family. Green (exit 0) iff no plan portuale would run has a failure the
 plan itself introduced; findings already present before the plan, cycle
@@ -63,7 +65,8 @@ Output: `differential-test-bed/logs/l0-health-<timestamp>/` (`plans/`,
 `compare/health-mutants.py --vdb VDB PLAN.json...` tests the checker
 itself: it breaks clean plans on purpose and exits 1 when the checker
 misses a mutant. Unit tests: `pytests-contract-suite/test_health_checker.py`.
-The checker covers properties 1 and 2 only.
+The checker covers properties 1 to 4; property 5 (messages help) has no
+checker yet.
 
 ### L0 — resolver comparison at real-tree scale
 
