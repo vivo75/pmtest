@@ -1685,6 +1685,48 @@ def test_mrg_remote_merge_installs_a_fresh_package(
     )
 
 
+def test_a_real_merge_leaves_a_healthy_installed_state(
+    mrg_binary, fixture_env, tmp_path
+):
+    """Properties 1 and 4 on the root a real merge leaves behind
+    (`health_checker.check_installed`, written from the PMS, not from Portage).
+    The empty root before the merge is the baseline, so only what the merge
+    introduced can fail."""
+    import health_checker
+
+    root = tmp_path / "root"
+    (root / "var" / "db" / "pkg").mkdir(parents=True)
+    before = health_checker.check_installed(root)
+    binpkg = (
+        Path(fixture_env["PORTAGE_CONFIGROOT"])
+        / "pkgdir/dev-libs/binpkgrmpkg-1.0.tbz2"
+    )
+    result = subprocess.run(
+        [str(mrg_binary),
+         "--remote-hostname", "localtest",
+         "--remote-transport", "local",
+         "--remote-root", str(root),
+         "--remote-workdir", str(tmp_path / "work"),
+         *_client_etc_args(tmp_path),
+         "--remote-binpkg", str(binpkg)],
+        capture_output=True, text=True, check=False,
+        env=fixture_env,
+    )
+    assert result.returncode == 0, result.stderr
+    baseline = frozenset(health_checker.finding_key(f) for f in before)
+    after = health_checker.check_installed(root, baseline)
+    assert [f for f in after if f.is_failure and not f.pre_existing] == []
+    # The check looked at something: the merged package is in the state it read.
+    assert "dev-libs/binpkgrmpkg-1.0" in {
+        p.cpv for p in health_checker.installed_plan(root / "var/db/pkg").kept}
+    # Not vacuous: break the merged entry and the same check must now fail.
+    entry = root / "var/db/pkg/dev-libs/binpkgrmpkg-1.0"
+    (entry / "RDEPEND").write_text("dev-libs/not-installed\n")
+    broken = health_checker.check_installed(root, baseline)
+    assert [(f.property, f.atom) for f in broken if f.is_failure] == [
+        ("runtime-deps", "dev-libs/not-installed")]
+
+
 def test_mrg_remote_merge_replaces_a_same_slot_version(
     mrg_binary, fixture_env, tmp_path
 ):

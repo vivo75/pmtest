@@ -26,6 +26,16 @@ Properties, from portuale's charter (PMS-based, no Portage involved):
    Dependencies the removal leaves unmatched are warnings (`removal-deps`),
    since the charter lets the user remove them. Needs the VDB.
 
+The installed state (`--installed ROOT`): after a real merge, the VDB and the
+files under ROOT are checked for properties 1 and 4, with no plan: every
+installed package's runtime and post-merge dependencies are matched, no blocker
+matches, REQUIRED_USE holds, no slot holds two packages, and every shared
+library an installed ELF file needs is found by the dynamic linker (a
+preserved library is a file on disk, so it is found). `--baseline FILE` is the
+output of the same check before the merge: its findings are marked
+`pre_existing`, so only what the merge introduced fails the run. Order (2) and
+newest version (3) are not checked here: a final state does not record them.
+
 With a VDB, the system before the plan is the VDB itself, not the plan's
 `kept` list, so an installed package the plan silently drops is seen.
 
@@ -33,6 +43,7 @@ The atom matcher, version comparison and dependency-string evaluator below
 are written from PMS and share no code with portuale or Portage.
 
 Usage: health_checker.py [--vdb /var/db/pkg] PLAN.json...
+       health_checker.py --installed ROOT [--baseline BEFORE.jsonl]
 Prints one JSON object per plan: {"plan", "findings": [...], "refused"},
 where `refused` says why portuale itself would not run the plan (its
 findings are then expected, not failures). Exit 1 when a plan portuale
@@ -45,6 +56,7 @@ import dataclasses
 import functools
 import json
 import os
+import posixpath
 import re
 import sys
 import time
@@ -58,8 +70,11 @@ DEP_CLASSES = ("DEPEND", "BDEPEND", "RDEPEND", "PDEPEND", "IDEPEND")
 
 
 # Notes and warnings: recorded, never a failure. `removal-deps` is a
-# dependency a removal leaves unmatched, which the charter allows.
-NOT_FAILURES = frozenset({"cycle-noted", "checker-limitation", "removal-deps"})
+# dependency a removal leaves unmatched, which the charter allows;
+# `private-library` is a library installed outside the linker's search path
+# (a JDK, systemd, a vendored application), which its own program finds.
+NOT_FAILURES = frozenset({"cycle-noted", "checker-limitation", "removal-deps",
+                          "private-library"})
 
 
 @dataclass(frozen=True)
@@ -1295,6 +1310,67 @@ def refusal(doc: dict) -> str:
     return ", ".join(reasons)
 
 
+# --- the installed state after a real merge -----------------------------------
+
+def installed_plan(vdb: Path) -> Plan:
+    """The VDB as a plan that merges nothing: every installed package is kept."""
+    kept = [_package(c, p, v, "", read_vdb(vdb, c, p, v)) for c, p, v in installed_cpvs(vdb)]
+    return Plan([], kept, [], [])
+
+
+def finding_key(f: Finding) -> tuple:
+    return (f.property, f.package, f.atom, f.reason)
+
+
+def check_installed(root: Path, baseline: frozenset = frozenset(),
+                    vdb: Path | None = None) -> list[Finding]:
+    """Properties 1 and 4 on the system installed under `root`. A finding whose
+    key is in `baseline` (the same check run before the merge) is `pre_existing`.
+    `vdb` overrides `root/var/db/pkg` (the mutation test reads a modified copy)."""
+    vdb = vdb or root / "var/db/pkg"
+    for cached in (read_vdb, read_installed, installed_cpvs):
+        cached.cache_clear()  # the disk may have changed since an earlier call
+    findings = check_final_state(installed_plan(vdb))
+    installed = read_installed(vdb)
+    world = Removal(root, installed, set(), set())
+    searched = {posixpath.dirname(world.canon(f"{d.rstrip('/')}/x")) for d in world.dirs}
+    # Libraries installed outside the search path: found by the program that
+    # carries their directory in its own RUNPATH, not by the linker's default.
+    private = {(e.abi, e.soname) for pkg in installed.values() for e in pkg.elfs
+               if e.soname and posixpath.dirname(world.canon(e.path)) not in searched
+               and world.exists(world.canon(e.path), False)}
+    # An ABI this system cannot run (a vendored ppc64 or arm library) has no
+    # library in the search path; its files are not programs that run here.
+    runnable = {e.abi for pkg in installed.values() for e in pkg.elfs
+                if e.soname and posixpath.dirname(world.canon(e.path)) in searched}
+    for cpv, pkg in sorted(installed.items()):
+        for elf in pkg.elfs:
+            if elf.abi not in runnable:
+                continue
+            for soname in elf.needed:
+                if world.lookup(elf.runpaths, elf.abi, soname, False):
+                    continue
+                if (elf.abi, soname) in private:
+                    findings.append(Finding(
+                        "private-library", cpv, soname,
+                        f"{elf.path} needs {soname}, installed outside the linker's search path"))
+                else:
+                    findings.append(Finding(
+                        "linked-library", cpv, soname,
+                        f"{elf.path} needs {soname}, which the dynamic linker does not find"))
+    return [dataclasses.replace(f, pre_existing=finding_key(f) in baseline) for f in findings]
+
+
+def read_baseline(path: str) -> frozenset:
+    """The finding keys of an earlier `--installed` run (its JSON line)."""
+    keys = set()
+    for line in Path(path).read_text().splitlines():
+        if line.startswith("{"):
+            keys |= {(f["property"], f["package"], f["atom"], f["reason"])
+                     for f in json.loads(line).get("findings", ())}
+    return frozenset(keys)
+
+
 def parse_json_output(text: str) -> dict | None:
     """The `--json` document in a captured stdout, or None."""
     for line in text.splitlines():
@@ -1307,6 +1383,14 @@ def main(argv: list[str]) -> int:
     vdb = None
     if len(argv) >= 2 and argv[0] == "--vdb":
         vdb, argv = Path(argv[1]), argv[2:]
+    if len(argv) >= 2 and argv[0] == "--installed":
+        root, baseline = Path(argv[1]), frozenset()
+        if len(argv) == 4 and argv[2] == "--baseline":
+            baseline = read_baseline(argv[3])
+        findings = check_installed(root, baseline)
+        print(json.dumps({"installed": str(root), "findings": [
+            dict(asdict(f), failure=f.is_failure) for f in findings]}, sort_keys=True))
+        return 1 if any(f.is_failure and not f.pre_existing for f in findings) else 0
     failed = False
     for name in argv:
         doc = parse_json_output(Path(name).read_text(errors="replace"))

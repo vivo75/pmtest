@@ -68,6 +68,36 @@ misses a mutant. Unit tests: `pytests-contract-suite/test_health_checker.py`.
 The checker covers properties 1 to 4; property 5 (messages help) has no
 checker yet.
 
+### Installed-state health — what a real merge leaves behind
+
+`health_checker.py --installed ROOT [--baseline BEFORE.jsonl]` checks the
+system installed under ROOT (its VDB and its files) for properties 1 and 4:
+every installed package's runtime and post-merge dependencies are matched, no
+blocker matches, `REQUIRED_USE` holds, no slot holds two packages, and every
+shared library an installed ELF file needs is found by the dynamic linker (a
+preserved library is a file on disk, so it is found). A library installed
+outside the search path is a `private-library` note, and files of an ABI the
+system cannot run (a vendored ppc64 or arm library) are skipped. Order (2) and
+newest version (3) are not checked here, because a final state does not record
+them. On this host's real root (2376 packages) it takes about 30 s and reports
+no failure.
+
+`run/l1-merge-from-binpkg.sh` runs it inside each consumer container before
+and after the merge (`layers/l1/consume.sh`), with the "before" findings as the
+baseline, and `compare/health-state-report.py` lists what the merge introduced
+at the end of `l1-report.txt`. A failure portuale introduced makes the run exit
+1, so the merge-path safety gate (`l1-merge-gate.txt`) now reports health as
+well as the diff against Portage; Portage's result is a control, and a failure
+both sides introduce is marked as shared.
+
+`compare/health-state-mutants.py ROOT` tests the check itself: it breaks a
+copy of the VDB on purpose (drop a needed package, add a blocker, break a
+`REQUIRED_USE`, put a second version in a slot, make an ELF file need a library
+that is nowhere) and exits 1 if a mutant is not reported or a harmless change
+is. Unit tests are in `pytests-contract-suite/test_health_checker.py`, and an
+end-to-end one in `test_portuale.py` merges a package into a temporary root and
+checks the result.
+
 ### L0 — resolver comparison at real-tree scale
 
 ```sh

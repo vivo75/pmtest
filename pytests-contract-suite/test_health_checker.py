@@ -571,3 +571,135 @@ def test_masked_rebuild_is_flagged_even_for_a_set(tmp_path):
     root = config_root(tmp_path, A12)
     rebuild = [entry("app-misc/a-3", 0, outcome="reinstall")]
     assert best(root, rebuild, request=["@world"]) == [("visibility", "app-misc/a-3", "")]
+
+
+# --- the installed state after a real merge ---------------------------------
+
+def put(vdb, cpv, **files):
+    """Add VDB variables (RDEPEND, USE, REQUIRED_USE, ...) to one installed package."""
+    cat, pkg, version = split(cpv)
+    d = vdb / cat / f"{pkg}-{version}"
+    d.mkdir(parents=True, exist_ok=True)
+    if not (d / "SLOT").exists():
+        (d / "SLOT").write_text("0\n")
+    for key, text in files.items():
+        (d / key).write_text(text + "\n")
+
+
+def state_failures(root, baseline=frozenset()):
+    return [(f.property, f.package, f.atom, f.pre_existing)
+            for f in hc.check_installed(root, baseline) if f.is_failure]
+
+
+def test_a_healthy_installed_state_has_no_finding(tmp_path):
+    vdb = installed_root(tmp_path, ZLIB)
+    put(vdb, "app-misc/tool-1", RDEPEND="sys-libs/z")
+    assert hc.check_installed(tmp_path) == []
+
+
+def test_an_installed_program_whose_library_is_gone_is_flagged(tmp_path):
+    installed_root(tmp_path, ZLIB)
+    (tmp_path / "usr/lib64/libz.so.1").unlink()
+    assert state_failures(tmp_path) == [("linked-library", "app-misc/tool-1", "libz.so.1", False)]
+
+
+def test_a_library_that_is_only_preserved_on_disk_is_still_found(tmp_path):
+    """Property 4 after a merge: the package is gone from the VDB, the file
+    stays on disk (preserved), so the program still links."""
+    vdb = installed_root(tmp_path, ZLIB)
+    import shutil
+    shutil.rmtree(vdb / "sys-libs/z-1")
+    assert hc.check_installed(tmp_path) == []
+
+
+def test_an_installed_package_with_an_unmatched_runtime_dependency_is_flagged(tmp_path):
+    vdb = installed_root(tmp_path, {"app-misc/tool-1": {}})
+    put(vdb, "app-misc/tool-1", RDEPEND="dev-libs/gone")
+    assert state_failures(tmp_path) == [("runtime-deps", "app-misc/tool-1", "dev-libs/gone", False)]
+
+
+def test_an_installed_blocker_REQUIRED_USE_and_double_slot_are_flagged(tmp_path):
+    vdb = installed_root(tmp_path, {"app-misc/a-1": {}, "app-misc/b-1": {},
+                                    "dev-libs/s-1": {}, "dev-libs/s-2": {}})
+    put(vdb, "app-misc/a-1", RDEPEND="!app-misc/b")
+    put(vdb, "app-misc/b-1", USE="x y", IUSE="x y", REQUIRED_USE="^^ ( x y )")
+    assert sorted(state_failures(tmp_path)) == [
+        ("blocker", "app-misc/a-1", "!app-misc/b", False),
+        ("required-use", "app-misc/b-1", "^^ ( x y )", False),
+        ("slot", "dev-libs/s", "dev-libs/s:0", False)]
+
+
+def test_a_baseline_finding_is_pre_existing_and_a_new_one_is_not(tmp_path):
+    installed_root(tmp_path, ZLIB)
+    (tmp_path / "usr/lib64/libz.so.1").unlink()
+    baseline = frozenset(hc.finding_key(f) for f in hc.check_installed(tmp_path))
+    assert state_failures(tmp_path, baseline) == [("linked-library", "app-misc/tool-1", "libz.so.1", True)]
+    put(tmp_path / "var/db/pkg", "app-misc/tool-1", RDEPEND="dev-libs/gone")
+    assert sorted((p, pre) for p, _, _, pre in state_failures(tmp_path, baseline)) == [
+        ("linked-library", True), ("runtime-deps", False)]
+
+
+def test_installed_mode_exit_code_counts_only_what_the_merge_introduced(tmp_path, capsys):
+    before = tmp_path / "before.jsonl"
+    root = tmp_path / "root"
+    vdb = installed_root(root, ZLIB)
+    (root / "usr/lib64/libz.so.1").unlink()
+    assert hc.main(["--installed", str(root)]) == 1
+    before.write_text(capsys.readouterr().out)
+    assert hc.main(["--installed", str(root), "--baseline", str(before)]) == 0
+    put(vdb, "app-misc/tool-1", RDEPEND="dev-libs/gone")
+    assert hc.main(["--installed", str(root), "--baseline", str(before)]) == 1
+
+
+def load_state_mutants():
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "differential-test-bed/compare/health-state-mutants.py"
+    spec = importlib.util.spec_from_file_location("health_state_mutants", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_state_mutation_test_kills_every_mutant_and_leaves_the_control_clean(tmp_path):
+    """The installed-state check notices each kind of breakage it claims to."""
+    vdb = installed_root(tmp_path, {
+        **ZLIB,
+        "dev-libs/png-1": {"/usr/lib64/libpng.so.16.0": ("lib", "libpng.so.16", "libz.so.1")}})
+    put(vdb, "app-misc/tool-1", RDEPEND="sys-libs/z dev-libs/png")
+    put(vdb, "dev-libs/png-1", RDEPEND="sys-libs/z")
+    assert hc.check_installed(tmp_path) == []
+    mutants = load_state_mutants()
+    results, ok = mutants.run(tmp_path, per_op=2)
+    assert ok, [r for r in results if not r["good"]]
+    assert {r["operator"] for r in results} == {op.__name__ for op in mutants.OPERATORS}
+
+
+def test_a_library_installed_outside_the_search_path_is_a_note_not_a_failure(tmp_path):
+    """A JDK or systemd keeps private libraries that their own program finds
+    through its RUNPATH; the default linker lookup misses them, and that is fine."""
+    installed_root(tmp_path, {
+        **ZLIB,
+        "dev-java/jdk-1": {"/opt/jdk/lib/libjvm.so.1.0": ("lib", "libjvm.so.1", ""),
+                           "/opt/jdk/lib/libjava.so.1.0": ("lib", "libjava.so.1", "libjvm.so.1")}})
+    found = hc.check_installed(tmp_path)
+    assert [(f.property, f.package, f.atom, f.is_failure) for f in found] == [
+        ("private-library", "dev-java/jdk-1", "libjvm.so.1", False)]
+
+
+def test_a_library_that_is_found_nowhere_is_still_a_failure_next_to_private_ones(tmp_path):
+    installed_root(tmp_path, {
+        **ZLIB, "dev-java/jdk-1": {"/opt/jdk/lib/libjava.so.1.0": ("lib", "libjava.so.1", "libjvm.so.1")}})
+    assert state_failures(tmp_path) == [("linked-library", "dev-java/jdk-1", "libjvm.so.1", False)]
+
+
+def test_files_of_an_abi_this_system_cannot_run_are_not_checked(tmp_path):
+    """maven-bin ships jline for ppc64 and arm: they need a libc nobody here has."""
+    vdb = installed_root(tmp_path, ZLIB)
+    foreign = tmp_path / "usr/share/maven/jline/ppc64/libjline.so"
+    foreign.parent.mkdir(parents=True)
+    foreign.write_bytes(b"\x7fELF")
+    put(vdb, "dev-java/maven-1")
+    (vdb / "dev-java/maven-1/NEEDED.ELF.2").write_text(
+        "PPC64;/usr/share/maven/jline/ppc64/libjline.so;libjline.so;;libc.so.6;ppc_64\n")
+    assert hc.check_installed(tmp_path) == []

@@ -102,6 +102,19 @@ done < "$ATOMLIST"
 
 installed_cpvs > "$OUT.installed-before.txt"
 
+# Health of the installed state (charter properties 1 and 4), before and
+# after the merge: health_checker.py is mounted at /HC by the run script.
+# The "after" run takes the "before" findings as its baseline, so only what
+# the merge introduced counts (health-state-report.py grades it).
+health_state() { # $1 = before|after
+  [ -f /HC/health_checker.py ] || return 0
+  local baseline=()
+  [ "$1" = after ] && baseline=(--baseline "$OUT.health-before.jsonl")
+  python3 /HC/health_checker.py --installed / "${baseline[@]}" \
+    > "$OUT.health-$1.jsonl" 2> "$OUT.health-$1.err" || true
+}
+health_state before
+
 # Pre-merge CONTENTS snapshot (backlog #358): copy every installed
 # package's CONTENTS now, before the vdb conversions below rewrite
 # /var/db/pkg (the `mrg --vdb-backend` / FUSE-mount paths). The path
@@ -234,6 +247,7 @@ if [ -n "$PMOUNT_DB" ]; then
   fi
 fi
 
+health_state after
 installed_cpvs > "$OUT.installed-after.txt"
 if [ "${L1_CONSUME_REINSTALL:-0}" = 1 ]; then
   # A reinstall keeps the same cpv, so the before/after diff sees nothing;

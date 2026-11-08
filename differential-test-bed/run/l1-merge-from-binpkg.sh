@@ -81,6 +81,7 @@ consume() {  # pm
   echo ">>> merging with $pm"
   podman_run_pm "porttest-l1-$pm-$$" "${fuse[@]}" \
     -v "$PKGCACHE:/pkgs:ro" "${ovl_mount[@]}" \
+    -v "$REPO_ROOT/pytests-contract-suite/health_checker.py:/HC/health_checker.py:ro" \
     -e PKGDIR=/pkgs \
     -e "L1_SKIP_PORTAGE_UPGRADE=${L1_SKIP_PORTAGE_UPGRADE:-0}" \
     -e "L1_CONSUME_REINSTALL=${L1_CONSUME_REINSTALL:-0}" \
@@ -104,6 +105,19 @@ python3 "$TEST_DIR/compare/diff.py" "$OUT/portage" "$OUT/portuale" \
   "$TEST_DIR/compare/known-divergences.yaml" | tee "$OUT/l1-report.txt"
 rc=${PIPESTATUS[0]}
 set -e
+
+# --- health of portuale's installed state (charter properties 1 and 4) --
+# Run inside each consumer, before and after the merge; what the merge
+# introduced fails the run. Portage's result is only a control.
+if [ -f "$OUT/portuale.health-after.jsonl" ]; then
+  echo ">>> health of the installed state"
+  set +e
+  python3 "$TEST_DIR/compare/health-state-report.py" "$OUT/portuale.health-after.jsonl" \
+    "$OUT/portage.health-after.jsonl" | tee -a "$OUT/l1-report.txt"
+  health_rc=${PIPESTATUS[0]}
+  set -e
+  [ "$rc" = 0 ] && rc=$health_rc
+fi
 
 ln -sfn "$RUN/l1-report.txt" "$LOGS_DIR/l1-report.txt"
 echo ">>> report: $OUT/l1-report.txt   (rc=$rc)"
