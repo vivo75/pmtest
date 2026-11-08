@@ -446,6 +446,24 @@ def older_visible_version(doc, plan):
                    entry_for(d, m).update(version=v)), {"best-version"})
 
 
+def older_visible_binary(doc, plan):
+    """Merge an older visible binary package than the plan picked (property 3)."""
+    if VDB is None:
+        return
+    world = hc.visibility(VDB.parents[2])
+    for _, m in plan.merges:
+        if not m.binary or outcome(doc, m) not in ("new", "upgrade"):
+            continue
+        for c in world.binary_candidates(m.cp) or ():
+            if c.pkg.slot == m.slot and hc.vercmp(c.pkg.version, m.version) < 0 \
+                    and not world.mask_reason(c, hc.candidate_use(c, m)) \
+                    and {f for f in c.pkg.use if f in c.pkg.iuse} == {
+                        f for f in hc.candidate_use(c, m) if f in c.pkg.iuse}:
+                yield (f"merge binary {c.pkg.cpv} instead of {m.version}", mutant(
+                    doc, lambda d, m=m, c=c: entry_for(d, m).update(
+                        version=c.pkg.version, build_id=c.build_id)), {"best-version"})
+
+
 def masked_newer_version(doc, plan):
     """Merge a newer version that is not visible (property 3)."""
     for m, visible, c in _versions(plan, older=False):
@@ -477,7 +495,7 @@ OPERATORS = [drop_needed_merge, drop_needed_upgrade, swap_build_edge, break_requ
              enable_missing_conditional, drop_any_of_provider, add_build_cycle,
              add_late_build_dep, late_runtime_of_build_dep, lower_version, stale_build_dep,
              keep_what_build_blocks, drop_sub_slot, two_level_runtime_of_build_dep,
-             older_visible_version, masked_newer_version, harmless_move]
+             older_visible_version, older_visible_binary, masked_newer_version, harmless_move]
 
 
 # --- removal operators (property 4): each yields like the plan operators --------

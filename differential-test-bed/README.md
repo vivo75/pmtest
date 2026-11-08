@@ -52,7 +52,8 @@ Portuale only; Portage is not run. For every atom list entry, inside the
 container (so it can read the VDB), portuale plans with `emerge --pretend
 -v --json` and `pytests-contract-suite/health_checker.py` checks the plan
 for charter property 1 (dependencies hold), 2 (order is legal) and 3 (newest
-visible versions); a removal plan (`-C`, `--depclean`, `--prune`) is checked for
+visible versions, binary packages from the local binary index included, as far as
+the plan's `options` let the run use them); a removal plan (`-C`, `--depclean`, `--prune`) is checked for
 property 4 (linked libraries are kept).
 `compare/health-report.py` summarises the findings per property and per
 family. Green (exit 0) iff no plan portuale would run has a failure the

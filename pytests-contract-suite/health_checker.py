@@ -811,13 +811,16 @@ def read_lines(path: Path) -> list[str]:
 
 @dataclass
 class Candidate:
-    """One ebuild of the repositories, with what visibility needs."""
+    """One ebuild of the repositories, or one binary package of the binary
+    index, with what visibility needs."""
 
     pkg: Package
     keywords: list[str]
     license: str
     iuse_raw: list[str]
     repo: str
+    binary: bool = False  # an entry of the binary index, not an ebuild
+    build_id: str = ""
 
 
 class Visibility:
@@ -837,6 +840,8 @@ class Visibility:
             values.append(read_make_vars(layer, env, root))
             env.update(values[-1])
         values.append(os.environ)
+        pkgdir = [v["PKGDIR"] for v in values if v.get("PKGDIR")]
+        self.pkgdir = root / (pkgdir[-1] if pkgdir else "var/cache/binpkgs").lstrip("/")
         self.accept_keywords = []
         for v in values:
             self.accept_keywords = stack(self.accept_keywords, v.get("ACCEPT_KEYWORDS", ""))
@@ -900,6 +905,37 @@ class Visibility:
                               required_use=meta.get("REQUIRED_USE", ""))
                 out.append(Candidate(pkg, meta.get("KEYWORDS", "").split(), meta.get("LICENSE", ""),
                                      iuse, name))
+        return out
+
+    @functools.lru_cache(maxsize=None)
+    def binary_candidates(self, cp: tuple[str, str]) -> list[Candidate] | None:
+        """Every binary package of `cp` in the local binary index (`Packages`
+        under PKGDIR), or None when there is no index. A remote binhost is not
+        read."""
+        index = self.pkgdir / "Packages"
+        if not index.is_file():
+            return None
+        out = []
+        for block in index.read_text(errors="replace").split("\n\n"):
+            meta = {}
+            for line in block.splitlines():
+                key, sep, value = line.partition(": ")
+                if sep:
+                    meta[key] = value.strip()
+            if "CPV" not in meta or "/" not in meta["CPV"]:
+                continue
+            split = split_pv(meta["CPV"].partition("/")[2])
+            if (meta["CPV"].partition("/")[0], split and split[0]) != cp:
+                continue
+            main, sub = _split_slot(meta.get("SLOT", "0"))
+            iuse = meta.get("IUSE", "").split()
+            pkg = Package(cp[0], cp[1], split[1], main, sub,
+                          use=frozenset(meta.get("USE", "").split()),
+                          iuse=frozenset(f.lstrip("+-") for f in iuse),
+                          dependencies={c: meta[c] for c in DEP_CLASSES if meta.get(c)},
+                          required_use=meta.get("REQUIRED_USE", ""), binary=True)
+            out.append(Candidate(pkg, meta.get("KEYWORDS", "").split(), meta.get("LICENSE", ""),
+                                 iuse, meta.get("REPO", ""), True, meta.get("BUILD_ID", "")))
         return out
 
     def _matching(self, lines: list[list[str]], pkg: Package) -> list[str]:
@@ -1049,7 +1085,9 @@ def request_atoms(doc: dict, root: Path) -> list[Atom]:
 def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
     """Property 3: no merged package has a higher visible version (in its
     slot, or in any slot for a new package nothing pins to one) that every
-    constraint of the plan also allows."""
+    constraint of the plan also allows. The candidates are the ebuilds of the
+    repositories and the binary packages of the local binary index, as far as
+    the run's `options` (`--usepkg`, `--usepkgonly`) let it use them."""
     if vdb is None or "request" not in doc:
         return [Finding("checker-limitation", "", "", "property 3 needs the VDB and `-v --json`")]
     root = vdb.parents[2]
@@ -1058,16 +1096,23 @@ def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
     request = request_atoms(doc, root)
     sets = [a for a in doc["request"] if a.startswith("@")]
     named = {a.cp for a in request_atoms({"request": [a for a in doc["request"] if a not in sets]}, root)}
+    options = doc.get("options")  # absent from a plan printed before it was added
     findings = []
+    if options and options.get("getbinpkg"):
+        findings.append(Finding("checker-limitation", "", "",
+                                "property 3 does not read a remote binary index (--getbinpkg)"))
     for order, merged in plan.merges:
         entry = next(e for e in doc["entries"] if e["merge_order"] == order)
-        if merged.binary or not merged.known:
+        if not merged.known:
             continue
-        cands = world.candidates(merged.cp)
-        mine = [c for c in cands or () if c.pkg.version == merged.version]
-        if cands is None or not mine:
-            findings.append(Finding("checker-limitation", merged.cpv, "",
-                                    "property 3: the repositories' metadata cache does not have it"))
+        mine_pool = world.binary_candidates(merged.cp) if merged.binary else world.candidates(merged.cp)
+        mine = [c for c in mine_pool or () if c.pkg.version == merged.version
+                and (not merged.binary or not entry.get("build_id")
+                     or c.build_id == str(entry["build_id"]))]
+        if mine_pool is None or not mine:
+            what = "the local binary index does not have it" if merged.binary \
+                else "the repositories' metadata cache does not have it"
+            findings.append(Finding("checker-limitation", merged.cpv, "", f"property 3: {what}"))
             continue
         reasons = {world.mask_reason(c, merged.use) for c in mine}
         if "" not in reasons:
@@ -1081,8 +1126,36 @@ def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
         needs, blockers = _constraints(plan, merged, request)
         free = entry["outcome"] == "new" and all(not a.slot for a, _ in needs) and \
             sum(p.cp == merged.cp for p in plan.final + plan.initial) == 1
+        cands, notes = _usable_candidates(world, merged, options)
         findings += _better_version(world, plan, merged, cands, needs, blockers, free)
+        findings += notes
     return findings
+
+
+def _usable_candidates(world, merged: Package, options: dict | None):
+    """The candidates the run could have picked instead of `merged`, and the
+    notes about the ones it cannot tell about. Ebuilds count unless
+    `--usepkgonly`; binary packages count with `--usepkg` or when `merged`
+    is one. Without `options` (an older plan), a higher ebuild for a merged
+    binary is only a note: the run may have been `--usepkgonly`."""
+    usepkgonly = bool(options and options.get("usepkgonly"))
+    usepkg = bool(options and (options.get("usepkg") or usepkgonly))
+    ebuilds = world.candidates(merged.cp) or []
+    binaries = world.binary_candidates(merged.cp) or []
+    notes = []
+    if merged.binary:
+        if options is None:
+            for cand in ebuilds:
+                if vercmp(cand.pkg.version, merged.version) > 0 and cand.pkg.slot == merged.slot \
+                        and not world.mask_reason(cand, candidate_use(cand, merged)):
+                    notes.append(Finding(
+                        "checker-limitation", merged.cpv, f"={cand.pkg.cpv}",
+                        "property 3: a higher ebuild is visible, but the plan does not say "
+                        "whether `--usepkgonly` ruled it out"))
+                    break
+            return binaries, notes
+        return binaries + ([] if usepkgonly else ebuilds), notes
+    return ebuilds + (binaries if usepkg else []), notes
 
 
 def _better_version(world, plan, merged, cands, needs, blockers, free) -> list[Finding]:
@@ -1093,12 +1166,20 @@ def _better_version(world, plan, merged, cands, needs, blockers, free) -> list[F
               and (c.pkg.slot == merged.slot or free)]
     for cand in sorted(higher, key=functools.cmp_to_key(lambda a, b: vercmp(b.pkg.version, a.pkg.version))):
         use = candidate_use(cand, merged)
+        if cand.binary:
+            # `--binpkg-respect-use`: a binary whose USE differs from the one
+            # the package would get is not a candidate.
+            flags = cand.pkg.iuse
+            if {f for f in cand.pkg.use if f in flags} != {f for f in use if f in flags}:
+                continue
+            use = cand.pkg.use
         if world.mask_reason(cand, use):
             continue
         fit = _fits(cand, use, merged, plan, needs, blockers)
         if fit == "yes":
             return [Finding("best-version", merged.cpv, f"={cand.pkg.cpv}",
-                            f"{cand.pkg.version} (slot {cand.pkg.slot}) is visible and meets every "
+                            f"{cand.pkg.version}{' binary package' if cand.binary else ''} "
+                            f"(slot {cand.pkg.slot}) is visible and meets every "
                             f"atom the plan places on {merged.category}/{merged.package}")]
         unknown = unknown or (fit == "unknown" and cand)
     if unknown:

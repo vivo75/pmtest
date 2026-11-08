@@ -703,3 +703,143 @@ def test_files_of_an_abi_this_system_cannot_run_are_not_checked(tmp_path):
     (vdb / "dev-java/maven-1/NEEDED.ELF.2").write_text(
         "PPC64;/usr/share/maven/jline/ppc64/libjline.so;libjline.so;;libc.so.6;ppc_64\n")
     assert hc.check_installed(tmp_path) == []
+
+
+# --- property 3 for binary packages -------------------------------------------
+
+def binary_index(root, packages):
+    """Write the local binary index: cpv -> keys (KEYWORDS defaults to amd64)."""
+    pkgdir = root / "var/cache/binpkgs"
+    pkgdir.mkdir(parents=True, exist_ok=True)
+    blocks = ["VERSION: 0\nPACKAGES: %d\n" % len(packages)]
+    for cpv, meta in packages.items():
+        meta = {"CPV": cpv, "SLOT": "0", "KEYWORDS": "amd64", "LICENSE": "GPL-2", "EAPI": "8",
+                "IUSE": "", "USE": "", "BUILD_ID": "1", **meta}
+        blocks.append("".join(f"{k}: {v}\n" for k, v in meta.items()))
+    (pkgdir / "Packages").write_text("\n".join(blocks))
+    hc.visibility.cache_clear()
+
+
+def best_bin(root, entries, options, request=("app-misc/a",)):
+    doc = dict(plan(entries), request=list(request))
+    if options is not None:
+        doc["options"] = options
+    return [(f.property, f.package, f.atom, f.is_failure)
+            for f in hc.check_best_versions(doc, root / "var/db/pkg")]
+
+
+USEPKG = {"usepkg": True, "usepkgonly": False, "getbinpkg": False, "getbinpkgonly": False}
+USEPKGONLY = dict(USEPKG, usepkg=False, usepkgonly=True)
+
+
+def bin_entry(cpv, **kw):
+    return entry(cpv, 0, source="binary", **kw) | {"build_id": "1"}
+
+
+def test_an_older_binary_than_the_best_visible_binary_is_flagged(tmp_path):
+    root = config_root(tmp_path, {})
+    binary_index(root, {"app-misc/a-1": {}, "app-misc/a-2": {}})
+    for options in (USEPKG, USEPKGONLY, None):
+        assert best_bin(root, [bin_entry("app-misc/a-1")], options) == [
+            ("best-version", "app-misc/a-1", "=app-misc/a-2", True)]
+    assert best_bin(root, [bin_entry("app-misc/a-2")], USEPKG) == []
+
+
+def test_a_higher_ebuild_beats_a_merged_binary_with_usepkg_but_not_with_usepkgonly(tmp_path):
+    root = config_root(tmp_path, {"app-misc/a-2": {}})
+    binary_index(root, {"app-misc/a-1": {}})
+    merged = [bin_entry("app-misc/a-1")]
+    assert best_bin(root, merged, USEPKG) == [("best-version", "app-misc/a-1", "=app-misc/a-2", True)]
+    assert best_bin(root, merged, USEPKGONLY) == []
+
+
+def test_without_options_a_higher_ebuild_for_a_merged_binary_is_only_a_note(tmp_path):
+    root = config_root(tmp_path, {"app-misc/a-2": {}})
+    binary_index(root, {"app-misc/a-1": {}})
+    assert best_bin(root, [bin_entry("app-misc/a-1")], None) == [
+        ("checker-limitation", "app-misc/a-1", "=app-misc/a-2", False)]
+
+
+def test_a_higher_binary_beats_a_merged_ebuild_only_with_usepkg(tmp_path):
+    root = config_root(tmp_path, {"app-misc/a-1": {}})
+    binary_index(root, {"app-misc/a-2": {}})
+    merged = [entry("app-misc/a-1", 0)]
+    assert best_bin(root, merged, USEPKG) == [("best-version", "app-misc/a-1", "=app-misc/a-2", True)]
+    assert best_bin(root, merged, dict(USEPKG, usepkg=False)) == []
+    assert best_bin(root, merged, None) == []
+
+
+def test_a_binary_whose_use_differs_from_the_configured_one_is_not_a_candidate(tmp_path):
+    """binpkg-respect-use: the newer binary was built with another flag."""
+    root = config_root(tmp_path, {})
+    binary_index(root, {"app-misc/a-1": {"IUSE": "x", "USE": "x"},
+                        "app-misc/a-2": {"IUSE": "x", "USE": ""}})
+    merged = [bin_entry("app-misc/a-1", use=["x"], iuse=["x"])]
+    assert best_bin(root, merged, USEPKG) == []
+
+
+def test_a_masked_newer_binary_is_not_flagged_and_a_masked_merged_one_is(tmp_path):
+    root = config_root(tmp_path, {})
+    binary_index(root, {"app-misc/a-1": {}, "app-misc/a-2": {"KEYWORDS": "~amd64"}})
+    assert best_bin(root, [bin_entry("app-misc/a-1")], USEPKG) == []
+    assert best_bin(root, [bin_entry("app-misc/a-2")], USEPKG) == [
+        ("visibility", "app-misc/a-2", "", True)]
+
+
+def test_a_merged_binary_missing_from_the_local_index_is_a_limitation_and_so_is_getbinpkg(tmp_path):
+    root = config_root(tmp_path, {})
+    binary_index(root, {"app-misc/a-2": {}})
+    assert best_bin(root, [bin_entry("app-misc/a-1")], dict(USEPKG, getbinpkg=True)) == [
+        ("checker-limitation", "", "", False),
+        ("checker-limitation", "app-misc/a-1", "", False)]
+
+
+@pytest.mark.parametrize("flag, expected", [
+    ("--usepkg", {"usepkg": True, "usepkgonly": False, "getbinpkg": False, "getbinpkgonly": False}),
+    ("--usepkgonly", {"usepkg": False, "usepkgonly": True, "getbinpkg": False, "getbinpkgonly": False}),
+])
+def test_portuale_json_records_the_binary_options_and_the_checker_reads_a_binary_entry(
+        flag, expected, emerge_binary, fixture_env):
+    """`-v --json` carries the options that decide the candidates (a plan
+    checker needs them for property 3 with binary packages); a binary entry
+    whose index line the checker cannot read is a note, never a failure of
+    property 3 (the fixture's VDB has failures of its own)."""
+    run = subprocess.run([str(emerge_binary), "--pretend", "-v", "--json", flag,
+                          "dev-libs/binaryonlypkg"],
+                         capture_output=True, text=True, env=fixture_env, check=False)
+    doc = hc.parse_json_output(run.stdout)
+    assert doc["options"] == expected, run.stdout + run.stderr
+    assert [e["source"] for e in doc["entries"]] == ["binary"]
+    vdb = hc.Path(fixture_env["ROOT"]) / "var/db/pkg"
+    assert [f for f in hc.check_best_versions(doc, vdb) if f.is_failure] == []
+
+
+def test_the_json_without_verbose_has_no_options(emerge_binary, fixture_env):
+    """`options` is part of the `-v` extras, like `kept` and `request`."""
+    run = subprocess.run([str(emerge_binary), "--pretend", "--json", "--usepkg",
+                          "dev-libs/binaryonlypkg"],
+                         capture_output=True, text=True, env=fixture_env, check=False)
+    doc = hc.parse_json_output(run.stdout)
+    assert doc is not None and "options" not in doc and "request" not in doc
+
+
+def test_the_binary_mutation_operator_breaks_a_clean_plan_and_the_checker_notices(tmp_path):
+    """health-mutants.py `older_visible_binary`: swap the merged binary for an
+    older visible one; the checker must report best-version."""
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "differential-test-bed/compare/health-mutants.py"
+    spec = importlib.util.spec_from_file_location("health_mutants", path)
+    mutants = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mutants)
+    root = config_root(tmp_path, {})
+    binary_index(root, {"app-misc/a-1": {}, "app-misc/a-2": {}})
+    vdb = root / "var/db/pkg"
+    mutants.VDB = vdb
+    doc = dict(plan([bin_entry("app-misc/a-2")]), request=["app-misc/a"], options=USEPKG)
+    assert hc.check_best_versions(doc, vdb) == []
+    offers = list(mutants.older_visible_binary(doc, hc.load_plan(doc, vdb)))
+    assert [desc for desc, _, _ in offers] == ["merge binary app-misc/a-1 instead of 2"]
+    _, make, expected = offers[0]
+    assert expected == {"best-version"}
+    assert [f.property for f in hc.check_best_versions(make(), vdb)] == ["best-version"]
