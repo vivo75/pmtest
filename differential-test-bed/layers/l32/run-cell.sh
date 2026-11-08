@@ -49,6 +49,19 @@ if ! stage_overlay; then exit 2; fi
 
 rc_of() { echo "$?" > "$G/$1.rc"; }
 
+# Health of the installed state (charter properties 1 and 4) before the cell
+# and after it: health_checker.py is mounted at /HC by the run script. The
+# "after" run takes the "before" findings as its baseline, so only what the
+# cell introduced counts (compare/health-state-report.py grades it, #689).
+health_state() { # $1 = before|after
+  [ -f /HC/health_checker.py ] || return 0
+  local baseline=()
+  [ "$1" = after ] && baseline=(--baseline "$OUT.health-before.jsonl")
+  python3 /HC/health_checker.py --installed / "${baseline[@]}" \
+    > "$OUT.health-$1.jsonl" 2> "$OUT.health-$1.err" || true
+}
+health_state before
+
 # ---------------------------------------------------------------------------
 # C1 -- -C / --depclean diffs (S0 group 1)
 # ---------------------------------------------------------------------------
@@ -420,6 +433,7 @@ case $L32_CELL in
   *) echo "unknown cell $L32_CELL" >&2; exit 2 ;;
 esac
 
+health_state after
 if ! snapshot_cell "$OUT"; then
   log "!!! snapshot failed"
   exit 2

@@ -151,6 +151,7 @@ run_pm() {  # <label> <portage|portuale> [cpuset] [distfiles-dir]
     "${PM_MOUNTS[@]}" \
     ${cpuset_args[@]+"${cpuset_args[@]}"} \
     -v "$sidedist:/distfiles" \
+    -v "$REPO_ROOT/pytests-contract-suite/health_checker.py:/HC/health_checker.py:ro" \
     ${tmpfs_args[@]+"${tmpfs_args[@]}"} \
     -e DISTDIR=/distfiles \
     ${MIRROR_ENV[@]+"${MIRROR_ENV[@]}"} \
@@ -382,6 +383,16 @@ summary() {  # <file> <label>
   [ -f "$f" ] || { echo "  (no $label run)"; return; }
   sed -n '/^## summary/,/^$/p' "$f" | sed '1d;$d'
 }
+# Failures the build introduced (after vs the before baseline); Portage's
+# run of the same atoms is the control. Sets HEALTH_RC for the grading below.
+HEALTH_RC=0
+l3_health_report() {
+  [ -f "$OUT/portuale.health-after.jsonl" ] || { echo "  (no portuale health run)"; return; }
+  local control=()
+  [ -f "$OUT/portage.health-after.jsonl" ] && control=("$OUT/portage.health-after.jsonl")
+  python3 "$TEST_DIR/compare/health-state-report.py" "$OUT/portuale.health-after.jsonl" \
+    ${control[@]+"${control[@]}"} || HEALTH_RC=1
+}
 {
   echo "# L3 source-build parity report"
   echo
@@ -409,6 +420,8 @@ summary() {  # <file> <label>
     [ -f "$OUT/$label.merged-cpvs.txt" ] || continue
     echo "  $label: $(wc -l < "$OUT/$label.merged-cpvs.txt")"
   done
+  echo "## health of the installed state (charter properties 1 and 4, #689)"
+  l3_health_report
   echo "## per-PM build args + tmpfs peak (#280, #282)"
   for label in portage portuale control-a control-b; do
     [ -f "$OUT/$label.meta.tsv" ] || continue
@@ -501,6 +514,7 @@ for label in "${expected[@]}"; do
   fi
 done
 [ "$DIFF_RC" = 0 ] || rc=1
+[ "$HEALTH_RC" = 0 ] || { echo ">>> the build introduced health failures -- see the report"; rc=1; }
 if [ -f "$OUT/control-a.files.tsv" ] && [ -f "$OUT/control-b.files.tsv" ] && [ "$CTRL_RC" != 0 ]; then
   echo ">>> control pair is NOT clean ($CTRL_RC unexplained) -- instrument invalid"
   rc=1

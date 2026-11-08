@@ -119,6 +119,7 @@ run_cell() {  # <pm> <tag>  (tag is the path under <run>/<cell>/)
     --security-opt seccomp=unconfined --cgroups=enabled --cgroupns=private \
     "${PM_MOUNTS[@]}" "${extra[@]}" \
     -v "$OVL_DIR:/l32-overlay:ro" \
+    -v "$REPO_ROOT/pytests-contract-suite/health_checker.py:/HC/health_checker.py:ro" \
     -e "MAKEOPTS=${MAKEOPTS:--j2}" \
     -e "L32_F1_TMPFS=${L32_F1_TMPFS:-16m}" \
     -e "L32_SKIP_PORTAGE_UPGRADE=${L32_SKIP_PORTAGE_UPGRADE:-0}" \
@@ -182,6 +183,7 @@ if [ "$CELL" != all ]; then CELLS=("$CELL"); fi
 
 ROWS=()
 BAD=0
+HEALTH_BAD=0
 for c in "${CELLS[@]}"; do
   CELL=$c
   if [ "$MODE" = control ]; then
@@ -209,6 +211,15 @@ for c in "${CELLS[@]}"; do
     n=$(unexplained_of "$REPORT")
     if [ "$c" = F3 ]; then
       set +e; check_f3_rc "$REPORT" "$A" "$B"; [ "$?" = 0 ] || rc=1; set -e
+    fi
+    # Failures portuale's cell introduced in the installed state (#689);
+    # Portage's run of the same cell is the control.
+    if [ -f "$B.health-after.jsonl" ]; then
+      set +e
+      python3 "$TEST_DIR/compare/health-state-report.py" "$B.health-after.jsonl" \
+        $([ -f "$A.health-after.jsonl" ] && echo "$A.health-after.jsonl") | tee -a "$REPORT"
+      [ "${PIPESTATUS[0]}" = 0 ] || { rc=1; HEALTH_BAD=1; }
+      set -e
     fi
     ROWS+=("$c	candidate	$n	rc=$rc")
   fi
@@ -245,4 +256,5 @@ echo ">>> run dir: $OUT"
 if [ "$MODE" = control ]; then
   exit "$BAD"
 fi
-exit 0
+# The candidate run is a triage list, but a failed health property is not.
+exit "$HEALTH_BAD"

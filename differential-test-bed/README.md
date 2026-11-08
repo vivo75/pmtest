@@ -99,6 +99,11 @@ is. Unit tests are in `pytests-contract-suite/test_health_checker.py`, and an
 end-to-end one in `test_portuale.py` merges a package into a temporary root and
 checks the result.
 
+The L3 and L32 beds run the same check (`--installed /`, baseline taken
+before the build or cell) inside each container; `run/l3-source-parity.sh` and
+`run/l32-lifecycle.sh` grade what portuale introduced with
+`compare/health-state-report.py`, with Portage's run as the control.
+
 ### L0 — resolver comparison at real-tree scale
 
 ```sh

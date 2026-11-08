@@ -126,6 +126,19 @@ done < "$ATOMLIST"
 installed_cpvs() { ( cd /var/db/pkg && ls -d */*/ 2>/dev/null | sed 's:/$::' ) | LC_ALL=C sort; }
 installed_cpvs > "$OUT.installed-before.txt"
 
+# Health of the installed state (charter properties 1 and 4), before and
+# after the build: health_checker.py is mounted at /HC by the run script.
+# The "after" run takes the "before" findings as its baseline, so only what
+# the build introduced counts (health-state-report.py grades it, #689).
+health_state() { # $1 = before|after
+  [ -f /HC/health_checker.py ] || return 0
+  local baseline=()
+  [ "$1" = after ] && baseline=(--baseline "$OUT.health-before.jsonl")
+  python3 /HC/health_checker.py --installed / "${baseline[@]}" \
+    > "$OUT.health-$1.jsonl" 2> "$OUT.health-$1.err" || true
+}
+health_state before
+
 log "building ${#atoms[@]} atoms: $EM $BUILD_ARGS ${atoms[*]}"
 # #282: when L3_TMPFS=1 and /var/tmp/portage is a tmpfs mount, sample
 # its peak use around the merge only. Kept cheap on purpose (df every
@@ -167,6 +180,7 @@ if [ -n "$tmpfs_sampler_pid" ]; then
 fi
 set -e
 installed_cpvs > "$OUT.installed-after.txt"
+health_state after
 comm -13 "$OUT.installed-before.txt" "$OUT.installed-after.txt" > "$OUT.merged-cpvs.txt"
 log "merge rc=$rc, $(wc -l < "$OUT.merged-cpvs.txt") packages touched"
 

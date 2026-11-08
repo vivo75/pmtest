@@ -54,12 +54,15 @@ from __future__ import annotations
 
 import dataclasses
 import functools
+import io
 import json
 import os
 import posixpath
 import re
 import sys
+import tarfile
 import time
+from urllib.parse import urlparse
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
@@ -823,6 +826,42 @@ class Candidate:
     build_id: str = ""
 
 
+def _binary_metadata(path: Path) -> dict | None:
+    """The metadata of a binary package file (`SLOT`, `USE`, `KEYWORDS`, ...):
+    the xpak of a `.tbz2`, the `metadata.tar` of a `.gpkg.tar`. None when it
+    cannot be read."""
+    try:
+        if path.name.endswith(".tbz2"):
+            data = path.read_bytes()
+            if data[-4:] != b"STOP":
+                return None
+            xpak = data[-8 - int.from_bytes(data[-8:-4], "big"):-8]
+            idx_len, data_len = (int.from_bytes(xpak[8 + 4 * i:12 + 4 * i], "big") for i in (0, 1))
+            index, body = xpak[16:16 + idx_len], xpak[16 + idx_len:16 + idx_len + data_len]
+            out, pos = {}, 0
+            while pos < len(index):
+                size = int.from_bytes(index[pos:pos + 4], "big")
+                name = index[pos + 4:pos + 4 + size].decode()
+                off, length = (int.from_bytes(index[pos + 4 + size + 4 * i:pos + 8 + size + 4 * i], "big")
+                               for i in (0, 1))
+                out[name] = " ".join(body[off:off + length].decode(errors="replace").split())
+                pos += 12 + size
+            return out
+        with tarfile.open(path) as outer:
+            member = next(m for m in outer.getmembers() if "/metadata.tar" in m.name)
+            raw = outer.extractfile(member).read()
+        suffix = member.name.rpartition("metadata.tar")[2]
+        if suffix == ".zst":
+            from compression import zstd
+            raw = zstd.decompress(raw)
+        with tarfile.open(fileobj=io.BytesIO(raw)) as inner:  # transparent gz/xz/bz2
+            return {m.name.rpartition("/")[2]: " ".join(inner.extractfile(m).read().decode(
+                errors="replace").split()) for m in inner.getmembers() if m.isfile()
+                and "/metadata/" in m.name}
+    except (OSError, ValueError, StopIteration, ImportError, tarfile.TarError, AttributeError):
+        return None
+
+
 class Visibility:
     """An independent model of which ebuilds are visible on a system, read
     from its repositories and configuration (no package manager involved)."""
@@ -842,6 +881,7 @@ class Visibility:
         values.append(os.environ)
         pkgdir = [v["PKGDIR"] for v in values if v.get("PKGDIR")]
         self.pkgdir = root / (pkgdir[-1] if pkgdir else "var/cache/binpkgs").lstrip("/")
+        self.binhosts = self._binhosts(etc, values)
         self.accept_keywords = []
         for v in values:
             self.accept_keywords = stack(self.accept_keywords, v.get("ACCEPT_KEYWORDS", ""))
@@ -907,36 +947,94 @@ class Visibility:
                                      iuse, name))
         return out
 
-    @functools.lru_cache(maxsize=None)
-    def binary_candidates(self, cp: tuple[str, str]) -> list[Candidate] | None:
-        """Every binary package of `cp` in the local binary index (`Packages`
-        under PKGDIR), or None when there is no index. A remote binhost is not
-        read."""
-        index = self.pkgdir / "Packages"
-        if not index.is_file():
+    def _binhosts(self, etc: Path, values: list[dict]) -> list[str]:
+        """The `sync-uri` of every `binrepos.conf` section, then the words of
+        `PORTAGE_BINHOST` (the last layer that sets it wins)."""
+        uris = [line.partition("=")[2].strip() for line in read_lines(etc / "binrepos.conf")
+                if line.replace(" ", "").startswith("sync-uri=")]
+        binhost = [v["PORTAGE_BINHOST"] for v in values if v.get("PORTAGE_BINHOST")]
+        return uris + (binhost[-1].split() if binhost else [])
+
+    def _binary_indexes(self) -> list[Path]:
+        """The `Packages` files that list binary packages: the local one, then
+        the cached copy of every remote index (`EROOT/var/cache/edb/binhost/
+        <host>/<path>`, where Portage keeps what it fetched; the checker never
+        uses the network) and, for a `file://` binhost, its own directory."""
+        found = [self.pkgdir / "Packages"]
+        for uri in self.binhosts:
+            url = urlparse(uri)
+            found.append(self.root / "var/cache/edb/binhost" / (url.hostname or "")
+                         / url.path.lstrip("/") / "Packages")
+            if url.scheme == "file":
+                found.append(Path(url.path) / "Packages")
+        return [f for f in dict.fromkeys(found) if f.is_file()]
+
+    @functools.cached_property
+    def _binary_pool(self) -> dict[tuple[str, str], list[Candidate]] | None:
+        """Every binary package the checker can read, by `(category, name)`:
+        the stanzas of the binary indexes, then the packages of PKGDIR that no
+        stanza lists (their own metadata). None when there is nothing to read."""
+        metas = []
+        for index in self._binary_indexes():
+            for block in index.read_text(errors="replace").split("\n\n"):
+                meta = dict(line.partition(": ")[::2] for line in block.splitlines() if ": " in line)
+                if "/" in meta.get("CPV", ""):
+                    metas.append({k: v.strip() for k, v in meta.items()})
+        listed = {(m["CPV"], m.get("BUILD_ID", "")) for m in metas}
+        for path, cpv, build_id in self._unlisted_binaries(listed):
+            if (meta := _binary_metadata(path)) is not None:
+                metas.append(dict(meta, CPV=cpv, BUILD_ID=build_id, REPO=meta.get("REPO", "")))
+        if not metas and not self._binary_indexes():
             return None
-        out = []
-        for block in index.read_text(errors="replace").split("\n\n"):
-            meta = {}
-            for line in block.splitlines():
-                key, sep, value = line.partition(": ")
-                if sep:
-                    meta[key] = value.strip()
-            if "CPV" not in meta or "/" not in meta["CPV"]:
+        pool: dict[tuple[str, str], list[Candidate]] = {}
+        seen = set()
+        for meta in metas:
+            cat, _, pv = meta["CPV"].partition("/")
+            split = split_pv(pv)
+            key = (cat, split and split[0])
+            if not split or (meta["CPV"], meta.get("BUILD_ID", ""), meta.get("REPO", "")) in seen:
                 continue
-            split = split_pv(meta["CPV"].partition("/")[2])
-            if (meta["CPV"].partition("/")[0], split and split[0]) != cp:
-                continue
+            seen.add((meta["CPV"], meta.get("BUILD_ID", ""), meta.get("REPO", "")))
             main, sub = _split_slot(meta.get("SLOT", "0"))
             iuse = meta.get("IUSE", "").split()
-            pkg = Package(cp[0], cp[1], split[1], main, sub,
+            pkg = Package(cat, split[0], split[1], main, sub,
                           use=frozenset(meta.get("USE", "").split()),
                           iuse=frozenset(f.lstrip("+-") for f in iuse),
                           dependencies={c: meta[c] for c in DEP_CLASSES if meta.get(c)},
                           required_use=meta.get("REQUIRED_USE", ""), binary=True)
-            out.append(Candidate(pkg, meta.get("KEYWORDS", "").split(), meta.get("LICENSE", ""),
-                                 iuse, meta.get("REPO", ""), True, meta.get("BUILD_ID", "")))
-        return out
+            pool.setdefault(key, []).append(Candidate(
+                pkg, meta.get("KEYWORDS", "").split(), meta.get("LICENSE", ""), iuse,
+                meta.get("REPO", ""), True, meta.get("BUILD_ID", "")))
+        return pool
+
+    def _unlisted_binaries(self, listed: set):
+        """`(file, cat/pn-ver, build id)` of the `.tbz2`/`.gpkg.tar` files under
+        PKGDIR that no index stanza names. The name gives category, package
+        and version (`<cat>/<pn>-<ver>.tbz2`, or `<cat>/<pn>/<pn>-<ver>-<id>.`
+        with multiple instances); the slot comes from the file's metadata."""
+        if not self.pkgdir.is_dir():
+            return
+        for path in sorted(self.pkgdir.rglob("*")):
+            stem = next((path.name.removesuffix(x) for x in (".tbz2", ".gpkg.tar")
+                         if path.name.endswith(x)), None)
+            rel = path.relative_to(self.pkgdir).parts
+            if stem is None or len(rel) not in (2, 3):
+                continue
+            build_id = ""
+            if len(rel) == 3:
+                stem, _, build_id = stem.rpartition("-")
+            if (split := split_pv(stem)) is None or (len(rel) == 3 and split[0] != rel[1]):
+                continue
+            cpv = f"{rel[0]}/{stem}"
+            if (cpv, build_id) not in listed and (cpv, "") not in listed:
+                yield path, cpv, build_id
+
+    def binary_candidates(self, cp: tuple[str, str]) -> list[Candidate] | None:
+        """Every binary package of `cp` the checker can read: the local binary
+        index, the cached copies of remote indexes and the PKGDIR files outside
+        any index; None when there is none of them."""
+        pool = self._binary_pool
+        return None if pool is None else pool.get(cp, [])
 
     def _matching(self, lines: list[list[str]], pkg: Package) -> list[str]:
         """The tokens of the per-package lines whose atom matches `pkg`."""
@@ -1086,7 +1184,8 @@ def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
     """Property 3: no merged package has a higher visible version (in its
     slot, or in any slot for a new package nothing pins to one) that every
     constraint of the plan also allows. The candidates are the ebuilds of the
-    repositories and the binary packages of the local binary index, as far as
+    repositories and the binary packages the checker can read (the local
+    index, the cached index of each binhost, the files of PKGDIR), as far as
     the run's `options` (`--usepkg`, `--usepkgonly`) let it use them."""
     if vdb is None or "request" not in doc:
         return [Finding("checker-limitation", "", "", "property 3 needs the VDB and `-v --json`")]
@@ -1098,9 +1197,10 @@ def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
     named = {a.cp for a in request_atoms({"request": [a for a in doc["request"] if a not in sets]}, root)}
     options = doc.get("options")  # absent from a plan printed before it was added
     findings = []
-    if options and options.get("getbinpkg"):
+    if options and options.get("getbinpkg") and not world.binhosts:
         findings.append(Finding("checker-limitation", "", "",
-                                "property 3 does not read a remote binary index (--getbinpkg)"))
+                                "property 3: --getbinpkg without a binhost in binrepos.conf "
+                                "or PORTAGE_BINHOST: no remote index to read"))
     for order, merged in plan.merges:
         entry = next(e for e in doc["entries"] if e["merge_order"] == order)
         if not merged.known:
@@ -1110,7 +1210,7 @@ def check_best_versions(doc: dict, vdb: Path | None) -> list[Finding]:
                 and (not merged.binary or not entry.get("build_id")
                      or c.build_id == str(entry["build_id"]))]
         if mine_pool is None or not mine:
-            what = "the local binary index does not have it" if merged.binary \
+            what = "no binary index the checker can read has it" if merged.binary \
                 else "the repositories' metadata cache does not have it"
             findings.append(Finding("checker-limitation", merged.cpv, "", f"property 3: {what}"))
             continue

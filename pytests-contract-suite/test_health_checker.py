@@ -794,6 +794,77 @@ def test_a_merged_binary_missing_from_the_local_index_is_a_limitation_and_so_is_
         ("checker-limitation", "app-misc/a-1", "", False)]
 
 
+def _xpak(meta):
+    index = data = b""
+    for name, value in meta.items():
+        raw = value.encode()
+        index += len(name).to_bytes(4, "big") + name.encode() + len(data).to_bytes(4, "big") \
+            + len(raw).to_bytes(4, "big")
+        data += raw
+    xpak = b"XPAKPACK" + len(index).to_bytes(4, "big") + len(data).to_bytes(4, "big") \
+        + index + data + b"XPAKSTOP"
+    return b"\0" * 16 + xpak + len(xpak).to_bytes(4, "big") + b"STOP"
+
+
+def _gpkg(path, meta):
+    import io
+    import tarfile
+    inner = io.BytesIO()
+    with tarfile.open(fileobj=inner, mode="w:gz") as tar:
+        for name, value in meta.items():
+            info = tarfile.TarInfo(f"{path.stem}/metadata/{name}")
+            info.size = len(value)
+            tar.addfile(info, io.BytesIO(value.encode()))
+    with tarfile.open(path, "w") as tar:
+        info = tarfile.TarInfo(f"{path.name.removesuffix('.gpkg.tar')}/metadata.tar.gz")
+        info.size = len(inner.getvalue())
+        tar.addfile(info, io.BytesIO(inner.getvalue()))
+
+
+def test_a_cached_remote_index_is_read_for_getbinpkg(tmp_path):
+    """A binhost named in binrepos.conf: the copy Portage cached under
+    var/cache/edb/binhost/<host>/<path> is read, never the network."""
+    root = config_root(tmp_path, {})
+    (root / "etc/portage/binrepos.conf").write_text(
+        "[remote]\nsync-uri = https://binhost.example/gentoo/\n")
+    cache = root / "var/cache/edb/binhost/binhost.example/gentoo"
+    cache.mkdir(parents=True)
+    (cache / "Packages").write_text(
+        "VERSION: 0\n\nCPV: app-misc/a-2\nSLOT: 0\nKEYWORDS: amd64\nLICENSE: GPL-2\n"
+        "BUILD_ID: 1\n\nCPV: app-misc/a-1\nSLOT: 0\nKEYWORDS: amd64\nLICENSE: GPL-2\n"
+        "BUILD_ID: 1\n")
+    hc.visibility.cache_clear()
+    options = dict(USEPKG, getbinpkg=True)
+    assert best_bin(root, [bin_entry("app-misc/a-1")], options) == [
+        ("best-version", "app-misc/a-1", "=app-misc/a-2", True)]
+
+
+def test_portage_binhost_names_a_cached_index_too(tmp_path):
+    root = config_root(tmp_path, {}, make_conf='PORTAGE_BINHOST="https://h.example/b"\n')
+    cache = root / "var/cache/edb/binhost/h.example/b"
+    cache.mkdir(parents=True)
+    (cache / "Packages").write_text(
+        "VERSION: 0\n\nCPV: app-misc/a-2\nSLOT: 0\nKEYWORDS: amd64\nLICENSE: GPL-2\nBUILD_ID: 1\n")
+    hc.visibility.cache_clear()
+    pool = hc.visibility(root).binary_candidates(("app-misc", "a"))
+    assert [c.pkg.version for c in pool] == ["2"]
+
+
+def test_pkgdir_files_without_an_index_line_are_candidates(tmp_path):
+    """A flat PKGDIR (no index, or a file the index does not list): category
+    and version come from the path, the slot from the file's own metadata."""
+    root = config_root(tmp_path, {})
+    pkgdir = root / "var/cache/binpkgs/app-misc"
+    pkgdir.mkdir(parents=True)
+    (pkgdir / "a-1.tbz2").write_bytes(_xpak({"SLOT": "1/2", "KEYWORDS": "amd64", "USE": "x"}))
+    _gpkg(pkgdir / "a-2.gpkg.tar", {"SLOT": "3", "KEYWORDS": "amd64"})
+    hc.visibility.cache_clear()
+    pool = hc.visibility(root).binary_candidates(("app-misc", "a"))
+    assert sorted((c.pkg.version, c.pkg.slot, c.pkg.subslot) for c in pool) == [
+        ("1", "1", "2"), ("2", "3", "")]
+    assert hc.visibility(root).binary_candidates(("app-misc", "zz")) == []
+
+
 @pytest.mark.parametrize("flag, expected", [
     ("--usepkg", {"usepkg": True, "usepkgonly": False, "getbinpkg": False, "getbinpkgonly": False}),
     ("--usepkgonly", {"usepkg": False, "usepkgonly": True, "getbinpkg": False, "getbinpkgonly": False}),
