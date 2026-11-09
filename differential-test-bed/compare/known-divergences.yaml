@@ -89,6 +89,65 @@
 # they exist only so the L2 bed can gate everything else while the gap
 # is open.
 
+- id: l0-order-only-health-clean-558
+  layer: l0
+  categories: [order]
+  slugs: ["MULTI_deep-update-world", "MULTI_emptytree-system", "_system", "_world",
+          "app-editors_gedit", "app-office_libreoffice", "dev-lang_ruby", "dev-ruby_rake",
+          "gnome-base_gnome-shell", "gnome-base_nautilus", "gui-libs_gtk_4",
+          "kde-apps_kdecore-meta", "mail-client_thunderbird", "media-gfx_gimp", "media-video_vlc",
+          "net-analyzer_wireshark", "net-misc_networkmanager", "www-client_firefox",
+          "x11-base_xorg-server", "x11-libs_gtk__3"]
+  match: "merge order diverges"
+  reason: >
+    Backlog #558 closing re-triage (2026-11-09, bed l0-20261109T191937Z): a
+    pure merge-order difference. The 2026-11-07 health run over the same
+    probes reports no build-order, blocker or runtime violation attributable
+    to the order, and the charter says an order difference that breaks
+    nothing is not chased. Masking tradeoff: this hides any order
+    divergence in these cells; the health run, not this bed, is the gate
+    for a real order defect.
+  owner: charter
+
+- id: l0-perl-skip-parent-list-658
+  layer: l0
+  categories: [skipped-updates]
+  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
+          "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
+          "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
+          "virtual_perl-ExtUtils-MakeMaker"]
+  match: "dev-lang/perl:0: skipped package list differs"
+  reason: >
+    Backlog #658 (re-scoped): the `dev-lang/perl:0` skip block prints on both
+    sides, portuale's parent list is shorter than Portage's. Known and
+    owned; the block itself, the packages and the plan are the same.
+  owner: portuale-bug
+
+- id: l0-autounmask-masked-block-558
+  layer: l0
+  categories: [advice, error]
+  slugs: ["app-editors_gedit", "gnome-base_nautilus", "gnome-base_gnome-shell",
+          "kde-plasma_plasma-meta"]
+  match: "masked"
+  reason: >
+    Both sides stop at the same autounmask change (`gcr[gtk]` / `cups`, rc 1,
+    same USE flip suggested). Portage appends a `!!! All ebuilds ... have
+    been masked` block as a by-product of backtracking terminated early
+    (LLM/portage-quirks.md, R3c re-walk abort); portuale prints the
+    suggestion only. Not a wrong package or a misleading message.
+  owner: charter
+
+- id: l0-autounmask-truncated-558
+  layer: l0
+  categories: [truncated]
+  slugs: ["app-containers_podman", "kde-plasma_plasma-meta"]
+  match: "autounmask backtracking terminated early"
+  reason: >
+    By design the comparator suppresses the set/order comparison when
+    autounmask ends backtracking early; the two sides' totals then measure
+    different stopping points, not different plans.
+  owner: charter
+
 - id: l0-vm-installed-expat
   layer: l0
   backend: vm
