@@ -118,10 +118,10 @@
           "virtual_perl-ExtUtils-MakeMaker"]
   match: "dev-lang/perl:0: skipped package list differs"
   reason: >
-    Backlog #658 (re-scoped): the `dev-lang/perl:0` skip block prints on both
-    sides, portuale's parent list is shorter than Portage's. Known and
-    owned; the block itself, the packages and the plan are the same.
-  owner: portuale-bug
+    Backlog #658 (withdrawn 2026-11-10, charter): the `dev-lang/perl:0` skip block prints on both
+    sides, portuale's parent list is shorter than Portage's. Accepted:
+    informational rows only; the block itself, the packages and the plan are the same.
+  owner: charter
 
 - id: l0-autounmask-masked-block-558
   layer: l0
