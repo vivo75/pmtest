@@ -34344,6 +34344,49 @@ def test_pubgrub_aborts_like_the_default_solver(emerge_binary, fixture_env, atom
     assert pubgrub.stdout == default.stdout
 
 
+@pytest.mark.parametrize(
+    "args,needle",
+    [
+        (["--autounmask-keep-keywords=n", "dev-libs/akk0a"], "keyword changes are necessary"),
+        (["--autounmask", "dev-libs/hardmaskedpkg"], "mask changes are necessary"),
+        (["--autounmask-keep-masks=n", "dev-libs/hardmaskedpkg"], "mask changes are necessary"),
+        (
+            ["--autounmask", "--autounmask-license=y", "dev-libs/crossrepolicensepkg"],
+            "license changes are necessary",
+        ),
+    ],
+)
+def test_pubgrub_suggests_keyword_license_mask_changes(emerge_binary, fixture_env, args, needle):
+    """Backlog #431 S2: when the strict pool has no plan, `--solver=pubgrub` re-solves over a
+    pool relaxed one autounmask level at a time and prints the same merge rows, `~`/`#` marker
+    and `The following ... changes are necessary` block as the default solver. Expected text is
+    the default solver's, which is pinned against Portage by the `akk0a`/`hardmaskedpkg`/
+    `crossrepolicensepkg` cases above; the project's rule is the plan Portage would offer is a
+    plan the user can apply."""
+    base = ["--pretend", *args]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert needle in default.stderr
+    assert pubgrub.returncode == default.returncode
+    assert pubgrub.stdout == default.stdout
+    assert pubgrub.stderr == default.stderr
+
+
+def test_pubgrub_missed_update_notice_is_a_cut(emerge_binary, fixture_env):
+    """Backlog #431 S1 (owner decision 2026-11-10): `--solver=pubgrub` plans the same rows
+    and exits like the default solver on `btparent`, but prints no "updates/rebuilds have
+    been skipped" warning; the default solver builds it from backtracking state the engine
+    lacks. Source: the project's own expectation (rows/rc equal), not a Portage capture."""
+    base = ["--pretend", "--verbose", "--getbinpkg=n", "--usepkg=n", "dev-libs/btparent"]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == pubgrub.returncode == 0
+    rows = lambda r: [l for l in r.stdout.splitlines() if l.startswith("[ebuild")]
+    assert rows(pubgrub) == rows(default) and len(rows(default)) == 4
+    assert "have been skipped due to a dependency conflict" in default.stdout
+    assert "have been skipped" not in pubgrub.stdout
+
+
 _BCDEP_PKG_ROW = (
     "BUILD_ID: 1\nBUILD_TIME: 100\nCPV: dev-libs/bcdeppkg-1.0\nDEFINED_PHASES: -\nEAPI: 8\n"
     "KEYWORDS: amd64\nRDEPEND: dev-libs/bcdepold\nREPO: testrepo\nSLOT: 0\nUSE:\n"
