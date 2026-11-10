@@ -39420,6 +39420,35 @@ def test_606_q19_installed_virtual_selecting_the_merge_is_its_parent(
     }, got.stdout
 
 
+def test_676_installed_consumer_reached_only_through_a_merge_bound_package(
+    emerge_binary, fixture_env, tmp_path
+):
+    """#676: same ROOT as the Q19 pin, but `p590vpar` is not in world; it is
+    reached only because the new `p590vpull-2` names it. Its installed
+    `virtual/p590vvb-1` accepts `p590vprov` 5.42 or 5.38 only, so the plan
+    `U p590vprov-5.44` + `N p590vpull-2` left an installed dependency broken
+    with no warning (charter property 1). The new package's own dependencies
+    now make their installed closure part of the consumer scope, so 5.44 is
+    held back and `p590vpull-1` is merged, with the skip block.
+
+    Source: the charter's health property; host Portage 3.0.83 does the same
+    (comparison only). World holds `p590vprov` only: with an empty world the
+    complete-mode scope is off (residue, backlog #676)."""
+    root = _b1_root(tmp_path, ["dev-libs/p590vprov"], _606_Q19)
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", "dev-libs/p590vpull"], env)
+    assert got.returncode == 0, got.stdout
+    assert _b1_merges(got.stdout) == [
+        f"[ebuild  N     ] dev-libs/p590vpull-1 to {root}"
+    ], got.stdout
+    for vv in ("p590vva", "p590vvb"):
+        line = (
+            f"    =dev-libs/p590vprov-5.42* required by (virtual/{vv}-1:0/0::testrepo, "
+            f"installed in '{root}') USE=\"\""
+        )
+        assert line in got.stdout.splitlines(), (line, got.stdout)
+
+
 def test_625b_walk_chosen_or_branch_owns_the_merge_order_edge(
     emerge_binary, fixture_env, tmp_path
 ):
