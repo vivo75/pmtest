@@ -39637,3 +39637,39 @@ def test_696_binary_mask_hides_one_build_not_every_build_of_the_version(
         f'[ebuild  N     ] app-misc/u257prov-2 to {env["ROOT"]}',
         f'[binary  N     ] app-misc/u257par-1-3 to {env["ROOT"]}',
     ]
+
+
+def test_697_binary_with_a_missing_dependency_falls_back_to_the_ebuild(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#697: the only binary build of `app-misc/u257par-1` records a plain
+    dependency on `app-misc/u701gone`, which no repository has; the ebuild
+    of the same version is fine. Portage masks that binary package object
+    (`depgraph.py`, `_add_dep` missing-dependency mask), backtracks once
+    and plans the source build. Portage 3.0.83, `--pretend --usepkg
+    --binpkg-changed-deps=n`: `[ebuild N] u257prov-2`, `[ebuild N]
+    u257par-1`, rc 0, `backtrack: 1/20`. The charter's property 1: a plan
+    that holds exists, so the run must not end in a missing-dependency
+    error."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root)
+    pkgdir = tmp_path / "fixtures" / "pkgdir"
+    packages = (pkgdir / "Packages").read_text()
+    count = int(re.search(r"^PACKAGES: (\d+)", packages, re.M).group(1))
+    packages = re.sub(r"^PACKAGES: \d+", f"PACKAGES: {count + 1}", packages, count=1, flags=re.M)
+    packages = packages.rstrip("\n") + (
+        "\n\nCPV: app-misc/u257par-1\nBUILD_ID: 4\nBUILD_TIME: 2000\n"
+        "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+        "PATH: app-misc/u257par-1-4.gpkg.tar\nRDEPEND: app-misc/u701gone\n"
+        "REPO: testrepo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
+    )
+    (pkgdir / "Packages").write_text(packages)
+    r = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkg", "--binpkg-changed-deps=n", "app-misc/u257par"],
+        env,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.splitlines() == [
+        f'[ebuild  N     ] app-misc/u257prov-2 to {env["ROOT"]}',
+        f'[ebuild  N     ] app-misc/u257par-1 to {env["ROOT"]}',
+    ]
