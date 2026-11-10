@@ -34372,6 +34372,87 @@ def test_pubgrub_suggests_keyword_license_mask_changes(emerge_binary, fixture_en
     assert pubgrub.stderr == default.stderr
 
 
+@pytest.mark.parametrize(
+    "args,row",
+    [
+        (["--getbinpkg=y", "--usepkg=y", "dev-libs/binebuildtie"], "[binary  N g   ] dev-libs/binebuildtie-1.0-1"),
+        (["--getbinpkg=y", "--usepkg=y", "dev-libs/remotebinpkg"], "[binary  N g   ] dev-libs/remotebinpkg-1.0-1"),
+        (["--usepkgonly", "--getbinpkg=y", "dev-libs/remotebinpkg"], "[binary  N g   ] dev-libs/remotebinpkg-1.0-1"),
+    ],
+)
+def test_pubgrub_plans_binaries_like_the_default_solver(emerge_binary, fixture_env, args, row):
+    """Backlog #430 S1: `--solver=pubgrub` offers binaries from the local `$PKGDIR` and the
+    binhost index, a binary wins the same-version tie with its ebuild, and a remote-only
+    binary plans with the `g` column and its download size. Expected rows are the default
+    solver's `[binary ...]` rows (the walk's `collect_binary_candidates` filters), which the
+    `--usepkg` cases above pin; a binary the user asked for must not become a source build."""
+    base = ["-pv", *args]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert row in default.stdout
+    assert pubgrub.returncode == default.returncode == 0
+    assert pubgrub.stdout == default.stdout
+    assert pubgrub.stderr == default.stderr
+
+
+@pytest.mark.parametrize(
+    "args,rc",
+    [
+        (["--usepkgonly", "dev-libs/newpkg"], 1),
+        (["--usepkgonly", "dev-libs/pg367-top"], 1),
+        (["--usepkgonly=n", "dev-libs/pg367-top"], 1),
+        (["-uD", "--usepkgonly=n", "dev-libs/pg34-blib"], 0),
+        (["--usepkgonly", "--getbinpkg=y", "dev-libs/binebuildtie"], 0),
+        (["--usepkgonly", "--getbinpkg=y", "dev-libs/binbdepconsumer"], 0),
+    ],
+)
+def test_pubgrub_usepkgonly_drops_the_ebuild_pool(emerge_binary, fixture_env, args, rc):
+    """Backlog #430 S3: `--usepkgonly` (and the explicit `=n` spelling, which Portage also
+    treats as dropping the ebuild db) leaves only binaries and installed packages in the pool,
+    so an ebuild-only package is "no binary packages to satisfy" rather than a source build.
+    Expected output is the default solver's, which pins Portage's `dbs` construction."""
+    base = ["-pv", *args]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert default.returncode == pubgrub.returncode == rc
+    assert pubgrub.stdout == default.stdout
+    assert pubgrub.stderr == default.stderr
+
+
+def test_pubgrub_masks_a_binary_whose_built_slot_operator_dep_went_stale(emerge_binary, fixture_env):
+    """Backlog #430 S2: `dev-libs/mbabicons-1.0` is a binary built against `mbabilib:0/1=`
+    while the plan upgrades `mbabilib` to `0/2`. The default solver masks that binary and
+    merges the ebuild (the #477 case above, Portage 3.0.82.2 rows); `--solver=pubgrub` must
+    not plan the stale binary either, because it would be installed against the wrong ABI."""
+    base = ["--pretend", "--verbose", "--update", "--deep", "--usepkg", "dev-libs/mbabicons"]
+    default = _run([str(emerge_binary)], base, fixture_env)
+    pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+    assert pubgrub.returncode == default.returncode == 0
+    icons = "[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo"
+    assert any(l.startswith(icons) for l in default.stdout.splitlines())
+    assert any(l.startswith(icons) for l in pubgrub.stdout.splitlines())
+    assert "[binary" not in pubgrub.stdout
+
+
+def test_pubgrub_drops_a_built_packages_build_time_deps(emerge_binary, fixture_env):
+    """Backlog #430 S2: with `--usepkg` the `bdeps=auto` default is off, so a binary's recorded
+    DEPEND/BDEPEND are not traversed (`binbdepconsumer` must not pull `binbdeponly`); with
+    `--with-bdeps=y` they are, and both solvers agree on that too. Source: Portage's
+    `_add_pkg_deps` (built and not bdeps) as pinned for the default solver by the #420 cases."""
+    for extra in ([], ["--with-bdeps=y"]):
+        base = ["-pv", "--getbinpkg=y", "--usepkg=y", *extra, "dev-libs/binbdepconsumer"]
+        default = _run([str(emerge_binary)], base, fixture_env)
+        pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
+        assert pubgrub.returncode == default.returncode == 0
+        assert pubgrub.stdout == default.stdout
+    plain = _run(
+        [str(emerge_binary)],
+        ["-pv", "--solver=pubgrub", "--getbinpkg=y", "--usepkg=y", "dev-libs/binbdepconsumer"],
+        fixture_env,
+    )
+    assert "binbdeponly" not in plain.stdout
+
+
 def test_pubgrub_missed_update_notice_is_a_cut(emerge_binary, fixture_env):
     """Backlog #431 S1 (owner decision 2026-11-10): `--solver=pubgrub` plans the same rows
     and exits like the default solver on `btparent`, but prints no "updates/rebuilds have
