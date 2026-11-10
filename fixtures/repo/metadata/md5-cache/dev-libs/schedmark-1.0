@@ -1,0 +1,6 @@
+DEFINED_PHASES=compile install
+DESCRIPTION=fixture package: Scheduler / system-deps gate test (schedmark) -- src_compile records when this build started
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f3047e57e79bfb43b6dc3b78753bb416
