@@ -39444,3 +39444,43 @@ def test_f695_installed_consumer_outside_the_request_keeps_its_use_dep(
     assert [l for l in result.stdout.splitlines() if l.startswith("[")] == []
     assert "f484-mime" not in result.stdout
     assert result.stderr == ""
+
+
+def test_696_binary_mask_hides_one_build_not_every_build_of_the_version(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#696: Portage's `slot_operator_mask_built` masks one package object
+    (`_slot_operator_unsatisfied_backtrack`, `depgraph.py:2896-2903`), so
+    a second build of the same version stays a legal candidate. Two local
+    builds of `app-misc/u257par-1`: BUILD_ID 4 (newer) records a stale
+    `u257prov:0/1=` dep, BUILD_ID 3 (older) records `u257prov:2/2=`, which
+    the provider's current slot satisfies. Build 4 is masked; the plan
+    must take binary build 3 instead of compiling the ebuild (charter: no
+    needless work). Comparison only: Portage 3.0.83 `[binary gU]` in
+    `LLM/evidence/2026-11-09-491/` for the pipewire shape."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root)
+    pkgdir = tmp_path / "fixtures" / "pkgdir"
+    packages = (pkgdir / "Packages").read_text()
+    count = int(re.search(r"^PACKAGES: (\d+)", packages, re.M).group(1))
+    packages = re.sub(r"^PACKAGES: \d+", f"PACKAGES: {count + 2}", packages, count=1, flags=re.M)
+
+    def entry(build_id, build_time, dep):
+        return (
+            f"\n\nCPV: app-misc/u257par-1\nBUILD_ID: {build_id}\nBUILD_TIME: {build_time}\n"
+            "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+            f"PATH: app-misc/u257par-1-{build_id}.gpkg.tar\nRDEPEND: {dep}\n"
+            "REPO: testrepo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
+        )
+
+    packages = (
+        packages.rstrip("\n")
+        + entry(3, 1000, "app-misc/u257prov:2/2=")
+        + entry(4, 2000, "app-misc/u257prov:0/1=")
+    )
+    (pkgdir / "Packages").write_text(packages)
+    r = _run([str(emerge_binary)], ["--pretend", "--usepkg", "app-misc/u257par"], env)
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert r.stdout.splitlines() == [
+        f'[ebuild  N     ] app-misc/u257prov-2 to {env["ROOT"]}',
+        f'[binary  N     ] app-misc/u257par-1-3 to {env["ROOT"]}',
+    ]
