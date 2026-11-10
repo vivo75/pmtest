@@ -39413,3 +39413,34 @@ def test_depclean_pretend_keeps_sub_slot_dependencies_and_idepend_targets(
     out = result.stdout.splitlines()
     assert [ln for ln in out if ln.startswith(" dev-libs/")] == [" dev-libs/sorphan"]
     assert out[-2:] == ["Required packages:    3", "Number to remove:     1"]
+
+
+def test_f695_installed_consumer_outside_the_request_keeps_its_use_dep(
+    emerge_binary, fixture_env, fixtures_root, tmp_path
+):
+    """Backlog #695: the request reaches `app-misc/f484-mime` only through
+    `dev-lang/f484-py`'s plain dependency, while the installed
+    `www-servers/f484-ng-1.0` (in @world here, not walked by the request)
+    records `f484-mime[nginx]`. The `-nginx` binary build 1 would break it;
+    the installed twin (build 2, `+nginx`) satisfies both, so the merge
+    instance goes and nothing is merged.
+
+    Grounded on charter property 1 (every kept package has its
+    dependencies): the old plan merged `[binary R] f484-mime-1.0-1
+    USE="-nginx*"` and left ng without its use dep. Comparison: host Portage
+    3.0.83 on the real tree (`LLM/evidence/2026-11-09-491/`,
+    `emerge -uDpvN =kde-frameworks/kdbusaddons-6.31.0`) plans the same
+    binary, then its slot-conflict handler removes it (`Removing package:
+    app-misc/mime-types-2.1.54-1`, installed build 2 kept) and the list has
+    no mime-types row. Portage cannot read the fixture tree (relative
+    repos.conf), so the host capture stands in for a fixture run."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root, "www-servers/f484-ng")
+    result = _run(
+        [str(emerge_binary)],
+        ["-pvuDN", "--usepkg=y", "--binpkg-respect-use=y", "dev-lang/f484-py"],
+        env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert [l for l in result.stdout.splitlines() if l.startswith("[")] == []
+    assert "f484-mime" not in result.stdout
+    assert result.stderr == ""
