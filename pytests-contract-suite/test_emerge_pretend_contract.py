@@ -39842,6 +39842,37 @@ def test_698_a_holder_without_a_route_still_withholds_the_upgrade(
         assert "skipped due to a dependency conflict" in ok.stdout
 
 
+def test_713_co_upgraded_holders_name_the_provider_as_parent(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #713, charter property 5 (say why): the three holders of the #698 pin join the plan
+    only because `dev-libs/p569prov` moves to 5.44. Their `--json` rows used to have
+    `requested: false` and an empty `required_by`, so nothing said why they were there and the
+    bed's output invariants failed (`not requested and required_by is empty`, `unreachable from
+    the seeds`). Each holder now names the provider as its parent. Source: the project's own
+    output invariants (`output_invariants.check_json`) and the charter; Portage keeps perl at the
+    old version here, so there is nothing to compare."""
+    import output_invariants as inv
+
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"],
+    )
+    ok = _run([str(emerge_binary)], ["--pretend", "--json", "dev-libs/p569prov"], env)
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    doc = inv.parse_json_stdout(ok.stdout)
+    holders = {e["package"]: e for e in doc["entries"] if e["package"].startswith("p698")}
+    assert sorted(holders) == ["p698rebuild", "p698reinst", "p698upg"], ok.stdout
+    for name, entry in holders.items():
+        assert entry["requested"] is False, name
+        assert entry["required_by"] == [{"category": "dev-libs", "package": "p569prov"}], (
+            name,
+            entry["required_by"],
+        )
+    assert inv.check_json(doc, args=["--pretend", "--json", "dev-libs/p569prov"]) == []
+
+
 @pytest.mark.parametrize("solver", ["portage", "pubgrub"])
 def test_715_the_provider_is_merged_before_the_holders_rebuilt_for_it(
     emerge_binary, fixture_env, tmp_path, solver
