@@ -39513,8 +39513,8 @@ def test_676_installed_consumer_reached_only_through_a_merge_bound_package(
     held back and `p590vpull-1` is merged, with the skip block.
 
     Source: the charter's health property; host Portage 3.0.83 does the same
-    (comparison only). World holds `p590vprov` only: with an empty world the
-    complete-mode scope is off (residue, backlog #676)."""
+    (comparison only). World holds `p590vprov` only; the empty-world twin is
+    `test_700_empty_world_still_protects_an_installed_consumer`."""
     root = _b1_root(tmp_path, ["dev-libs/p590vprov"], _606_Q19)
     env = _b1_env(fixture_env, root)
     got = _run([str(emerge_binary)], ["--pretend", "dev-libs/p590vpull"], env)
@@ -39528,6 +39528,39 @@ def test_676_installed_consumer_reached_only_through_a_merge_bound_package(
             f"installed in '{root}') USE=\"\""
         )
         assert line in got.stdout.splitlines(), (line, got.stdout)
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_700_empty_world_still_protects_an_installed_consumer(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """#700: the ROOT of the #676 pin with an empty world. `p590vpull-2` still pulls
+    `U p590vprov-5.44`, and the installed `virtual/p590vvb-1`, which accepts 5.42 or 5.38 only,
+    is left with a dependency nothing satisfies, with no warning. Charter property 1 (every
+    package that stays installed has its dependencies) holds on any ROOT, also one with no world
+    and no `@system`: 5.44 is held back, `p590vpull-1` is merged, and the skip block names
+    `virtual/p590vvb-1`. Source: the charter (Portage not consulted)."""
+    root = _b1_root(tmp_path, [], _606_Q19)
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", f"--solver={solver}", "dev-libs/p590vpull"], env)
+    assert got.returncode == 0, got.stdout
+    new_row = f"[ebuild  N     ] dev-libs/p590vpull-1 to {root}"
+    if solver == "pubgrub":
+        # The bridge prints no skip block (#431 S1); it holds the provider back by asking for its
+        # installed version, which shows as an `R` row (#729), and names the holder in a NOTE (#703).
+        assert _b1_merges(got.stdout) == [
+            f"[ebuild   R    ] dev-libs/p590vprov-5.42 to {root}",
+            new_row,
+        ], got.stdout
+        assert "No visible version of virtual/p590vvb accepts dev-libs/p590vprov-5.44." in got.stdout
+        return
+    assert _b1_merges(got.stdout) == [new_row], got.stdout
+    assert "skipped due to a dependency conflict" in got.stdout, got.stdout
+    line = (
+        f"    =dev-libs/p590vprov-5.42* required by (virtual/p590vvb-1:0/0::testrepo, "
+        f"installed in '{root}') USE=\"\""
+    )
+    assert line in got.stdout.splitlines(), (line, got.stdout)
 
 
 def test_625b_walk_chosen_or_branch_owns_the_merge_order_edge(
