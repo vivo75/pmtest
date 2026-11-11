@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 g): sub-slot 0/1 visible, the tests install it as 0/1
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/1
+_md5_=e2c5fdfe093a6e2b9a4ed59c35996e59

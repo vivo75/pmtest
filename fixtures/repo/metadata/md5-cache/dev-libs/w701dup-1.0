@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 d): one slot, two visible versions
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=b9ac5abe0c4b2635d35c515b8b90a795
