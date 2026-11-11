@@ -39867,6 +39867,30 @@ def test_703_the_route_less_note_is_quiet_under_quiet(emerge_binary, fixture_env
     assert "cannot follow them" not in ok.stdout, ok.stdout
 
 
+def test_702_resolvo_does_not_upgrade_installed_packages_so_there_is_no_co_upgrade(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #702, a documented cut (CUT-12): `--solver=resolvo` keeps every installed package as
+    it is. On the #698 ROOT (`p569prov-5.42` installed, 5.44 in the tree) it plans nothing, with
+    or without `--update --deep`, and the same holds for the lone `p698upg` 1 -> 2 upgrade; a
+    package that is not installed still resolves. So no installed holder is left unsatisfied
+    (charter property 1 holds) and the co-upgrade has no upgrade to follow; property 3 (as new
+    as possible) is the part resolvo does not serve. Source: the capture of 2026-11-11 (the three
+    commands below), not Portage. If resolvo learns to upgrade installed packages this pin goes
+    red and #702 must be wired then."""
+    env = _698_root(
+        fixture_env, tmp_path, ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"]
+    )
+    for args in (
+        ["dev-libs/p569prov"],
+        ["--update", "--deep", "dev-libs/p569prov"],
+        ["--update", "--deep", "dev-libs/p698upg"],
+    ):
+        out = _run([str(emerge_binary)], ["--pretend", "--solver=resolvo", *args], env)
+        assert out.returncode == 0, (args, out.stdout, out.stderr)
+        assert not any(l.startswith("[ebuild") for l in out.stdout.splitlines()), (args, out.stdout)
+
+
 def test_713_co_upgraded_holders_name_the_provider_as_parent(
     emerge_binary, fixture_env, tmp_path
 ):
