@@ -335,3 +335,63 @@
     still independent of each other, so the pair is still an ordering
     artifact; only the match text was updated.
   owner: deepseek-v4.1-flash
+
+# --- #705 triage (2026-11-11) ---
+- id: l0-perl-co-upgrade-698-file-temp-use
+  layer: l0
+  categories: [use]
+  slugs: ["dev-lang_perl"]
+  match: "perl-core/File-Temp USE: real ['-test%'] vs portuale []"
+  reason: >
+    #705 (b), seen with `-pv --usepkg` and a populated PKGDIR. Follows from the
+    l0-perl-co-upgrade-698 version row: Portage upgrades perl-core/File-Temp to 0.231.200,
+    whose IUSE gains `test` (hence `-test%`); portuale rebuilds the installed 0.231.100-r1
+    (`rR`), which has no `test` flag, so it prints no USE. Where portuale plans 0.231.200
+    (mariadb, MakeMaker, the MULTI cells) it prints `USE="-test%"` like Portage. The configured
+    USE is the same on both sides. Whether rebuilding the installed version is as new as
+    possible is backlog #728. Masking tradeoff: exact string, one cell; it hides a display
+    regression on this one row only while portuale still picks 0.231.100-r1.
+  owner: charter
+
+- id: l0-pubgrub-705-perl-r-column
+  layer: l0-pubgrub
+  categories: [flags]
+  slugs: ["MULTI_deep-update-world"]
+  match: "dev-lang/perl: real flags [r U] vs portuale [U]"
+  reason: >
+    #705 (a), class C. Both sides upgrade dev-lang/perl 5.42.2 -> 5.44.0. Portage adds
+    the `r` column because it pulled perl through its internal
+    `__auto_slot_operator_replace_installed__` argument (Portage depgraph.py
+    _iter_atoms_for_pkg / output.py 813-817, force_reinstall). That column says why
+    the package was pulled in. The action and the package are the same, so the row
+    without it is still true. The default solver prints `r  U` because it copies
+    Portage here. Masking tradeoff: the match is exact, so it hides only this
+    one column on this one row.
+  owner: charter
+
+- id: l0-pubgrub-705-multislot-row-collapse-autoconf
+  layer: l0-pubgrub
+  categories: [flags]
+  slugs: ["MULTI_emptytree-system"]
+  match: "dev-build/autoconf: real flags [NS] vs portuale [R]"
+  reason: >
+    #705 (a), class D. `emerge -pe @system` (no -v) prints no `:slot`, so
+    resolve-compare.py keys both autoconf rows (R 2.72-r7 and NS 2.73-r2) on the same
+    `(ebuild, dev-build/autoconf, "")`, and only the last one seen is compared. Both
+    plans contain both rows: Portage at lines 214/215 and portuale at 212 (NS) and
+    279 (R). Only their relative order differs. The comparator already suppresses
+    `version` for this case (resolve-compare.py:512-533) but not `flags`. The better
+    fix is to suppress `flags` there too, and then this entry is not needed. Masking
+    tradeoff: a real NS->R change of autoconf in this cell would be hidden.
+  owner: comparator
+
+- id: l0-pubgrub-705-multislot-row-collapse-automake
+  layer: l0-pubgrub
+  categories: [flags]
+  slugs: ["MULTI_emptytree-system"]
+  match: "dev-build/automake: real flags [NS] vs portuale [R]"
+  reason: >
+    As l0-pubgrub-705-multislot-row-collapse-autoconf: both plans hold automake
+    1.18.1-r1 (R) and 1.19 (NS). Portage lists them at 216/217 and portuale at
+    237 (NS) and 238 (R).
+  owner: comparator
