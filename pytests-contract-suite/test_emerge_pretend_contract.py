@@ -39247,6 +39247,57 @@ def test_605_unwalked_consumer_use_dep_broken_by_an_upgrade(
 
 
 @pytest.mark.parametrize(
+    "installed,world,hint",
+    [
+        (
+            [("app-misc", "w605conc", "1", "0",
+              {"EAPI": "8", "RDEPEND": "dev-libs/w605x[w605flag]"})],
+            "app-misc/w605conc",
+            True,
+        ),
+        (
+            [("dev-libs", "w605y", "1", "0", {"EAPI": "8"}),
+             ("app-misc", "w605cona", "1", "0",
+              {"EAPI": "8", "RDEPEND": "|| ( dev-libs/w605x[w605flag] dev-libs/w605y )"})],
+            "app-misc/w605cona",
+            False,
+        ),
+    ],
+    ids=["C-plain-consumer-hint", "A-or-arm-no-hint"],
+)
+def test_699_update_held_back_by_an_installed_consumers_use_dep(
+    emerge_binary, fixture_env, tmp_path, installed, world, hint
+):
+    """#699: installed `w605x-1` built with `w605flag`, `w605x-2` visible with the
+    flag off, one world consumer per cell, `emerge -puD @world` in an ad-hoc ROOT.
+
+    Expected behaviour is the charter's property 5 (say what the user can do),
+    not Portage's output: the plan is healthy (no `w605x` row, rc 0) but the
+    held-back update is named with the USE change that lets it in. Portage 3.0.83
+    fails with "Change USE: +w605flag" on cell C (comparison only, backlog #699).
+    Cell A: the `||` arm `w605y` is installed, the consumer does not need
+    `w605x`, so nothing is held back and nothing is printed."""
+    root = _b1_root(tmp_path, [world], [_605_X1, *installed])
+    env = _b1_env(fixture_env, root)
+    got = _run([str(emerge_binary)], ["--pretend", "--update", "--deep", "@world"], env)
+    assert got.returncode == 0, got.stderr
+    assert not [ln for ln in _b1_merges(got.stdout) if "w605x" in ln], got.stdout
+    block = [
+        "NOTE: One or more updates were not merged because an installed package needs a USE flag:",
+        f"dev-libs/w605x:0 for {root}/",
+        "  installed: 1",
+        "  not merged: 2 (app-misc/w605conc-1 needs dev-libs/w605x[w605flag])",
+        "  Change USE: dev-libs/w605x +w605flag",
+    ]
+    lines = got.stdout.splitlines()
+    if hint:
+        for line in block:
+            assert line in lines, (line, got.stdout)
+    else:
+        assert "NOTE: One or more updates were not merged" not in got.stdout, got.stdout
+
+
+@pytest.mark.parametrize(
     "args,virtual",
     [
         (["virtual/p651th"], "p651th-3.500.0-r1"),
