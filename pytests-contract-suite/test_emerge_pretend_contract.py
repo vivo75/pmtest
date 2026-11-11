@@ -39546,12 +39546,10 @@ def test_700_empty_world_still_protects_an_installed_consumer(
     assert got.returncode == 0, got.stdout
     new_row = f"[ebuild  N     ] dev-libs/p590vpull-1 to {root}"
     if solver == "pubgrub":
-        # The bridge prints no skip block (#431 S1); it holds the provider back by asking for its
-        # installed version, which shows as an `R` row (#729), and names the holder in a NOTE (#703).
-        assert _b1_merges(got.stdout) == [
-            f"[ebuild   R    ] dev-libs/p590vprov-5.42 to {root}",
-            new_row,
-        ], got.stdout
+        # The bridge prints no skip block (#431 S1); it holds the provider back by pinning its
+        # installed version, which prints no row (#729: the user did not ask for it), and names the
+        # holder in a NOTE (#703).
+        assert _b1_merges(got.stdout) == [new_row], got.stdout
         assert "No visible version of virtual/p590vvb accepts dev-libs/p590vprov-5.44." in got.stdout
         return
     assert _b1_merges(got.stdout) == [new_row], got.stdout
