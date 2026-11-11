@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 e): asks for the children with [w701flag=] while its own w701flag is ON
+EAPI=8
+IUSE=+w701flag
+KEYWORDS=amd64
+RDEPEND=dev-libs/w701flagon[w701flag=] dev-libs/w701flagoff[w701flag=]
+SLOT=0
+_md5_=0e276682f05e33825f8e3c4e24dc7c35

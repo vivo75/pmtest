@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 e): USE flag w701flag is OFF by its IUSE default
+EAPI=8
+IUSE=w701flag
+KEYWORDS=amd64
+SLOT=0
+_md5_=3d28f64058658814b214b80990a406a8

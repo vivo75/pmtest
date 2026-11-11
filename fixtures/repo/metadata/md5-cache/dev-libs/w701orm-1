@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 c): first || branch is masked
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-libs/w701ormask dev-libs/w701orb )
+SLOT=0
+_md5_=64b0ae1052b736df3df32a43128ef71d

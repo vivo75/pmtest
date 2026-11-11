@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 a): the higher version 2.0 lives in the lower-priority main repo
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=dd4a61569e53e3633801e3d7587efefd

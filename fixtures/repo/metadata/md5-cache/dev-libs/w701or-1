@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #701 c): two visible || branches
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( dev-libs/w701ora dev-libs/w701orb )
+SLOT=0
+_md5_=99165a9e30020ea1b95b53c0ddfb960b
