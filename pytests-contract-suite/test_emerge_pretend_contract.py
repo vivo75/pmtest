@@ -5451,6 +5451,26 @@ def test_or_group_in_bin_ordering_promotes_all_installed_slots_over_any_slot(
     )
 
 
+def test_712_deep_alone_keeps_the_installed_slot_and_update_adds_the_new_one(
+    emerge_binary, fixture_env
+):
+    """Backlog #712 (ruling of #683 read as `--update --deep`). Same fixture
+    as above. Portage's `_want_update_pkg` (depgraph.py:7581) is true only
+    with `--update` or for a command-line atom, and `_too_deep` cuts a
+    dependency below the command line unless `--deep` is given. So only
+    `--update --deep` asks for newer versions there; `-D`, `-u` and neither
+    keep the installed slot 1, and `-uD` adds slot 2 (charter property 3)."""
+    root = fixture_env["ROOT"]
+    for opts in (["-D"], ["-u"], []):
+        rust = _run([str(emerge_binary)], ["--pretend", *opts, "dev-libs/oranyslot"], fixture_env)
+        assert rust.returncode == 0, opts
+        assert rust.stdout.splitlines() == [f"[ebuild  N     ] dev-libs/oranyslot-1.0 to {root}"], opts
+    for opts in (["-uD"],):
+        rust = _run([str(emerge_binary)], ["--pretend", *opts, "dev-libs/oranyslot"], fixture_env)
+        assert rust.returncode == 0, opts
+        assert "[ebuild  NS    ] dev-libs/oranyslotalt-2.0 [1.0]" in rust.stdout, rust.stdout
+
+
 def test_or_group_installed_alternative_use_dep_matches_its_vdb_use(
     emerge_binary, fixture_env
 ):
