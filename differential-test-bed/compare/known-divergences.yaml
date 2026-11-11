@@ -109,6 +109,51 @@
     for a real order defect.
   owner: charter
 
+- id: l0-perl-co-upgrade-698
+  layer: l0
+  categories: [extra, missing, version, flags]
+  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
+          "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
+          "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
+          "virtual_perl-ExtUtils-MakeMaker"]
+  match: "perl"
+  reason: >
+    Backlog #698 / Q31 (charter property 1 plus "as up to date as it can be"): Portage keeps
+    `dev-lang/perl` at 5.42 (`R` plus a skipped-update block) because installed `virtual/perl-*`
+    and `dev-perl/*` hold the old slot; portuale checks that every holder has a route (rebuild, or
+    a newer version whose tree deps accept 5.44) and, since they all do, plans perl 5.44 and the
+    holders together. The rows are the perl packages themselves (name contains "perl"), their
+    version/flag moves and the 5.42.2 row Portage plans; l0-health checks the plan keeps every
+    dependency.
+  owner: charter
+
+- id: l0-perl-co-upgrade-698-po4a
+  layer: l0
+  categories: [extra]
+  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
+          "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
+          "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
+          "virtual_perl-ExtUtils-MakeMaker"]
+  match: "app-text/po4a"
+  reason: >
+    The one holder of `dev-lang/perl:0/5.42=` whose name has no "perl" in it: it is rebuilt with
+    the others by the co-upgrade (l0-perl-co-upgrade-698).
+  owner: charter
+
+- id: l0-perl-co-upgrade-698-consequences
+  layer: l0
+  categories: [totals, skipped-updates, error, order]
+  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
+          "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
+          "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
+          "virtual_perl-ExtUtils-MakeMaker"]
+  reason: >
+    Consequences of l0-perl-co-upgrade-698 on the same cells: the package total moves with the
+    extra perl rows, the skipped-update block (and the two `!!!` lines that announce it) is absent
+    because nothing is skipped any more, and the merge order shifts around the added rows (its
+    legality is checked by l0-health, property 2).
+  owner: charter
+
 - id: l0-perl-skip-parent-list-658
   layer: l0
   categories: [skipped-updates]

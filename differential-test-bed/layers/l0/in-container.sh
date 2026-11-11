@@ -19,6 +19,11 @@
 #                               parity mode); Portage's argv is unchanged.
 #                               Empty (the default) leaves portuale's argv
 #                               byte-identical to the default run.
+#   L0_PREPARE_PKGDIR="a/b c/d" pack these installed packages with `quickpkg`
+#                               into $PKGDIR before the probes, so `--usepkg`
+#                               runs exercise a populated binary pool on the
+#                               real tree (backlog #698). Default: none, an
+#                               empty pool (0 `[binary` rows).
 #   L0_SKIP_INVARIANTS=1        skip the extra portuale --json/--tree/--quiet
 #                               runs read by differential-test-bed/compare/check-invariants.py
 
@@ -87,6 +92,15 @@ if [ "${L0_SKIP_PORTAGE_UPGRADE:-0}" != 1 ]; then
   fi
 fi
 "$PORTAGE_EMERGE" --version 2>/dev/null | head -1 >> "$OUTDIR/fingerprint.tsv"
+
+# -- populated binary pool (backlog #698) --------------------------------
+# Both PMs read the same $PKGDIR, so the binary candidates are identical.
+if [ -n "${L0_PREPARE_PKGDIR:-}" ]; then
+  for atom in $L0_PREPARE_PKGDIR ; do
+    /usr/bin/quickpkg --include-config=n "$atom" >> "$OUTDIR/run.log" 2>&1 \
+      && log "quickpkg $atom" || log "!!! quickpkg $atom FAILED"
+  done
+fi
 
 # -- seed a realistic @world -------------------------------------------
 # The image ships an empty /var/lib/portage/world, so `@world` collapses

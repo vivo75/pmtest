@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #698 holder of the built provider slot operator only (a rebuild is the route)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p569prov:=
+SLOT=0
+_md5_=fd2a08788bb87ad5ffc57dec8b693303

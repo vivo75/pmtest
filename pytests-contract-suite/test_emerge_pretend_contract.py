@@ -26398,10 +26398,23 @@ def test_oracle_292_pin_withhold_block_follows_the_conflict_block(
                 line for line in out.splitlines() if line.endswith(_for_root(env["ROOT"]))
                 and line.startswith("dev-libs/")
             ]
+            if budget:
+                # `--backtrack=0` asks for no second walk: Portage's order.
+                assert heads == [
+                    f"dev-libs/slotconflicttarget:0{_for_root(env['ROOT'])}",
+                    f"dev-libs/whblocker:0{_for_root(env['ROOT'])}",
+                ], (budget, atoms, out)
+                continue
+            # #698 (charter, not Portage): with a budget `whtarget-2.0` accepts
+            # `whblocker-2.0`, so the pinning holder follows the upgrade and no
+            # withhold block is left to order against the conflict block. The
+            # block-ordering claim above needs a holder with no route at the
+            # default budget too (backlog #703).
             assert heads == [
                 f"dev-libs/slotconflicttarget:0{_for_root(env['ROOT'])}",
-                f"dev-libs/whblocker:0{_for_root(env['ROOT'])}",
             ], (budget, atoms, out)
+            assert "dev-libs/whblocker-2.0 [1.0]" in out, (budget, atoms, out)
+            assert "dev-libs/whtarget-2.0 [1.0]" in out, (budget, atoms, out)
 
 
 def test_oracle_298_argument_subtrees_walk_last_argument_first(
@@ -27776,6 +27789,10 @@ def test_oracle_blocker_replaced_version_satisfied_and_unsatisfied_twin(
         [
             "--pretend",
             "-v",
+            # #698: with a budget the pinning consumer would follow the upgrade
+            # (it has a newer version); `--backtrack=0` keeps this a twin of the
+            # unsatisfied-blocker shape.
+            "--backtrack=0",
             "--dynamic-deps=n",
             "--update",
             "--deep",
@@ -37922,7 +37939,13 @@ def test_650_skipped_transient_holder_holds_the_installed_binding(
 def test_651_bare_request_with_transient_merging_seeds_the_fall_through(
     emerge_binary, fixture_env
 ):
-    """#656 leg (a) (the former #651 N1 guard leg, same argv): `emerge -pv
+    """#698 SUPERSEDES the R+skip posture below (charter, not Portage): both
+    kept virtuals have a route to 5.44 (`enc` 3.240.0, `th` 3.520.0 accept
+    `=p651prov-5.44*`), so they upgrade with the provider and nothing is
+    withheld: three `U` rows, no skip block. The text that follows records
+    the Portage 3.0.83 behaviour this used to pin (still the hint).
+
+    #656 leg (a) (the former #651 N1 guard leg, same argv): `emerge -pv
     dev-libs/p651prov` (no `--update`). The enforcement-open gate files the
     kept virtuals' `||` conflict when installed, tree-present
     `=p651prov-5.42*` requirers carry the pin (the three `p656hold` twins
@@ -37967,19 +37990,11 @@ def test_651_bare_request_with_transient_merging_seeds_the_fall_through(
     # Trailing space on the prov row: strip_zero_size_suffix keeps one
     # space after a closing '"' (#469).
     assert got.stdout.splitlines() == [
-        f'[ebuild   R    ] dev-libs/p651prov-5.42.2:0/5.42::testrepo to {root} USE="-minimal%" ',
+        f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
+        f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
+        f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
         "",
-        "Total: 1 package (1 reinstall), Size of downloads: 0 KiB",
-        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:",
-        "",
-        f"dev-libs/p651prov:0 for {root}/",
-        "",
-        f"  (dev-libs/p651prov-5.44.0:0/5.44::testrepo, ebuild scheduled for merge to '{root}') USE=\"-minimal\" ELIBC=\"glibc\" conflicts with",
-        f"    =dev-libs/p651prov-5.42* required by (virtual/p651enc-3.210.0-r2:0/0::testrepo, installed in '{root}') USE=\"\"",
-        "    ^                  ^^^^^",
-        f"    =dev-libs/p651prov-5.42* required by (virtual/p651th-3.500.0-r1:0/0::testrepo, installed in '{root}') USE=\"\"",
-        "    ^                  ^^^^^",
-        "",
+        "Total: 3 packages (3 upgrades), Size of downloads: 0 KiB",
     ], got.stdout
 
 
@@ -38132,7 +38147,11 @@ def test_652_nform_consumer_holds_the_virtual_no_subname(
 def test_654_bare_try_and_foo_merge_no_seed_cores(
     emerge_binary, fixture_env
 ):
-    """#654 evidence: bare `dev-perl/p652try` and bare `virtual/p652foo`
+    """#698 SUPERSEDES the row lists asserted below (charter, not Portage): the
+    holders can follow the provider, so it upgrades with them. The #654 claim
+    (no seed core merges) is unchanged and still asserted.
+
+    #654 evidence: bare `dev-perl/p652try` and bare `virtual/p652foo`
     merge ZERO seed cores. This test IS the committed evidence behind the
     "#654 gap has no material" claim: the mechanism in one sentence is
     that enforcement-open skips the transient on bare #652-atom requests
@@ -38161,17 +38180,25 @@ def test_654_bare_try_and_foo_merge_no_seed_cores(
         (
             ["--pretend", "--verbose", "dev-perl/p652try"],
             [
+                f"[ebuild  N     ] dev-perl/p652subname-0.280.0-r1::testrepo to {root}",
+                f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
+                f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
+                f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
                 f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
                 f'[ebuild  N     ] dev-perl/p652try-1::testrepo to {root} USE="-minimal" ',
             ],
-            "Total: 2 packages (2 new), Size of downloads: 0 KiB",
+            # #698: the holders can follow the provider, so it upgrades with them.
+            "Total: 6 packages (3 upgrades, 3 new), Size of downloads: 0 KiB",
         ),
         (
             ["--pretend", "--verbose", "virtual/p652foo"],
             [
+                f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
+                f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
+                f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
                 f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
             ],
-            "Total: 1 package (1 new), Size of downloads: 0 KiB",
+            "Total: 4 packages (3 upgrades, 1 new), Size of downloads: 0 KiB",
         ),
     ):
         got = _run([str(emerge_binary)], args, fixture_env)
@@ -38203,7 +38230,12 @@ def test_654_bare_try_and_foo_merge_no_seed_cores(
 def test_652_hform_upgrade_holds_th_while_encode_merges(
     emerge_binary, fixture_env
 ):
-    """#656 leg (a) consequence on the #652 H-form world: `emerge -pv
+    """#698 SUPERSEDES the R+skip expectation below (charter, not Portage):
+    every holder has a route, so the provider and both virtuals upgrade and
+    `p652early` merges beside them (four rows, no skip block; the hold-back
+    mechanics need a route-less holder, backlog #703).
+
+    #656 leg (a) consequence on the #652 H-form world: `emerge -pv
     dev-perl/p652early dev-libs/p651prov` (no `--update`). The same
     installed, tree-present `=p651prov-5.42*` holders that flip the bare
     leg flip this one too -- the requested early TH consumer does NOT save
@@ -38261,25 +38293,17 @@ def test_652_hform_upgrade_holds_th_while_encode_merges(
     # Trailing space on the prov row: strip_zero_size_suffix keeps one
     # space after a closing '"' (#469).
     assert rows == [
-        f'[ebuild   R    ] dev-libs/p651prov-5.42.2:0/5.42::testrepo to {root} USE="-minimal%" ',
+        f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
+        f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
+        f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
         f"[ebuild  N     ] dev-perl/p652early-1::testrepo to {root}",
     ], got.stdout
     assert (
-        "Total: 2 packages (1 new, 1 reinstall), Size of downloads: 0 KiB"
+        "Total: 4 packages (3 upgrades, 1 new), Size of downloads: 0 KiB"
         in got.stdout
     ), got.stdout
-    # Structural-only skip block (see docstring): presence, slot atom,
-    # and scheduled-instance header pinned; parent rows and order
-    # explicitly unasserted.
-    assert (
-        "WARNING: One or more updates/rebuilds have been skipped due to a dependency conflict:"
-        in got.stdout
-    ), got.stdout
-    assert f"dev-libs/p651prov:0 for {root}/" in got.stdout
-    assert (
-        f"  (dev-libs/p651prov-5.44.0:0/5.44::testrepo, ebuild scheduled for merge to '{root}') USE=\"-minimal\" ELIBC=\"glibc\" conflicts with"
-        in got.stdout
-    ), got.stdout
+    # #698: every holder has a route, so nothing is withheld.
+    assert "skipped due to" not in got.stdout, got.stdout
 
 
 def test_656_pinned_transient_with_fresh_encode_consumer_holds_th(
@@ -39235,7 +39259,14 @@ def test_605_unwalked_consumer_use_dep_broken_by_an_upgrade(
 def test_602_complete_walk_keeps_the_settled_backtrack_masks(
     emerge_binary, fixture_env, args, virtual
 ):
-    """#602 regression (bed `l0-20261107T041916Z`,
+    """#698 SUPERSEDES the expectation below (charter, not Portage): the
+    installed virtuals can follow the provider (`enc` 3.240.0 and `th`
+    3.520.0 accept `=p651prov-5.44*`), so the plan is the complete upgrade:
+    three `U` rows, no skip block. The #602 mask-keeping mechanics now need a
+    route-less holder to be exercised (backlog #703); what follows is the
+    Portage 3.0.83 behaviour this used to pin.
+
+    #602 regression (bed `l0-20261107T041916Z`,
     `virtual/perl-ExtUtils-MakeMaker`): a bare request for an installed
     perl-style virtual whose newest version needs the next provider
     (`|| ( =dev-libs/p651prov-5.44* ~core )`) while installed virtuals hold
@@ -39258,18 +39289,17 @@ def test_602_complete_walk_keeps_the_settled_backtrack_masks(
     root = fixture_env["ROOT"]
     got = _run([str(emerge_binary)], ["--pretend", "--verbose", *args], fixture_env)
     assert got.returncode == 0, got.stdout
-    cp, ver = virtual.split("-", 1)
-    assert got.stdout.splitlines()[0] == (
-        f"[ebuild   R    ] virtual/{virtual}::testrepo to {root}"
-    ), got.stdout
-    assert "Total: 1 package (1 reinstall), Size of downloads: 0 KiB" in got.stdout
-    assert f"dev-libs/p651prov:0 for {root}/" in got.stdout, got.stdout
-    assert (
-        "!!! The following update(s) have been skipped due to unsatisfied dependencies\n"
-        "!!! triggered by backtracking:\n"
-        "\n"
-        f"virtual/{cp}:0 for {root}/"
-    ) in got.stdout, got.stdout
+    # #698: both installed virtuals have a route to 5.44, so the provider and
+    # both virtuals upgrade together and nothing is withheld.
+    assert sorted(
+        ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")
+    ) == sorted([
+        f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
+        f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
+        f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
+    ]), got.stdout
+    assert "Total: 3 packages (3 upgrades), Size of downloads: 0 KiB" in got.stdout
+    assert "skipped due to" not in got.stdout, got.stdout
 
 
 
@@ -39673,3 +39703,89 @@ def test_697_binary_with_a_missing_dependency_falls_back_to_the_ebuild(
         f'[ebuild  N     ] app-misc/u257prov-2 to {env["ROOT"]}',
         f'[ebuild  N     ] app-misc/u257par-1 to {env["ROOT"]}',
     ]
+
+
+def _698_root(fixture_env, tmp_path, world_extra, installed_extra=()):
+    """A scratch ROOT: the shared vdb plus installed #698 holders that recorded
+    the pins the provider's old sub-slot (`p569prov-5.42`) left in them."""
+    root = tmp_path / "root"
+    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True)
+    world = root / "var/lib/portage/world"
+    world.write_text(world.read_text() + "".join(f"{w}\n" for w in world_extra))
+    seed_updates_record(root)
+    for cpv, rdepend in (
+        ("dev-libs/p698rebuild-1", "dev-libs/p569prov:0/5.42="),
+        ("dev-libs/p698reinst-1", "=dev-libs/p569prov-5.42* dev-libs/p569prov:0/5.42="),
+        ("dev-libs/p698upg-1", "=dev-libs/p569prov-5.42* dev-libs/p569prov:0/5.42="),
+        *installed_extra,
+    ):
+        entry = root / "var/db/pkg" / cpv
+        entry.mkdir(parents=True)
+        (entry / "CATEGORY").write_text(cpv.split("/")[0] + "\n")
+        (entry / "EAPI").write_text("8\n")
+        (entry / "SLOT").write_text("0\n")
+        (entry / "repository").write_text("testrepo\n")
+        (entry / "RDEPEND").write_text(rdepend + "\n")
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    return env
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_698_holders_that_can_follow_an_upgrade_join_it(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #698, charter property 1 plus "as up to date as it can be":
+    `dev-libs/p569prov` moves 5.42 -> 5.44 (new sub-slot) while three installed
+    @world holders recorded the old pins. Each has a route, so each joins the
+    plan instead of withholding the upgrade: `p698rebuild` (built `:0/5.42=`
+    only) is rebuilt, `p698reinst` (tree ebuild already accepts 5.44) is
+    reinstalled, `p698upg` (pinned `=5.42*`; its `-2` requires `=5.44*`)
+    upgrades. No skipped-update block. Portage keeps 5.42 with an `R` and a
+    skipped-update block here (`LLM/portage-quirks.md`); the comparison is a
+    hint only. Same plan with both solvers."""
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"],
+    )
+    ok = _run(
+        [str(emerge_binary)],
+        ["--pretend", f"--solver={solver}", "dev-libs/p569prov"],
+        env,
+    )
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    rows = [
+        line.split(" to ")[0] for line in ok.stdout.splitlines() if line.startswith("[ebuild")
+    ]
+    assert sorted(r.split("] ")[1].split(" [")[0] for r in rows) == [
+        "dev-libs/p569prov-5.44",
+        "dev-libs/p698rebuild-1",
+        "dev-libs/p698reinst-1",
+        "dev-libs/p698upg-2",
+    ], ok.stdout
+    assert "skipped due to a dependency conflict" not in ok.stdout
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_698_a_holder_without_a_route_still_withholds_the_upgrade(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Counter-example of the test above: `p573virt` (installed @world, its
+    tree ebuild still pins `=p569prov-5.42*`) cannot follow, so the provider
+    stays at 5.42 with both solvers; the default solver also prints the
+    skipped-update block (the bridge prints none, #431 S1)."""
+    env = _698_root(fixture_env, tmp_path, ["dev-libs/p698rebuild", "dev-libs/p573virt"],
+                    [("dev-libs/p573virt-1", "=dev-libs/p569prov-5.42* dev-libs/p569prov:0/5.42=")])
+    ok = _run(
+        [str(emerge_binary)],
+        ["--pretend", f"--solver={solver}", "dev-libs/p569prov"],
+        env,
+    )
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    assert "p569prov-5.44" not in "".join(
+        line for line in ok.stdout.splitlines() if line.startswith("[ebuild")
+    ), ok.stdout
+    if solver == "portage":
+        assert "skipped due to a dependency conflict" in ok.stdout

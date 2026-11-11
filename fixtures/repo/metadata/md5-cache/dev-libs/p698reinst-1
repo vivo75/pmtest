@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #698 holder whose tree ebuild already accepts the new provider (a reinstall of the same version is the route)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p569prov:=
+SLOT=0
+_md5_=10af2e014ba3f4eed94e1a5fca8178e7
