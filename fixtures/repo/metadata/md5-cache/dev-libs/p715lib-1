@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #715 dependency of the new provider version, not installed
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=ea2325aa88bcf33815f99c6735efbc46

@@ -7,6 +7,9 @@
 #
 #   differential-test-bed/run/l0-health.sh [atomlist]
 #
+# Env: L0_PORTUALE_OPTS  extra options for every portuale probe, e.g.
+#      L0_PORTUALE_OPTS=--solver=pubgrub (plans of another solver are checked too).
+#
 # Output: differential-test-bed/logs/l0-health-<timestamp>/ (plans/,
 # health.jsonl, health-report.txt). Exit: 0 when no plan has a failure the
 # plan itself introduced, 1 otherwise, 2 on a setup error.
@@ -30,6 +33,7 @@ ensure_image
 
 echo ">>> planning and checking in $IMAGE  (out: $OUT)"
 podman_run_pm "porttest-l0-health-$$" "${MIRROR_ENV[@]}" \
+  -e "L0_PORTUALE_OPTS=${L0_PORTUALE_OPTS:-}" \
   -v "$REPO_ROOT/pytests-contract-suite/health_checker.py:/HC/health_checker.py:ro" \
   --entrypoint /bin/bash "$IMAGE" \
   /TEST/layers/l0-health/in-container.sh "$REL_ATOMLIST" "/TEST/logs/$RUN"

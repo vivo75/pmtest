@@ -10,7 +10,7 @@
 # List lines: atoms (planned with `-pv`), or a whole argument list when the
 # line starts with '-'. `#:family NAME` names the group of the lines after
 # it. Every probe adds --ignore-default-opts, so the options are the ones
-# written. meta.tsv gets: label, exit code, seconds, family.
+# written, plus L0_PORTUALE_OPTS (for example --solver=pubgrub) when set. meta.tsv gets: label, exit code, seconds, family.
 
 set -u
 ATOMLIST=${1:?atom list path}
@@ -28,7 +28,8 @@ slug() { printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_' ; }
 probe() {  # family, label, emerge args
   local family=$1 label=$2 start rc; shift 2
   start=${EPOCHREALTIME/./}
-  timeout 1200 "$PTL" "$@" --ignore-default-opts --color=n --json \
+  # shellcheck disable=SC2086  # L0_PORTUALE_OPTS is an option list on purpose
+  timeout 1200 "$PTL" "$@" ${L0_PORTUALE_OPTS:-} --ignore-default-opts --color=n --json \
     > "$OUTDIR/plans/$label.json" 2> "$OUTDIR/plans/$label.stderr"
   rc=$?
   local ms=$(( (${EPOCHREALTIME/./} - start) / 1000 ))

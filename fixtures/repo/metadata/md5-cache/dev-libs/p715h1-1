@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/p715prov:=
+DESCRIPTION=fixture package: #715 holder built against the provider sub-slot
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p715prov:=
+SLOT=0
+_md5_=995c3e6c8b6c8e696f1ff89258deafec

@@ -39840,3 +39840,62 @@ def test_698_a_holder_without_a_route_still_withholds_the_upgrade(
     ), ok.stdout
     if solver == "portage":
         assert "skipped due to a dependency conflict" in ok.stdout
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_715_the_provider_is_merged_before_the_holders_rebuilt_for_it(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #715, charter property 2 (the merge order builds each package
+    against what it will run with) and, through it, property 1. Installed
+    @world holders `p715h1` and `p715h2` were built against `p715prov:0/1`;
+    `p715prov-2` (SLOT `0/2`) has a `DEPEND` of its own on the not-installed
+    `p715lib`. The holders are rebuilt for the new sub-slot, so the provider
+    must be merged first: a holder rebuilt earlier is built against the OLD
+    provider again and its recorded `p715prov:0/1=` is unsatisfied after the
+    merge. PMS `dependencies.tex`, "Slot dependencies": the `=` operator
+    "indicates that the package will break unless a matching package with slot
+    and sub-slot equal to the slot and sub-slot of the best version installed
+    as a build-time (DEPEND) dependency is available". Order wanted:
+    `p715lib`, `p715prov-2`, then the holders, with both solvers."""
+    root = tmp_path / "root"
+    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True)
+    world = root / "var/lib/portage/world"
+    world.write_text(
+        world.read_text() + "dev-libs/p715h1\ndev-libs/p715h2\ndev-libs/p715prov\n"
+    )
+    seed_updates_record(root)
+    for cpv, slot, pin in (
+        ("dev-libs/p715prov-1", "0/1", ""),
+        ("dev-libs/p715h1-1", "0", "dev-libs/p715prov:0/1="),
+        ("dev-libs/p715h2-1", "0", "dev-libs/p715prov:0/1="),
+    ):
+        entry = root / "var/db/pkg" / cpv
+        entry.mkdir(parents=True)
+        (entry / "CATEGORY").write_text("dev-libs\n")
+        (entry / "EAPI").write_text("8\n")
+        (entry / "SLOT").write_text(slot + "\n")
+        (entry / "repository").write_text("testrepo\n")
+        if pin:
+            (entry / "RDEPEND").write_text(pin + "\n")
+            (entry / "DEPEND").write_text(pin + "\n")
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    ok = _run(
+        [str(emerge_binary)],
+        ["--pretend", f"--solver={solver}", "dev-libs/p715prov"],
+        env,
+    )
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    names = [
+        line.split(" to ")[0].split("] ")[1].split(" [")[0].split(":")[0]
+        for line in ok.stdout.splitlines()
+        if line.startswith("[ebuild")
+    ]
+    for want in ("dev-libs/p715prov-2", "dev-libs/p715h1-1", "dev-libs/p715h2-1"):
+        assert want in names, ok.stdout
+    prov = names.index("dev-libs/p715prov-2")
+    assert names.index("dev-libs/p715lib-1") < prov, ok.stdout
+    for holder in ("dev-libs/p715h1-1", "dev-libs/p715h2-1"):
+        assert prov < names.index(holder), ok.stdout

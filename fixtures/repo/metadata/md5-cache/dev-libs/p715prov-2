@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/p715lib
+DESCRIPTION=fixture package: #715 provider, new sub-slot with a dependency of its own
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=e96ef075fc0aa51ee34cced3455f90e2
