@@ -39817,6 +39817,7 @@ def test_698_holders_that_can_follow_an_upgrade_join_it(
         "dev-libs/p698upg-2",
     ], ok.stdout
     assert "skipped due to a dependency conflict" not in ok.stdout
+    assert "cannot follow them" not in ok.stdout, ok.stdout
 
 
 @pytest.mark.parametrize("solver", ["portage", "pubgrub"])
@@ -39826,7 +39827,11 @@ def test_698_a_holder_without_a_route_still_withholds_the_upgrade(
     """Counter-example of the test above: `p573virt` (installed @world, its
     tree ebuild still pins `=p569prov-5.42*`) cannot follow, so the provider
     stays at 5.42 with both solvers; the default solver also prints the
-    skipped-update block (the bridge prints none, #431 S1)."""
+    skipped-update block (the bridge prints none, #431 S1). Backlog #703, charter
+    property 5 (messages help): where no such block exists (pubgrub) a NOTE names the one
+    holder that cannot follow (`p573virt`, not `p698rebuild`, which can); the default solver's
+    block already names it, so no second NOTE (duplicate text is noise). Portage prints the
+    skipped-update block only (comparison, `LLM/portage-quirks.md` Q31)."""
     env = _698_root(fixture_env, tmp_path, ["dev-libs/p698rebuild", "dev-libs/p573virt"],
                     [("dev-libs/p573virt-1", "=dev-libs/p569prov-5.42* dev-libs/p569prov:0/5.42=")])
     ok = _run(
@@ -39840,6 +39845,26 @@ def test_698_a_holder_without_a_route_still_withholds_the_upgrade(
     ), ok.stdout
     if solver == "portage":
         assert "skipped due to a dependency conflict" in ok.stdout
+        assert "cannot follow them" not in ok.stdout, ok.stdout
+        return
+    assert "skipped due to a dependency conflict" not in ok.stdout
+    assert (
+        "NOTE: One or more updates were not merged because an installed package cannot follow "
+        "them:\n\ndev-libs/p569prov:0 for " + env["ROOT"].rstrip("/") + "/\n\n  installed: 5.42\n"
+        "  not merged: 5.44 (dev-libs/p573virt-1 needs =dev-libs/p569prov-5.42*)\n"
+        "  No visible version of dev-libs/p573virt accepts dev-libs/p569prov-5.44.\n"
+    ) in ok.stdout, ok.stdout
+    assert "p698rebuild-1 needs" not in ok.stdout
+
+
+def test_703_the_route_less_note_is_quiet_under_quiet(emerge_binary, fixture_env, tmp_path):
+    """Backlog #703: same ROOT as the pin above with `--quiet --solver=pubgrub` (the solver that prints the NOTE); like the #699 note, the NOTE is
+    suppressed and the exit code stays 0 (charter property 5: notes, not noise)."""
+    env = _698_root(fixture_env, tmp_path, ["dev-libs/p698rebuild", "dev-libs/p573virt"],
+                    [("dev-libs/p573virt-1", "=dev-libs/p569prov-5.42* dev-libs/p569prov:0/5.42=")])
+    ok = _run([str(emerge_binary)], ["--pretend", "--quiet", "--solver=pubgrub", "dev-libs/p569prov"], env)
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    assert "cannot follow them" not in ok.stdout, ok.stdout
 
 
 def test_713_co_upgraded_holders_name_the_provider_as_parent(
