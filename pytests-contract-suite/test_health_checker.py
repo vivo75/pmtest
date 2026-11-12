@@ -325,6 +325,58 @@ def test_build_time_blocker_is_checked_when_the_package_builds():
     assert failures(doc) == [("blocker", "app-misc/a-1", "!dev-libs/old")]
 
 
+def test_737_weak_blocker_against_a_package_the_plan_replaces_later_is_noted():
+    """Backlog #737 (2): `w737compat` weakly blocks `!=w737old-1*` while the
+    `w737old-1` it matches is still installed, but the plan upgrades that
+    very package later, so the final set is valid. PMS 8.3: `!` blocks one
+    package, and the hit is gone by the end."""
+    doc = plan([
+        entry("dev-libs/w737compat-1", 0, deps={"DEPEND": "!=dev-libs/w737old-1*:0"}),
+        entry("dev-libs/w737old-2", 1, outcome="upgrade", from_version="1"),
+    ])
+    found = hc.check_plan(doc)
+    assert [f for f in found if f.is_failure] == []
+    assert [(f.property, f.package, f.atom) for f in found] == [
+        ("cycle-noted", "dev-libs/w737compat-1", "!=dev-libs/w737old-1*:0")]
+
+
+def test_737_strong_blocker_against_a_replaced_package_still_fails():
+    """Backlog #737 (2), guard: `!!` blocks everything matching, so a later
+    replacement does not excuse it."""
+    doc = plan([
+        entry("dev-libs/w737compat-1", 0, deps={"DEPEND": "!!=dev-libs/w737old-1*:0"}),
+        entry("dev-libs/w737old-2", 1, outcome="upgrade", from_version="1"),
+    ])
+    assert failures(doc) == [("blocker", "dev-libs/w737compat-1", "!!=dev-libs/w737old-1*:0")]
+
+
+def test_737_weak_blocker_against_a_package_the_plan_keeps_still_fails():
+    """Backlog #737 (2), guard: the note needs a later replacement; a hit
+    that stays installed is still a build-time blocker."""
+    doc = plan([entry("dev-libs/w737compat-1", 0, deps={"DEPEND": "!=dev-libs/w737old-1*:0"})],
+               [kept("dev-libs/w737old-1")])
+    assert failures(doc) == [("blocker", "dev-libs/w737compat-1", "!=dev-libs/w737old-1*:0")]
+
+
+def test_737_late_reinstall_self_unmatched_need_stays_reported(tmp_path):
+    """Backlog #737 (3): the provider's own old RDEPEND atom, met only by an
+    installed package the plan never touches and by no merge, stays a
+    `build-order` failure. The plan orders the rebuild late for reasons the
+    checker cannot see (a sub-slot pin, a compat package, a soname change);
+    Portage merges that late too, so this is an accepted checker limitation,
+    not a plan defect (see the `l0-737-openssl-world-late-reinstall-order`
+    divergence entry)."""
+    vdb_package(tmp_path, "dev-libs/prov-1", rdepend="dev-libs/dep")
+    vdb_package(tmp_path, "dev-libs/dep-1")
+    doc = plan([
+        entry("app-misc/x-1", 0, deps={"DEPEND": "dev-libs/prov"}),
+        entry("dev-libs/prov-2", 1, outcome="upgrade", from_version="1"),
+    ])
+    found = [f for f in hc.check_plan(doc, tmp_path) if f.is_failure]
+    assert [(f.property, f.package, f.atom) for f in found] == [
+        ("build-order", "app-misc/x-1", "dev-libs/dep")]
+
+
 def test_no_sub_slot_means_the_sub_slot_is_the_slot():
     """drop_sub_slot (PMS 7.2)."""
     doc = plan([entry("dev-libs/b-2", 0, outcome="upgrade", from_version="1")],

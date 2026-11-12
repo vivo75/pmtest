@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=!=dev-libs/w737old-1*:0
+DESCRIPTION=fixture package (backlog #737): weakly blocks !=w737old-1* while the plan upgrades w737old itself, like openssl-compat vs openssl-3*
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=!=dev-libs/w737old-1*:0
+SLOT=3
+_md5_=7c23477d2ee06dbfad78ccd28314d46a
