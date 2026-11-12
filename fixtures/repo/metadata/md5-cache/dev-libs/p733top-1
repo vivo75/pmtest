@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #733 installed package with a post-merge dependency on an installed package that needs it back (dev-build/ninja and app-alternatives/ninja)
+EAPI=8
+KEYWORDS=amd64
+PDEPEND=dev-libs/p733dep
+SLOT=0
+_md5_=2388d9951387e42009c17b424c77bd1c

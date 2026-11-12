@@ -40194,3 +40194,32 @@ def test_714_b_row_shows_the_download_size_and_the_installed_sub_slot(
     assert sub.returncode == 0, (sub.stdout, sub.stderr)
     upgrade = [l for l in sub.stdout.splitlines() if "dev-libs/mbabilib-2.0:0/2" in l]
     assert len(upgrade) == 1 and "[1.0:0/1::testrepo]" in upgrade[0], sub.stdout
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_733_tree_does_not_nest_a_row_under_a_hidden_leaf(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #733, charter property 5 (the display tells the truth; the output invariant is
+    that a row at depth 1 has a parent row). `p733top` has `PDEPEND=p733dep` and the installed
+    `p733dep` has `RDEPEND=p733top`, the shape of `dev-build/ninja` and `app-alternatives/ninja`
+    (`reference? ( >=dev-build/ninja )`). Without `--deep` the installed `p733dep` is a leaf, its
+    dependencies are not part of the plan, so `--tree` prints the requested reinstall at depth 0.
+    `--solver=pubgrub` gave the leaf entry the dependency edge back to `p733top`, so the tree
+    put `p733top` under a parent that is not displayed (bed `l0-20261112T032148Z`, `dev-build/ninja`:
+    `R    ]  dev-build/ninja` with two spaces). Expected text: the default solver's."""
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        [],
+        [("dev-libs/p733top-1", ""), ("dev-libs/p733dep-1", "dev-libs/p733top")],
+    )
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--tree", f"--solver={solver}", "dev-libs/p733top"],
+        env,
+    )
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    assert got.stdout.splitlines()[0] == (
+        f"[ebuild   R    ] dev-libs/p733top-1::testrepo to {env['ROOT']}"
+    ), got.stdout

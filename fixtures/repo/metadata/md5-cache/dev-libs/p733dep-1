@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #733 installed dependency of p733top whose runtime dependency is p733top
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p733top
+SLOT=0
+_md5_=25ca33901ec5a765d79cf104c1c2fa52
