@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #737): provider upgraded 1 -> 2 while w737compat weakly blocks the old series
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=9ce084d7299d3b02ccf1c4248c8e8e61

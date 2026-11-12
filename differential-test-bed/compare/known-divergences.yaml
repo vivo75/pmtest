@@ -489,3 +489,36 @@
     flag pair on one cell; it hides a missing `r` on a row whose package is rebuilt on both
     sides, and nothing else.
   owner: charter
+
+# --- #737 (2026-11-12): the `@world` openssl 3 -> 4 move orders late rebuilds ---
+- id: l0-737-openssl-world-late-reinstall-order
+  layer: l0
+  categories: [order]
+  slugs: ["_world"]
+  match: "merge order diverges"
+  reason: >
+    Backlog #737 (3): the `-uDN @world` plan carrying the
+    `dev-libs/openssl` 3.6.5 -> 4.1.0 upgrade (with the new
+    `dev-libs/openssl-compat-3.6.5:3`) orders rebuilds after their consumers:
+    916 of the health run's 922 `build-order` findings are `met only by X,
+    merged later`, dominated by the `net-nds/openldap-2.6.14` reinstall
+    (#1866, 447 findings) and the `sys-fs/cryptsetup-2.8.8` reinstall (#1948,
+    446), trailing `sys-libs/libnvme-1.16.2` (#1952, 19),
+    `kde-frameworks/extra-cmake-modules-6.31.0` (#1869),
+    `dev-libs/libfido2-1.17.0` (#1949), `dev-util/bpftool-7.8.1-r1` (#1996)
+    and the `net-misc/openssh` upgrade (#1954, 1 each); the other 6 are the
+    provider's own old RDEPEND atom met by nothing in the plan
+    (`not matched by anything installed or merged before it`). Portage
+    does the same: its own `-pvuDN --getbinpkg=n @world` on this host
+    (2026-11-12) puts `dev-libs/openssl-4.1.0` at row 35 of 348 and
+    `net-nds/openldap-2.6.14` and `sys-fs/cryptsetup-2.8.8` at rows 270 and
+    271, so no ordering edge is missing: the checker reports them because it cannot
+    see why a rebuild is late (a sub-slot pin such as `openssl:0/3=`, the
+    compat package, a soname change live in the VDB and the ebuilds, not in
+    the plan; see the `gap()` note in
+    `pytests-contract-suite/health_checker.py`). The order itself breaks
+    nothing: every finding carries an `openssl:0/3=`-family atom and the
+    final set holds. Masking tradeoff: this hides any future order
+    divergence in `_world` whose first reported pair is exactly this one;
+    the health run, not this bed, is the gate for a real order defect.
+  owner: charter

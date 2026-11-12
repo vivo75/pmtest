@@ -158,6 +158,7 @@ class UseDep:
 class Atom:
     text: str
     blocker: bool
+    strong: bool  # `!!` blocks everything matching; `!` blocks one package (PMS 8.3)
     op: str  # "", "<", "<=", "=", "~", ">=", ">"
     cp: tuple[str, str]
     version: str
@@ -191,9 +192,11 @@ def parse_atom(text: str) -> Atom:
             raise ValueError(f"bad version in atom: {text}")
     slot = (m.group("slot") or "").rstrip("=")
     slot, _, subslot = slot.partition("/")
+    blocker = m.group("blocker") or ""
     return Atom(
         text=text,
-        blocker=bool(m.group("blocker")),
+        blocker=bool(blocker),
+        strong=blocker == "!!",
         op=op,
         cp=(m.group("cat"), pkg),
         version=version,
@@ -696,7 +699,11 @@ class _Moment:
         """Why `pkg` is not usable now (PMS 8.1): the first package in its
         RDEPEND closure with an RDEPEND atom the plan left unmet, and that
         atom. An atom an installed package already missed before the plan
-        does not count; a runtime cycle counts as usable."""
+        does not count; a runtime cycle counts as usable. A need met only by
+        a merge the plan orders later (a late rebuild for a sub-slot pin, a
+        compat package, a soname change the checker cannot see) is still
+        reported: that ordering reason is outside the plan, so the finding
+        is a checker limitation, not a plan defect (backlog #737)."""
         if id(pkg) in self.gaps:
             return self.gaps[id(pkg)]
         self.gaps[id(pkg)] = None  # a cycle back here counts as usable
@@ -728,9 +735,24 @@ def _unusable(node, moment: _Moment, pkg: Package) -> tuple[Package, tuple] | No
     return None
 
 
-def _build_blockers(pkg: Package, available: Index) -> list[tuple[Atom, Package]]:
-    """DEPEND/BDEPEND blockers of `pkg` matching a package present when it builds."""
-    return [hit for c in BUILD_CLASSES for hit in _blocker_hits(_reduced(pkg, c), available, pkg)]
+def _build_blockers(pkg: Package, available: Index, plan: Plan, order: int) -> list[Finding]:
+    """DEPEND/BDEPEND blockers of `pkg` matching a package present when it builds.
+
+    A weak (`!`) blocker matching a package the plan itself replaces later is
+    only noted: the final set decides, and the hit is gone by then. A strong
+    (`!!`) blocker always fails."""
+    findings = []
+    for dep_class in BUILD_CLASSES:
+        for atom, hit in _blocker_hits(_reduced(pkg, dep_class), available, pkg):
+            if not atom.strong and any(r is hit and ro > order for ro, r in plan.replaced):
+                findings.append(Finding(
+                    "cycle-noted", pkg.cpv, atom.text,
+                    f"weak blocker {atom.text} matches {hit.cpv}, which the plan replaces later"))
+            else:
+                findings.append(Finding(
+                    "blocker", pkg.cpv, atom.text,
+                    f"build-time blocker: {hit.cpv} is installed when it builds"))
+    return findings
 
 
 def check_order(plan: Plan) -> list[Finding]:
@@ -744,9 +766,7 @@ def check_order(plan: Plan) -> list[Finding]:
         available = index(plan.available_at(order))
         moment = _Moment(available, initial, merged)
         if not pkg.binary:
-            findings += [Finding("blocker", pkg.cpv, atom.text,
-                                 f"build-time blocker: {hit.cpv} is installed when it builds")
-                         for atom, hit in _build_blockers(pkg, available)]
+            findings += _build_blockers(pkg, available, plan, order)
         for dep_class, node in _build_atoms(pkg):
             if not _satisfied(node, available, pkg):
                 findings.append(_order_finding(plan, component, order, pkg, node, dep_class))
