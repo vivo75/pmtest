@@ -40197,6 +40197,41 @@ def test_714_b_row_shows_the_download_size_and_the_installed_sub_slot(
 
 
 @pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_735_fetch_restricted_row_shows_the_marker_and_the_summary_line(
+    emerge_binary, fixture_env, solver
+):
+    """Backlog #735, charter property 5 (a user must be told to fetch a file by hand). A
+    `RESTRICT=fetch` ebuild prints `F` in the bracket when its distfile is missing and `f` when
+    it is in DISTDIR, and the summary ends with a `Fetch Restriction:` line (`(1 unsatisfied)`
+    only for the missing file). `--solver=pubgrub` printed neither. Expected text: the default
+    solver's, as pinned by the `Fetch Restriction` block of the first-slice test above (Portage
+    output.py, getfetchsizes only_restricted)."""
+    missing = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", f"--solver={solver}", "dev-libs/fetchrestrictmissingpkg"],
+        fixture_env,
+    )
+    assert missing.returncode == 0, (missing.stdout, missing.stderr)
+    assert missing.stdout.splitlines()[0].startswith(
+        "[ebuild  N F   ] dev-libs/fetchrestrictmissingpkg-1.0"
+    ), missing.stdout
+    assert missing.stdout.splitlines()[-2:] == [
+        "Total: 1 package (1 new), Size of downloads: 13 KiB",
+        "Fetch Restriction: 1 package (1 unsatisfied)",
+    ], missing.stdout
+    present = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", f"--solver={solver}", "dev-libs/fetchrestrictsatisfiedpkg"],
+        fixture_env,
+    )
+    assert present.returncode == 0, (present.stdout, present.stderr)
+    assert present.stdout.splitlines()[0].startswith(
+        "[ebuild  N f   ] dev-libs/fetchrestrictsatisfiedpkg-1.0"
+    ), present.stdout
+    assert present.stdout.splitlines()[-1] == "Fetch Restriction: 1 package", present.stdout
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
 def test_733_tree_does_not_nest_a_row_under_a_hidden_leaf(
     emerge_binary, fixture_env, tmp_path, solver
 ):
