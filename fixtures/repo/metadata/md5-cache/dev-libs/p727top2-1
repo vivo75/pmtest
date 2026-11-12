@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #727 not-installed package depending on the virtual
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p727virt
+SLOT=0
+_md5_=50453c194525687db8e9a4a7f0bb4678

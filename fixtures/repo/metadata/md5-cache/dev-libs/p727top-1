@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #727 not-installed package whose || group lists the new provider first (mirrors virtual/perl-Digest-MD5)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p569prov-5.44* =dev-libs/p569prov-5.42* ) dev-libs/p569prov:=
+SLOT=0
+_md5_=00e643c063414fa3d20c2593ea466e2c

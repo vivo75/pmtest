@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #727 virtual accepting only the new provider (mirrors virtual/perl-Storable-3.410)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p569prov-5.44* ~dev-libs/p727core-2 ) dev-libs/p569prov:=
+SLOT=0
+_md5_=27ccb1d203a616e1285768b1b8706183

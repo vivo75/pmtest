@@ -3195,6 +3195,7 @@ CASES = [
     ("#604: the same with the parent picking =w604prov-5.42* in its own || (Portage 3.0.83 rc 1, 4/20)", ["--pretend", "dev-libs/w604force", "dev-libs/w604paror"], 1),
     ("#613: abk0d with default options in the shared ROOT, where abk0b is not in world (A-3 plus the x USE change, Portage 3.0.83 rc 1, 0/20; the world-B shape needs its own ROOT: test_613_*)", ["--pretend", "dev-libs/abk0d"], 1),
     ("#613: the same with --backtrack=1 (Portage 3.0.83 rc 1, 0/1)", ["--pretend", "--backtrack=1", "dev-libs/abk0d"], 1),
+    ("#727: a new package whose || group lists the new p569prov first, in the shared ROOT where p569prov is not installed (the withheld-provider shape needs its own ROOT: test_727_*)", ["--pretend", "dev-libs/p727top"], 0),
 ]
 
 
@@ -38167,11 +38168,7 @@ def test_652_nform_consumer_holds_the_virtual_no_subname(
 def test_654_bare_try_and_foo_merge_no_seed_cores(
     emerge_binary, fixture_env
 ):
-    """#698 SUPERSEDES the row lists asserted below (charter, not Portage): the
-    holders can follow the provider, so it upgrades with them. The #654 claim
-    (no seed core merges) is unchanged and still asserted.
-
-    #654 evidence: bare `dev-perl/p652try` and bare `virtual/p652foo`
+    """#654 evidence: bare `dev-perl/p652try` and bare `virtual/p652foo`
     merge ZERO seed cores. This test IS the committed evidence behind the
     "#654 gap has no material" claim: the mechanism in one sentence is
     that enforcement-open skips the transient on bare #652-atom requests
@@ -38200,25 +38197,17 @@ def test_654_bare_try_and_foo_merge_no_seed_cores(
         (
             ["--pretend", "--verbose", "dev-perl/p652try"],
             [
-                f"[ebuild  N     ] dev-perl/p652subname-0.280.0-r1::testrepo to {root}",
-                f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
-                f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
-                f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
                 f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
                 f'[ebuild  N     ] dev-perl/p652try-1::testrepo to {root} USE="-minimal" ',
             ],
-            # #698: the holders can follow the provider, so it upgrades with them.
-            "Total: 6 packages (3 upgrades, 3 new), Size of downloads: 0 KiB",
+            "Total: 2 packages (2 new), Size of downloads: 0 KiB",
         ),
         (
             ["--pretend", "--verbose", "virtual/p652foo"],
             [
-                f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
-                f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
-                f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
                 f"[ebuild  N     ] virtual/p652foo-2.223.0-r1::testrepo to {root}",
             ],
-            "Total: 4 packages (3 upgrades, 1 new), Size of downloads: 0 KiB",
+            "Total: 1 package (1 new), Size of downloads: 0 KiB",
         ),
     ):
         got = _run([str(emerge_binary)], args, fixture_env)
@@ -39330,14 +39319,7 @@ def test_699_update_held_back_by_an_installed_consumers_use_dep(
 def test_602_complete_walk_keeps_the_settled_backtrack_masks(
     emerge_binary, fixture_env, args, virtual
 ):
-    """#698 SUPERSEDES the expectation below (charter, not Portage): the
-    installed virtuals can follow the provider (`enc` 3.240.0 and `th`
-    3.520.0 accept `=p651prov-5.44*`), so the plan is the complete upgrade:
-    three `U` rows, no skip block. The #602 mask-keeping mechanics now need a
-    route-less holder to be exercised (backlog #703); what follows is the
-    Portage 3.0.83 behaviour this used to pin.
-
-    #602 regression (bed `l0-20261107T041916Z`,
+    """#602 regression (bed `l0-20261107T041916Z`,
     `virtual/perl-ExtUtils-MakeMaker`): a bare request for an installed
     perl-style virtual whose newest version needs the next provider
     (`|| ( =dev-libs/p651prov-5.44* ~core )`) while installed virtuals hold
@@ -39360,17 +39342,18 @@ def test_602_complete_walk_keeps_the_settled_backtrack_masks(
     root = fixture_env["ROOT"]
     got = _run([str(emerge_binary)], ["--pretend", "--verbose", *args], fixture_env)
     assert got.returncode == 0, got.stdout
-    # #698: both installed virtuals have a route to 5.44, so the provider and
-    # both virtuals upgrade together and nothing is withheld.
-    assert sorted(
-        ln for ln in got.stdout.splitlines() if ln.startswith("[ebuild")
-    ) == sorted([
-        f'[ebuild     U  ] dev-libs/p651prov-5.44.0:0/5.44::testrepo [5.42.2:0/5.42::testrepo] to {root} USE="-minimal%" ',
-        f"[ebuild     U  ] virtual/p651enc-3.240.0::testrepo [3.210.0-r2::testrepo] to {root}",
-        f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
-    ]), got.stdout
-    assert "Total: 3 packages (3 upgrades), Size of downloads: 0 KiB" in got.stdout
-    assert "skipped due to" not in got.stdout, got.stdout
+    cp, ver = virtual.split("-", 1)
+    assert got.stdout.splitlines()[0] == (
+        f"[ebuild   R    ] virtual/{virtual}::testrepo to {root}"
+    ), got.stdout
+    assert "Total: 1 package (1 reinstall), Size of downloads: 0 KiB" in got.stdout
+    assert f"dev-libs/p651prov:0 for {root}/" in got.stdout, got.stdout
+    assert (
+        "!!! The following update(s) have been skipped due to unsatisfied dependencies\n"
+        "!!! triggered by backtracking:\n"
+        "\n"
+        f"virtual/{cp}:0 for {root}/"
+    ) in got.stdout, got.stdout
 
 
 
@@ -40030,3 +40013,91 @@ def test_715_the_provider_is_merged_before_the_holders_rebuilt_for_it(
     assert names.index("dev-libs/p715lib-1") < prov, ok.stdout
     for holder in ("dev-libs/p715h1-1", "dev-libs/p715h2-1"):
         assert prov < names.index(holder), ok.stdout
+
+
+def _727_rows(stdout):
+    return sorted(
+        line.split(" to ")[0].split("] ")[1].split(" [")[0]
+        for line in stdout.splitlines()
+        if line.startswith("[ebuild")
+    )
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_727_a_plain_request_leaves_the_provider_where_it_is(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #727, owner decision 2026-11-12 (the smallest plan): `p727top` (not
+    installed) lists the new `p569prov-5.44` first in its `||` group (the shape of
+    `virtual/perl-Digest-MD5`), over the #698 ROOT whose three @world holders pin the old
+    provider. A request that names neither the provider nor `--update` leaves the provider at
+    5.42 and plans `p727top` alone, with both solvers. The #698 co-upgrade applies when the
+    provider is requested (the second command) or the request updates deeply (the third).
+    Source: Portage 3.0.83 on the bed, `emerge -pv dev-lang/ruby`: 62 new packages, perl stays
+    5.42.2 (skipped-update block), where portuale planned 111 with `perl U`; and Portage's own
+    `_want_update_pkg` (depgraph.py: `(arg_atoms or update) and not _too_deep`)."""
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"],
+    )
+    plain = _run([str(emerge_binary)], ["--pretend", f"--solver={solver}", "dev-libs/p727top"], env)
+    assert plain.returncode == 0, (plain.stdout, plain.stderr)
+    assert _727_rows(plain.stdout) == ["dev-libs/p727top-1"], plain.stdout
+    named = _run(
+        [str(emerge_binary)],
+        ["--pretend", f"--solver={solver}", "dev-libs/p727top", "dev-libs/p569prov"],
+        env,
+    )
+    assert named.returncode == 0, (named.stdout, named.stderr)
+    assert "dev-libs/p569prov-5.44" in _727_rows(named.stdout), named.stdout
+    assert "dev-libs/p698upg-2" in _727_rows(named.stdout), named.stdout
+    updating = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--update", "--deep", f"--solver={solver}", "dev-libs/p727top"],
+        env,
+    )
+    assert updating.returncode == 0, (updating.stdout, updating.stderr)
+    assert _727_rows(updating.stdout) == [
+        "dev-libs/p569prov-5.44",
+        "dev-libs/p698rebuild-1",
+        "dev-libs/p698reinst-1",
+        "dev-libs/p698upg-2",
+        "dev-libs/p727top-1",
+    ], updating.stdout
+
+
+@pytest.mark.parametrize(
+    "solver",
+    [
+        "portage",
+        pytest.param(
+            "pubgrub",
+            marks=pytest.mark.xfail(
+                strict=True,
+                reason="#730: the pubgrub crate drops a `||` arm whose package has no ebuild, so "
+                "the arm that stays is satisfied vacuously and virtual/perl-Storable-3.410.0 "
+                "is planned beside the kept perl 5.42",
+            ),
+        ),
+    ],
+)
+def test_727_a_kept_provider_picks_the_virtual_that_accepts_it(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #727 with #730 (charter property 1: every package that stays installed has its
+    dependencies). `p727virt-2` needs `|| ( =p569prov-5.44* ~p727core-2 )` and `p727virt-1`
+    `|| ( =p569prov-5.42* ~p727core-1 )`; no `p727core` exists in the tree, like
+    `perl-core/Storable` for `virtual/perl-Storable`. A plain request for `p727top2` leaves the
+    provider at 5.42, so the virtual that accepts it, `-1`, is the plan. The default solver does
+    so (Portage 3.0.83 on the bed, `emerge -pv dev-db/mariadb`: `virtual/perl-Storable-3.370.0`);
+    `--solver=pubgrub` plans `-2` (bed `l0-20261112T012357Z`, same cell), which breaks the
+    dependency."""
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"],
+    )
+    got = _run([str(emerge_binary)], ["--pretend", f"--solver={solver}", "dev-libs/p727top2"], env)
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    assert _727_rows(got.stdout) == ["dev-libs/p727top2-1", "dev-libs/p727virt-1"], got.stdout
