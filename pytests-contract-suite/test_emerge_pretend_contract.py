@@ -40260,6 +40260,39 @@ def test_733_tree_does_not_nest_a_row_under_a_hidden_leaf(
     ), got.stdout
 
 
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_736_a_held_provider_nobody_depends_on_is_not_a_plan_entry(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #736, charter property 5 (every entry says why it is there; the output invariants
+    `not requested and required_by is empty`). The request names the installed `p727virt-1`, the
+    shape of `virtual/perl-ExtUtils-MakeMaker`; its newer `-2` needs the new provider, which the
+    three @world holders keep at 5.42 (#698). `--solver=pubgrub` plans nothing for the virtual and
+    kept the pin that withholds the provider as an `already_installed` entry with no requester
+    (bed `l0-20261112T062527Z`, `dev-lang/perl`); the default solver reinstalls the virtual and
+    names it as the provider's parent. Either way no entry is unexplained: each one is requested
+    or has a `required_by`."""
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"],
+        [
+            (
+                "dev-libs/p727virt-1",
+                "|| ( =dev-libs/p569prov-5.42* ~dev-libs/p727core-1 ) dev-libs/p569prov:0/5.42=",
+            )
+        ],
+    )
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", "--json", f"--solver={solver}", "dev-libs/p727virt"],
+        env,
+    )
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    entries = json.loads(got.stdout)["entries"]
+    assert all(e.get("requested") or e.get("required_by") for e in entries), got.stdout
+
+
 def test_716_pubgrub_json_carries_what_a_plan_checker_needs(emerge_binary, fixture_env):
     """Backlog #716, charter property 5 and the health checker (property 1): with `-v` a
     merge-bound `--json` entry carries `sub_slot`, `dependencies`, `required_use`, `iuse` and
