@@ -508,9 +508,11 @@
     `dev-libs/libfido2-1.17.0` (#1949), `dev-util/bpftool-7.8.1-r1` (#1996)
     and the `net-misc/openssh` upgrade (#1954, 1 each); the other 6 are the
     provider's own old RDEPEND atom met by nothing in the plan
-    (`not matched by anything installed or merged before it`). Per the S0
-    adjudication Portage merges these packages in the same late position, so
-    no ordering edge is missing: the checker reports them because it cannot
+    (`not matched by anything installed or merged before it`). Portage
+    does the same: its own `-pvuDN --getbinpkg=n @world` on this host
+    (2026-11-12) puts `dev-libs/openssl-4.1.0` at row 35 of 348 and
+    `net-nds/openldap-2.6.14` and `sys-fs/cryptsetup-2.8.8` at rows 270 and
+    271, so no ordering edge is missing: the checker reports them because it cannot
     see why a rebuild is late (a sub-slot pin such as `openssl:0/3=`, the
     compat package, a soname change live in the VDB and the ebuilds, not in
     the plan; see the `gap()` note in
