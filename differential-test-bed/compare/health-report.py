@@ -71,7 +71,7 @@ def main(path: str, meta_path: str | None = None) -> int:
         plan = label(r)
         for f in r["findings"]:
             origin = "pre-existing" if f["pre_existing"] else "plan"
-            failure = f.get("failure", f["property"] not in ("cycle-noted", "checker-limitation"))
+            failure = f.get("failure", f["property"] not in ("cycle-noted", "checker-limitation", "world-unneeded"))
             if failure and origin == "plan":
                 dirty.add(plan)
             by_key[(f["property"], origin)][(f["package"], f["atom"], f["reason"])].add(plan)

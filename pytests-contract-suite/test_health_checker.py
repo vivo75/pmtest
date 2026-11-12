@@ -8,6 +8,7 @@ manager's output.
 
 from __future__ import annotations
 
+import json
 import subprocess
 
 import pytest
@@ -914,3 +915,29 @@ def test_the_binary_mutation_operator_breaks_a_clean_plan_and_the_checker_notice
     _, make, expected = offers[0]
     assert expected == {"best-version"}
     assert [f.property for f in hc.check_best_versions(make(), vdb)] == ["best-version"]
+
+
+def _check_world_json(mrg_binary, fixture_env, tmp_path, world):
+    root = tmp_path / "root"
+    (root / "var/lib/portage").mkdir(parents=True)
+    (root / "var/lib/portage/world").write_text("".join(a + "\n" for a in world))
+    env = dict(fixture_env, ROOT=str(root), PORTAGE_RUNNING_ROOT=str(root))
+    run = subprocess.run([str(mrg_binary), "--check-world", "--json"],
+                         capture_output=True, text=True, env=env, check=False)
+    lines = [json.loads(line) for line in run.stdout.splitlines()]
+    return run.returncode, lines[:-1], lines[-1]
+
+
+def test_692_check_world_json_loads_as_findings(mrg_binary, fixture_env, tmp_path):
+    """Charter property 1: `mrg --check-world --json` speaks the checker's `Finding`
+    shape, so the report groups it unchanged; a missing package is a failure."""
+    rc, findings, summary = _check_world_json(
+        mrg_binary, fixture_env, tmp_path, ["app-misc/doesnotexist", "dev-libs/w701two"])
+    loaded = [hc.Finding(**f) for f in findings]
+    assert rc == 1 and summary["unsatisfiable"] == 1
+    assert [(f.property, f.atom, f.is_failure) for f in loaded] == [
+        ("world-no-match", "app-misc/doesnotexist", True)]
+    rc, findings, summary = _check_world_json(
+        mrg_binary, fixture_env, tmp_path / "clean", [])
+    assert (rc, findings, summary["unsatisfiable"]) == (0, [], 0)
+    assert not hc.Finding("world-unneeded", "a/b:1", "", "x").is_failure

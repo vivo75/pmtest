@@ -76,8 +76,9 @@ DEP_CLASSES = ("DEPEND", "BDEPEND", "RDEPEND", "PDEPEND", "IDEPEND")
 # dependency a removal leaves unmatched, which the charter allows;
 # `private-library` is a library installed outside the linker's search path
 # (a JDK, systemd, a vendored application), which its own program finds.
+# `world-unneeded` is `mrg --check-world`'s note that another slot serves a slot.
 NOT_FAILURES = frozenset({"cycle-noted", "checker-limitation", "removal-deps",
-                          "private-library"})
+                          "private-library", "world-unneeded"})
 
 
 @dataclass(frozen=True)
