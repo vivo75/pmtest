@@ -105,6 +105,6 @@ def test_706_help_names_every_option_with_its_stage(mrg_binary, fixture_env):
     out = subprocess.run(
         [str(mrg_binary), "--help"], capture_output=True, text=True, env=fixture_env, check=False
     ).stdout
-    for name in ("check-world-unique", "check-world-threads", "check-world-unneeded"):
+    for name in ("check-world-unique", "check-world-threads", "check-world-unneeded", "plan-world-newuse"):
         assert name in out
     assert "alpha since" in out

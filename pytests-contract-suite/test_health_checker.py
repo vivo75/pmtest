@@ -8,7 +8,9 @@ manager's output.
 
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
 import subprocess
 
 import pytest
@@ -957,3 +959,54 @@ def test_693_plan_world_json_loads_and_the_checker_judges_it(mrg_binary, fixture
     vdb = hc.Path(fixture_env["ROOT"]) / "var/db/pkg"
     found = [f for f in hc.check_document(doc, vdb) if f.is_failure and not f.pre_existing]
     assert found == [], found
+
+
+def _write_ebuild(repo, cpv, slot, deps=()):
+    """An ebuild and its md5-cache entry in `repo` (a copy of the fixtures)."""
+    category, pf = cpv.split("/")
+    package = pf.rsplit("-", 1)[0]
+    variables = [("EAPI", "8"), ("SLOT", slot), ("KEYWORDS", "amd64"), *deps]
+    pdir = repo / "repo" / category / package
+    pdir.mkdir(parents=True, exist_ok=True)
+    text = "".join(f'{k}="{v}"\n' for k, v in variables)
+    (pdir / f"{pf}.ebuild").write_text(text)
+    cache = repo / "repo/metadata/md5-cache" / category
+    cache.mkdir(parents=True, exist_ok=True)
+    md5 = hashlib.md5(text.encode()).hexdigest()
+    lines = sorted(f"{k}={v}\n" for k, v in variables)
+    (cache / pf).write_text("".join(lines) + f"_md5_={md5}\n")
+
+
+def _write_installed(root, cpf, slot, **recorded):
+    """A VDB entry for `cpf` with `SLOT` and the recorded variables."""
+    vdir = root / "var/db/pkg" / cpf
+    vdir.mkdir(parents=True)
+    files = {"CATEGORY": cpf.split("/")[0], "SLOT": slot, "EAPI": "8", **recorded}
+    for name, value in files.items():
+        (vdir / name).write_text(value + "\n")
+
+
+def test_693_a_sub_slot_upgrade_rebuilds_the_slot_operator_consumer(mrg_binary, fixture_env, tmp_path):
+    """Charter property 1: the provider moves from sub-slot 0/1 to 0/2, so
+    the `:=` consumer that recorded `0/1` is rebuilt after it; the `:*`
+    consumer is not. The plan loads in the checker and finds nothing wrong.
+    Source: PMS `dependencies.tex`, `sec:slot-dep`."""
+    root = tmp_path / "tree"
+    shutil.copytree(fixture_env["ROOT"], root, symlinks=True)
+    _write_ebuild(root, "dev-libs/w693prov-2", "0/2")
+    _write_installed(root, "dev-libs/w693prov-1", "0/1")
+    _write_ebuild(root, "dev-libs/w693cons-1", "0", [("RDEPEND", "dev-libs/w693prov:=")])
+    _write_installed(root, "dev-libs/w693cons-1", "0", RDEPEND="dev-libs/w693prov:0/1=")
+    _write_ebuild(root, "dev-libs/w693star-1", "0", [("RDEPEND", "dev-libs/w693prov:*")])
+    _write_installed(root, "dev-libs/w693star-1", "0", RDEPEND="dev-libs/w693prov:*")
+    with (root / "var/lib/portage/world").open("a") as world:
+        world.write("dev-libs/w693cons\ndev-libs/w693star\n")
+    env = dict(fixture_env, ROOT=str(root), PORTAGE_CONFIGROOT=str(root), PORTAGE_RUNNING_ROOT=str(root))
+    run = subprocess.run([str(mrg_binary), "--plan-world", "--json", "--sort", "depend"],
+                         capture_output=True, text=True, env=env, check=False)
+    doc = hc.parse_json_output(run.stdout)
+    assert run.returncode == 0 and doc is not None, run.stdout + run.stderr
+    found = [f for f in hc.check_document(doc, root / "var/db/pkg") if f.is_failure and not f.pre_existing]
+    assert found == [], found
+    ours = [(e["package"], e["outcome"]) for e in doc["entries"] if e["package"].startswith("w693")]
+    assert ours == [("w693prov", "upgrade"), ("w693cons", "reinstall")], ours
