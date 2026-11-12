@@ -391,3 +391,46 @@ def test_unparsed_report_names_sites_on_nonzero():
               "portuale: unparsed dependency sites: graph_lookup=2\n")
     problems = inv.check_unparsed_dep_tokens(stderr)
     assert problems and "graph_lookup=2" in problems[0]
+
+
+def _with_deps(entry, text):
+    return {**entry, "dependencies": {"RDEPEND": text}}
+
+
+def _holder_doc(child_required_by):
+    return _doc(
+        _entry("prov", 0, requested=True, outcome="upgrade"),
+        _with_deps(_entry("holder", 1, child_required_by, outcome="reinstall"), "dev-libs/prov:="),
+        _with_deps(_entry("other", 2, ("prov",), outcome="already_installed"), "dev-libs/prov:="),
+        _with_deps(_entry("top", 3, requested=True), ">=dev-libs/holder-1 dev-libs/other"),
+    )
+
+
+_HOLDER_TREE = ("[ebuild     U  ] dev-libs/prov-1.0 \n"
+                "[ebuild  N     ] dev-libs/top-1.0 \n"
+                "[ebuild   R    ]  dev-libs/holder-1.0 \n")
+_HOLDER_PLAIN = "".join(line.replace("]  dev", "] dev") + "\n" for line in _HOLDER_TREE.splitlines())
+
+
+def test_tree_may_nest_a_co_upgrade_holder_under_a_real_dependent():
+    """#732, owner decision 2026-11-12: a holder's `required_by` names the provider that
+    moved (#718), `--tree` follows the real edges, so the holder nests under the package
+    whose own dependencies name it."""
+    doc = _holder_doc(("prov",))
+    assert inv.check_cross_mode(_HOLDER_PLAIN, _HOLDER_TREE, _HOLDER_PLAIN, doc) == []
+
+
+def test_tree_nesting_under_a_parent_that_does_not_name_the_child_is_still_flagged():
+    doc = _holder_doc(("prov",))
+    doc["entries"][3]["dependencies"] = {"RDEPEND": "dev-libs/other"}
+    problems = inv.check_cross_mode(_HOLDER_PLAIN, _HOLDER_TREE, _HOLDER_PLAIN, doc)
+    assert any("required_by" in p for p in problems)
+
+
+def test_tree_nesting_of_a_child_its_owner_names_is_still_flagged():
+    """Not a holder: its `required_by` owner depends on it, so `required_by` is the real
+    dependent list and a nesting under any other parent is a wrong tree or a wrong list."""
+    doc = _holder_doc(("other",))
+    doc["entries"][2]["dependencies"] = {"RDEPEND": "dev-libs/holder"}
+    problems = inv.check_cross_mode(_HOLDER_PLAIN, _HOLDER_TREE, _HOLDER_PLAIN, doc)
+    assert any("required_by" in p for p in problems)

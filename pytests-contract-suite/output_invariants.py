@@ -388,6 +388,22 @@ def check_summary(stdout: str) -> list[str]:
     return problems
 
 
+_CP = re.compile(r"[A-Za-z0-9+_.-]+/[A-Za-z0-9+_.-]+")
+
+
+def _dependency_names(doc: dict) -> dict[tuple[str, str], set[tuple[str, str]]]:
+    """`(category, package)` of every entry with `dependencies` (`--json -v`)
+    -> the `cat/pkg` names its dependency strings mention."""
+    out: dict[tuple[str, str], set[tuple[str, str]]] = {}
+    for e in doc["entries"]:
+        text = " ".join((e.get("dependencies") or {}).values())
+        # `=cat/pkg-1.2*` names `cat/pkg`: also try the name without the version.
+        names = {m for tok in _CP.findall(text)
+                 for m in (tok, re.sub(r"-\d[\w.*]*$", "", tok))}
+        out[(e["category"], e["package"])] = {tuple(m.split("/", 1)) for m in names}
+    return out
+
+
 def check_cross_mode(plain: str, tree: str, quiet: str, doc: dict,
                      args: list[str] | None = None) -> list[str]:
     """`args` is the command line: `--autounmask-only` is skipped because a
@@ -451,6 +467,21 @@ def check_cross_mode(plain: str, tree: str, quiet: str, doc: dict,
     def has_hidden_owner(cp):
         return any(o not in shown for o in required_by.get(cp, ()))
 
+    # A co-upgrade holder (#718) is listed under the provider that moved, which
+    # it depends on and which does not depend on it; `--tree` follows the real
+    # dependency edges instead, so a holder may nest under any parent whose
+    # own dependencies name it (owner decision 2026-11-12, #732).
+    named_by = _dependency_names(doc)
+    holders = {
+        (e["category"], e["package"]) for e in doc["entries"]
+        if not e["requested"] and e["required_by"] and all(
+            (e["category"], e["package"]) not in named_by.get((o["category"], o["package"]), ())
+            for o in e["required_by"])
+    }
+
+    def real_dependent(child, parent):
+        return child in holders and child in named_by.get(parent, ())
+
     stack: list[tuple[int, tuple[str, str]]] = []
     for r in tree_rows:
         while stack and stack[-1][0] >= r["depth"]:
@@ -474,6 +505,7 @@ def check_cross_mode(plain: str, tree: str, quiet: str, doc: dict,
                 # ancestor rows alone would reject that shape.
                 hidden_path_to(r["cp"], stack[-1][1])
                 or hidden_path_to(stack[-1][1], r["cp"])
+                or real_dependent(r["cp"], stack[-1][1])
             ):
                 p = stack[-1][1]
                 problems.append(
