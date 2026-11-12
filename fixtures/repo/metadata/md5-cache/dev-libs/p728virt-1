@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #728 virtual pinning the old core (mirrors virtual/perl-File-Temp-0.231.100-r1)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=~dev-libs/p728core-1 dev-libs/p569prov:=
+SLOT=0
+_md5_=94112f15d71aa8925dad51c70fca6ad3

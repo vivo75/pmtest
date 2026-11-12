@@ -40101,3 +40101,34 @@ def test_727_a_kept_provider_picks_the_virtual_that_accepts_it(
     got = _run([str(emerge_binary)], ["--pretend", f"--solver={solver}", "dev-libs/p727top2"], env)
     assert got.returncode == 0, (got.stdout, got.stderr)
     assert _727_rows(got.stdout) == ["dev-libs/p727top2-1", "dev-libs/p727virt-1"], got.stdout
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_728_a_rebuilt_package_moves_to_its_best_visible_version(
+    emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #728, charter property 3 (each package ends at the best visible version that fits
+    the others). `p569prov` moves 5.42 -> 5.44 and the installed `p728virt-1` and `p728core-1`
+    (built against `p569prov:0/5.42=`) must be rebuilt for it; the tree also has `p728core-2`
+    and `p728virt-2`, whose dependencies fit the new provider. The rebuild is the moment to take
+    them: `p728core-2` and `p728virt-2` are planned, not `R` of the installed versions. The pair
+    is the shape of `perl-core/File-Temp` 0.231.100-r1 -> 0.231.200 and its virtual (the virtual
+    pins the core with `~`, so both move together and the plan stays consistent). Source:
+    Portage 3.0.83 on the bed, `emerge -pv --usepkg dev-lang/perl`: `[ebuild r U]
+    perl-core/File-Temp-0.231.200 [0.231.100-r1]` and the same for the virtual, where portuale
+    planned `rR` of the installed versions (bed `l0-20261112T012743Z`); Portage's
+    `_want_update_pkg` counts the auto-rebuild set as an argument."""
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p728virt"],
+        [
+            ("dev-libs/p728core-1", "dev-libs/p569prov:0/5.42="),
+            ("dev-libs/p728virt-1", "~dev-libs/p728core-1 dev-libs/p569prov:0/5.42="),
+        ],
+    )
+    got = _run([str(emerge_binary)], ["--pretend", f"--solver={solver}", "dev-libs/p569prov"], env)
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    rows = _727_rows(got.stdout)
+    assert "dev-libs/p728core-2" in rows and "dev-libs/p728virt-2" in rows, got.stdout
+    assert "dev-libs/p728core-1" not in rows and "dev-libs/p728virt-1" not in rows, got.stdout

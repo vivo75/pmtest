@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #728 slot-operator consumer, newer visible version (mirrors perl-core/File-Temp-0.231.200)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/p569prov:=
+SLOT=0
+_md5_=3b3666c0f912b9d029313ec5176e34b5
