@@ -40223,3 +40223,27 @@ def test_733_tree_does_not_nest_a_row_under_a_hidden_leaf(
     assert got.stdout.splitlines()[0] == (
         f"[ebuild   R    ] dev-libs/p733top-1::testrepo to {env['ROOT']}"
     ), got.stdout
+
+
+def test_716_pubgrub_json_carries_what_a_plan_checker_needs(emerge_binary, fixture_env):
+    """Backlog #716, charter property 5 and the health checker (property 1): with `-v` a
+    merge-bound `--json` entry carries `sub_slot`, `dependencies`, `required_use`, `iuse` and
+    `use`, so a plan can be checked on its own. `--solver=pubgrub` carried none of them and the
+    L0 health bed read every USE dependency on a planned package as unmet (22 plans failed,
+    bed `l0-health-20261112T034753Z`: `sys-apps/systemd` PDEPEND `>=sys-apps/dbus-1.9.8[systemd]`
+    against the planned `dbus`). Expected: the default solver's values for the same atom."""
+    docs = {}
+    for solver in ("portage", "pubgrub"):
+        got = _run(
+            [str(emerge_binary)],
+            ["--pretend", "-v", "--json", f"--solver={solver}", "--update", "dev-libs/upgradeusepkg"],
+            fixture_env,
+        )
+        assert got.returncode == 0, (got.stdout, got.stderr)
+        docs[solver] = {
+            e["package"]: e for e in json.loads(got.stdout)["entries"] if e["package"] == "upgradeusepkg"
+        }["upgradeusepkg"]
+    keys = ("sub_slot", "dependencies", "required_use", "iuse", "use")
+    assert all(k in docs["pubgrub"] for k in keys), docs["pubgrub"]
+    assert {k: docs["pubgrub"][k] for k in keys} == {k: docs["portage"][k] for k in keys}
+    assert docs["pubgrub"]["use"] == ["added", "keep"], docs["pubgrub"]
