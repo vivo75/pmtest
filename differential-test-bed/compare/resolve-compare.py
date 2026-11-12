@@ -498,8 +498,23 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path,
     # -- package identity keyed by (type, cp, slot) ------------------------
     # slot is load-bearing: a package installed in two slots at once
     # (llvm-core/llvm:21 + :22) must not collapse to one map entry.
-    rmap = {(p.type, p.cp, p.slot): p for p in rpk}
-    pmap = {(p.type, p.cp, p.slot): p for p in ppk}
+    # `emerge -pe` (no `-v`) shows no `:slot`, so the slots of such a cp
+    # (app-text/docbook-xml-dtd:4.2 + :4.4 + :4.5, autoconf 2.72 + 2.73)
+    # would share one key and only the last row would be compared. A
+    # slot-less cp that appears more than once on either side is keyed by
+    # its version instead: the same set of rows pairs up, a row only one
+    # side has is reported as missing/extra, and the order stays an
+    # `order` finding.
+    rcount = Counter(x.cp for x in rpk if not x.slot)
+    pcount = Counter(x.cp for x in ppk if not x.slot)
+
+    def key_of(x: Pkg) -> tuple:
+        if not x.slot and (rcount[x.cp] > 1 or pcount[x.cp] > 1):
+            return (x.type, x.cp, "", x.ver)
+        return (x.type, x.cp, x.slot)
+
+    rmap = {key_of(p): p for p in rpk}
+    pmap = {key_of(p): p for p in ppk}
     def ident(p: Pkg) -> str:
         s = f":{p.slot}" if p.slot else ""
         return f"{p.type} {p.cp}-{p.ver}{s}" if p.ver else f"{p.type} {p.cp}{s}"
@@ -509,27 +524,10 @@ def compare(slug: str, kind: str, rrc: int, prc: int, rp: Path, pp: Path,
     for key in pmap.keys() - rmap.keys():
         add("extra", f"{ident(pmap[key])} present for portuale, absent for real")
 
-    # A multi-slot package reinstalled/merged in several slots at once
-    # (app-text/docbook-xml-dtd:4.2 + :4.4 + :4.5 ...) shows no `:slot` at
-    # verbosity 2 (`emerge -pe`, no `-v`), so every slot collapses to the
-    # same `(type, cp, "")` map key and only the last-seen survives. A
-    # `version` finding off that survivor is pure position noise -- the
-    # underlying lists carry the identical slot set. Suppress `version`
-    # for any cp that appears more than once on either side without slot
-    # disambiguation; the reordering still surfaces as an `order` finding.
-    rcp_count: dict[str, int] = {}
-    pcp_count: dict[str, int] = {}
-    for x in rpk:
-        rcp_count[x.cp] = rcp_count.get(x.cp, 0) + 1
-    for x in ppk:
-        pcp_count[x.cp] = pcp_count.get(x.cp, 0) + 1
-
     for key in rmap.keys() & pmap.keys():
         r, p = rmap[key], pmap[key]
         s = f":{r.slot}" if r.slot else ""
-        if r.ver != p.ver and not (
-            not r.slot and (rcp_count.get(r.cp, 0) > 1 or pcp_count.get(r.cp, 0) > 1)
-        ):
+        if r.ver != p.ver:
             add("version", f"{r.cp}{s}: real {r.ver} vs portuale {p.ver}")
         if r.flags != p.flags:
             if split_action:
@@ -749,7 +747,9 @@ def explained(finding: dict, slug: str, kind: str, allow: list[dict],
         if slugs and not any(glob_match(g, slug) for g in slugs):
             continue
         sub = e.get("match")
-        if sub and sub not in finding["detail"]:
+        if isinstance(sub, str):
+            sub = [sub]
+        if sub and not any(m in finding["detail"] for m in sub):
             continue
         if not (cats or slugs or sub):
             continue  # an entry that constrains nothing matches nothing

@@ -119,30 +119,75 @@
 
 - id: l0-perl-co-upgrade-698
   layer: l0
-  categories: [extra, missing, version, flags]
-  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
-          "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
-          "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
-          "virtual_perl-ExtUtils-MakeMaker"]
-  match: "perl"
+  categories: [extra, missing]
+  slugs: ["dev-lang_perl"]
+  match: [
+      "ebuild dev-lang/perl-5.44.0:0/5.44 present for portuale, absent for real",
+      "ebuild dev-perl/Capture-Tiny-0.500.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/Class-Inspector-1.360.0 present for portuale, absent for real",
+      "ebuild dev-perl/Config-AutoConf-0.320.0 present for portuale, absent for real",
+      "ebuild dev-perl/Exporter-Tiny-1.6.3 present for portuale, absent for real",
+      "ebuild dev-perl/ExtUtils-CChecker-0.120.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/File-ShareDir-1.118.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/File-ShareDir-Install-0.140.0 present for portuale, absent for real",
+      "ebuild dev-perl/File-Slurper-0.14.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/List-MoreUtils-0.430.0 present for portuale, absent for real",
+      "ebuild dev-perl/List-MoreUtils-XS-0.430.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/Locale-gettext-1.70.0_p20181130 present for portuale, absent for real",
+      "ebuild dev-perl/MIME-Charset-1.13.1 present for portuale, absent for real",
+      "ebuild dev-perl/Module-Build-0.423.400-r5 present for portuale, absent for real",
+      "ebuild dev-perl/Params-Util-1.102.0 present for portuale, absent for real",
+      "ebuild dev-perl/PerlIO-utf8_strict-0.10.0 present for portuale, absent for real",
+      "ebuild dev-perl/Pod-Parser-1.660.0 present for portuale, absent for real",
+      "ebuild dev-perl/SGMLSpm-1.1-r2 present for portuale, absent for real",
+      "ebuild dev-perl/Syntax-Keyword-Try-0.310.0 present for portuale, absent for real",
+      "ebuild dev-perl/TermReadKey-2.380.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/Text-CharWidth-0.40.0-r2 present for portuale, absent for real",
+      "ebuild dev-perl/Text-WrapI18N-0.60.0-r3 present for portuale, absent for real",
+      "ebuild dev-perl/Unicode-LineBreak-2019.1.0-r2 present for portuale, absent for real",
+      "ebuild dev-perl/XS-Parse-Keyword-0.490.0-r1 present for portuale, absent for real",
+      "ebuild dev-perl/YAML-Tiny-1.760.0-r1 present for portuale, absent for real",
+      "ebuild perl-core/File-Temp-0.231.200 present for portuale, absent for real",
+      "ebuild virtual/perl-CPAN-2.380.0-r1 present for portuale, absent for real",
+      "ebuild virtual/perl-CPAN-Meta-2.150.13 present for portuale, absent for real",
+      "ebuild virtual/perl-Carp-1.540.0-r3 present for portuale, absent for real",
+      "ebuild virtual/perl-Data-Dumper-2.192.0-r1 present for portuale, absent for real",
+      "ebuild virtual/perl-Encode-3.240.0 present for portuale, absent for real",
+      "ebuild virtual/perl-Exporter-5.790.0-r1 present for portuale, absent for real",
+      "ebuild virtual/perl-ExtUtils-CBuilder-0.280.243 present for portuale, absent for real",
+      "ebuild virtual/perl-ExtUtils-MakeMaker-7.780.0 present for portuale, absent for real",
+      "ebuild virtual/perl-ExtUtils-ParseXS-3.630.0 present for portuale, absent for real",
+      "ebuild virtual/perl-File-Path-2.180.0-r5 present for portuale, absent for real",
+      "ebuild virtual/perl-File-Spec-3.950.0 present for portuale, absent for real",
+      "ebuild virtual/perl-File-Temp-0.231.200 present for portuale, absent for real",
+      "ebuild virtual/perl-IO-1.560.0 present for portuale, absent for real",
+      "ebuild virtual/perl-JSON-PP-4.160.0-r4 present for portuale, absent for real",
+      "ebuild virtual/perl-Math-BigInt-2.5.3 present for portuale, absent for real",
+      "ebuild virtual/perl-Module-Metadata-1.0.39 present for portuale, absent for real",
+      "ebuild virtual/perl-Scalar-List-Utils-1.700.0 present for portuale, absent for real",
+      "ebuild virtual/perl-Test-Harness-3.520.0 present for portuale, absent for real",
+      "ebuild virtual/perl-Text-ParseWords-3.310.0-r5 present for portuale, absent for real",
+      "ebuild virtual/perl-XSLoader-0.320.0-r3 present for portuale, absent for real",
+      "ebuild virtual/perl-podlators-6.0.2-r1 present for portuale, absent for real",
+      "ebuild virtual/perl-version-0.993.400 present for portuale, absent for real",
+      "ebuild dev-lang/perl-5.42.2:0/5.42 present for real, absent for portuale",
+    ]
   reason: >
     Backlog #698 / Q31 (charter property 1 plus "as up to date as it can be"): Portage keeps
     `dev-lang/perl` at 5.42 (`R` plus a skipped-update block) because installed `virtual/perl-*`
     and `dev-perl/*` hold the old slot; portuale checks that every holder has a route (rebuild, or
     a newer version whose tree deps accept 5.44) and, since they all do, plans perl 5.44 and the
-    holders together. The rows are the perl packages themselves (name contains "perl"), their
-    version/flag moves and the 5.42.2 row Portage plans; l0-health checks the plan keeps every
-    dependency.
+    holders together. #734: the rows are listed one by one (the 48 packages the co-upgrade adds
+    to the `dev-lang/perl` plan and the 5.42.2 row Portage plans), no longer every row with
+    "perl" in it; the other nine cells have no such row, so any new one there is unexplained.
+    l0-health checks the plan keeps every dependency.
   owner: charter
 
 - id: l0-perl-co-upgrade-698-po4a
   layer: l0
   categories: [extra]
-  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
-          "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
-          "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
-          "virtual_perl-ExtUtils-MakeMaker"]
-  match: "app-text/po4a"
+  slugs: ["dev-lang_perl"]
+  match: "app-text/po4a-0.74-r1 present for portuale, absent for real"
   reason: >
     The one holder of `dev-lang/perl:0/5.42=` whose name has no "perl" in it: it is rebuilt with
     the others by the co-upgrade (l0-perl-co-upgrade-698).
@@ -150,16 +195,46 @@
 
 - id: l0-perl-co-upgrade-698-consequences
   layer: l0
-  categories: [totals, skipped-updates, error, order]
+  categories: [skipped-updates, totals]
   slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-lang_perl",
           "dev-lang_ruby", "dev-perl_XML-Parser", "dev-ruby_rake",
           "dev-texlive_texlive-latex", "kde-apps_kdecore-meta",
           "virtual_perl-ExtUtils-MakeMaker"]
+  match: ["skipped-update block present for real, absent for portuale: dev-lang/perl:0",
+          "real Total 1 vs portuale Total 49"]
   reason: >
-    Consequences of l0-perl-co-upgrade-698 on the same cells: the package total moves with the
-    extra perl rows, the skipped-update block (and the two `!!!` lines that announce it) is absent
-    because nothing is skipped any more, and the merge order shifts around the added rows (its
-    legality is checked by l0-health, property 2).
+    Consequences of l0-perl-co-upgrade-698: the package total of the `dev-lang/perl` cell moves
+    with the extra perl rows, and the skipped-update block is absent because nothing is skipped
+    any more. #734: the `order` category is no longer listed (no run of 2026-11-12 needs it; a
+    merge-order difference is judged by l0-health, property 2, and the order entries above) and
+    the totals row is the one cell's own.
+  owner: charter
+
+- id: l0-pubgrub-736-virtual-not-merged
+  layer: l0-pubgrub
+  categories: [missing, totals]
+  slugs: ["virtual_perl-ExtUtils-MakeMaker"]
+  match: ["ebuild virtual/perl-ExtUtils-MakeMaker-7.760.0 present for real, absent for portuale",
+          "real Total 1 vs portuale Total 0"]
+  reason: >
+    Request for the installed `virtual/perl-ExtUtils-MakeMaker-7.760.0`, whose newer version needs
+    the perl the installed holders keep back (#698, #730). Portage plans an `R` of the installed
+    virtual with its skipped-update block; `--solver=pubgrub` plans nothing for it (it is already
+    installed and up to date as far as the plan can take it), so the `R` row and the total differ.
+    No package is wrong.
+    Masking tradeoff: exact rows, one cell, pubgrub only.
+  owner: charter
+
+- id: l0-pubgrub-698-skipped-block-messages
+  layer: l0-pubgrub
+  categories: [error]
+  slugs: ["app-text_texlive", "app-text_texlive-core", "dev-db_mariadb", "dev-perl_XML-Parser", "dev-texlive_texlive-latex", "kde-apps_kdecore-meta", "virtual_perl-ExtUtils-MakeMaker"]
+  match: ["real-only message: !!! The following update(s) have been skipped due to unsatisfied dependencies",
+          "real-only message: !!! triggered by backtracking:"]
+  reason: >
+    The two `!!!` lines Portage prints with the skipped-update block of the `dev-lang/perl` pin
+    (the block itself is l0-perl-co-upgrade-698-consequences). `--solver=pubgrub` prints neither
+    line in these cells; the block is the information and is compared there.
   owner: charter
 
 - id: l0-perl-skip-parent-list-658
@@ -376,33 +451,6 @@
     Portage here. Masking tradeoff: the match is exact, so it hides only this
     one column on this one row.
   owner: charter
-
-- id: l0-pubgrub-705-multislot-row-collapse-autoconf
-  layer: l0-pubgrub
-  categories: [flags]
-  slugs: ["MULTI_emptytree-system"]
-  match: "dev-build/autoconf: real flags [NS] vs portuale [R]"
-  reason: >
-    #705 (a), class D. `emerge -pe @system` (no -v) prints no `:slot`, so
-    resolve-compare.py keys both autoconf rows (R 2.72-r7 and NS 2.73-r2) on the same
-    `(ebuild, dev-build/autoconf, "")`, and only the last one seen is compared. Both
-    plans contain both rows: Portage at lines 214/215 and portuale at 212 (NS) and
-    279 (R). Only their relative order differs. The comparator already suppresses
-    `version` for this case (resolve-compare.py:512-533) but not `flags`. The better
-    fix is to suppress `flags` there too, and then this entry is not needed. Masking
-    tradeoff: a real NS->R change of autoconf in this cell would be hidden.
-  owner: comparator
-
-- id: l0-pubgrub-705-multislot-row-collapse-automake
-  layer: l0-pubgrub
-  categories: [flags]
-  slugs: ["MULTI_emptytree-system"]
-  match: "dev-build/automake: real flags [NS] vs portuale [R]"
-  reason: >
-    As l0-pubgrub-705-multislot-row-collapse-autoconf: both plans hold automake
-    1.18.1-r1 (R) and 1.19 (NS). Portage lists them at 216/217 and portuale at
-    237 (NS) and 238 (R).
-  owner: comparator
 
 # --- #726 (2026-11-12): the grader can tell the solver now ---
 - id: l0-pubgrub-order-only-health-clean-726

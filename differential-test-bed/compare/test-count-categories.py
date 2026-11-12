@@ -200,6 +200,25 @@ def main() -> int:
     check("default CLI still reports flags",
           "[flags]" in out, out)
 
+    # 8. #734: slot-less rows of one cp pair up by version (autoconf 2.72-r7 R + 2.73-r2 NS
+    # in `emerge -pe`), so a reorder is not a flags finding; a `match` list explains any of
+    # its rows exactly.
+    two = "[ebuild  R    ] dev-build/autoconf-2.72-r7\n[ebuild  N    S] dev-build/autoconf-2.73-r2\n"
+    swapped = "[ebuild  N    S] dev-build/autoconf-2.73-r2\n[ebuild  R    ] dev-build/autoconf-2.72-r7\n"
+    pr = run_case(two, swapped)
+    check("slot-less multi-row cp pairs by version",
+          cats(pr.findings) in ([], ["order"]), repr(pr.findings))
+    pr = run_case(two, "[ebuild  R    ] dev-build/autoconf-2.72-r7\n[ebuild  N    S] dev-build/autoconf-2.74\n")
+    check("a row only one side has is missing/extra, not a version finding",
+          cats(pr.findings) == ["extra", "missing"], repr(pr.findings))
+    f = {"category": "extra", "detail": "ebuild dev-perl/Foo-1.0 present for portuale, absent for real"}
+    lst = [{"id": "l", "categories": ["extra"], "match": ["dev-perl/Bar-2", "dev-perl/Foo-1.0 present"]}]
+    check("a match list explains a finding that contains one of its rows",
+          mod.explained(f, "s", "atom", lst) is not None, "")
+    lst[0]["match"] = ["dev-perl/Bar-2"]
+    check("a match list without the row explains nothing",
+          mod.explained(f, "s", "atom", lst) is None, "")
+
     print("ALL OK" if FAILED == 0 else "FAILURES")
     return 0 if FAILED == 0 else 1
 
