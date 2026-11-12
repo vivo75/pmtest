@@ -40067,21 +40067,7 @@ def test_727_a_plain_request_leaves_the_provider_where_it_is(
     ], updating.stdout
 
 
-@pytest.mark.parametrize(
-    "solver",
-    [
-        "portage",
-        pytest.param(
-            "pubgrub",
-            marks=pytest.mark.xfail(
-                strict=True,
-                reason="#730: the pubgrub crate drops a `||` arm whose package has no ebuild, so "
-                "the arm that stays is satisfied vacuously and virtual/perl-Storable-3.410.0 "
-                "is planned beside the kept perl 5.42",
-            ),
-        ),
-    ],
-)
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
 def test_727_a_kept_provider_picks_the_virtual_that_accepts_it(
     emerge_binary, fixture_env, tmp_path, solver
 ):
