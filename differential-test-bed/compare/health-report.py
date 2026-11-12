@@ -13,6 +13,11 @@ five examples.
 With the run's meta.tsv (label, exit code, seconds, family) it also prints
 one row per family of the list and the slowest probes and checks.
 
+The fast world plan (`FAST_world`, from `mrg --plan-world`) is known to be
+incomplete: its findings are printed apart and never count. If the run
+directory has a `world/` directory, a section "world cross-check" prints
+what `world-crosscheck.py` and `mrg --check-world` wrote there.
+
 Usage: health-report.py health.jsonl [meta.tsv]
 Exit: 0 when every plan portuale would run is clean, 1 otherwise.
 """
@@ -20,6 +25,7 @@ Exit: 0 when every plan portuale would run is clean, 1 otherwise.
 import json
 import sys
 from collections import defaultdict
+from pathlib import Path
 
 
 def label(record: dict) -> str:
@@ -61,24 +67,48 @@ def family_table(records: list, dirty: set, meta_path: str) -> None:
     print("slowest checks: " + ", ".join(f"{label(r)} {r['seconds']:.2f}s" for r in checks))
 
 
+FAST = "FAST_"  # labels of the fast plan: judged, never gating
+
+
+def world_section(run_dir: Path) -> None:
+    """The cross-check files of the run: per file its judge lines and summary."""
+    files = sorted((run_dir / "world").glob("crosscheck-*.txt")) if (run_dir / "world").is_dir() else []
+    check = run_dir / "world/check-world.jsonl"
+    if not files and not check.is_file():
+        return
+    print("world cross-check")
+    if check.is_file():
+        last = check.read_text().splitlines()[-1:]
+        if last:
+            summary = json.loads(last[0])
+            unread = f", {summary['not_read']} not read" if summary.get("not_read") else ""
+            print(f"  check-world: {summary['atoms']} atoms, {summary['slots']} slots, "
+                  f"{summary['unsatisfiable']} unsatisfiable{unread}")
+    for file in files:
+        lines = file.read_text().splitlines()
+        print(f"  {file.stem}: {lines[-1] if lines else '(empty)'}")
+        for line in [x for x in lines if x.startswith("[judge]")][:20]:
+            print(f"    {line}")
+
+
 def main(path: str, meta_path: str | None = None) -> int:
     records = [json.loads(line) for line in open(path) if line.strip()]
     skipped = [r for r in records if "skipped" in r]
     checked = [r for r in records if "findings" in r]
     by_key = defaultdict(lambda: defaultdict(set))  # (property, origin) -> pair -> plans
-    dirty = set()
+    dirty, fast_dirty = set(), set()
     for r in checked:
         plan = label(r)
         for f in r["findings"]:
             origin = "pre-existing" if f["pre_existing"] else "plan"
             failure = f.get("failure", f["property"] not in ("cycle-noted", "checker-limitation", "world-unneeded"))
             if failure and origin == "plan":
-                dirty.add(plan)
+                (fast_dirty if plan.startswith(FAST) else dirty).add(plan)
             by_key[(f["property"], origin)][(f["package"], f["atom"], f["reason"])].add(plan)
     refused = {label(r): r["refused"]
                for r in checked if r.get("refused")}
     failing = dirty - set(refused)
-    print(f"plans: {len(records)}  checked: {len(checked)}  clean: {len(checked) - len(dirty)}"
+    print(f"plans: {len(records)}  checked: {len(checked)}  clean: {len(checked) - len(dirty) - len(fast_dirty)}"
           f"  with failures: {len(failing)}  refused by portuale, with findings:"
           f" {len(dirty & set(refused))}  skipped: {len(skipped)}")
     for r in skipped:
@@ -90,11 +120,14 @@ def main(path: str, meta_path: str | None = None) -> int:
             print(f"  {pkg}  {atom}  -- {reason}  ({len(where)} plan(s), e.g. {sorted(where)[0]})")
     for plan in sorted(dirty & set(refused)):
         print(f"\nrefused by portuale ({refused[plan]}): {plan}", end="")
+    for plan in sorted(fast_dirty):
+        print(f"\n{plan}: has findings of its own, known incomplete, not gating")
     if failing:
         print("\n\nplans with failures: " + " ".join(sorted(failing)))
     print()
+    world_section(Path(path).parent)
     if meta_path:
-        family_table(records, dirty, meta_path)
+        family_table(records, dirty | fast_dirty, meta_path)
     return 1 if failing else 0
 
 

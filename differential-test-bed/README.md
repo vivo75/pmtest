@@ -69,6 +69,25 @@ misses a mutant. Unit tests: `pytests-contract-suite/test_health_checker.py`.
 The checker covers properties 1 to 4; property 5 (messages help) has no
 checker yet.
 
+`compare/check-world-mutants.py [--tree DIR] [--mrg PROGRAM...]` tests
+`mrg --check-world --json` the same way: it breaks a copy of the fixture tree
+(mask the best version, drop a keyword, raise a dependency bound, delete a
+package, make an ebuild unreadable) and exits 1 when the check does not
+report it, when a mutation changed no file, or when a harmless control mask
+changes the result. Unit test: `pytests-contract-suite/test_check_world_mutants.py`.
+
+`compare/world-crosscheck.py RESOLVER.json FAST.json [--check CHECK.jsonl]`
+sets the resolver's `@world` plan, `mrg --plan-world --json` and
+`mrg --check-world --json` side by side and labels each line `[judge]`
+(version differs, a world atom the check calls unsatisfiable that a plan
+holds, a resolver that refused a world the check finds clean) or `[note]`
+(a slot only one plan lists; the resolver's reinstalls counted apart). It
+never fails by itself. `run/l0-health.sh` runs it for the default resolver
+plan and for `--getbinpkg=n`, prints it as the report section "world
+cross-check", and feeds the fast plan to the checker as `FAST_world`, whose
+findings are shown but do not gate the run. Unit tests:
+`pytests-contract-suite/test_world_crosscheck.py`.
+
 ### Installed-state health — what a real merge leaves behind
 
 `health_checker.py --installed ROOT [--baseline BEFORE.jsonl]` checks the
@@ -439,7 +458,7 @@ layers/z326/  merged-snapshot-lib.sh (shared restricted snapshot) +
               ref-build-merge-snapshot.sh (reference from-source build
               + snapshot for the #326 Z close-out)
 atomlists/    curated atom / package lists (incl. z326-nopy.txt)
-compare/      health-report.py + health-mutants.py (L0 health), resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
+compare/      health-report.py + health-mutants.py + check-world-mutants.py + world-crosscheck.py (L0 health), resolve-compare.py (L0), snapshot.sh + normalize.py + diff.py (L1/L2),
               gpkg-structure.sh + gpkg-diff.sh (L2), z326-audit.py (the #326 Z
               phase-env audit), test-*.sh, normalize.md,
               known-divergences.yaml, known-divergences-fixture-oracle.yaml
