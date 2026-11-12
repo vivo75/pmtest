@@ -85,6 +85,7 @@ DESCRIPTION: 212 oracle fixture: genuine binpkg built at SLOT 0/1 (real ebuild p
 EAPI: 8
 IUSE:
 KEYWORDS: amd64
+PATH: dev-libs/somaskchild-1.0.gpkg.tar
 REPO: testrepo
 SIZE: 20480
 SLOT: 0/1

@@ -12902,6 +12902,20 @@ def test_usepkg_slot_operator_mask_built_rejects_a_stale_slot_binary(
     ]
 
 
+def test_711_a_stale_binary_costs_one_backtrack(emerge_binary, fixture_env):
+    """Backlog #711: the stale-slot binary of the #212 case is masked once, so the run spends one
+    backtrack. The fixture's `Packages` stanza for `somaskchild` had no `PATH`, so the scan saw
+    the one gpkg twice, once from the file (no build id) and once as an orphan stanza
+    (`BUILD_ID: 1`); the mask named the build, hid one of the two, and a second try was needed
+    (`backtrack: 2/20`). With the stanza naming its file there is one candidate. Source: the
+    mask is keyed by package object, as Portage's `_slot_change_backtrack` does."""
+    got = _run(
+        [str(emerge_binary)], ["--pretend", "--json", "--usepkg", "dev-libs/somaskparent"], fixture_env
+    )
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    assert json.loads(got.stdout)["backtrack"]["restarts"] == 1, got.stdout
+
+
 def test_binpkg_changed_deps_explicit_override(
     emerge_binary, fixture_env
 ):
