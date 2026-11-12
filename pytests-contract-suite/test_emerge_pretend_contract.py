@@ -40132,3 +40132,34 @@ def test_728_a_rebuilt_package_moves_to_its_best_visible_version(
     rows = _727_rows(got.stdout)
     assert "dev-libs/p728core-2" in rows and "dev-libs/p728virt-2" in rows, got.stdout
     assert "dev-libs/p728core-1" not in rows and "dev-libs/p728virt-1" not in rows, got.stdout
+
+
+def test_718_pubgrub_holders_name_the_provider_as_parent(emerge_binary, fixture_env, tmp_path):
+    """Backlog #718 (a), charter property 5 (say why), the pubgrub half of #713: with
+    `--solver=pubgrub` the three holders of the #698 pin join the plan only because
+    `dev-libs/p569prov` moves to 5.44, but their `--json` rows had `requested: false` and an
+    empty `required_by`, so the output invariants failed (`not requested and required_by is
+    empty`, `unreachable from the seeds`: 133 rows on the bed run `l0-20261111T144308Z`). Each
+    holder now names the provider as its parent, as the default solver does. `--tree` is left as
+    it is (owner decision 2026-11-12). Source: the project's own output invariants
+    (`output_invariants.check_json`) and the charter."""
+    import output_invariants as inv
+
+    env = _698_root(
+        fixture_env,
+        tmp_path,
+        ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"],
+    )
+    args = ["--pretend", "--solver=pubgrub", "--json", "dev-libs/p569prov"]
+    ok = _run([str(emerge_binary)], args, env)
+    assert ok.returncode == 0, (ok.stdout, ok.stderr)
+    doc = inv.parse_json_stdout(ok.stdout)
+    holders = {e["package"]: e for e in doc["entries"] if e["package"].startswith("p698")}
+    assert sorted(holders) == ["p698rebuild", "p698reinst", "p698upg"], ok.stdout
+    for name, entry in holders.items():
+        assert entry["requested"] is False, name
+        assert entry["required_by"] == [{"category": "dev-libs", "package": "p569prov"}], (
+            name,
+            entry["required_by"],
+        )
+    assert inv.check_json(doc, args=args) == []
