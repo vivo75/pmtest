@@ -673,11 +673,62 @@ def glob_match(pat: str, s: str) -> bool:
     return re.fullmatch(re.escape(pat).replace(r"\*", ".*"), s) is not None
 
 
+def load_run_options(d: Path) -> dict:
+    """What the run was asked to do, from ``run-options.json`` (#726).
+
+    Returns ``{"solver": "default"|"pubgrub"|..., "usepkg": bool}``. A run
+    directory without the file predates the record and counts as a default
+    solver run without binary packages.
+    """
+    f = d / "run-options.json"
+    env = {}
+    if f.exists():
+        env = json.loads(f.read_text()).get("env", {})
+    solver = "default"
+    popts = (env.get("L0_PORTUALE_OPTS") or "").split()
+    for i, tok in enumerate(popts):
+        if tok.startswith("--solver="):
+            solver = tok.split("=", 1)[1]
+        elif tok == "--solver" and i + 1 < len(popts):
+            solver = popts[i + 1]
+    usepkg = False
+    for tok in (env.get("L0_EMERGE_OPTS") or "").split():
+        if tok in ("--usepkg", "--usepkgonly", "--getbinpkg", "--getbinpkgonly"):
+            usepkg = True
+        elif re.fullmatch(r"-[A-Za-z]+", tok) and set(tok[1:]) & set("kKgG"):
+            usepkg = True
+    return {"solver": solver, "usepkg": usepkg}
+
+
+def run_applies(e: dict, run_opts: dict | None) -> bool:
+    """Whether allowlist entry ``e`` is in scope for a run with these options.
+
+    ``layer: l0`` covers every solver; ``l0-pubgrub`` only pubgrub runs.
+    ``solver:`` (string or list) and ``usepkg:`` (bool) narrow an entry
+    further. A run whose options are unknown is a default-solver run
+    without binary packages.
+    """
+    opts = run_opts or {"solver": "default", "usepkg": False}
+    if e.get("layer", "l0") not in ("l0", "l0-pubgrub"):
+        return False
+    solvers = e.get("solver")
+    if solvers is not None:
+        solvers = [solvers] if isinstance(solvers, str) else list(solvers)
+    if e.get("layer") == "l0-pubgrub":
+        solvers = ["pubgrub"] if solvers is None else [s for s in solvers if s == "pubgrub"]
+    if solvers is not None and opts["solver"] not in solvers:
+        return False
+    if e.get("usepkg") is not None and bool(e["usepkg"]) != opts["usepkg"]:
+        return False
+    return True
+
+
 def explained(finding: dict, slug: str, kind: str, allow: list[dict],
               run_fs: str | None = None,
-              run_backend: str | None = None) -> dict | None:
+              run_backend: str | None = None,
+              run_opts: dict | None = None) -> dict | None:
     for e in allow:
-        if e.get("layer", "l0") not in ("l0", "l0-pubgrub"):
+        if not run_applies(e, run_opts):
             continue
         fs = e.get("fs")
         if fs is not None:
@@ -745,6 +796,7 @@ def main(argv: list[str]) -> int:
     allow = load_allowlist(
         Path(pos[1]) if len(pos) == 2 else Path(__file__).with_name("known-divergences.yaml")
     )
+    run_opts = load_run_options(d)
     meta = d / "meta.tsv"
     if not meta.exists():
         sys.exit(f"{meta} not found -- run the in-container half first")
@@ -764,7 +816,7 @@ def main(argv: list[str]) -> int:
     explained_hits: list[tuple[str, dict, str]] = []
     for pr in probes:
         for f in pr.findings:
-            e = explained(f, pr.slug, pr.kind, allow, run_fs, run_backend)
+            e = explained(f, pr.slug, pr.kind, allow, run_fs, run_backend, run_opts)
             if e:
                 f["explained_by"] = e.get("id", "<unnamed>")
                 explained_hits.append((pr.slug, f, e.get("id", "<unnamed>")))
@@ -800,6 +852,10 @@ def main(argv: list[str]) -> int:
         "## environment",
         *("  " + x for x in fp.splitlines()),
         "",
+        "## run options",
+        f"  solver           : {run_opts['solver']}",
+        f"  usepkg           : {str(run_opts['usepkg']).lower()}",
+        "",
         "## summary",
         f"  probes           : {n_probes}",
         f"  clean            : {n_clean}",
@@ -831,7 +887,7 @@ def main(argv: list[str]) -> int:
     unused = [
         e.get("id", "<unnamed>")
         for e in allow
-        if e.get("layer", "l0") in ("l0", "l0-pubgrub")
+        if run_applies(e, run_opts)
         # An fs-qualified entry for another fs is out of scope here,
         # not a removal candidate.
         and (e.get("fs") is None or run_fs in (
@@ -867,6 +923,8 @@ def main(argv: list[str]) -> int:
         "by_category": by_cat,
         "fs": run_fs,
         "backend": run_backend,
+        "solver": run_opts["solver"],
+        "usepkg": run_opts["usepkg"],
     }
     if count_cats is not None:
         summary["counts"] = counts

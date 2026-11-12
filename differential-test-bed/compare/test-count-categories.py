@@ -13,6 +13,7 @@ Run: python3 differential-test-bed/compare/test-count-categories.py   (exit 0 = 
 import contextlib
 import importlib.util
 import io
+import json
 import sys
 import tempfile
 from pathlib import Path
@@ -121,9 +122,40 @@ def main() -> int:
     pr = run_case(REAL, PTL, split_action=True)
     extra = next(f for f in pr.findings if f["category"] == "extra")
     allow = [{"id": "pg", "layer": "l0-pubgrub", "categories": ["extra"], "match": "pg34-c"}]
-    check("l0-pubgrub entry explains",
-          mod.explained(extra, "s", "atom", allow) is not None,
-          repr(mod.explained(extra, "s", "atom", allow)))
+    pg = {"solver": "pubgrub", "usepkg": False}
+    check("l0-pubgrub entry explains a pubgrub run",
+          mod.explained(extra, "s", "atom", allow, run_opts=pg) is not None,
+          repr(mod.explained(extra, "s", "atom", allow, run_opts=pg)))
+    check("l0-pubgrub entry does not explain a default-solver run",
+          mod.explained(extra, "s", "atom", allow) is None
+          and mod.explained(extra, "s", "atom", allow,
+                            run_opts={"solver": "default", "usepkg": False}) is None, "")
+    l0e = [{"id": "l0e", "layer": "l0", "categories": ["extra"], "match": "pg34-c"}]
+    check("l0 entry explains both solvers",
+          mod.explained(extra, "s", "atom", l0e) is not None
+          and mod.explained(extra, "s", "atom", l0e, run_opts=pg) is not None, "")
+    sp = [{"id": "sp", "layer": "l0", "solver": "pubgrub", "categories": ["extra"]},
+          {"id": "up", "layer": "l0", "usepkg": True, "categories": ["extra"]}]
+    check("solver: pubgrub entry only explains pubgrub",
+          mod.explained(extra, "s", "atom", sp[:1]) is None
+          and mod.explained(extra, "s", "atom", sp[:1], run_opts=pg) is not None, "")
+    check("usepkg: true entry only explains a --usepkg run",
+          mod.explained(extra, "s", "atom", sp[1:]) is None
+          and mod.explained(extra, "s", "atom", sp[1:],
+                            run_opts={"solver": "default", "usepkg": True}) is not None, "")
+    with tempfile.TemporaryDirectory() as tmp:
+        t = Path(tmp)
+        check("no run-options.json is a default run",
+              mod.load_run_options(t) == {"solver": "default", "usepkg": False}, "")
+        (t / "run-options.json").write_text(json.dumps({"env": {
+            "L0_PORTUALE_OPTS": "--solver=pubgrub", "L0_EMERGE_OPTS": "-pvk"}}))
+        check("run-options.json: pubgrub and -pvk",
+              mod.load_run_options(t) == {"solver": "pubgrub", "usepkg": True},
+              repr(mod.load_run_options(t)))
+        (t / "run-options.json").write_text(json.dumps({"env": {
+            "L0_PORTUALE_OPTS": "", "L0_EMERGE_OPTS": "-pv --usepkg"}}))
+        check("run-options.json: --usepkg",
+              mod.load_run_options(t) == {"solver": "default", "usepkg": True}, "")
     other = [{"id": "other", "layer": "l1", "categories": ["extra"], "match": "pg34-c"}]
     check("l1 entry does not explain an l0 probe",
           mod.explained(extra, "s", "atom", other) is None,

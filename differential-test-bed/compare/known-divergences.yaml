@@ -17,9 +17,16 @@
 #               (`l0-pubgrub` = backlog #34 pubgrub parity mode entries,
 #               graded with resolve-compare.py --count-categories)
 #   categories: [missing, extra, version, flags, action, columns, use, order, error,
-#                exit, totals, advice]  -- or `category:` for a single one
+#                exit, totals, advice, skipped-updates, truncated]
+#                -- or `category:` for a single one
 #                (`advice` = a needed USE change / mask / REQUIRED_USE
 #                 diagnostic that only one side emits)
+#   solver:     default | pubgrub, string or list -- the solver the run used
+#               (from `L0_PORTUALE_OPTS=--solver=...`, recorded in the run's
+#               run-options.json; #726). Absent = every solver. `layer: l0`
+#               covers every solver, `l0-pubgrub` only pubgrub runs.
+#   usepkg:     true | false -- whether `L0_EMERGE_OPTS` asked for binary
+#               packages (`--usepkg`, `-k`, `--getbinpkg`...). Absent = both.
 #   slugs:      list of probe-slug globs (e.g. "app-editors_vim",
 #               "MULTI_*"); '*' is the only wildcard
 #   match:      substring that must appear in the finding detail
@@ -35,7 +42,8 @@
 #   ticket:     upstream/issue reference, if any
 #   owner:      who adjudicated it
 #
-# Keep this file sorted by id. Every entry is a deliberate, reviewed
+# Entries are grouped by topic (older groups first, then one block per
+# triage), not sorted by id; look an id up with grep. Every entry is a deliberate, reviewed
 # decision. An entry tagged `owner: portuale-bug` is a KNOWN bug being
 # suppressed only so the layer can still gate *other* changes -- it must
 # be deleted the moment the bug is fixed (see the finding it names).
@@ -395,3 +403,41 @@
     1.18.1-r1 (R) and 1.19 (NS). Portage lists them at 216/217 and portuale at
     237 (NS) and 238 (R).
   owner: comparator
+
+# --- #726 (2026-11-12): the grader can tell the solver now ---
+- id: l0-pubgrub-order-only-health-clean-726
+  layer: l0-pubgrub
+  categories: [order]
+  slugs: ["app-admin_sudo", "app-editors_emacs", "app-editors_neovim", "app-editors_vim",
+          "app-shells_starship", "dev-db_postgresql", "dev-lang_rust-bin", "dev-libs_glib",
+          "dev-qt_qtbase_6", "kde-frameworks_kcoreaddons", "media-libs_gstreamer",
+          "media-libs_mesa", "media-video_ffmpeg", "net-libs_nodejs", "sys-apps_bat",
+          "sys-apps_dbus", "sys-apps_fd", "sys-apps_ripgrep", "sys-apps_systemd",
+          "sys-auth_polkit", "virtual_mta", "www-servers_apache"]
+  match: "merge order diverges"
+  reason: >
+    #705 (a) left 22 pure `order` differences of the `--solver=pubgrub` bed unexplained because
+    no entry could be limited to that solver. The charter (property 2) asks for a legal order,
+    not Portage's; the health run over the same probes with `--solver=pubgrub`
+    (`l0-health-20261112T034753Z`) reports no `build-order` failure in any of these 22 plans (its
+    four `build-order` failures are the refused libreoffice, gnome-shell, plasma-meta and gimp
+    plans; the `runtime-deps` and `blocker` failures in dbus, systemd, polkit and nodejs are
+    #716, not an order defect). Masking tradeoff: it hides any order divergence of these cells
+    under pubgrub; the health run is the gate for a real order defect.
+  owner: charter
+
+- id: l0-pubgrub-726-rebuild-r-column
+  layer: l0-pubgrub
+  categories: [flags]
+  slugs: ["MULTI_deep-update-world"]
+  match: "real flags [rR] vs portuale [R]"
+  reason: >
+    Same class as l0-pubgrub-705-perl-r-column, on the 34 slot-operator rebuild rows of the
+    perl holders in the same cell (#705 (a) left them unexplained because that entry matches
+    one row). Portage adds the `r` column to a row it pulled in through its internal
+    `__auto_slot_operator_replace_installed__` argument (Portage output.py 813-817,
+    force_reinstall); pubgrub prints the plain `R`. The action, the package and its version are
+    the same, and the column only says why the package is there. Masking tradeoff: exact
+    flag pair on one cell; it hides a missing `r` on a row whose package is rebuilt on both
+    sides, and nothing else.
+  owner: charter

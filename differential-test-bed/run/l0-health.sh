@@ -30,6 +30,7 @@ OUT="$LOGS_DIR/$RUN"
 mkdir -p "$OUT"
 ensure_pm_built "$OUT"
 ensure_image
+run_options_stamp "$OUT" l0-health
 
 echo ">>> planning and checking in $IMAGE  (out: $OUT)"
 podman_run_pm "porttest-l0-health-$$" "${MIRROR_ENV[@]}" \

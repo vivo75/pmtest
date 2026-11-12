@@ -18,7 +18,9 @@
 #                               (e.g. `--solver=pubgrub` for the #34 pubgrub
 #                               parity mode); Portage's argv is unchanged.
 #                               Empty (the default) leaves portuale's argv
-#                               byte-identical to the default run.
+#                               byte-identical to the default run. The
+#                               --tree/--quiet/--json mode runs take it too,
+#                               so the invariants read the same solver's plan.
 #   L0_PREPARE_PKGDIR="a/b c/d" pack these installed packages with `quickpkg`
 #                               into $PKGDIR before the probes, so `--usepkg`
 #                               runs exercise a populated binary pool on the
@@ -144,11 +146,11 @@ probe() {
     local mode
     for mode in tree quiet ; do
       # shellcheck disable=SC2086
-      timeout 600 "$PTL" $EOPTS --color=n "--$mode" "$atom" \
+      timeout 600 "$PTL" $EOPTS $POPTS --color=n "--$mode" "$atom" \
         > "$OUTDIR/portuale-modes/$s.$mode.txt" 2>/dev/null
     done
     # shellcheck disable=SC2086
-    PORTUALE_REPORT_UNPARSED_DEP_TOKENS=1 timeout 600 "$PTL" $EOPTS --color=n --json "$atom" \
+    PORTUALE_REPORT_UNPARSED_DEP_TOKENS=1 timeout 600 "$PTL" $EOPTS $POPTS --color=n --json "$atom" \
       > "$OUTDIR/portuale-modes/$s.json.txt" 2> "$OUTDIR/portuale-modes/$s.json.stderr"
   fi
   printf '%s\t%s\t%s\t%s\n' "$s" "$kind" "$rrc" "$prc" >> "$OUTDIR/meta.tsv"

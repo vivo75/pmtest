@@ -134,9 +134,14 @@ step), `L0_SKIP_MULTI=1` (skip the `@system`/`@world` whole-graph runs),
 `L0_PORTUALE_OPTS` (default empty) appends extra flags to portuale's
 argv only — Portage's argv is unchanged, and empty leaves portuale's
 argv byte-identical to the default run. Backlog #34's pubgrub comparison
-mode uses `L0_PORTUALE_OPTS=--solver=pubgrub` (with
-`L0_SKIP_INVARIANTS=1`, since the invariant runs pin the default
-resolver) and grades the run with
+mode uses `L0_PORTUALE_OPTS=--solver=pubgrub`; the `--tree`, `--quiet`
+and `--json` invariant runs take the same options, so the invariants
+read a pubgrub plan (backlog #731). A run records what it was asked to
+do in `run-options.json` next to `pm.json` (which also carries the
+binary's sha256); the grader reads the solver and whether `--usepkg` was
+on from it. In `known-divergences.yaml`, `layer: l0` entries cover every
+solver, `l0-pubgrub` ones only pubgrub runs, and `solver:` / `usepkg:`
+narrow an entry further (backlog #726). The count mode grades with
 `compare/resolve-compare.py --count-categories missing,extra,version,action,exit`,
 which counts only the package-set/action findings against the
 `l0-pubgrub` allowlist layer.

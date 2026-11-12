@@ -200,12 +200,23 @@ pm_stamp() {  # <run-dir>
     echo "!!! repo drift: /.gentoo/repos differs from differential-test-bed/repo-pins.txt (run scripts/repo-pins.sh --check)" >&2
   }
   PM_STAMP_DIR="$1" PM_REPO_PINS="$pins" PM_REPO_PINS_OK="$pins_ok" python3 - <<'PY'
-import json, os, datetime
+import hashlib, json, os, datetime
+
+def sha256(path):
+    try:
+        with open(os.path.realpath(path), "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
+
 out = {
     "pm": os.environ["PM_NAME"],
     "version": os.environ["PM_VERSION"],
     "profile": os.environ["PM_PROFILE"],
     "binary": os.environ["PM_EMERGE"],
+    # `version` is the repo HEAD; a frozen copy (portuale-bed) can differ
+    # from it, the hash of the file that actually ran cannot (#726 e).
+    "binary_sha256": sha256(os.environ["PM_EMERGE"]),
     "repo": os.environ["PM_REPO"],
     "repo_pins": dict(l.split("=", 1) for l in os.environ["PM_REPO_PINS"].splitlines() if "=" in l),
     "repo_pins_match_file": os.environ["PM_REPO_PINS_OK"] == "true",
@@ -241,3 +252,21 @@ ensure_image() {
 }
 
 timestamp() { date -u +%Y%m%dT%H%M%SZ; }
+
+# What a bed run was asked to do, recorded next to pm.json so the grader can
+# tell a default-solver run from a pubgrub or --usepkg one (#726). The raw
+# strings are stored; resolve-compare.py derives solver and usepkg from them.
+run_options_stamp() {  # <run-dir> <layer>
+  [ -d "$1" ] || return 0
+  RO_DIR="$1" RO_LAYER="$2" python3 - <<'PY'
+import json, os
+keys = ("L0_EMERGE_OPTS", "L0_PORTUALE_OPTS", "L0_PREPARE_PKGDIR",
+        "L0_SKIP_MULTI", "L0_SKIP_INVARIANTS", "L0_PORTAGE_PIN")
+defaults = {"L0_EMERGE_OPTS": "-pv", "L0_PORTAGE_PIN": "3.0.83-r1"}
+out = {"layer": os.environ["RO_LAYER"],
+       "env": {k: os.environ.get(k) or defaults.get(k, "") for k in keys}}
+with open(os.path.join(os.environ["RO_DIR"], "run-options.json"), "w") as fh:
+    json.dump(out, fh, indent=2)
+    fh.write("\n")
+PY
+}

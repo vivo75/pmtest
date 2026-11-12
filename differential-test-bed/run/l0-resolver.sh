@@ -30,6 +30,7 @@ ln -sfn "$RUN" "$LOGS_DIR/l0-latest"
 
 ensure_pm_built "$OUT"
 ensure_image
+run_options_stamp "$OUT" l0
 
 echo ">>> running L0 probes in $IMAGE  (out: $OUT)"
 podman_run_pm "porttest-l0-$$" \
