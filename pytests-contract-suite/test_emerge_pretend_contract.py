@@ -40149,3 +40149,48 @@ def test_718_pubgrub_holders_name_the_provider_as_parent(emerge_binary, fixture_
             entry["required_by"],
         )
     assert inv.check_json(doc, args=args) == []
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_714_a_upgrade_row_is_compared_with_the_installed_package(
+    emerge_binary, fixture_env, solver
+):
+    """Backlog #714, charter property 5 (the row shows what changes). An upgrade row carries
+    the markers of the installed package it replaces, in both solvers: `-change*` (was on, now
+    off), `added%*` (flag new in IUSE), `(-drop%)` (flag removed), and a plain `keep`. The
+    expected text is the default solver's (`test_upgrade_row_marks_changed_flags`-style pin
+    above, `dev-libs/upgradeusepkg` 1.0 installed with IUSE `+keep change drop`); pubgrub
+    printed every flag plain and no `(-drop%)` entry (bed `l0-20261112T032148Z`)."""
+    got = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", f"--solver={solver}", "--update", "dev-libs/upgradeusepkg"],
+        fixture_env,
+    )
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    assert got.stdout.splitlines()[0] == (
+        f'[ebuild     U  ] dev-libs/upgradeusepkg-2.0::testrepo [1.0::testrepo] to {fixture_env["ROOT"]} USE="added%* keep -change* (-drop%)" '
+    ), got.stdout
+
+
+@pytest.mark.parametrize("solver", ["portage", "pubgrub"])
+def test_714_b_row_shows_the_download_size_and_the_installed_sub_slot(
+    emerge_binary, fixture_env, solver
+):
+    """Backlog #714, charter property 5. An ebuild row prints the bytes still to fetch (the
+    Manifest size of the missing distfile, `fetchrestrictmissingpkg`: 12345 bytes = 13 KiB,
+    as the default solver's `Size of downloads: 13 KiB` pin; pubgrub printed `0 KiB`), and the
+    `[oldver]` bracket of an upgrade shows the sub-slot of the installed package, not of the
+    new one (`mbabilib` installed in `0/1`, upgraded to `0/2`; pubgrub printed `[1.0:0/2::...]`
+    before the bridge read the vdb for upgrades too)."""
+    fetch = _run(
+        [str(emerge_binary)],
+        ["--pretend", "-v", f"--solver={solver}", "dev-libs/fetchrestrictmissingpkg"],
+        fixture_env,
+    )
+    assert fetch.returncode == 0, (fetch.stdout, fetch.stderr)
+    assert fetch.stdout.splitlines()[0].endswith(f"to {fixture_env['ROOT']} 13 KiB"), fetch.stdout
+    assert "Size of downloads: 13 KiB" in fetch.stdout, fetch.stdout
+    sub = _run([str(emerge_binary)], [*_MBABI_ARGS, f"--solver={solver}"], fixture_env)
+    assert sub.returncode == 0, (sub.stdout, sub.stderr)
+    upgrade = [l for l in sub.stdout.splitlines() if "dev-libs/mbabilib-2.0:0/2" in l]
+    assert len(upgrade) == 1 and "[1.0:0/1::testrepo]" in upgrade[0], sub.stdout
