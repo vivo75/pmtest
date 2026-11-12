@@ -941,3 +941,19 @@ def test_692_check_world_json_loads_as_findings(mrg_binary, fixture_env, tmp_pat
         mrg_binary, fixture_env, tmp_path / "clean", [])
     assert (rc, findings, summary["unsatisfiable"]) == (0, [], 0)
     assert not hc.Finding("world-unneeded", "a/b:1", "", "x").is_failure
+
+
+def test_693_plan_world_json_loads_and_the_checker_judges_it(mrg_binary, fixture_env):
+    """Charter properties 1 and 2: `mrg --plan-world --json` is a plan the
+    checker loads (entries in `depend` order, the rest of the VDB as `kept`)
+    and finds nothing wrong in that the installed system did not have already.
+    Source: the checker, written from the PMS."""
+    run = subprocess.run([str(mrg_binary), "--plan-world", "--json", "--sort", "depend"],
+                         capture_output=True, text=True, env=fixture_env, check=False)
+    doc = hc.parse_json_output(run.stdout)
+    assert run.returncode == 0 and doc is not None, run.stdout + run.stderr
+    assert [e["outcome"] for e in doc["entries"]].count("upgrade") == 1
+    assert [e["merge_order"] for e in doc["entries"]] == list(range(len(doc["entries"])))
+    vdb = hc.Path(fixture_env["ROOT"]) / "var/db/pkg"
+    found = [f for f in hc.check_document(doc, vdb) if f.is_failure and not f.pre_existing]
+    assert found == [], found
