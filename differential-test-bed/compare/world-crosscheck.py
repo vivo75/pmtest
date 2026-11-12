@@ -15,7 +15,8 @@ by itself. Each output line says which class it is:
                                      resolver aborted or reported a conflict
   [note]  fast-only / resolver-only  a slot only one plan lists (the
                                      resolver's reinstalls are counted
-                                     apart: the fast plan has no rebuild rows)
+                                     apart: the fast plan rebuilds only for
+                                     a slot operator)
 
 Atoms are matched by name, version and slot; USE dependencies are not judged.
 Portage is not involved.
@@ -131,7 +132,8 @@ def crosscheck(resolver: dict, fast: dict, findings: list[dict] | None = None) -
                               f"{name(key)}  resolver={theirs[key]['version']} ({theirs[key]['outcome']})"))
     if reinstalls:
         notes.append(Line("note", "resolver-only-reinstall",
-                          f"{reinstalls} reinstall(s) only the resolver lists (the fast plan has no rebuild rows yet)"))
+                          f"{reinstalls} reinstall(s) only the resolver lists "
+                          "(the fast plan rebuilds only for a slot operator)"))
     return judge + notes
 
 
