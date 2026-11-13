@@ -21304,7 +21304,11 @@ def test_installed_consumers_built_slot_operator_atom_does_not_block_an_upgrade(
     RDEPEND="dev-libs/revdepslottarget:0/1=". Enforced literally that
     atom would veto the upgrade; stripped as Portage strips it, the upgrade
     goes ahead. Same fixture shape as the blocking case above, differing
-    only in the recorded atom -- which is the whole distinction."""
+    only in the recorded atom -- which is the whole distinction. No `rR`
+    row follows: the consumer's tree ebuild names no dependency at all, so
+    a rebuild would re-record nothing -- there is no stale binding left to
+    repair (backlog #741: only a tree that still names the provider
+    schedules its stale consumer)."""
     args = ["--pretend", "--update", "dev-libs/revdepslottarget"]
     rust = _run([str(emerge_binary)], args, fixture_env)
     assert rust.returncode == 0
