@@ -17,6 +17,10 @@ by itself. Each output line says which class it is:
                                      resolver's reinstalls are counted
                                      apart: the fast plan rebuilds only for
                                      a slot operator)
+  [note]  fast-stale-binding-unrepaired
+                                     a kept package whose recorded slot-
+                                     operator binding the fast plan does
+                                     not repair (one `stale-bindings` row)
 
 Atoms are matched by name, version and slot; USE dependencies are not judged.
 Portage is not involved.
@@ -134,6 +138,10 @@ def crosscheck(resolver: dict, fast: dict, findings: list[dict] | None = None) -
         notes.append(Line("note", "resolver-only-reinstall",
                           f"{reinstalls} reinstall(s) only the resolver lists "
                           "(the fast plan rebuilds only for a slot operator)"))
+    for stale in fast.get("stale-bindings", []):
+        notes.append(Line("note", "fast-stale-binding-unrepaired",
+                           f"{stale['consumer']} ({stale['atom']}: "
+                           f"{stale.get('reason', 'not rebuilt')})"))
     return judge + notes
 
 

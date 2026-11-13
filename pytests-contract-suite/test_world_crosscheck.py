@@ -78,6 +78,17 @@ def test_a_resolver_that_gave_up_on_a_world_the_check_calls_clean_is_said_so():
     assert kinds(got) == [("judge", "world-clean-but-resolver-refused")]
 
 
+def test_a_fast_plan_stale_binding_the_plan_does_not_repair_is_noted():
+    stale = {"consumer": "a/b", "atom": "c/d:0/1=",
+             "provider": "c/d-2", "reason": "not satisfied by c/d-2"}
+    fast = {"entries": [], "kept": [], "stale-bindings": [stale], "aborted": None}
+    got = load().crosscheck({"entries": []}, fast, [])
+    assert kinds(got) == [("note", "fast-stale-binding-unrepaired")]
+    assert "a/b (c/d:0/1=: not satisfied by c/d-2)" in got[0].text
+    bare = {"entries": [], "kept": [], "aborted": None}
+    assert load().crosscheck({"entries": []}, bare, []) == []
+
+
 def test_the_command_line_prints_the_lines_and_exits_zero(tmp_path):
     (tmp_path / "rs.json").write_text(json.dumps({"entries": [entry("a/b-3", "upgrade")]}) + "\n")
     (tmp_path / "fast.json").write_text(json.dumps(
