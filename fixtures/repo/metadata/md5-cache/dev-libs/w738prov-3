@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=738 pin fixture: provider, old sub-slot (installed on the test root)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/3
+_md5_=39d6ab30961d70c90027106c8dea084b

@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=738 pin fixture: consumer with an unversioned := dep (admits the move)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/w738prov:=
+SLOT=0
+_md5_=b7d15e8e0267138953a56ca9c239e1e7

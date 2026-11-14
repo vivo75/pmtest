@@ -2323,6 +2323,8 @@ CASES = [
     ("multi-atom: solvable slot conflict between two targets is reconciled", ["--pretend", "dev-libs/slotconflictnewconsumer", "dev-libs/slotconflictoldconsumer"], 0),
     ("multi-atom: reversed two-target order withholds with a skip notice at --backtrack=0 (#90 S2: rc 0 like Portage)", ["--pretend", "--backtrack=0", "dev-libs/slotconflictoldconsumer", "dev-libs/slotconflictnewconsumer"], 0),
     ("multi-atom: unsolvable slot conflict between two targets is reported (#62: rc 1 like Portage)", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 1),
+    ("slot conflict: two versioned atoms name their (Argument) parents, no bare 'pulled in by' (#738)", ["--pretend", "=dev-libs/slotconflicttarget-1.0", "=dev-libs/slotconflicttarget-2.0"], 1),
+    ("slot conflict: a binary instance reads 'binary scheduled for merge' like its merge row (#738)", ["--pretend", "--usepkg", "=dev-libs/binpkgrmpkg-1.0", "=dev-libs/binpkgrmpkg-2.0"], 1),
     ("multi-atom: all requested atoms already installed", ["--pretend", "dev-libs/samepkg", "dev-libs/samepkg"], 0),
     ("multi-atom: a nonexistent atom aborts the whole run, first-bad-wins", ["--pretend", "dev-libs/does-not-exist", "dev-libs/newpkg"], 1),
     ("multi-atom: a later nonexistent atom still aborts the whole run", ["--pretend", "dev-libs/newpkg", "dev-libs/does-not-exist"], 1),
@@ -17209,6 +17211,72 @@ def test_slot_conflict_notice_renders_pkg_use_display(emerge_binary, fixture_env
     tail = rust.stdout.split("required by (dev-libs/scusenewpin-1.0:0/0::testrepo, ebuild scheduled for merge) USE=\"scupin\" ELIBC=\"glibc\"\n", 1)[1]
     marker = tail.split("\n", 1)[0]
     assert marker.startswith("    ") and set(marker) <= {" ", "^"} and "^" in marker
+
+
+def test_slot_conflict_two_versioned_atoms_name_their_argument_parents(
+    emerge_binary, fixture_env
+):
+    """Backlog #738, message defect (a): a `slot_conflicts` instance whose
+    only pullers are bare command-line atoms must name them instead of
+    rendering a bare `pulled in by`. Portage shows `{atom} (Argument)`
+    whenever the argument carries a version, slot or USE reason
+    (`_emerge/resolver/slot_collision.py`,
+    `_prepare_conflict_msg_and_check_for_specificity`); only the
+    reason-less fallback waits for another installed instance (the
+    `("AtomArg", None)` key). Grounded on host Portage 3.0.83's source
+    (the fixture configroot is not runnable by host `emerge` directly).
+    Before the fix both instances of
+    `=dev-libs/slotconflicttarget-1.0 =dev-libs/slotconflicttarget-2.0`
+    rendered `pulled in by` with nothing after it -- the shape of the
+    `dev-libs/openssl:0` block in the #738 capture."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "=dev-libs/slotconflicttarget-1.0", "=dev-libs/slotconflicttarget-2.0"],
+        fixture_env,
+    )
+    assert rust.returncode == 1, rust.stdout
+    assert _SLOT_COLLISION_PREAMBLE in rust.stdout
+    assert "    =dev-libs/slotconflicttarget-1.0 (Argument)\n" in rust.stdout
+    assert "    =dev-libs/slotconflicttarget-2.0 (Argument)\n" in rust.stdout
+    assert "pulled in by\n\n" not in rust.stdout
+
+
+def test_slot_conflict_binary_instance_reads_binary_scheduled_for_merge(
+    emerge_binary, fixture_env
+):
+    """Backlog #738, message defect (b): the conflict block must call a
+    binary instance a binary, agreeing with its merge-list row (charter
+    property 5). Portage's `str(Package)` reads `binary scheduled for
+    merge` for one (`_emerge/resolver/slot_collision.py`,
+    `_prepare_conflict_msg_and_check_for_specificity`); portuale
+    hardcoded `ebuild scheduled for merge`, so the #738 capture called
+    `media-video/ffmpeg-9.0.2` an ebuild in the block and a binary in
+    the merge list. Under `--usepkg`
+    `=dev-libs/binpkgrmpkg-1.0 =dev-libs/binpkgrmpkg-2.0` resolves 1.0
+    from the ebuild and 2.0 from the pool binary, and the block must
+    label each like its row."""
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkg", "=dev-libs/binpkgrmpkg-1.0", "=dev-libs/binpkgrmpkg-2.0"],
+        fixture_env,
+    )
+    assert rust.returncode == 1, rust.stdout
+    assert _SLOT_COLLISION_PREAMBLE in rust.stdout
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith(("[ebuild", "[binary"))]
+    assert rows == [
+        f'[ebuild  N     ] dev-libs/binpkgrmpkg-1.0 to {fixture_env["ROOT"]}',
+        f'[binary  N     ] dev-libs/binpkgrmpkg-2.0 to {fixture_env["ROOT"]}',
+    ], rust.stdout
+    assert (
+        "  (dev-libs/binpkgrmpkg-2.0:0/0::testrepo, binary scheduled for merge) "
+        'USE="" ELIBC="glibc" pulled in by\n'
+        "    =dev-libs/binpkgrmpkg-2.0 (Argument)\n"
+    ) in rust.stdout
+    assert (
+        "  (dev-libs/binpkgrmpkg-1.0:0/0::testrepo, ebuild scheduled for merge) "
+        'USE="" ELIBC="glibc" pulled in by\n'
+        "    =dev-libs/binpkgrmpkg-1.0 (Argument)\n"
+    ) in rust.stdout
 
 
 def test_slot_conflict_groups_same_reason_parents_and_offers_verbose_conflicts(

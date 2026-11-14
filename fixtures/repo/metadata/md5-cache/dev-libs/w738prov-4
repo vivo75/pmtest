@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=738 pin fixture: provider, new sub-slot (the plan moves here)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/4
+_md5_=d44299c6f15b7e2057b08cff7f66216b
