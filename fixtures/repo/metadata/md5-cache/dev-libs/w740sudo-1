@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #740): kept slot-operator consumer
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/w740prov:=
+SLOT=0
+_md5_=6c0b78650d5f860fe82e4d13d6e9d73b

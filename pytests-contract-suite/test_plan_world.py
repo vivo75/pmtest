@@ -86,3 +86,29 @@ def test_plan_world_emptytree_json_is_a_plan_the_checker_loads(mrg_binary, fixtu
     vdb = hc.Path(fixture_env["ROOT"]) / "var/db/pkg"
     found = [f for f in hc.check_document(doc, vdb) if f.is_failure and not f.pre_existing]
     assert found == [], found
+
+
+def test_740_the_plan_takes_the_newest_arm(mrg_binary, fixture_env, tmp_path):
+    """Charter property 3 (backlog #740): the fast plan takes the `||` arm whose atoms the
+    best visible candidates match, so the compat package is new and the provider upgrades
+    instead of staying pinned to the installed sub-slot. A CASES/`emerge` pin is the wrong
+    shape: this is the fast plan, not `emerge`."""
+    root = tmp_path / "root"
+    (root / "var/lib/portage").mkdir(parents=True)
+    (root / "var/lib/portage/world").write_text("dev-libs/w740user\ndev-libs/w740sudo\n")
+    for pf, slot in (("dev-libs/w740prov-3", "0/3"), ("dev-libs/w740sudo-1", "0")):
+        vdb = root / "var/db/pkg" / pf
+        vdb.mkdir(parents=True)
+        (vdb / "CATEGORY").write_text("dev-libs\n")
+        (vdb / "SLOT").write_text(f"{slot}\n")
+        (vdb / "EAPI").write_text("8\n")
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    run = subprocess.run(
+        [str(mrg_binary), "--plan-world"],
+        capture_output=True, text=True, env=env, check=False,
+    )
+    assert run.returncode == 0, run.stderr
+    assert "[ebuild  N     ] dev-libs/w740compat-3:3" in run.stdout.splitlines(), run.stdout
+    assert "[ebuild     U  ] dev-libs/w740prov-4:0 [3]" in run.stdout.splitlines(), run.stdout

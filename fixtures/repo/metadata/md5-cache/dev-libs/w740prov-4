@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (backlog #740): provider, new sub-slot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/4
+_md5_=aa18b5dbf4f367fa93b976e9e363fe06
