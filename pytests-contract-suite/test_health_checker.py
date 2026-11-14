@@ -217,12 +217,16 @@ def test_binary_package_needs_no_build_deps():
     assert hc.check_plan(doc) == []
 
 
-def test_build_time_cycle_is_noted_not_failed():
+def test_genuine_build_time_cycle_fails():
+    """Backlog #749: mutual `DEPEND` is a genuine build cycle — no order
+    satisfies it, so a `build-order` failure naming the cycle and pointing
+    at the #753 bootstrap variant (was: a `cycle-noted`, which masked the
+    real failure)."""
     doc = plan([entry("dev-libs/a-1", 0, deps={"DEPEND": "dev-libs/b"}),
                 entry("dev-libs/b-1", 1, deps={"DEPEND": "dev-libs/a"})])
-    found = hc.check_plan(doc)
-    assert [(f.property, f.package) for f in found] == [("cycle-noted", "dev-libs/a-1")]
-    assert not any(f.is_failure for f in found)
+    [finding] = [f for f in hc.check_plan(doc) if f.is_failure]
+    assert (finding.property, finding.package) == ("build-order", "dev-libs/a-1")
+    assert "build cycle" in finding.reason and "#753" in finding.reason
 
 
 def test_build_dep_never_provided_is_flagged():
@@ -286,42 +290,54 @@ def test_installed_package_missing_from_kept_breaks_its_dependants(tmp_path):
         ("runtime-deps", "acct-group/adm", False)]
 
 
-def test_runtime_dep_of_a_build_dep_merged_too_late_is_flagged():
-    """late_runtime_of_build_dep (PMS 8.1: a DEPEND must be usable)."""
+def test_runtime_dep_of_a_build_dep_merged_later_is_fine():
+    """Backlog #749, charter property 2 (literal): a build dependency must
+    be installed before the build; its runtime needs hold by the end.
+    `y` is merged when `x` builds and `z` is in the final set, so the
+    literal rule passes (was: the usability closure flagged this)."""
     doc = plan([entry("dev-libs/y-1", 0, deps={"RDEPEND": "dev-libs/z"}),
                 entry("app-misc/x-1", 1, deps={"DEPEND": "dev-libs/y"}),
                 entry("dev-libs/z-1", 2)])
-    assert failures(doc) == [("build-order", "app-misc/x-1", "dev-libs/z")]
+    assert hc.check_plan(doc) == []
 
 
-def test_two_levels_of_runtime_deps_of_a_build_dep_are_followed():
-    """two_level_runtime_of_build_dep."""
+def test_two_levels_of_runtime_deps_of_a_build_dep_are_fine():
+    """Backlog #749, charter property 2 (literal): one level deeper than
+    above — every build atom is satisfied at start, the runtime closure
+    holds by the end (was: the usability closure flagged this)."""
     doc = plan([entry("dev-libs/y-1", 0, deps={"RDEPEND": "dev-libs/z"}),
                 entry("dev-libs/z-1", 1, deps={"RDEPEND": "dev-libs/w"}),
                 entry("app-misc/x-1", 2, deps={"DEPEND": "dev-libs/y"}),
                 entry("dev-libs/w-1", 3)])
-    assert failures(doc) == [("build-order", "app-misc/x-1", "dev-libs/w")]
+    assert hc.check_plan(doc) == []
 
 
-def test_build_against_a_stale_slot_operator_consumer_is_flagged(tmp_path):
-    """stale_build_dep: x builds while the installed y is still bound to
-    the lib sub-slot the upgrade just removed; y is rebuilt only later."""
+def test_build_against_a_rebuilt_slot_operator_consumer_is_fine(tmp_path):
+    """Backlog #749, charter property 2 (literal): `x` builds while the
+    installed `y` is still bound to the old sub-slot and `y` is rebuilt
+    only later — the build-time need `y` is installed, the final set
+    repairs the binding (was: the usability closure flagged this)."""
     vdb_package(tmp_path, "dev-libs/lib-1", slot="0/1")
     vdb_package(tmp_path, "dev-libs/y-1", rdepend="dev-libs/lib:0/1=")
     doc = plan([entry("dev-libs/lib-2", 0, outcome="upgrade", from_version="1", sub_slot="2"),
                 entry("app-misc/x-1", 1, deps={"DEPEND": "dev-libs/y"}),
                 entry("dev-libs/y-1", 2, outcome="reinstall", deps={"RDEPEND": "dev-libs/lib:0/2="})])
-    found = [f for f in hc.check_plan(doc, tmp_path) if f.is_failure]
-    assert [(f.property, f.package, f.atom) for f in found] == [
-        ("build-order", "app-misc/x-1", "dev-libs/lib:0/1=")]
-    assert "met only by dev-libs/y-1, merged later" in found[0].reason
+    assert hc.check_plan(doc, tmp_path) == []
 
 
-def test_runtime_cycle_through_a_build_dep_is_noted_not_failed():
+def test_runtime_cycle_through_a_build_dep_orders_the_provider_first():
+    """Backlog #749: `x` builds with `y` (#0) while `y`'s `RDEPEND` needs
+    `x` (#1) — the pinned order is genuinely wrong for the literal rule
+    (`y` is not installed when `x` builds), so a `build-order`
+    merge-it-first failure. The runtime back-edge never reads as a cycle:
+    `reaches` runs on the build-only graph."""
     doc = plan([entry("app-misc/x-1", 0, deps={"DEPEND": "dev-libs/y", "RDEPEND": "dev-libs/y"}),
                 entry("dev-libs/y-1", 1, deps={"RDEPEND": "app-misc/x"})])
-    found = hc.check_plan(doc)
-    assert [(f.property, f.package) for f in found] == [("cycle-noted", "app-misc/x-1")]
+    [finding] = [f for f in hc.check_plan(doc) if f.is_failure]
+    assert (finding.property, finding.package, finding.atom) == (
+        "build-order", "app-misc/x-1", "dev-libs/y")
+    assert "merge it first" in finding.reason
+    assert "cycle" not in finding.reason and "#753" not in finding.reason
 
 
 def test_build_time_blocker_is_checked_when_the_package_builds():
@@ -365,86 +381,92 @@ def test_737_weak_blocker_against_a_package_the_plan_keeps_still_fails():
     assert failures(doc) == [("blocker", "dev-libs/w737compat-1", "!=dev-libs/w737old-1*:0")]
 
 
-def test_737_late_reinstall_self_unmatched_need_stays_reported(tmp_path):
-    """Backlog #737 (3): the provider's own old RDEPEND atom, met only by an
-    installed package the plan never touches and by no merge, stays a
-    `build-order` failure. The plan orders the rebuild late for reasons the
-    checker cannot see (a sub-slot pin, a compat package, a soname change);
-    Portage merges that late too, so this is an accepted checker limitation,
-    not a plan defect (formerly allowlisted as
-    `l0-737-openssl-world-late-reinstall-order`; removed as unused by #747)."""
+def test_737_late_reinstall_self_unmatched_need_is_fine(tmp_path):
+    """Backlog #749, charter property 2 (literal): the provider's own old
+    `RDEPEND` atom, met only by installed packages the plan never merges,
+    is no finding — `x`'s build-time need `prov` is installed when `x`
+    builds, the runtime closure holds by the end. The late-rebuild order
+    the plan itself chose (a sub-slot pin, a compat package, a soname
+    change) stays unjudged by design (was: a `build-order` failure, the
+    #737(3) accepted checker limitation — gone with the closure)."""
     vdb_package(tmp_path, "dev-libs/prov-1", rdepend="dev-libs/dep")
     vdb_package(tmp_path, "dev-libs/dep-1")
     doc = plan([
         entry("app-misc/x-1", 0, deps={"DEPEND": "dev-libs/prov"}),
         entry("dev-libs/prov-2", 1, outcome="upgrade", from_version="1"),
     ])
-    found = [f for f in hc.check_plan(doc, tmp_path) if f.is_failure]
-    assert [(f.property, f.package, f.atom) for f in found] == [
-        ("build-order", "app-misc/x-1", "dev-libs/dep")]
+    assert hc.check_plan(doc, tmp_path) == []
 
 
-# --- property 2a: a cycle broken by building a package twice -----------------
-
-def test_745_second_build_of_the_same_version_excuses_the_unmet_need():
-    """Backlog #745/#746, charter 2a: the plan merges `w745p-1` again at #2,
-    and by then the need its first build missed is matched, so the
-    `build-order` finding becomes a `cycle-noted` naming the second build."""
-    doc = plan([
-        entry("dev-libs/w745p-1", 0, deps={"BDEPEND": "dev-libs/w745q"}),
-        entry("dev-libs/w745q-1", 1),
-        entry("dev-libs/w745p-1", 2, deps={"BDEPEND": "dev-libs/w745q"}),
-    ])
-    found = hc.check_plan(doc)
-    assert [f for f in found if f.is_failure] == []
-    assert [(f.property, f.package) for f in found] == [
-        ("cycle-noted", "dev-libs/w745p-1")]
-    assert "#2" in found[0].reason
-
+# --- property 2a: a reported build cycle, never a second build ---------------
 
 def test_745_without_the_second_build_the_unmet_need_still_fails():
     """Backlog #745, guard: with the second build removed, the unmet need is
-    still a `build-order` failure."""
+    still a `build-order` failure — now the charter-literal path (the need
+    is simply not installed yet), pinning the merge-it-first arm, which
+    carries no cycle language: `reaches` on the build-only graph finds no
+    cycle here."""
     doc = plan([
         entry("dev-libs/w745p-1", 0, deps={"BDEPEND": "dev-libs/w745q"}),
         entry("dev-libs/w745q-1", 1),
     ])
     assert failures(doc) == [("build-order", "dev-libs/w745p-1", "dev-libs/w745q")]
+    [finding] = hc.check_plan(doc)
+    assert "cycle" not in finding.reason and "#753" not in finding.reason
 
 
-def test_745_duplicate_free_mixed_cycle_still_fails():
-    """Backlog #745, guard (phase 2): the planner-side fix is load-bearing.
-    The duplicate-free `prov -> virt -> user` plan still reports the
-    `build-order` failure the second `user` build excuses."""
+def test_745_mixed_runtime_cycle_passes_with_single_rows():
+    """Backlog #749: the #745 shape is a runtime-closed cycle, not a
+    genuine build-time one — every build atom is satisfied at start, so
+    the duplicate-free `[prov, virt, user]` plan passes with no finding
+    (was: a `build-order` failure the second `user` build excused — the
+    excuse is gone because the strictness that needed it is)."""
     doc = plan([
         entry("dev-libs/w745prov-1", 0, deps={"RDEPEND": "dev-libs/w745user"}),
         entry("dev-libs/w745virt-1", 1, deps={"RDEPEND": "dev-libs/w745prov"}),
         entry("dev-libs/w745user-1", 2, deps={"BDEPEND": "dev-libs/w745virt"}),
     ])
-    assert failures(doc) == [("build-order", "dev-libs/w745user-1", "dev-libs/w745user")]
+    assert hc.check_plan(doc) == []
 
 
-def test_745_a_different_version_later_does_not_excuse_the_need():
-    """Backlog #745, guard: the excuse needs the identical cpv in the
-    identical slot. A later build of another version while the need stays
-    unmet is still a `build-order` failure."""
-    doc = plan([
-        entry("dev-libs/w693p-1", 0, deps={"BDEPEND": "dev-libs/dep"}),
-        entry("dev-libs/w693p-2", 1, deps={"BDEPEND": "dev-libs/dep"}, slot="1"),
+def test_use_conditional_build_cycle_fails():
+    """Backlog #749 (the owner's USE-conditional pair): with both flags on,
+    `pkgnew` builds with `otherpkg[useblah]` and `otherpkg` builds with
+    `pkgnew[use3]` — a genuine build cycle, so a `build-order` failure
+    with the cycle message and the #753 pointer. With both flags off the
+    conditionals vanish and the same plan is clean (folded in: no separate
+    absent-without-the-flags test)."""
+    deps_new = {"BDEPEND": "usefoo? ( dev-libs/w749otherpkg[useblah] )"}
+    deps_other = {"BDEPEND": "useboh? ( dev-libs/w749pkgnew[use3] )"}
+    on = plan([
+        entry("dev-libs/w749pkgnew-1", 0, deps=deps_new,
+              use=["usefoo", "use3"], iuse=["usefoo", "use3"]),
+        entry("dev-libs/w749otherpkg-1", 1, deps=deps_other,
+              use=["useboh", "useblah"], iuse=["useboh", "useblah"]),
     ])
-    assert failures(doc) == [("build-order", "dev-libs/w693p-1", "dev-libs/dep"),
-                             ("build-order", "dev-libs/w693p-2", "dev-libs/dep")]
+    [finding] = [f for f in hc.check_plan(on) if f.is_failure]
+    assert (finding.property, finding.package) == ("build-order", "dev-libs/w749pkgnew-1")
+    assert "build cycle" in finding.reason and "#753" in finding.reason
+    off = plan([
+        entry("dev-libs/w749pkgnew-1", 0, deps=deps_new),
+        entry("dev-libs/w749otherpkg-1", 1, deps=deps_other),
+    ])
+    assert hc.check_plan(off) == []
 
 
-def test_745_same_version_twice_in_one_slot_is_one_package():
-    """Backlog #745, charter 2a: a second build of the same version is not a
-    second package; two different versions in one slot still fail."""
+def test_identical_cpv_twice_in_one_slot_fails():
+    """Backlog #749: one row per slot — a second build of the identical
+    cpv in one slot is no longer producible, so it fails the slot check
+    (the S0 collapse probe pinned the before: no `slot` finding, excused
+    by the identical-cpv collapse)."""
     doc = plan([
         entry("dev-libs/w745b-1", 0, deps={"BDEPEND": "dev-libs/w745a"}),
         entry("dev-libs/w745a-1", 1, deps={"BDEPEND": "dev-libs/w745b"}),
         entry("dev-libs/w745b-1", 2, deps={"BDEPEND": "dev-libs/w745a"}),
     ])
-    assert [f for f in hc.check_plan(doc) if f.property == "slot"] == []
+    assert [(f.property, f.package, f.atom) for f in hc.check_plan(doc)
+            if f.property == "slot"] == [
+        ("slot", "dev-libs/w745b", "dev-libs/w745b:0")]
 
 
 def test_745_clean_acyclic_plan_stays_clean():

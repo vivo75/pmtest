@@ -573,9 +573,9 @@ def check_final_state(plan: Plan) -> list[Finding]:
         by_slot.setdefault((pkg.cp, pkg.slot), []).append(pkg.cpv)
     initial_cpvs = {p.cpv for p in plan.initial}
     for (cp, slot), cpvs in sorted(by_slot.items()):
-        # A second build of the same version is one package, not two
-        # (charter 2a); two different versions in one slot still fail.
-        if len(set(cpvs)) > 1:
+        # One row per slot (backlog #749): a second build of an identical
+        # cpv is no longer producible, so any repeat fails.
+        if len(cpvs) > 1:
             findings.append(Finding("slot", "/".join(cp), f"{'/'.join(cp)}:{slot}",
                                     "slot holds " + ", ".join(sorted(cpvs)),
                                     pre_existing=initial_cpvs.issuperset(cpvs)))
@@ -601,95 +601,60 @@ def _matching_merges(by_cp: dict, nodes: list, parent: Package) -> set[int]:
 
 
 def _build_graph(plan: Plan) -> dict[int, set[int]]:
-    """order -> orders of the merges that must be usable before it: those its
-    build-time atoms name (to build it) and those its RDEPEND names (for it
-    to be usable), unless an installed package meets the atom already. A
-    cycle in this graph cannot be serialized."""
+    """order -> orders of the merges its build-time atoms name (to build
+    it): the build-edge graph the cycle message arm reads. Runtime edges
+    are not in this graph, so a runtime back-edge can never turn a late
+    build need into a cycle (charter property 2: a build dependency must
+    be installed before the build; a runtime need holds by the end). An
+    atom already met by an installed package constrains nothing."""
     by_cp, initial = _merges_by_cp(plan), index(plan.initial)
     graph = {}
     for order, pkg in plan.merges:
-        nodes = [n for _, n in _build_atoms(pkg)] + _reduced(pkg, "RDEPEND")
+        nodes = [n for _, n in _build_atoms(pkg)]
         needs = [[("atom", a) for a in atoms] for atoms in _choices(nodes)
                  if not any(matches(a, p, pkg.use) for a in atoms for p in initial.get(a.cp, ()))]
         graph[order] = {o for n in needs for o in _matching_merges(by_cp, n, pkg)} - {order}
     return graph
 
 
-def _components(graph: dict[int, set[int]]) -> dict[int, int]:
-    """Strongly connected component id per node (Tarjan, iterative)."""
-    index, low, comp, stack, on_stack, counter = {}, {}, {}, [], set(), [0]
-    for root in graph:
-        if root in index:
-            continue
-        work = [(root, iter(sorted(graph[root])))]
-        index[root] = low[root] = counter[0]
-        counter[0] += 1
-        stack.append(root)
-        on_stack.add(root)
-        while work:
-            node, children = work[-1]
-            child = next(children, None)
-            if child is None:
-                work.pop()
-                if work:
-                    low[work[-1][0]] = min(low[work[-1][0]], low[node])
-                if low[node] == index[node]:
-                    while True:
-                        member = stack.pop()
-                        on_stack.discard(member)
-                        comp[member] = node
-                        if member == node:
-                            break
-            elif child not in index:
-                index[child] = low[child] = counter[0]
-                counter[0] += 1
-                stack.append(child)
-                on_stack.add(child)
-                work.append((child, iter(sorted(graph.get(child, ())))))
-            elif child in on_stack:
-                low[node] = min(low[node], index[child])
-    return comp
+def reaches(graph: dict[int, set[int]], start: int, goal: int) -> bool:
+    """Whether `goal` is reachable from `start` in `graph`."""
+    seen, todo = set(), [start]
+    while todo:
+        node = todo.pop()
+        if node == goal:
+            return True
+        if node not in seen:
+            seen.add(node)
+            todo += graph.get(node, ())
+    return False
 
 
-def _order_finding(plan: Plan, component, order: int, pkg: Package, node,
+def _order_finding(plan: Plan, order: int, pkg: Package, node,
                    what: str, owner: Package | None = None, later=None) -> Finding:
-    """A build-time need of `pkg` (merged at `order`) that is not met when it
-    starts: noted as a cycle when a later package of its cycle meets it.
-    `owner` is the package whose dependency `node` is (default: `pkg`);
-    `later` the merges that would meet it (default: those matching `node`)."""
+    """A build-time need of `pkg` (merged at `order`) that is not met when
+    it starts: always a `build-order` failure (charter property 2: a build
+    dependency must be installed before the build). When a later merge
+    that meets it reaches back to `order` through build edges, the need is
+    part of a genuine build cycle: no order satisfies it (breakable only
+    by a bootstrap variant with reduced USE). `owner` is the package whose
+    dependency `node` is (default: `pkg`); `later` the merges that would
+    meet it (default: those matching `node`)."""
     if later is None:
         later = sorted((o, p) for o, p in plan.merges if o > order
                        and o in _matching_merges(_merges_by_cp(plan), [node], owner or pkg))
-    if any(component.get(o) == component[order] for o, _ in later):
-        return Finding("cycle-noted", pkg.cpv, render(node),
-                       f"{what} is only met by a later package of the same cycle")
-    second = _second_build(plan, order, pkg, node, owner or pkg)
-    if second is not None:
-        return Finding("cycle-noted", pkg.cpv, render(node),
-                       f"{what} is met only after an identical rebuild of the same "
-                       f"package (#{second} > #{order})")
     if later:
+        graph = _build_graph(plan)
+        if any(reaches(graph, o, order) for o, _ in later):
+            return Finding("build-order", pkg.cpv, render(node),
+                           f"{what}: no order satisfies this build cycle "
+                           f"(breakable only by a bootstrap variant with reduced USE; "
+                           f"see backlog #753)")
         return Finding("build-order", pkg.cpv, render(node),
                        f"{what} is met only by {later[0][1].cpv}, merged later "
                        f"(#{later[0][0]} > #{order}): merge it first")
     return Finding("build-order", pkg.cpv, render(node),
                    f"{what} is not matched by anything installed or merged before it")
-
-
-def _second_build(plan: Plan, order: int, pkg: Package, node,
-                 owner: Package) -> int | None:
-    """Charter 2a: the order of a later merge of the identical cpv in the
-    identical slot that already meets `node`, or None. A package the plan
-    builds twice to break a cycle excuses the need its first build missed;
-    a later build of another version never does."""
-    # Matching against available_at excuses the order finding only: the
-    # second build changes no version in the final set, so property 1 stays
-    # with check_final_state either way.
-    for later, other in sorted(plan.merges, key=lambda m: m[0]):
-        if (later > order and other.cpv == pkg.cpv and other.slot == pkg.slot
-                and _satisfied(node, index(plan.available_at(later)), owner)):
-            return later
-    return None
 
 
 def _choices(nodes: list) -> list[list[Atom]]:
@@ -704,58 +669,6 @@ def _choices(nodes: list) -> list[list[Atom]]:
         else:
             out.append(_plain_atoms([node]))
     return out
-
-
-@dataclass
-class _Moment:
-    """The system when one merge starts, for the usability walk."""
-
-    available: Index
-    initial: Index
-    merged: set  # id() of the packages the plan merges
-    gaps: dict = field(default_factory=dict)  # id(package) -> its gap, or None
-
-    def providers(self, atoms: list[Atom], parent: Package) -> list[Package]:
-        return [p for a in atoms for p in self.available.get(a.cp, ()) if matches(a, p, parent.use)]
-
-    def gap(self, pkg: Package) -> tuple[Package, tuple] | None:
-        """Why `pkg` is not usable now (PMS 8.1): the first package in its
-        RDEPEND closure with an RDEPEND atom the plan left unmet, and that
-        atom. An atom an installed package already missed before the plan
-        does not count; a runtime cycle counts as usable. A need met only by
-        a merge the plan orders later (a late rebuild for a sub-slot pin, a
-        compat package, a soname change the checker cannot see) is still
-        reported: that ordering reason is outside the plan, so the finding
-        is a checker limitation, not a plan defect (backlog #737)."""
-        if id(pkg) in self.gaps:
-            return self.gaps[id(pkg)]
-        self.gaps[id(pkg)] = None  # a cycle back here counts as usable
-        found = None
-        for node in _reduced(pkg, "RDEPEND"):
-            if not _satisfied(node, self.available, pkg):
-                if id(pkg) in self.merged or _satisfied(node, self.initial, pkg):
-                    found = (pkg, node)
-                    break
-                continue
-            for atoms in _choices([node]):
-                sub = [self.gap(p) for p in self.providers(atoms, pkg)]
-                if sub and all(sub):
-                    found = sub[0]
-                    break
-            if found:
-                break
-        self.gaps[id(pkg)] = found
-        return found
-
-
-def _unusable(node, moment: _Moment, pkg: Package) -> tuple[Package, tuple] | None:
-    """When no package meeting build-time `node` of `pkg` is usable: the
-    first gap found."""
-    for atoms in _choices([node]):
-        gaps = [moment.gap(p) for p in moment.providers(atoms, pkg)]
-        if gaps and all(gaps):
-            return gaps[0]
-    return None
 
 
 def _build_blockers(pkg: Package, available: Index, plan: Plan, order: int) -> list[Finding]:
@@ -779,31 +692,20 @@ def _build_blockers(pkg: Package, available: Index, plan: Plan, order: int) -> l
 
 
 def check_order(plan: Plan) -> list[Finding]:
-    """Property 2: build-time atoms are matched, by usable packages, when
-    each merge starts."""
-    component = _components(_build_graph(plan))
-    merged = {id(p) for _, p in plan.merges}
-    initial = index(plan.initial)
+    """Property 2: a build-time atom must be satisfied (installed or
+    available) when its merge starts; its runtime dependencies need only
+    be present by the end (checked against the final set). If a build
+    *executes* a build tool whose runtime dependency is absent, the
+    literal checker misses it — that is the owner's trade (backlog #749),
+    recorded, not a reason to keep depth 1."""
     findings = []
     for order, pkg in plan.merges:
         available = index(plan.available_at(order))
-        moment = _Moment(available, initial, merged)
         if not pkg.binary:
             findings += _build_blockers(pkg, available, plan, order)
         for dep_class, node in _build_atoms(pkg):
             if not _satisfied(node, available, pkg):
-                findings.append(_order_finding(plan, component, order, pkg, node, dep_class))
-                continue
-            hit = _unusable(node, moment, pkg)
-            if hit:
-                provider, unmet = hit
-                # An installed copy the plan rebuilds later is fixed by that rebuild.
-                rebuild = [(o, p) for o, p in plan.merges if o > order and any(
-                    r is provider and ro == o for ro, r in plan.replaced)]
-                findings.append(_order_finding(
-                    plan, component, order, pkg, unmet,
-                    f"{dep_class} {render(node)} is not usable yet: RDEPEND of {provider.cpv}",
-                    provider, rebuild or None))
+                findings.append(_order_finding(plan, order, pkg, node, dep_class))
     return findings
 
 

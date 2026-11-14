@@ -292,7 +292,7 @@ def add_build_cycle(doc, plan):
                     e = entry_for(d, a)
                     e["dependencies"]["DEPEND"] = f"{e['dependencies'].get('DEPEND', '')} {b.category}/{b.package}"
                 yield f"{a.cpv} now DEPENDs on {b.category}/{b.package} (which DEPENDs on it)", \
-                    mutant(doc, change), {"cycle-noted"}
+                    mutant(doc, change), ORDER
                 break
 
 
@@ -321,32 +321,6 @@ def add_late_build_dep(doc, plan):
             yield f"{a.cpv} now BDEPENDs on {b.category}/{b.package}, merged later", mutant(doc, change), ORDER
 
 
-def late_runtime_of_build_dep(doc, plan):
-    """Move a new package that a build dependency needs at run time after the
-    package that builds against it: the build dependency is there but not
-    usable (PMS 8.1: DEPEND must be installed and usable). The moved package
-    is not a direct build dependency of anything, so only the indirect check
-    can see it."""
-    by_cp = {m.cp: (o, m) for o, m in plan.merges}
-    direct = {a.cp for _, m in plan.merges if not m.binary
-              for _, node in hc._build_atoms(m) for a in hc._plain_atoms([node])}
-    for ox, x in plan.merges:
-        for _, atom in required_atoms(x, hc.BUILD_CLASSES) if not x.binary else ():
-            y = by_cp.get(atom.cp)
-            if not y or y[0] >= ox or not hc.matches(atom, y[1], x.use):
-                continue
-            for _, ratom in required_atoms(y[1], ("RDEPEND",)):
-                z = by_cp.get(ratom.cp)
-                if (z and z[0] < ox and outcome(doc, z[1]) == "new" and sole_provider(plan, ratom.cp)
-                        and ratom.cp not in direct):
-                    def change(d, z=z[1]):
-                        entry_for(d, z)["merge_order"] = len(d["entries"]) + 1
-                        renumber(d)
-                    yield f"move {z[1].cpv} (RDEPEND of build dep {y[1].cpv}) after {x.cpv}", \
-                        mutant(doc, change), ORDER
-                    break
-
-
 def lower_version(doc, plan):
     """Merge a version below what a dependant's `>=` atom asks."""
     for _, m in plan.merges:
@@ -357,44 +331,6 @@ def lower_version(doc, plan):
                 yield (f"merge {m.category}/{m.package}-0_alpha, below {atom.text[:60]} of {p.cpv}",
                        mutant(doc, lambda d, m=m: entry_for(d, m).update(version="0_alpha")), RUNTIME)
                 break
-
-
-def stale_build_dep(doc, plan):
-    """Rebuild a slot-operator consumer only after a package that builds
-    against it: that build sees the old copy, bound to a sub-slot gone."""
-    for oy, y in plan.merges:
-        if not entry_for(doc, y).get("slot_operator_rebuild"):
-            continue
-        for ox, x in plan.merges:
-            if ox > oy and not x.binary and any(
-                    hc.matches(a, y, x.use) for _, a in required_atoms(x, hc.BUILD_CLASSES)):
-                def change(d, y=y):
-                    entry_for(d, y)["merge_order"] = len(d["entries"]) + 1
-                    renumber(d)
-                yield f"rebuild {y.cpv} after {x.cpv}, which builds against it", mutant(doc, change), ORDER
-                break
-
-
-def drop_second_build(doc, plan):
-    """Drop the second build of an identical cpv in one slot: the need the
-    first build missed, excused by the rebuild (charter 2a), is unmet again.
-    Offered only where the base plan notes the excuse, so a harmless extra
-    build is not counted as a blind spot."""
-    base = [f for f in hc.check_document(doc, VDB) if f.property == "cycle-noted"]
-    first: dict = {}
-    for order, m in sorted(plan.merges, key=lambda t: t[0]):
-        key = (m.cpv, m.slot)
-        if key in first:
-            if any(f.package == m.cpv and f"#{order}" in f.reason for f in base):
-                def change(d, key=key, order=order):
-                    d["entries"] = [x for x in d["entries"] if not (
-                        cpv_of(x) == key[0] and x.get("slot", "0") == key[1]
-                        and x["merge_order"] == order)]
-                    renumber(d)
-                yield (f"drop the second build of {m.cpv} (first at #{first[key]})",
-                       mutant(doc, change), ORDER)
-        else:
-            first[key] = order
 
 
 def keep_what_build_blocks(doc, plan):
@@ -420,31 +356,6 @@ def drop_sub_slot(doc, plan):
                 yield (f"merge {m.cpv} without a sub-slot ({atom.text} of {p.cpv})",
                        mutant(doc, lambda d, m=m: entry_for(d, m).update(sub_slot=None)), RUNTIME)
                 break
-
-
-def two_level_runtime_of_build_dep(doc, plan):
-    """Like late_runtime_of_build_dep, one level deeper: x builds with y, y
-    needs z at run time, z needs w; w moves after x."""
-    by_cp = {m.cp: (o, m) for o, m in plan.merges}
-    near = {a.cp for _, m in plan.merges if not m.binary for _, node in hc._build_atoms(m)
-            for a in hc._plain_atoms([node])}
-    near |= {a.cp for cp in list(near) if cp in by_cp
-             for _, a in required_atoms(by_cp[cp][1], ("RDEPEND",))}
-    for ox, x in plan.merges:
-        for _, atom in required_atoms(x, hc.BUILD_CLASSES) if not x.binary else ():
-            y = by_cp.get(atom.cp)
-            for _, a2 in required_atoms(y[1], ("RDEPEND",)) if y and y[0] < ox else ():
-                z = by_cp.get(a2.cp)
-                for _, a3 in required_atoms(z[1], ("RDEPEND",)) if z and z[0] < ox else ():
-                    w = by_cp.get(a3.cp)
-                    if (w and w[0] < ox and a3.cp not in near and outcome(doc, w[1]) == "new"
-                            and sole_provider(plan, a3.cp)):
-                        def change(d, w=w[1]):
-                            entry_for(d, w)["merge_order"] = len(d["entries"]) + 1
-                            renumber(d)
-                        yield (f"move {w[1].cpv} (RDEPEND of {z[1].cpv}, RDEPEND of build dep "
-                               f"{y[1].cpv}) after {x.cpv}", mutant(doc, change), ORDER)
-                        return
 
 
 def _versions(plan, older: bool):
@@ -515,10 +426,9 @@ OPERATORS = [drop_needed_merge, drop_needed_upgrade, swap_build_edge, break_requ
              second_in_slot, merge_what_kept_blocks, keep_what_merge_blocks, delete_needed_kept,
              drop_slot_rebuild, bump_sub_slot, break_use_dep, wrong_slot,
              enable_missing_conditional, drop_any_of_provider, add_build_cycle,
-             add_late_build_dep, late_runtime_of_build_dep, lower_version, stale_build_dep,
-             keep_what_build_blocks, drop_sub_slot, two_level_runtime_of_build_dep,
-             older_visible_version, older_visible_binary, masked_newer_version, harmless_move,
-             drop_second_build]
+             add_late_build_dep, lower_version,
+             keep_what_build_blocks, drop_sub_slot,
+             older_visible_version, older_visible_binary, masked_newer_version, harmless_move]
 
 
 # --- removal operators (property 4): each yields like the plan operators --------
