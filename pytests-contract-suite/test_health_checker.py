@@ -412,6 +412,18 @@ def test_745_without_the_second_build_the_unmet_need_still_fails():
     assert failures(doc) == [("build-order", "dev-libs/w745p-1", "dev-libs/w745q")]
 
 
+def test_745_duplicate_free_mixed_cycle_still_fails():
+    """Backlog #745, guard (phase 2): the planner-side fix is load-bearing.
+    The duplicate-free `prov -> virt -> user` plan still reports the
+    `build-order` failure the second `user` build excuses."""
+    doc = plan([
+        entry("dev-libs/w745prov-1", 0, deps={"RDEPEND": "dev-libs/w745user"}),
+        entry("dev-libs/w745virt-1", 1, deps={"RDEPEND": "dev-libs/w745prov"}),
+        entry("dev-libs/w745user-1", 2, deps={"BDEPEND": "dev-libs/w745virt"}),
+    ])
+    assert failures(doc) == [("build-order", "dev-libs/w745user-1", "dev-libs/w745user")]
+
+
 def test_745_a_different_version_later_does_not_excuse_the_need():
     """Backlog #745, guard: the excuse needs the identical cpv in the
     identical slot. A later build of another version while the need stays
