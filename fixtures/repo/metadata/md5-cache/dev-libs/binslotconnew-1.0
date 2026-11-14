@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (#752): RDEPEND pins dev-libs/binslottarget to >=2.0; ships a pool binary so the surviving conflict's 2.0 instance has a binary parent
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/binslottarget-2.0
+SLOT=0
+_md5_=dbb5df2e4378422c6d9ba80c93de151b

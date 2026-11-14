@@ -1,0 +1,5 @@
+EAPI=8
+DESCRIPTION=fixture package (#752): slot 0, older version; pulled by binslotconold (<2.0) against binslotconnew's 2.0
+KEYWORDS=amd64
+SLOT=0
+_md5_=55625e9543ba79c3914da3f9f7cf3299

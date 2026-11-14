@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (#752): RDEPEND wants dev-libs/binslottarget <2.0; ebuild-only, so the 1.0 instance keeps an ebuild parent as the mixed-block control
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=<dev-libs/binslottarget-2.0
+SLOT=0
+_md5_=7c0173672d8958f579c6622d51704c50

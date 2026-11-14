@@ -2325,6 +2325,7 @@ CASES = [
     ("multi-atom: unsolvable slot conflict between two targets is reported (#62: rc 1 like Portage)", ["--pretend", "dev-libs/slotconflictnewpin", "dev-libs/slotconflictoldpin"], 1),
     ("slot conflict: two versioned atoms name their (Argument) parents, no bare 'pulled in by' (#738)", ["--pretend", "=dev-libs/slotconflicttarget-1.0", "=dev-libs/slotconflicttarget-2.0"], 1),
     ("slot conflict: a binary instance reads 'binary scheduled for merge' like its merge row (#738)", ["--pretend", "--usepkg", "=dev-libs/binpkgrmpkg-1.0", "=dev-libs/binpkgrmpkg-2.0"], 1),
+    ("slot conflict: a binary parent reads 'binary scheduled for merge' like its merge row, ebuild parent stays ebuild (#752)", ["--pretend", "--usepkg", "dev-libs/binslotgroup"], 1),
     ("multi-atom: all requested atoms already installed", ["--pretend", "dev-libs/samepkg", "dev-libs/samepkg"], 0),
     ("multi-atom: a nonexistent atom aborts the whole run, first-bad-wins", ["--pretend", "dev-libs/does-not-exist", "dev-libs/newpkg"], 1),
     ("multi-atom: a later nonexistent atom still aborts the whole run", ["--pretend", "dev-libs/newpkg", "dev-libs/does-not-exist"], 1),
@@ -17276,6 +17277,53 @@ def test_slot_conflict_binary_instance_reads_binary_scheduled_for_merge(
         "  (dev-libs/binpkgrmpkg-1.0:0/0::testrepo, ebuild scheduled for merge) "
         'USE="" ELIBC="glibc" pulled in by\n'
         "    =dev-libs/binpkgrmpkg-1.0 (Argument)\n"
+    ) in rust.stdout
+
+
+def test_slot_conflict_binary_parent_reads_binary_scheduled_for_merge(
+    emerge_binary, fixture_env
+):
+    """Backlog #752, message defect: a conflict parent that merges from a
+    binary must read `binary scheduled for merge` like its merge-list row
+    (charter property 5). Portage's `str(Package)` distinguishes the same
+    way (`_emerge/resolver/slot_collision.py`,
+    `_prepare_conflict_msg_and_check_for_specificity`) -- cited as a
+    hint, never the oracle; the S0 capture (plan 03.752 section 2,
+    kept beside the portuale tree under
+    docs/evidence/2026-11-14-752/) is the oracle. Under
+    `--usepkg`, `dev-libs/binslotgroup` pulls `binslotconnew` (pool
+    binary, `>=binslottarget-2.0`) and `binslotconold` (ebuild-only,
+    `<binslottarget-2.0`) into a surviving `binslottarget:0` conflict.
+    The block must be mixed: the pool-backed consumer reads binary while
+    the source-resolved consumer on the same block still reads ebuild --
+    so a renderer that prints binary (or ebuild) for every parent fails.
+    """
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--usepkg", "dev-libs/binslotgroup"],
+        fixture_env,
+    )
+    assert rust.returncode == 1, rust.stdout
+    assert _SLOT_COLLISION_PREAMBLE in rust.stdout
+    rows = [ln for ln in rust.stdout.splitlines() if ln.startswith(("[ebuild", "[binary"))]
+    assert rows == [
+        f'[ebuild  N     ] dev-libs/binslottarget-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/binslottarget-2.0 to {fixture_env["ROOT"]}',
+        f'[binary  N     ] dev-libs/binslotconnew-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/binslotconold-1.0 to {fixture_env["ROOT"]}',
+        f'[ebuild  N     ] dev-libs/binslotgroup-1.0 to {fixture_env["ROOT"]}',
+    ], rust.stdout
+    assert (
+        "  (dev-libs/binslottarget-2.0:0/0::testrepo, ebuild scheduled for merge) "
+        'USE="" ELIBC="glibc" pulled in by\n'
+        "    >=dev-libs/binslottarget-2.0 required by (dev-libs/binslotconnew-1.0:0/0::testrepo, binary scheduled for merge) "
+        'USE="" ELIBC="glibc"\n'
+    ) in rust.stdout
+    assert (
+        "  (dev-libs/binslottarget-1.0:0/0::testrepo, ebuild scheduled for merge) "
+        'USE="" ELIBC="glibc" pulled in by\n'
+        "    <dev-libs/binslottarget-2.0 required by (dev-libs/binslotconold-1.0:0/0::testrepo, ebuild scheduled for merge) "
+        'USE="" ELIBC="glibc"\n'
     ) in rust.stdout
 
 

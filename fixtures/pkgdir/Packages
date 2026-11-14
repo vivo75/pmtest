@@ -168,3 +168,19 @@ REPO: testrepo
 SIZE: 10240
 SLOT: 0
 USE:
+
+BUILD_TIME: 1792580999
+CPV: dev-libs/binslotconnew-1.0
+DEFINED_PHASES: -
+DESCRIPTION: fixture package (#752): RDEPEND pins dev-libs/binslottarget to >=2.0; ships a pool binary so the surviving conflict's 2.0 instance has a binary parent
+EAPI: 8
+IUSE:
+KEYWORDS: amd64
+MD5: 555436358577ce68e232142817a08025
+PATH: dev-libs/binslotconnew-1.0.tbz2
+RDEPEND: >=dev-libs/binslottarget-2.0
+REPO: testrepo
+SHA1: a39ce31ee182ddce1756862f16a593c62c46b222
+SIZE: 888
+SLOT: 0
+USE:

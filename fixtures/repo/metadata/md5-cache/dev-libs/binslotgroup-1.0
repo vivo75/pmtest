@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package (#752): pulls binslotconnew plus binslotconold -- a surviving slot conflict on binslottarget:0 whose 2.0 instance has a binary parent
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/binslotconnew dev-libs/binslotconold
+SLOT=0
+_md5_=ea1335c1cbc52833ec7e1f3c8de5ec5e
