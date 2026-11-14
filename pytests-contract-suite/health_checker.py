@@ -697,7 +697,12 @@ def check_order(plan: Plan) -> list[Finding]:
     be present by the end (checked against the final set). If a build
     *executes* a build tool whose runtime dependency is absent, the
     literal checker misses it — that is the owner's trade (backlog #749),
-    recorded, not a reason to keep depth 1."""
+    recorded, not a reason to keep depth 1. Measured cost on the
+    2026-11-14 health bed: the deletion removed 406 findings, 0 added —
+    179 depth-1 (a build dep's direct RDEPEND unmet at build start, mostly
+    the `perl:0/5.42=` -> 5.44 binding transition and the pango/freetype
+    consumers) and 227 depth-2+; the same packages' end-state breakage is
+    still caught by the `runtime-deps` findings, which are unchanged."""
     findings = []
     for order, pkg in plan.merges:
         available = index(plan.available_at(order))
