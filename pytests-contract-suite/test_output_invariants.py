@@ -283,6 +283,36 @@ def test_checker_flags_a_duplicate_slot_without_a_conflict():
         _entry("root", 2, requested=True))["entries"], slot_conflicts=conflict))
 
 
+def _boot_entry(pkg, order, required_by=()):
+    e = _entry(pkg, order, required_by)
+    e["bootstrap"] = True
+    e["reduced_use"] = ["-useboh"]
+    return e
+
+
+def test_checker_accepts_the_marked_bootstrap_pair():
+    # Backlog #753: the boot row plus its definitive rebuild share the
+    # slot by construction — the marker distinguishes the rows, so the
+    # duplicate-slot check stays quiet (the health checker validates the
+    # pair itself).
+    doc = _doc(_boot_entry("otherpkg", 0, ("pkgnew",)),
+               _entry("pkgnew", 1, ("otherpkg",), requested=True),
+               _entry("otherpkg", 2, ("pkgnew",)))
+    assert not inv.check_json(doc)
+
+
+def test_checker_flags_an_orphan_boot_row_and_two_marked_rows():
+    # A marked row that is last, or two marked rows for one slot, is not
+    # the pair — still a duplicate.
+    doc = _doc(_entry("otherpkg", 0, ("pkgnew",), requested=True),
+               _boot_entry("otherpkg", 1, ("pkgnew",)))
+    assert any("appears 2 times" in p for p in inv.check_json(doc))
+    doc = _doc(_boot_entry("otherpkg", 0, ("pkgnew",)),
+               _entry("pkgnew", 1, ("otherpkg",), requested=True),
+               _boot_entry("otherpkg", 2, ("pkgnew",)))
+    assert any("appears 2 times" in p for p in inv.check_json(doc))
+
+
 def test_checker_flags_a_dependency_merged_after_its_owner():
     doc = _doc(_entry("root", 0, requested=True), _entry("leaf", 1, ("root",)))
     assert any("merges after its owner" in p for p in inv.check_json(doc))

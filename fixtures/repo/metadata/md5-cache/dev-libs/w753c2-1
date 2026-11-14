@@ -1,0 +1,8 @@
+BDEPEND=usec2? ( dev-libs/w753c3 )
+DESCRIPTION=fixture package: bootstrap long-loop c2
+EAPI=8
+IUSE=+usec2
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=67e02986fa261b74bdcbf86836a503a2

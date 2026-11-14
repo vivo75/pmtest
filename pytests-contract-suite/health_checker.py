@@ -237,6 +237,11 @@ class Package:
     required_use: str = ""
     binary: bool = False
     known: bool = True  # False when nothing beyond name and slot could be read
+    # Charter 2a bootstrap (backlog #753): a reduced-USE first build carries
+    # `bootstrap` plus the minus-spelled removed flags (`reduced_use`);
+    # the final row of the slot carries neither.
+    bootstrap: bool = False
+    reduced_use: frozenset = frozenset()
 
     @property
     def cp(self) -> tuple[str, str]:
@@ -490,12 +495,15 @@ def _package(category, package, version, slot, data: dict | None, binary=False) 
     known = data is not None and "dependencies" in data
     data = data or {}
     main, sub = _split_slot(data.get("slot") or slot or "")
+    reduced = frozenset(f[1:] if f.startswith("-") else f
+                        for f in data.get("reduced_use", ()))
     return Package(
         category=category, package=package, version=version, slot=main,
         subslot=data.get("sub_slot") or sub,
         use=frozenset(data.get("use", ())), iuse=frozenset(data.get("iuse", ())),
         dependencies=dict(data.get("dependencies", {})),
-        required_use=data.get("required_use", ""), binary=binary, known=known)
+        required_use=data.get("required_use", ""), binary=binary, known=known,
+        bootstrap=bool(data.get("bootstrap", False)), reduced_use=reduced)
 
 
 @dataclass
@@ -544,6 +552,37 @@ def load_plan(doc: dict, vdb: Path | None = None) -> Plan:
 
 # --- the checks --------------------------------------------------------------
 
+def _bootstrap_pair_violation(rows: list) -> str | None:
+    """None when `rows` — the merge rows of one slot, in merge order — are
+    the charter 2a bootstrap pair (backlog #753): exactly one marked boot
+    row that is not last, with a non-empty USE delta, followed by the
+    declared rebuild the survivor invariant names (same version, full USE
+    with the reduced flags restored, same sub-slot bindings). Otherwise
+    the `slot` failure's reason: an orphan boot row is a failure, never an
+    excuse, and an unmarked duplicate still fails as #749's `slot`."""
+    marked = [(o, p) for o, p in rows if p.bootstrap]
+    cpvs = sorted(p.cpv for _, p in rows)
+    if not marked:
+        return "slot holds " + ", ".join(cpvs)
+    if len(marked) > 1:
+        return "slot holds two bootstrap builds: " + ", ".join(cpvs)
+    if len(rows) != 2 or marked[0] != rows[0]:
+        # An orphan boot (marked last) is reported by the last-of-slot
+        # loop below, not here, so this is boot plus extra finals.
+        return "slot holds " + ", ".join(cpvs)
+    (_, boot), (_, final) = rows
+    if not boot.reduced_use:
+        return f"bootstrap build {boot.cpv} names no reduced USE"
+    if (final.bootstrap or final.version != boot.version
+            or final.subslot != boot.subslot
+            or not (boot.reduced_use <= final.use)
+            or boot.reduced_use & boot.use
+            or final.use != boot.use | boot.reduced_use):
+        return (f"bootstrap pair for {boot.cpv}: the final build is not the "
+                "declared build")
+    return None
+
+
 def check_final_state(plan: Plan) -> list[Finding]:
     """Property 1 on the set the plan leaves installed."""
     final, initial = index(plan.final), index(plan.initial)
@@ -572,13 +611,38 @@ def check_final_state(plan: Plan) -> list[Finding]:
     for pkg in plan.final:
         by_slot.setdefault((pkg.cp, pkg.slot), []).append(pkg.cpv)
     initial_cpvs = {p.cpv for p in plan.initial}
+    flagged_slots: set = set()
     for (cp, slot), cpvs in sorted(by_slot.items()):
         # One row per slot (backlog #749): a second build of an identical
-        # cpv is no longer producible, so any repeat fails.
+        # cpv is no longer producible, so any repeat fails — except the
+        # charter 2a bootstrap pair (backlog #753), validated in full.
         if len(cpvs) > 1:
+            rows = sorted(((o, p) for o, p in plan.merges if (p.cp, p.slot) == (cp, slot)),
+                          key=lambda t: t[0])
+            kept_here = [p for p in plan.kept if (p.cp, p.slot) == (cp, slot)]
+            # A marked last row is the orphan loop's below, never this one's.
+            if kept_here or (rows and rows[-1][1].bootstrap):
+                violation = "slot holds " + ", ".join(sorted(cpvs)) if kept_here else None
+            else:
+                violation = _bootstrap_pair_violation(rows)
+            if violation is not None:
+                findings.append(Finding("slot", "/".join(cp), f"{'/'.join(cp)}:{slot}",
+                                        violation,
+                                        pre_existing=initial_cpvs.issuperset(cpvs)))
+                flagged_slots.add((cp, slot))
+    # A marked boot row that is last for its slot is a failure naming the
+    # slot and the missing rebuild: after the survivor the bootstrap
+    # artifacts are gone, so nothing "excuses" an orphan boot.
+    last_of_slot: dict = {}
+    for o, p in plan.merges:
+        if (p.cp, p.slot) not in last_of_slot or o > last_of_slot[(p.cp, p.slot)][0]:
+            last_of_slot[(p.cp, p.slot)] = (o, p)
+    for (cp, slot), (_, pkg) in sorted(last_of_slot.items()):
+        if pkg.bootstrap and (cp, slot) not in flagged_slots:
             findings.append(Finding("slot", "/".join(cp), f"{'/'.join(cp)}:{slot}",
-                                    "slot holds " + ", ".join(sorted(cpvs)),
-                                    pre_existing=initial_cpvs.issuperset(cpvs)))
+                                    f"bootstrap build {pkg.cpv} has no declared rebuild "
+                                    "with the full USE",
+                                    pre_existing=False))
     return findings
 
 

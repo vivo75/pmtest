@@ -1,0 +1,9 @@
+BDEPEND=user? ( dev-libs/w753r2[use2] ) dev-libs/w753r3
+DESCRIPTION=fixture package: bootstrap refusal r1 (conditional BDEPEND on r2, soft path via r3)
+EAPI=8
+IUSE=+user +use2
+KEYWORDS=amd64
+RDEPEND=dev-libs/w753r3
+SLOT=0
+DEFINED_PHASES=-
+_md5_=faf5fa3f97d93d69375c0a8f21cd68d8

@@ -1,0 +1,8 @@
+BDEPEND=useboh? ( dev-libs/w753pkgnew[use3] )
+DESCRIPTION=fixture package: bootstrap cycle other side (USE-conditional BDEPEND on w753pkgnew)
+EAPI=8
+IUSE=+useboh +useblah
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=0dec32f9850b88057398619e0ab35d6f

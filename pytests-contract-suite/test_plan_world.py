@@ -21,7 +21,7 @@ def test_plan_world_update_says_on_stderr_what_it_did_not_check(mrg_binary, fixt
     run = _plan(mrg_binary, fixture_env, "--sort", "depend")
     assert run.returncode == 0, run.stderr
     assert run.stderr == (
-        "plan-world: 4 to install, order depend\n"
+        "plan-world: 4 to install (4 builds including 0 bootstrap), order depend\n"
         "not checked: blockers, REQUIRED_USE, slot conflicts, USE rebuilds; "
         "run 'mrg -puDN @world' for the full plan\n"
     )
@@ -56,7 +56,7 @@ def test_plan_world_emptytree_lists_every_reached_slot_and_names_its_full_plan(m
     assert "[ebuild     U  ] dev-libs/upgradepkg-2.0:0 [1.0]" in rows
     assert all(r.startswith("[ebuild") for r in rows)
     assert run.stderr == (
-        f"plan-world: {len(rows)} to install, order depend\n"
+        f"plan-world: {len(rows)} to install ({len(rows)} builds including 0 bootstrap), order depend\n"
         "not checked: blockers, REQUIRED_USE, slot conflicts; "
         "run 'mrg -pe @world' for the full plan\n"
     )

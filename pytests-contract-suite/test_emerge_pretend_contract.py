@@ -688,14 +688,14 @@ CASES = [
         1,
     ),
     (
-        "circular dep: USE-flag suggestion (_find_suggestions)",
+        "#753: the single-flag USE-gated build cycle bootstraps instead of suggesting (was: circular dep USE-flag suggestion (_find_suggestions); charter 2a, rc 0)",
         ["--pretend", "dev-libs/usecyclea"],
-        1,
+        0,
     ),
     (
-        "circular dep: USE-flag suggestion, --color y",
+        "#753: the same bootstrap in colour (was: circular dep USE-flag suggestion, --color y; charter 2a, rc 0)",
         ["--pretend", "--color", "y", "dev-libs/usecyclea"],
-        1,
+        0,
     ),
     (
         "invalid: conditional USE-dep on a flag outside the owner's own IUSE masks the package",
@@ -703,9 +703,9 @@ CASES = [
         1,
     ),
     (
-        "circular dep: grandparent cycle in --tree still exits 1 (#154: the nomerge ancestor row gains USE, the error is unchanged)",
+        "#753: the grandparent USE-gated cycle bootstraps under --tree, the boot row a real node (was: grandparent cycle in --tree exits 1 (#154); charter 2a, rc 0)",
         ["--pretend", "--tree", "dev-libs/gpcyclec"],
-        1,
+        0,
     ),
     (
         "tree: backtrack-abandoned parents display under the earliest-resolved puller (#155: [nomerge] mgfa/mgxa, not mgfb/mgxb)",
@@ -733,9 +733,9 @@ CASES = [
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0z-1 fails like Portage (rc 1; suggestions -foo/+bar match the oracle solutions; playground oracle, live text differs: #181)",
+        "#753: pg0 =cyc0z-1 bootstraps on its single outer guard (was: fails like Portage, rc 1 with -foo/+bar suggestions; the nested !bar? arm needs no second flag; charter 2a, rc 0; #181 oracle kept for the still-failing z-2/z-3 cells)",
         ["--pretend", "=dev-libs/cyc0z-1"],
-        1,
+        0,
     ),
     (
         "circular: upstream test_circular_dependencies pg0 =cyc0z-2 fails like Portage (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
@@ -763,9 +763,9 @@ CASES = [
         1,
     ),
     (
-        "circular: upstream test_circular_dependencies pg0 =cyc0b-1 fails like Portage (rc 1; suggestion +bar -foo matches the oracle solution; playground oracle, live text differs: #181)",
+        "#753: pg0 =cyc0b-1 bootstraps on its single outer guard (was: fails like Portage, rc 1 with +bar -foo suggestion; charter 2a, rc 0; #181 oracle kept for the still-failing b-2 cell)",
         ["--pretend", "=dev-libs/cyc0b-1"],
-        1,
+        0,
     ),
     (
         "circular: upstream test_circular_dependencies pg0 =cyc0b-2 fails like Portage (rc 1; no suggestion, oracle solutions are empty; playground oracle, live text differs: #181)",
@@ -3110,21 +3110,21 @@ CASES = [
     ("#506: a cycle edge pulled in while a flag is off names it as USE=-flag (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddnega"], 1),
     ("#506: a cycle edge that is also unconditional names no USE flag (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-libs/cddunra"], 1),
     ("#506: a cycle edge only two flags together drop names both (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddseva"], 1),
-    ("#506: a test? cycle edge points at FEATURES=test via package.env (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-libs/cddtsta"], 1),
-    ("#506: a test? cycle edge in colour (Portage 3.0.83-r1, rc 1)", ["--pretend", "--color", "y", "dev-libs/cddtsta"], 1),
+    ("#753: a test? cycle edge bootstraps with the test flag off first (was: #506 points at FEATURES=test via package.env, rc 1; charter 2a, rc 0)", ["--pretend", "dev-libs/cddtsta"], 0),
+    ("#753: the same test? bootstrap in colour (was: #506 in colour, rc 1; charter 2a, rc 0)", ["--pretend", "--color", "y", "dev-libs/cddtsta"], 0),
     ("#506: a test? and doc? cycle edge still points at FEATURES=test (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddtdoa"], 1),
     ("#506: an unkeyworded || bootstrap is listed as a masked alternative of the self cycle (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgo"], 1),
     ("#506: the masked alternative matches a [flag?] self atom unevaluated (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgou"], 1),
     ("#506: a -amd64 bootstrap reads as a missing keyword and is listed (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgok"], 1),
     ("#506: a package.mask'd bootstrap is listed as a masked alternative (Portage 3.0.83-r1, rc 1)", ["--pretend", "dev-lang/cddgop"], 1),
     ("#506: the USE-change search gives up past PORTAGE_CIRCULAR_MAX_USE_FLAGS=10 (Portage 3.0.83-r1, rc 1)", ["--pretend", "--autounmask-use=n", "dev-libs/cddtrna"], 1),
-    ("#507: --circular-deps-report=json prints the cycle and its USE solution as JSON (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-libs/usecyclea"], 1),
-    ("#507: the json report names a FEATURES=test parent (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-libs/cddtsta"], 1),
+    ("#753: --circular-deps-report=json is inert over a bootstrapped cycle (was: #507 prints the cycle and its USE solution as JSON, rc 1; charter 2a, rc 0)", ["--pretend", "--circular-deps-report=json", "dev-libs/usecyclea"], 0),
+    ("#753: the same inert report over the test? bootstrap (was: #507 names a FEATURES=test parent, rc 1; charter 2a, rc 0)", ["--pretend", "--circular-deps-report=json", "dev-libs/cddtsta"], 0),
     ("#507: the json report lists a masked bootstrap alternative of a self cycle (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-lang/cddgo"], 1),
     ("#507: the json report of a four-member ring lists all four rotations (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=json", "dev-libs/cyc4a"], 1),
-    ("#507: the json report under --tree (Portage 3.0.83-r1, rc 1)", ["--pretend", "--tree", "--circular-deps-report=json", "dev-libs/gpcyclec"], 1),
-    ("#507: --circular-deps-report json (space form) prints the json report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report", "json", "dev-libs/usecyclea"], 1),
-    ("#507: --circular-deps-report=text keeps the text report (Portage 3.0.83-r1, rc 1)", ["--pretend", "--circular-deps-report=text", "dev-libs/usecyclea"], 1),
+    ("#753: the same inert report under --tree over the grandparent bootstrap (was: #507, rc 1; charter 2a, rc 0)", ["--pretend", "--tree", "--circular-deps-report=json", "dev-libs/gpcyclec"], 0),
+    ("#753: the space form is likewise inert over the bootstrap (was: #507 prints the json report, rc 1; charter 2a, rc 0)", ["--pretend", "--circular-deps-report", "json", "dev-libs/usecyclea"], 0),
+    ("#753: the text report is likewise inert over the bootstrap (was: #507 keeps the text report, rc 1; charter 2a, rc 0)", ["--pretend", "--circular-deps-report=text", "dev-libs/usecyclea"], 0),
     ("#568/#569: the perl-heal skip block keeps the built subslot atom and drops non-selected || branches (Portage 3.0.83, rc 0)", ["--pretend", "dev-libs/p569pull"], 0),
     ("#573: a bare provider argument over the shared vdb resolves clean (the four-row installed-consumer block is pinned in test_skipped_update_block_names_every_installed_consumer, on its own ROOT)", ["--pretend", "dev-libs/p569prov"], 0),
     ("#571: a direct target in an unlisted category is masked (Portage 3.0.83, rc 1)", ["--pretend", "p571-hidden/p571-hidden"], 1),
@@ -3199,7 +3199,29 @@ CASES = [
     ("#613: abk0d with default options in the shared ROOT, where abk0b is not in world (A-3 plus the x USE change, Portage 3.0.83 rc 1, 0/20; the world-B shape needs its own ROOT: test_613_*)", ["--pretend", "dev-libs/abk0d"], 1),
     ("#613: the same with --backtrack=1 (Portage 3.0.83 rc 1, 0/1)", ["--pretend", "--backtrack=1", "dev-libs/abk0d"], 1),
     ("#727: a new package whose || group lists the new p569prov first, in the shared ROOT where p569prov is not installed (the withheld-provider shape needs its own ROOT: test_727_*)", ["--pretend", "dev-libs/p727top"], 0),
+    ("#753: the owner's USE-conditional build-time pair bootstraps to three rows (boot with USE=-useboh, the middle, the definitive rebuild; charter 2a, rc 0)", ["--pretend", "dev-libs/w753pkgnew", "dev-libs/w753otherpkg"], 0),
 ]
+
+
+def test_bootstrap_pair_pins_three_row_output(emerge_binary, fixture_env):
+    """Charter property 2a, the owner's #753 sequence: `pkgnew` builds with
+    `otherpkg[useblah]` under `usefoo`, `otherpkg` builds with
+    `pkgnew[use3]` under `useboh`, both flags on — so the cycle exists, and
+    it serializes to three rows: `USE="-useboh" otherpkg` (temporary), then
+    `pkgnew`, then `otherpkg` with the declared USE (definitive). The boot
+    row carries the `(bootstrap: … temporary …)` suffix (property 5: the
+    user is told); at most 3 rebuilds, the survivor equals a normal build.
+    No Portage comparison is claimed: Portage does not implement this."""
+    got = _run([str(emerge_binary)],
+               ["--pretend", "dev-libs/w753pkgnew", "dev-libs/w753otherpkg"],
+               dict(fixture_env))
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    root = fixture_env["ROOT"]
+    assert got.stdout.splitlines() == [
+        f"[ebuild  N     ] dev-libs/w753otherpkg-1 to {root} USE=\"useblah -useboh\"  (bootstrap: USE=\"-useboh\" temporary — will be rebuilt with the declared USE)",
+        f"[ebuild  N     ] dev-libs/w753pkgnew-1 to {root} USE=\"use3 usefoo\" ",
+        f"[ebuild  N     ] dev-libs/w753otherpkg-1 to {root} USE=\"useblah useboh\" ",
+    ]
 
 
 def _assert_abort_preamble(stdout: str) -> None:
@@ -4457,154 +4479,88 @@ def test_mixed_priority_cycle_prints_each_edge_portage_label(
     )
 
 
-def test_circular_dep_use_flag_suggestion(
+def test_circular_dep_use_flag_gated_cycle_bootstraps(
     emerge_binary, fixture_env
 ):
-    """find-suggestions Slice 2: dev-libs/usecyclea (IUSE +x) build-depends
+    """Backlog #753 (charter 2a): dev-libs/usecyclea (IUSE +x) build-depends
     on dev-libs/usecycleb only when x is on; usecycleb unconditionally
-    build-depends back. `circular_dependency_handler._find_suggestions`
-    finds that disabling x on usecyclea drops the offending atom without
-    violating REQUIRED_USE, so Portage prints `It might be possible to break
-    this cycle / by applying the following change: / - dev-libs/
-    usecyclea-1.0 (Change USE: -x)` instead of the generic advisory.
-    The `-x` renders blue under --color y.
-
-    Since backlog #206 the stdout list is Portage's forced `--verbose
-    --tree` stuck-remainder display and the stderr block carries Portage's
-    three leading newlines plus `Package.__str__` node text — row format
-    grounded on the live n206 probe (`localhost/test-portuale:latest`,
-    display paths diff-verified identical to 3rdparty 3.0.82.2), shape
-    from portuale's own tree renderer (see
-    test_unbreakable_build_time_cycle_prints_the_circular_deps_error).
-    Backlog #278: the cycle starts where Portage's single-root rendering
-    starts (`shortest_cycle[0]` — here `usecycleb`, matching Portage's
-    `FX_HOST_ROOTS=1` capture; portuale
-    `LLM/evidence/2026-09-30-278/`). The `-x` suggestion is
-    unaffected (it names the USE-gated member, not the start node).
-    Backlog #506: Portage 3.0.83 names the flag behind each edge, so the
-    usecyclea -> usecycleb edge reads `(buildtime, USE=x)` (bed
-    `l0-fixture-oracle-506.txt` and host captures, portuale
-    `LLM/evidence/2026-10-23-506/`)."""
+    build-depends back. The single flag that drops the gated arm serializes
+    the cycle instead of failing it: `USE="-x" usecyclea` (temporary),
+    then `usecycleb`, then `usecyclea` with the declared USE (definitive).
+    The boot row carries the `(bootstrap: … temporary …)` suffix (property
+    5: the user is told); no `* Error: circular dependencies` is printed.
+    (Was: find-suggestions Slice 2, Portage's `Change USE: -x` suggestion
+    with the forced `--verbose --tree` stuck-remainder display; Portage
+    implements no bootstrap, so no Portage capture is owed here.)"""
     base = ["--pretend", "dev-libs/usecyclea"]
     rust = _run([str(emerge_binary)], base, fixture_env)
-    assert rust.returncode == 1
-    assert rust.stdout == (
-        "\nThese are the packages that would be merged, in order:\n"
-        "\nCalculating dependencies ... done!\n"
-        "Dependency resolution took (backtrack: 1/20).\n"
-        "\n"
-        f'[nomerge       ] dev-libs/usecyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" \n'
-        f'[ebuild  N     ]  dev-libs/usecycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
-        f'[ebuild  N     ]   dev-libs/usecyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB\n'
-        "\n"
-        "Total: 2 packages (2 new), Size of downloads: 0 KiB\n"
-    )
-    assert rust.stderr == (
-        "\n\n\n * Error: circular dependencies:\n"
-        "\n"
-        "(dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/usecyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/usecycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=x)\n"
-        "\n"
-        "It might be possible to break this cycle\n"
-        "by applying the following change:\n"
-        "- dev-libs/usecyclea-1.0 (Change USE: -x)\n"
-        "\n"
-        "Note that this change can be reverted, once the package has been installed.\n"
-    )
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    assert "circular dependencies" not in rust.stderr
+    root = fixture_env["ROOT"]
+    assert rust.stdout.splitlines() == [
+        f"[ebuild  N     ] dev-libs/usecyclea-1.0 to {root} USE=\"-x\"  (bootstrap: USE=\"-x\" temporary — will be rebuilt with the declared USE)",
+        f"[ebuild  N     ] dev-libs/usecycleb-1.0 to {root}",
+        f"[ebuild  N     ] dev-libs/usecyclea-1.0 to {root} USE=\"x\" ",
+    ]
 
-    # --color y: the -x flag renders blue (Portage colorize("blue", ...))
+    # --color y: the removed flag still renders blue (Portage
+    # colorize("blue", ...)) inside the boot row's USE display.
     c = ["--pretend", "--color", "y", "dev-libs/usecyclea"]
     rc = _run([str(emerge_binary)], c, fixture_env)
-    assert "(Change USE: \x1b[34;01m-x\x1b[39;49;00m)" in rc.stderr
+    assert rc.returncode == 0, (rc.stdout, rc.stderr)
+    assert "USE=\"\x1b[34;01m-x\x1b[39;49;00m\"" in rc.stdout
+    assert "(bootstrap: USE=\"-x\" temporary" in rc.stdout
 
 
-def test_circular_dep_grandparent_use_conflict_disqualifies_the_suggestion(
+def test_circular_dep_grandparent_gated_cycle_bootstraps(
     emerge_binary, fixture_env
 ):
-    """The grandparent-atom conflict path (`docs/history/find-suggestions-
-    plan.md`'s "no fixture yet" note, `grandparent_use_conflict` /
-    `_grandparent_use_conflict`): same USE-gated build-cycle shape as
-    `dev-libs/usecyclea`/`usecycleb` (here `gpcyclea`/`gpcycleb`), but
-    `dev-libs/gpcyclec` -- the top-level target and a "grandparent" of
-    the cycle -- build-depends on `dev-libs/gpcyclea[x]` with a *hard*
-    USE-dep. Portage `_find_suggestions` step 9: the otherwise-viable "flip
-    x off on gpcyclea" fix would violate gpcyclec's own hard requirement,
-    so the suggestion is disqualified and dropped -- Portage prints the
-    generic "temporarily disabling USE flags" advisory instead of a
-    `Change USE:` line.
-
-    Since backlog #206 the stdout list is Portage's forced `--verbose
-    --tree` stuck-remainder display and the stderr block carries Portage's
-    three leading newlines plus `Package.__str__` node text. The n206
-    probe shows live Portage starting this cycle at `gpcycleb-1.0`
-    (`gpcycleb → gpcyclea → gpcycleb`); backlog #278 starts portuale's
-    printed cycle there too (`shortest_cycle[0]`; portuale
-    `LLM/evidence/2026-09-30-278/`), so the pin records Portage's bytes.
-    Backlog #506: the gpcyclea -> gpcycleb edge carries `, USE=x` like
-    Portage 3.0.83 (bed `l0-fixture-oracle-506.txt`)."""
+    """Backlog #753 (charter 2a): same USE-gated build-cycle shape as
+    `dev-libs/usecyclea`/`usecycleb` (here `gpcyclea`/`gpcycleb`), with
+    `dev-libs/gpcyclec` — the top-level target and a "grandparent" of the
+    cycle — build-depending on `dev-libs/gpcyclea[x]` with a hard USE-dep.
+    The single flag that drops the gated arm still serializes the cycle:
+    the boot build, the middle, the consumer, then the definitive rebuild
+    (the hard USE-dep is satisfied by the definitive row, which carries the
+    declared USE). Four rows, rc 0, no `* Error: circular dependencies`.
+    (Was: the grandparent conflict disqualified Portage's `Change USE:`
+    suggestion, so only the generic advisory printed; Portage implements
+    no bootstrap, so no Portage capture is owed here.)"""
     args = ["--pretend", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
-    assert rust.returncode == 1
-    assert rust.stdout == (
-        "\nThese are the packages that would be merged, in order:\n"
-        "\nCalculating dependencies ... done!\n"
-        "Dependency resolution took (backtrack: 1/20).\n"
-        "\n"
-        f'[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
-        f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" \n'
-        f'[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB\n'
-        f'[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB\n'
-        "\n"
-        "Total: 3 packages (3 new), Size of downloads: 0 KiB\n"
-    )
-    assert rust.stderr == (
-        "\n\n\n * Error: circular dependencies:\n"
-        "\n"
-        "(dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) depends on\n"
-        " (dev-libs/gpcyclea-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime)\n"
-        "  (dev-libs/gpcycleb-1.0:0/0::testrepo, ebuild scheduled for merge) (buildtime, USE=x)\n"
-        "\n"
-        " * Note that circular dependencies can often be avoided by temporarily\n"
-        " * disabling USE flags that trigger optional dependencies.\n"
-    )
-    assert "Change USE:" not in rust.stderr
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    assert "circular dependencies" not in rust.stderr
+    root = fixture_env["ROOT"]
+    assert rust.stdout.splitlines() == [
+        f"[ebuild  N     ] dev-libs/gpcyclea-1.0 to {root} USE=\"-x\"  (bootstrap: USE=\"-x\" temporary — will be rebuilt with the declared USE)",
+        f"[ebuild  N     ] dev-libs/gpcycleb-1.0 to {root}",
+        f"[ebuild  N     ] dev-libs/gpcyclec-1.0 to {root}",
+        f"[ebuild  N     ] dev-libs/gpcyclea-1.0 to {root} USE=\"x\" ",
+    ]
 
 
 def test_tree_nomerge_ancestor_row_carries_the_package_use_column(
     emerge_binary, fixture_env
 ):
-    """Backlog #154 (`--tree dev-libs/gpcyclec`, Portage 3.0.82.2 live
-    oracle): a merge node's ancestor occurrence renders as a `[nomerge]`
-    row that still carries the package's `USE="…"` display -- Portage
-    `Display.__call__` runs `_display_use` for every package with no
-    ordered/merge gate, and `print_messages` appends `" " + verboseadd`
-    (`_create_use_string`'s own trailing space makes Portage's row end
-    `USE="x" `; portuale's established convention omits trailing spaces,
-    as its merge rows already do, so the pinned row ends `USE="x"`).
-    `verbose_size` is merge-gated, so no size suffix follows on this arm.
-    Since backlog #206 the circular display runs forced-verbose whether
-    or not the user passed `--tree`, so these rows carry `::repo`,
-    `0 KiB` on the merge arms, and the `Total:` counters line (all
-    grounded on the live n206 probe); the `to <ROOT>` suffix on Portage's
-    argument row stays a portuale display cut. Full stdout pinned; the
-    stderr error block is the grandparent cell's."""
+    """Backlog #154 (`--tree dev-libs/gpcyclec`) plus backlog #753: a merge
+    node's ancestor occurrence still renders as a `[nomerge]` row carrying
+    the package's `USE="…"` display, and the charter 2a boot row renders as
+    a real tree node nested under its slot's definitive rebuild (it is a
+    same-slot second build, not a leftover). Four rows, rc 0. The #154
+    trailing-space convention stays (`USE="x" ` with the display's own
+    trailing space); the #749 stuck-remainder wording is gone with the
+    cycle it described (Portage implements no bootstrap, so no Portage
+    capture is owed for the boot row itself)."""
     args = ["--pretend", "--tree", "dev-libs/gpcyclec"]
     rust = _run([str(emerge_binary)], args, fixture_env)
-    assert rust.returncode == 1
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    root = fixture_env["ROOT"]
     assert rust.stdout.splitlines() == [
-        "",
-        "These are the packages that would be merged, in order:",
-        "",
-        "Calculating dependencies ... done!",
-        "Dependency resolution took (backtrack: 1/20).",
-        "",
-        f'[ebuild  N     ] dev-libs/gpcyclec-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
-        f'[nomerge       ]  dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" ',
-        f'[ebuild  N     ]   dev-libs/gpcycleb-1.0::testrepo to {fixture_env["ROOT"]} 0 KiB',
-        f'[ebuild  N     ]    dev-libs/gpcyclea-1.0::testrepo to {fixture_env["ROOT"]} USE=\"x\" 0 KiB',
-        "",
-        "Total: 3 packages (3 new), Size of downloads: 0 KiB",
+        f"[ebuild  N     ] dev-libs/gpcyclec-1.0 to {root}",
+        f"[nomerge       ]  dev-libs/gpcyclea-1.0 to {root} USE=\"x\" ",
+        f"[ebuild  N     ]   dev-libs/gpcycleb-1.0 to {root}",
+        f"[ebuild  N     ]    dev-libs/gpcyclea-1.0 to {root} USE=\"x\" ",
+        f"[ebuild  N     ]    dev-libs/gpcyclea-1.0 to {root} USE=\"-x\"  (bootstrap: USE=\"-x\" temporary — will be rebuilt with the declared USE)",
     ], rust.stdout
 
 
@@ -29847,18 +29803,23 @@ def test_circular_dependencies_upstream_pg0_portage_text(
 def test_circular_dependencies_upstream_pg0_portage_text_cyc0b1(
     emerge_binary, fixture_env
 ):
-    """Backlog #206: the `=dev-libs/cyc0b-1` third of the block above,
-    now passing — portuale prints Portage's package-node text
-    (`Package.__str__`: `(cpv:slot/sub::repo, ebuild scheduled for
-    merge)`, no `to '<ROOT>'` suffix under a staged ROOT) for the same
-    cycle and suggestion. Grounded on the #181 evidence captures plus
-    the n206 container probe (stock `localhost/test-portuale:latest`,
-    whose `_show_circular_deps` / node-text / display paths are
-    diff-verified identical to 3rdparty 3.0.82.2)."""
+    """Backlog #753 (charter 2a): the `=dev-libs/cyc0b-1` third of the
+    #206 block bootstraps on its single outer guard — `foo? ( =cyc0b-1 )`
+    drops the arm, so `cyc0a` builds first with `-foo`, then `cyc0b`,
+    then `cyc0a` with the declared USE. Three rows, rc 0, the boot row
+    marked. (Was: portuale printed Portage's package-node text for the
+    same cycle and suggestion; Portage implements no bootstrap, so the
+    #181 oracle stays recorded in `_CYC0_PORTAGE_BLOCKS` for the
+    still-failing siblings.)"""
     atom = "=dev-libs/cyc0b-1"
     rust = _run([str(emerge_binary)], ["--pretend", atom], fixture_env)
-    assert rust.returncode == 1
-    assert _CYC0_PORTAGE_BLOCKS[atom] in rust.stderr
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
+    root = fixture_env["ROOT"]
+    assert rust.stdout.splitlines() == [
+        f"[ebuild  N     ] dev-libs/cyc0a-1 to {root} USE=\"-bar -foo\"  (bootstrap: USE=\"-foo\" temporary — will be rebuilt with the declared USE)",
+        f"[ebuild  N     ] dev-libs/cyc0b-1 to {root}",
+        f"[ebuild  N     ] dev-libs/cyc0a-1 to {root} USE=\"foo -bar\" ",
+    ], rust.stdout
 
 
 def test_circular_dependencies_upstream_pg0_portage_text_cyc0w3(
@@ -32020,7 +31981,6 @@ def test_pg359_gsblk_default_pvu_plans_new_slot_only(emerge_binary, fixture_env)
     [
         "dev-libs/cyc0a",
         "dev-libs/hardcyclea",
-        "dev-libs/usecyclea",
         "dev-libs/aub0a",
         "dev-libs/scuseparent",
         "dev-libs/slotconfgroup",
@@ -32033,7 +31993,9 @@ def test_pubgrub_abort_prints_the_walks_partial_list(emerge_binary, fixture_env,
     package it walked before the abort, then the notice. The bridge stops at the first
     failing branch, so when both solvers fail the walk's own result is used. The default
     solver's output for these atoms is pinned against Portage 3.0.82.2 elsewhere
-    (cycle, slot-conflict and masked-dependency pins), so pubgrub must equal it."""
+    (cycle, slot-conflict and masked-dependency pins), so pubgrub must equal it.
+    Backlog #753: `dev-libs/usecyclea` left this list — the default solver now
+    bootstraps the cycle (rc 0) while pubgrub keeps reporting it (rc 1)."""
     base = ["-pv", "--getbinpkg=n", "--usepkg=n", atom]
     default = _run([str(emerge_binary)], base, fixture_env)
     pubgrub = _run([str(emerge_binary)], ["--solver=pubgrub", *base], fixture_env)
@@ -35405,7 +35367,6 @@ _CDD_STDERR = {
         ("neg", ["--autounmask-use=n", "dev-libs/cddnega"]),
         ("unrelated", ["dev-libs/cddunra"]),
         ("several", ["--autounmask-use=n", "dev-libs/cddseva"]),
-        ("test", ["dev-libs/cddtsta"]),
         ("testdoc", ["--autounmask-use=n", "dev-libs/cddtdoa"]),
         ("go", ["dev-lang/cddgo"]),
         ("gou", ["dev-lang/cddgou"]),
@@ -35484,35 +35445,24 @@ def test_506_circular_max_use_flags_invalid_values_warn_and_fall_back(
 def test_506_circular_report_colours_the_edge_flags_and_the_nomerge_row(
     emerge_binary, fixture_env
 ):
-    """Backlog #506 (`e0689630f`, Portage 3.0.83-r1 host shape 09 and the
-    bed `l0-fixture-oracle-506.txt` run): under `--color y` an enabled
-    edge flag is red, the FEATURES=test block keeps the red ` * ` prefix,
-    the re-displayed `[nomerge]` row is teal (`PKG_NOMERGE`, word and
-    package), and the argument is not coloured as world (Portage
-    `_show_circular_deps` calls `display()` without favorites)."""
+    """Backlog #506 (`e0689630f`, Portage 3.0.83-r1 host shape 09) plus
+    backlog #753: the `test?` cycle bootstraps, so under `--color y` the
+    boot row's removed flag renders blue, the definitive row's restored
+    flag red, and the `(bootstrap: …)` notice itself stays uncoloured.
+    (Was: the edge flag red in the circular block, the FEATURES=test block
+    red, the re-displayed `[nomerge]` row teal; Portage implements no
+    bootstrap, so no Portage capture is owed for the boot row itself.)"""
     rust = _run([str(emerge_binary)], ["--pretend", "--color", "y", "dev-libs/cddtsta"], fixture_env)
-    assert rust.returncode == 1
+    assert rust.returncode == 0, (rust.stdout, rust.stderr)
     red = "\x1b[31;01m"
     reset = "\x1b[39;49;00m"
-    assert f"(buildtime, USE={red}test{reset})\n" in rust.stderr
-    assert f"{red} * {reset}This cycle involves test dependencies." in rust.stderr
-    # Backlog #519: the resolution preamble now precedes the re-displayed
-    # rows, so locate them past it instead of indexing from zero.
+    blue = "\x1b[34;01m"
     rows = rust.stdout.splitlines()
-    first = next(i for i, line in enumerate(rows) if line.startswith("["))
-    assert rows[first].startswith(f"[\x1b[36mnomerge      {reset} ] \x1b[36mdev-libs/cddtsta-1::testrepo{reset}")
-    assert rows[first + 2].startswith(f"[\x1b[32mebuild{reset}  ")
-    assert f"\x1b[32mdev-libs/cddtsta-1::testrepo{reset}" in rows[first + 2]
+    assert f'USE="{blue}-test{reset}"  (bootstrap: USE="-test" temporary' in rows[0]
+    assert "dev-libs/cddtstb-1" in rows[1]
+    assert f'USE="{red}test{reset}" ' in rows[2]
 
 
-# Backlog #507 (portuale plan 02.442 S8): `--circular-deps-report=json`. Expected
-# values are the Portage 3.0.83-r1 host captures of portuale
-# `LLM/evidence/2026-10-23-507/captures/*.portage.out` (the fixture repo through a
-# staged config root); stdout is the resolution preamble (wall-clock seconds cut)
-# and one `json.dumps(report, indent=2)` document, stderr stays empty, rc 1.
-# Portage orders the keys of a `use_changes` object by hash (portuale
-# `LLM/portage-quirks.md` Q6); portuale sorts them, so the multi-flag shapes
-# compare the parsed document.
 def _cdr(
     cycles,
     edges,
@@ -35552,14 +35502,6 @@ def _cdr(
 
 
 _CDR_SHAPES = {
-    "use": (
-        ["--pretend", "dev-libs/usecyclea"],
-        _cdr(
-            [["usecycleb-1.0", "usecyclea-1.0"], ["usecyclea-1.0", "usecycleb-1.0"]],
-            [("usecyclea-1.0", "usecycleb-1.0", ["x"]), ("usecycleb-1.0", "usecyclea-1.0", [])],
-            solutions=[("usecyclea-1.0", [{"x": False}])],
-        ),
-    ),
     "neg": (
         ["--pretend", "--autounmask-use=n", "dev-libs/cddnega"],
         _cdr(
@@ -35581,15 +35523,6 @@ _CDR_SHAPES = {
             [["cddsevb-1", "cddseva-1"], ["cddseva-1", "cddsevb-1"]],
             [("cddseva-1", "cddsevb-1", ["doc", "nls"]), ("cddsevb-1", "cddseva-1", [])],
             solutions=[("cddseva-1", [{"doc": False, "nls": False}])],
-        ),
-    ),
-    "test": (
-        ["--pretend", "dev-libs/cddtsta"],
-        _cdr(
-            [["cddtstb-1", "cddtsta-1"], ["cddtsta-1", "cddtstb-1"]],
-            [("cddtsta-1", "cddtstb-1", ["test"]), ("cddtstb-1", "cddtsta-1", [])],
-            solutions=[("cddtsta-1", [{"test": False}])],
-            test=["cddtsta-1"],
         ),
     ),
     "go": (
@@ -35626,13 +35559,6 @@ _CDR_SHAPES = {
         _cdr(
             [["hardcycleb-1.0", "hardcyclea-1.0"], ["hardcyclea-1.0", "hardcycleb-1.0"]],
             [("hardcyclea-1.0", "hardcycleb-1.0", []), ("hardcycleb-1.0", "hardcyclea-1.0", [])],
-        ),
-    ),
-    "tree": (
-        ["--pretend", "--tree", "dev-libs/gpcyclec"],
-        _cdr(
-            [["gpcycleb-1.0", "gpcyclea-1.0"], ["gpcyclea-1.0", "gpcycleb-1.0"]],
-            [("gpcyclea-1.0", "gpcycleb-1.0", ["x"]), ("gpcycleb-1.0", "gpcyclea-1.0", [])],
         ),
     ),
     "ring4": (
@@ -35698,24 +35624,24 @@ def test_507_circular_report_json_matches_portage_3_0_83(emerge_binary, fixture_
 def test_507_json_report_replaces_the_merge_list_and_keeps_the_preamble(
     emerge_binary, fixture_env
 ):
-    """Backlog #507: with `json` the cycle's merge rows (the `[nomerge]` row,
-    the `Total:` line) are not printed, only the resolution preamble
-    (`--tree` says `in reverse order`) and the document (Portage 3.0.83-r1 host
-    shapes 01, 22; the seconds of the timing line are cut)."""
-    for args, banner in [
-        (["dev-libs/usecyclea"], "in order"),
-        (["--tree", "dev-libs/gpcyclec"], "in reverse order"),
+    """Backlog #507 plus backlog #753: with `json` the still-failing cycle's
+    merge rows (the `[nomerge]` row, the `Total:` line) are not printed, only
+    the resolution preamble and the document (Portage 3.0.83-r1 host shapes
+    01, 22; the seconds of the timing line are cut). Over a bootstrapped
+    cycle the flag is inert: there is no cycle to report, so the merge list
+    prints exactly as without the flag (rc 0)."""
+    for args in [
+        ["dev-libs/usecyclea"],
+        ["--tree", "dev-libs/gpcyclec"],
     ]:
         result = _run(
             [str(emerge_binary)], ["--pretend", "--circular-deps-report=json", *args], fixture_env
         )
-        head, body = _cdr_split(result.stdout)
-        assert head == (
-            f"\nThese are the packages that would be merged, {banner}:\n\n"
-            "Calculating dependencies ... done!\nDependency resolution took (backtrack: 1/20).\n\n"
-        )
-        assert "Total:" not in result.stdout and "[nomerge" not in result.stdout
-        assert body.endswith("}\n")
+        base = _run([str(emerge_binary)], ["--pretend", *args], fixture_env)
+        assert result.returncode == 0, (result.stdout, result.stderr)
+        assert result.stdout == base.stdout
+        assert result.stderr == base.stderr
+        assert "{\n" not in result.stdout
 
 
 @pytest.mark.parametrize(
@@ -35725,15 +35651,17 @@ def test_507_json_report_replaces_the_merge_list_and_keeps_the_preamble(
 )
 def test_507_text_and_bare_formats_keep_the_text_report(emerge_binary, fixture_env, extra):
     """Backlog #507 (`parse_opts`: bare `--circular-deps-report` is `True`,
-    which `_show_circular_deps` treats like `text`): the report is the S7 text
-    one on stderr and stdout carries no JSON (Portage 3.0.83-r1 host shapes
-    45, 46 and 52)."""
+    which `_show_circular_deps` treats like `text`) plus backlog #753: over
+    a bootstrapped cycle the report formats are inert — no cycle remains to
+    report, so the merge list prints exactly as without the flag (rc 0).
+    (Was: the report is the S7 text one on stderr; Portage 3.0.83-r1 host
+    shapes 45, 46 and 52.)"""
     base = _run([str(emerge_binary)], ["--pretend", "dev-libs/usecyclea"], fixture_env)
     result = _run([str(emerge_binary)], ["--pretend", *extra, "dev-libs/usecyclea"], fixture_env)
-    assert result.returncode == 1
+    assert result.returncode == 0, (result.stdout, result.stderr)
     assert result.stdout == base.stdout
     assert result.stderr == base.stderr
-    assert "Error: circular dependencies:" in result.stderr
+    assert "Error: circular dependencies:" not in result.stderr
     assert '"cycles"' not in result.stdout
 
 
@@ -35745,14 +35673,13 @@ def test_507_json_report_ignores_colour_and_keeps_the_limit_warning(
     stderr and the limit reads 10 (host shape 17); a limit of 16 appears in
     `max_affecting_use` and lets the search run (shape 16); `--quiet` drops the
     preamble only (shape 49)."""
-    expected = _CDR_SHAPES["use"][1]
     coloured = _run(
         [str(emerge_binary)],
         ["--pretend", "--color", "y", "--circular-deps-report=json", "dev-libs/usecyclea"],
         fixture_env,
     )
-    assert "\x1b" not in _cdr_split(coloured.stdout)[1]
-    assert json.loads(_cdr_split(coloured.stdout)[1]) == expected
+    assert coloured.returncode == 0, (coloured.stdout, coloured.stderr)
+    assert "{\n" not in coloured.stdout
     env = dict(fixture_env)
     env["PORTAGE_CIRCULAR_MAX_USE_FLAGS"] = "abc"
     bad = _run(
@@ -35782,8 +35709,8 @@ def test_507_json_report_ignores_colour_and_keeps_the_limit_warning(
         ["-pq", "--circular-deps-report=json", "dev-libs/usecyclea"],
         fixture_env,
     )
-    assert quiet.stdout.startswith("{\n")
-    assert json.loads(quiet.stdout) == expected
+    assert quiet.returncode == 0, (quiet.stdout, quiet.stderr)
+    assert not quiet.stdout.startswith("{\n")
 
 
 def test_507_json_report_is_not_printed_when_nothing_cycles(emerge_binary, fixture_env):

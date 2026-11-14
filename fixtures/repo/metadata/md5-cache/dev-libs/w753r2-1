@@ -1,0 +1,8 @@
+BDEPEND=dev-libs/w753r1
+DESCRIPTION=fixture package: bootstrap refusal r2 (unconditional BDEPEND on r1)
+EAPI=8
+IUSE=+use2
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=4fc7cb1b82b38b199bda6b127e943f3b
