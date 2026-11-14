@@ -371,8 +371,8 @@ def test_737_late_reinstall_self_unmatched_need_stays_reported(tmp_path):
     `build-order` failure. The plan orders the rebuild late for reasons the
     checker cannot see (a sub-slot pin, a compat package, a soname change);
     Portage merges that late too, so this is an accepted checker limitation,
-    not a plan defect (see the `l0-737-openssl-world-late-reinstall-order`
-    divergence entry)."""
+    not a plan defect (formerly allowlisted as
+    `l0-737-openssl-world-late-reinstall-order`; removed as unused by #747)."""
     vdb_package(tmp_path, "dev-libs/prov-1", rdepend="dev-libs/dep")
     vdb_package(tmp_path, "dev-libs/dep-1")
     doc = plan([
