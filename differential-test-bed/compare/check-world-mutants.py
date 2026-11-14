@@ -53,9 +53,35 @@ class CheckError(RuntimeError):
     """The check did not run or did not print what it promises."""
 
 
+def is_volatile_name(name: str) -> bool:
+    """Lock/inode-probe basenames that exist only for a lock hold, never content.
+
+    Same shape as portuale's `is_volatile_name`
+    (`crates/portuale/src/vdb_rw.rs`), which ports Portage `locks.py`
+    (`lockfile`/`unlockfile` with `unlinkfile=1`): `.pkg.portage_lockfile`
+    exists only while a writer holds the vdb lock, and Portage links it to a
+    `.hardlock-<pid>` sibling to probe the filesystem. Under parallel load a
+    concurrent `emerge` against the shared tree flickers these names
+    mid-harness-run (#754): `changed()` saw a phantom `+`/`-`, and once
+    `copytree` itself crashed (`shutil.Error`) when the file vanished between
+    listing and copy. Skipping them at copy *and* snapshot time keeps both
+    quiet. Residual: a lockfile present in both snapshots stays invisible —
+    it is noise either way, never content.
+    """
+    return (name.startswith(".")
+            and (name.endswith(".portage_lockfile")
+                 or ".portage_lockfile.hardlock-" in name
+                 or name.endswith("-inode-test")))
+
+
 def copy_tree(src: Path, dst: Path) -> Path:
-    """Copy keeping symlinks (a copy that follows or drops them tests another tree)."""
-    shutil.copytree(src, dst, symlinks=True)
+    """Copy keeping symlinks (a copy that follows or drops them tests another tree).
+
+    Volatile lock names (`is_volatile_name`) are skipped: they can vanish
+    mid-copy and crash `copytree`, and they are not tree content.
+    """
+    shutil.copytree(src, dst, symlinks=True,
+                    ignore=lambda _dir, names: {n for n in names if is_volatile_name(n)})
     links = lambda root: sorted(str(p.relative_to(root)) for p in root.rglob("*") if p.is_symlink())  # noqa: E731
     if links(src) != links(dst) or not links(dst):
         raise CheckError("the copy lost the symlinks of the tree")
@@ -77,9 +103,16 @@ def check(tree: Path, mrg: list[str]) -> tuple[int, list[dict], dict]:
 
 
 def snapshot(tree: Path) -> dict[str, str]:
-    """Relative path -> content hash (link target for a symlink)."""
+    """Relative path -> content hash (link target for a symlink).
+
+    Volatile lock names (`is_volatile_name`) are skipped: a concurrent `emerge`
+    flickers them between the harness's two copies (#754), and they are not
+    tree content.
+    """
     out = {}
     for p in sorted(tree.rglob("*")):
+        if is_volatile_name(p.name):
+            continue
         if p.is_symlink():
             out[str(p.relative_to(tree))] = "-> " + os.readlink(p)
         elif p.is_file():
