@@ -182,6 +182,13 @@ def test_two_packages_in_one_slot_are_flagged():
     assert failures(doc) == [("slot", "dev-libs/b", "dev-libs/b:0")]
 
 
+def test_two_versions_merged_in_one_slot_are_flagged():
+    """Backlog #745, guard: the 2a collapse needs the identical cpv. Two
+    different versions merged into one slot fail, even with nothing kept."""
+    doc = plan([entry("dev-libs/w693p-1", 0), entry("dev-libs/w693p-2", 1)])
+    assert failures(doc) == [("slot", "dev-libs/w693p", "dev-libs/w693p:0")]
+
+
 # --- property 2: the order -------------------------------------------------
 
 def test_build_dep_merged_later_is_flagged():

@@ -682,6 +682,9 @@ def _second_build(plan: Plan, order: int, pkg: Package, node,
     identical slot that already meets `node`, or None. A package the plan
     builds twice to break a cycle excuses the need its first build missed;
     a later build of another version never does."""
+    # Matching against available_at excuses the order finding only: the
+    # second build changes no version in the final set, so property 1 stays
+    # with check_final_state either way.
     for later, other in sorted(plan.merges, key=lambda m: m[0]):
         if (later > order and other.cpv == pkg.cpv and other.slot == pkg.slot
                 and _satisfied(node, index(plan.available_at(later)), owner)):
