@@ -573,7 +573,9 @@ def check_final_state(plan: Plan) -> list[Finding]:
         by_slot.setdefault((pkg.cp, pkg.slot), []).append(pkg.cpv)
     initial_cpvs = {p.cpv for p in plan.initial}
     for (cp, slot), cpvs in sorted(by_slot.items()):
-        if len(cpvs) > 1:
+        # A second build of the same version is one package, not two
+        # (charter 2a); two different versions in one slot still fail.
+        if len(set(cpvs)) > 1:
             findings.append(Finding("slot", "/".join(cp), f"{'/'.join(cp)}:{slot}",
                                     "slot holds " + ", ".join(sorted(cpvs)),
                                     pre_existing=initial_cpvs.issuperset(cpvs)))
@@ -661,12 +663,30 @@ def _order_finding(plan: Plan, component, order: int, pkg: Package, node,
     if any(component.get(o) == component[order] for o, _ in later):
         return Finding("cycle-noted", pkg.cpv, render(node),
                        f"{what} is only met by a later package of the same cycle")
+    second = _second_build(plan, order, pkg, node, owner or pkg)
+    if second is not None:
+        return Finding("cycle-noted", pkg.cpv, render(node),
+                       f"{what} is met only after an identical rebuild of the same "
+                       f"package (#{second} > #{order})")
     if later:
         return Finding("build-order", pkg.cpv, render(node),
                        f"{what} is met only by {later[0][1].cpv}, merged later "
                        f"(#{later[0][0]} > #{order}): merge it first")
     return Finding("build-order", pkg.cpv, render(node),
                    f"{what} is not matched by anything installed or merged before it")
+
+
+def _second_build(plan: Plan, order: int, pkg: Package, node,
+                 owner: Package) -> int | None:
+    """Charter 2a: the order of a later merge of the identical cpv in the
+    identical slot that already meets `node`, or None. A package the plan
+    builds twice to break a cycle excuses the need its first build missed;
+    a later build of another version never does."""
+    for later, other in sorted(plan.merges, key=lambda m: m[0]):
+        if (later > order and other.cpv == pkg.cpv and other.slot == pkg.slot
+                and _satisfied(node, index(plan.available_at(later)), owner)):
+            return later
+    return None
 
 
 def _choices(nodes: list) -> list[list[Atom]]:

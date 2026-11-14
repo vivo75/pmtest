@@ -377,6 +377,67 @@ def test_737_late_reinstall_self_unmatched_need_stays_reported(tmp_path):
         ("build-order", "app-misc/x-1", "dev-libs/dep")]
 
 
+# --- property 2a: a cycle broken by building a package twice -----------------
+
+def test_745_second_build_of_the_same_version_excuses_the_unmet_need():
+    """Backlog #745/#746, charter 2a: the plan merges `w745p-1` again at #2,
+    and by then the need its first build missed is matched, so the
+    `build-order` finding becomes a `cycle-noted` naming the second build."""
+    doc = plan([
+        entry("dev-libs/w745p-1", 0, deps={"BDEPEND": "dev-libs/w745q"}),
+        entry("dev-libs/w745q-1", 1),
+        entry("dev-libs/w745p-1", 2, deps={"BDEPEND": "dev-libs/w745q"}),
+    ])
+    found = hc.check_plan(doc)
+    assert [f for f in found if f.is_failure] == []
+    assert [(f.property, f.package) for f in found] == [
+        ("cycle-noted", "dev-libs/w745p-1")]
+    assert "#2" in found[0].reason
+
+
+def test_745_without_the_second_build_the_unmet_need_still_fails():
+    """Backlog #745, guard: with the second build removed, the unmet need is
+    still a `build-order` failure."""
+    doc = plan([
+        entry("dev-libs/w745p-1", 0, deps={"BDEPEND": "dev-libs/w745q"}),
+        entry("dev-libs/w745q-1", 1),
+    ])
+    assert failures(doc) == [("build-order", "dev-libs/w745p-1", "dev-libs/w745q")]
+
+
+def test_745_a_different_version_later_does_not_excuse_the_need():
+    """Backlog #745, guard: the excuse needs the identical cpv in the
+    identical slot. A later build of another version while the need stays
+    unmet is still a `build-order` failure."""
+    doc = plan([
+        entry("dev-libs/w693p-1", 0, deps={"BDEPEND": "dev-libs/dep"}),
+        entry("dev-libs/w693p-2", 1, deps={"BDEPEND": "dev-libs/dep"}, slot="1"),
+    ])
+    assert failures(doc) == [("build-order", "dev-libs/w693p-1", "dev-libs/dep"),
+                             ("build-order", "dev-libs/w693p-2", "dev-libs/dep")]
+
+
+def test_745_same_version_twice_in_one_slot_is_one_package():
+    """Backlog #745, charter 2a: a second build of the same version is not a
+    second package; two different versions in one slot still fail."""
+    doc = plan([
+        entry("dev-libs/w745b-1", 0, deps={"BDEPEND": "dev-libs/w745a"}),
+        entry("dev-libs/w745a-1", 1, deps={"BDEPEND": "dev-libs/w745b"}),
+        entry("dev-libs/w745b-1", 2, deps={"BDEPEND": "dev-libs/w745a"}),
+    ])
+    assert [f for f in hc.check_plan(doc) if f.property == "slot"] == []
+
+
+def test_745_clean_acyclic_plan_stays_clean():
+    """Backlog #745, guard: the 2a rule changes nothing without a duplicate
+    merge."""
+    doc = plan([
+        entry("dev-libs/b-1", 0),
+        entry("app-misc/a-1", 1, deps={"DEPEND": "dev-libs/b"}),
+    ])
+    assert hc.check_plan(doc) == []
+
+
 def test_no_sub_slot_means_the_sub_slot_is_the_slot():
     """drop_sub_slot (PMS 7.2)."""
     doc = plan([entry("dev-libs/b-2", 0, outcome="upgrade", from_version="1")],

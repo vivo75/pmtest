@@ -375,6 +375,28 @@ def stale_build_dep(doc, plan):
                 break
 
 
+def drop_second_build(doc, plan):
+    """Drop the second build of an identical cpv in one slot: the need the
+    first build missed, excused by the rebuild (charter 2a), is unmet again.
+    Offered only where the base plan notes the excuse, so a harmless extra
+    build is not counted as a blind spot."""
+    base = [f for f in hc.check_document(doc, VDB) if f.property == "cycle-noted"]
+    first: dict = {}
+    for order, m in sorted(plan.merges, key=lambda t: t[0]):
+        key = (m.cpv, m.slot)
+        if key in first:
+            if any(f.package == m.cpv and f"#{order}" in f.reason for f in base):
+                def change(d, key=key, order=order):
+                    d["entries"] = [x for x in d["entries"] if not (
+                        cpv_of(x) == key[0] and x.get("slot", "0") == key[1]
+                        and x["merge_order"] == order)]
+                    renumber(d)
+                yield (f"drop the second build of {m.cpv} (first at #{first[key]})",
+                       mutant(doc, change), ORDER)
+        else:
+            first[key] = order
+
+
 def keep_what_build_blocks(doc, plan):
     """Keep installed a package that only a DEPEND/BDEPEND blocker forbids."""
     present = {p.cp for p in plan.final}
@@ -495,7 +517,8 @@ OPERATORS = [drop_needed_merge, drop_needed_upgrade, swap_build_edge, break_requ
              enable_missing_conditional, drop_any_of_provider, add_build_cycle,
              add_late_build_dep, late_runtime_of_build_dep, lower_version, stale_build_dep,
              keep_what_build_blocks, drop_sub_slot, two_level_runtime_of_build_dep,
-             older_visible_version, older_visible_binary, masked_newer_version, harmless_move]
+             older_visible_version, older_visible_binary, masked_newer_version, harmless_move,
+             drop_second_build]
 
 
 # --- removal operators (property 4): each yields like the plan operators --------
