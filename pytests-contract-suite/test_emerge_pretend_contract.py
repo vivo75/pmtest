@@ -17277,7 +17277,7 @@ def test_slot_conflict_binary_parent_reads_binary_scheduled_for_merge(
     `_prepare_conflict_msg_and_check_for_specificity`) -- cited as a
     hint, never the oracle; the S0 capture (plan 03.752 section 2,
     kept beside the portuale tree under
-    docs/evidence/2026-11-14-752/) is the oracle. Under
+    LLM/evidence/2026-11-14-752/) is the oracle. Under
     `--usepkg`, `dev-libs/binslotgroup` pulls `binslotconnew` (pool
     binary, `>=binslottarget-2.0`) and `binslotconold` (ebuild-only,
     `<binslottarget-2.0`) into a surviving `binslottarget:0` conflict.

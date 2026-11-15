@@ -720,8 +720,7 @@ def _order_finding(plan: Plan, order: int, pkg: Package, node,
         if any(reaches(graph, o, order) for o, _ in later):
             return Finding("build-order", pkg.cpv, render(node),
                            f"{what}: no order satisfies this build cycle "
-                           f"(breakable only by a bootstrap variant with reduced USE; "
-                           f"see backlog #753)")
+                           f"(disable a USE flag on one of these packages to break it)")
         return Finding("build-order", pkg.cpv, render(node),
                        f"{what} is met only by {later[0][1].cpv}, merged later "
                        f"(#{later[0][0]} > #{order}): merge it first")

@@ -229,7 +229,7 @@ def test_genuine_build_time_cycle_fails():
                 entry("dev-libs/b-1", 1, deps={"DEPEND": "dev-libs/a"})])
     [finding] = [f for f in hc.check_plan(doc) if f.is_failure]
     assert (finding.property, finding.package) == ("build-order", "dev-libs/a-1")
-    assert "build cycle" in finding.reason and "#753" in finding.reason
+    assert "build cycle" in finding.reason and "disable a USE flag" in finding.reason
 
 
 def _bootstrap_plan(**tweaks):
@@ -419,7 +419,7 @@ def test_runtime_cycle_through_a_build_dep_orders_the_provider_first():
     assert (finding.property, finding.package, finding.atom) == (
         "build-order", "app-misc/x-1", "dev-libs/y")
     assert "merge it first" in finding.reason
-    assert "cycle" not in finding.reason and "#753" not in finding.reason
+    assert "cycle" not in finding.reason and "disable a USE flag" not in finding.reason
 
 
 def test_build_time_blocker_is_checked_when_the_package_builds():
@@ -494,7 +494,7 @@ def test_745_without_the_second_build_the_unmet_need_still_fails():
     ])
     assert failures(doc) == [("build-order", "dev-libs/w745p-1", "dev-libs/w745q")]
     [finding] = hc.check_plan(doc)
-    assert "cycle" not in finding.reason and "#753" not in finding.reason
+    assert "cycle" not in finding.reason and "disable a USE flag" not in finding.reason
 
 
 def test_745_mixed_runtime_cycle_passes_with_single_rows():
@@ -528,7 +528,7 @@ def test_use_conditional_build_cycle_fails():
     ])
     [finding] = [f for f in hc.check_plan(on) if f.is_failure]
     assert (finding.property, finding.package) == ("build-order", "dev-libs/w749pkgnew-1")
-    assert "build cycle" in finding.reason and "#753" in finding.reason
+    assert "build cycle" in finding.reason and "disable a USE flag" in finding.reason
     off = plan([
         entry("dev-libs/w749pkgnew-1", 0, deps=deps_new),
         entry("dev-libs/w749otherpkg-1", 1, deps=deps_other),
