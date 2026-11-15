@@ -1,0 +1,9 @@
+DEPEND=fc? ( dev-libs/w759d )
+DESCRIPTION=fixture package: bootstrap review cases (w759c)
+EAPI=8
+IUSE=+fc
+KEYWORDS=amd64
+REQUIRED_USE=fc
+SLOT=0
+DEFINED_PHASES=-
+_md5_=b2948349e42cf61d7ed5f42a2abaca84

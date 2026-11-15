@@ -1,0 +1,6 @@
+DESCRIPTION=fixture package: bootstrap review cases (w759x)
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=365c28a136d4244cd115dff348d47bd9

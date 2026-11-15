@@ -1,0 +1,8 @@
+DEPEND=fe? ( dev-libs/w759f ) !fe? ( dev-libs/w759x )
+DESCRIPTION=fixture package: bootstrap review cases (w759e)
+EAPI=8
+IUSE=+fe
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=925e93ce84dcc541ecbc92406e060049

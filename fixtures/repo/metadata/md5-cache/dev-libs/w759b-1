@@ -1,0 +1,8 @@
+DEPEND=fb? ( dev-libs/w759a )
+DESCRIPTION=fixture package: bootstrap review cases (w759b)
+EAPI=8
+IUSE=+fb
+KEYWORDS=amd64
+SLOT=0
+DEFINED_PHASES=-
+_md5_=cbbba6c5a656ea482e1c2da7c8339240
