@@ -83,6 +83,7 @@ _REPOS_FILTER_SRC_TEXT = (
 )
 
 import corpus  # noqa: E402  (see the ordering note above)
+from volatile_names import is_volatile_name  # noqa: E402
 
 # Preflight thresholds (env-overridable -- "tune to what this machine
 # actually has", not a number picked once and forgotten): a full
@@ -584,24 +585,18 @@ def fixtures_copytree_ignore(*extra) -> "callable":
     updates-record seeder's lock and temp files. A copy that lists such a
     name just as its owner deletes it dies with ENOENT, and a lock that is
     copied anyway is not transferable state (backlog #754, #757). The
-    shape mirrors portuale's own volatile-name list
-    (`crates/portuale/src/vdb_rw.rs`) and the bed's
-    `is_volatile_name` (`differential-test-bed/compare/check-world-mutants.py`),
-    so the three stay in step. All live under gitignored paths; none is
+    rule is `volatile_names.is_volatile_name`, shared with the bed's
+    `check-world-mutants.py` and pinned against portuale's `vdb_rw.rs` by
+    `test_volatile_names.py`. All live under gitignored paths; none is
     fixture state a copy must carry. `extra` appends site-specific names
     (for example `mtimedb`, where the copy must start record-free)."""
-    return shutil.ignore_patterns(
-        # The lock's basename when it guards the vdb is `.pkg.portage_lockfile`,
-        # but the two implementations this mirrors (`vdb_rw.rs`,
-        # `check-world-mutants.py`) cover any `*.portage_lockfile` -- a test
-        # root may lock with another prefix, and a copy must never carry one.
-        "*.portage_lockfile",
-        "*.portage_lockfile.hardlock-*",
-        "*-inode-test",
-        ".mtimedb.seed.lock",
-        ".mtimedb.tmp.*",
-        *extra,
-    )
+    extra_ignore = shutil.ignore_patterns(*extra)
+
+    def ignore(directory, names):
+        skipped = {n for n in names if is_volatile_name(n)}
+        return skipped | set(extra_ignore(directory, names))
+
+    return ignore
 
 
 @pytest.fixture(scope="session", autouse=True)

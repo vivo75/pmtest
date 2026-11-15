@@ -107,16 +107,37 @@ def test_both_plenty_is_ok_and_prints_both_tables(tmp_path):
     assert "LOW" not in out.stdout
 
 
-def test_a_zero_inode_filesystem_is_a_message_not_a_crash(tmp_path):
+def test_a_zero_inode_filesystem_is_warned_about_not_refused(tmp_path):
+    """btrfs and zfs report 0 inodes in total (#762): nothing to size, so the
+    inode check is skipped with a WARN line rather than refusing the run."""
     env = _env(
         _shim(tmp_path, bytes_pct=99, inodes_total=0, inodes_free=0),
         SHIM_BYTES_FREE="99", SHIM_INODES_TOTAL="0", SHIM_INODES_FREE="0",
     )
     out = _run(["sh", str(CHECK)], env)
-    assert out.returncode == 1, out.stderr
-    assert "cannot be sized" in out.stdout
+    assert out.returncode == 0, out.stderr
+    assert "WARN" in out.stdout
     assert "division by zero" not in out.stderr
     assert "error token" not in out.stderr
+
+    guard = _run(["sh", str(CHECK), "--require-inodes", str(tmp_path)], env)
+    assert guard.returncode == 0, guard.stderr
+    assert "WARN" in guard.stderr
+
+    both = _run(["sh", str(CHECK), "--basetemp", str(tmp_path)], env)
+    assert both.returncode == 0, both.stderr
+    assert "WARN" in both.stderr
+
+
+def test_basetemp_mode_checks_space_and_inodes_in_one_call(tmp_path):
+    short = _env(
+        _shim(tmp_path, bytes_pct=99, inodes_total=1_048_576, inodes_free=959_944),
+        SHIM_BYTES_FREE="99", SHIM_INODES_TOTAL="1048576", SHIM_INODES_FREE="959944",
+    )
+    out = _run(["sh", str(CHECK), "--basetemp", str(tmp_path / "bt")], short)
+    assert out.returncode == 1
+    assert "free inodes" in out.stderr
+    assert "inodes (sanity floor" in out.stdout, "the space tables ride along"
 
 
 def test_require_inodes_refuses_a_short_filesystem(tmp_path):
@@ -202,7 +223,7 @@ def test_gate_refuses_a_short_out_and_removes_only_what_it_created(tmp_path):
     fresh = tmp_path / "fresh-out"
     out = _run(["sh", str(GATE), str(fresh)], env)
     assert out.returncode == 2
-    assert "free inodes" in out.stderr
+    assert "free inodes" in out.stdout + out.stderr
     assert not fresh.exists(), "gate.sh must remove the directory it created"
 
     keep = tmp_path / "caller-out"
@@ -211,3 +232,54 @@ def test_gate_refuses_a_short_out_and_removes_only_what_it_created(tmp_path):
     out2 = _run(["sh", str(GATE), str(keep)], env)
     assert out2.returncode == 2
     assert (keep / "mine").exists(), "a caller's directory is never deleted"
+
+
+def test_pytest_parallel_warns_and_runs_on_a_zero_inode_filesystem(tmp_path):
+    """The 0-inode case (#762) through the entry point, and the proof that it
+    delegates to portuale's checker (its table is on the output)."""
+    venv = tmp_path / "venv"
+    (venv / "bin").mkdir(parents=True)
+    stub = venv / "bin/python"
+    stub.write_text("#!/bin/sh\nexit 0\n")
+    stub.chmod(0o755)
+    env = _env(
+        _shim(tmp_path, bytes_pct=99, inodes_total=0, inodes_free=0),
+        SHIM_BYTES_FREE="99", SHIM_INODES_TOTAL="0", SHIM_INODES_FREE="0",
+        PMTEST_XDIST_VENV=str(venv),
+    )
+    out = _run(["bash", str(PARALLEL), f"--basetemp={tmp_path / 'bt'}"], env)
+    assert out.returncode == 0, out
+    assert "WARN" in out.stdout + out.stderr
+    assert "sanity floor" in out.stdout + out.stderr
+
+
+def _fake_gate_root(tmp_path: Path, checker_body: str) -> Path:
+    """A throwaway repo root holding a copy of gate.sh and a stub checker, so
+    an unfixed gate can only ever delete this directory."""
+    root = tmp_path / "portuale"
+    (root / "LLM/tools").mkdir(parents=True)
+    (root / "LLM/tools/gate.sh").write_text(GATE.read_text())
+    stub = root / "LLM/tools/check-work-space.sh"
+    stub.write_text(checker_body)
+    (root / "sentinel").write_text("must survive")
+    return root
+
+
+def test_gate_refuses_an_empty_out_argument_first(tmp_path):
+    """`gate.sh ""` resolved OUT to the repo root and could rm -rf it (#762)."""
+    root = _fake_gate_root(tmp_path, "#!/bin/sh\nexit 1\n")
+    out = _run(["sh", str(root / "LLM/tools/gate.sh"), ""], dict(os.environ))
+    assert out.returncode == 2, out
+    assert "argument is empty" in out.stderr, out
+    assert (root / "sentinel").exists(), "the root must survive an empty argument"
+
+
+def test_gate_calls_the_space_checker_once(tmp_path):
+    root = _fake_gate_root(
+        tmp_path, '#!/bin/sh\necho "$*" >>"$(dirname "$0")/calls"\nexit 1\n'
+    )
+    out = _run(["sh", str(root / "LLM/tools/gate.sh"), str(tmp_path / "out")], dict(os.environ))
+    assert out.returncode == 2, out
+    calls = (root / "LLM/tools/calls").read_text().splitlines()
+    assert len(calls) == 1 and calls[0].startswith("--basetemp "), calls
+    assert GATE.read_text().count("check-work-space.sh") == 1

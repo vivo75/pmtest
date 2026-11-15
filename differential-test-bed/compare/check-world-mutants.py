@@ -35,6 +35,9 @@ import tempfile
 from collections.abc import Callable
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "pytests-contract-suite"))
+from volatile_names import is_volatile_name  # noqa: E402  (the one shared rule, #762)
+
 DEFAULT_TREE = Path(__file__).resolve().parents[2] / "fixtures"
 UNSATISFIED = frozenset({"world-no-match", "world-invalid"})
 CACHE = "repo/metadata/md5-cache"
@@ -51,27 +54,6 @@ class Operator:
 
 class CheckError(RuntimeError):
     """The check did not run or did not print what it promises."""
-
-
-def is_volatile_name(name: str) -> bool:
-    """Lock/inode-probe basenames that exist only for a lock hold, never content.
-
-    Same shape as portuale's `is_volatile_name`
-    (`crates/portuale/src/vdb_rw.rs`), which ports Portage `locks.py`
-    (`lockfile`/`unlockfile` with `unlinkfile=1`): `.pkg.portage_lockfile`
-    exists only while a writer holds the vdb lock, and Portage links it to a
-    `.hardlock-<pid>` sibling to probe the filesystem. Under parallel load a
-    concurrent `emerge` against the shared tree flickers these names
-    mid-harness-run (#754): `changed()` saw a phantom `+`/`-`, and once
-    `copytree` itself crashed (`shutil.Error`) when the file vanished between
-    listing and copy. Skipping them at copy *and* snapshot time keeps both
-    quiet. Residual: a lockfile present in both snapshots stays invisible —
-    it is noise either way, never content.
-    """
-    return (name.startswith(".")
-            and (name.endswith(".portage_lockfile")
-                 or ".portage_lockfile.hardlock-" in name
-                 or name.endswith("-inode-test")))
 
 
 def copy_tree(src: Path, dst: Path) -> Path:
