@@ -16,6 +16,7 @@ import subprocess
 import pytest
 
 import health_checker as hc
+from conftest import fixtures_copytree_ignore
 
 
 def split(cpv):
@@ -1227,7 +1228,8 @@ def test_693_a_sub_slot_upgrade_rebuilds_the_slot_operator_consumer(mrg_binary, 
     consumer is not. The plan loads in the checker and finds nothing wrong.
     Source: PMS `dependencies.tex`, `sec:slot-dep`."""
     root = tmp_path / "tree"
-    shutil.copytree(fixture_env["ROOT"], root, symlinks=True)
+    shutil.copytree(fixture_env["ROOT"], root, symlinks=True,
+                    ignore=fixtures_copytree_ignore())
     _write_ebuild(root, "dev-libs/w693prov-2", "0/2")
     _write_installed(root, "dev-libs/w693prov-1", "0/1")
     _write_ebuild(root, "dev-libs/w693cons-1", "0", [("RDEPEND", "dev-libs/w693prov:=")])
