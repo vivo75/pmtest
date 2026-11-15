@@ -28,12 +28,14 @@ def split(cpv):
 
 
 def entry(cpv, order, outcome="new", slot="0", deps=None, use=(), iuse=(),
-          required_use="", from_version=None, source="ebuild", sub_slot=None):
+          required_use="", from_version=None, source="ebuild", sub_slot=None,
+          bootstrap=False, reduced_use=()):
     cat, pkg, version = split(cpv)
     e = {"category": cat, "package": pkg, "version": version, "merge_order": order,
          "outcome": outcome, "slot": slot, "source": source, "sub_slot": sub_slot,
          "dependencies": deps or {}, "use": list(use), "iuse": list(iuse),
-         "required_use": required_use}
+         "required_use": required_use, "bootstrap": bootstrap,
+         "reduced_use": list(reduced_use)}
     if from_version:
         e["from_version"] = from_version
     return e
@@ -227,6 +229,85 @@ def test_genuine_build_time_cycle_fails():
     [finding] = [f for f in hc.check_plan(doc) if f.is_failure]
     assert (finding.property, finding.package) == ("build-order", "dev-libs/a-1")
     assert "build cycle" in finding.reason and "#753" in finding.reason
+
+
+def _bootstrap_plan(**tweaks):
+    """The owner's #753 pair as the resolver now plans it: the reduced-USE
+    boot build, the middle, the definitive rebuild with the declared USE.
+    The boot row carries its own `BDEPEND` string (grounded in
+    `--pretend --verbose --json`): under the reduced USE it evaluates to
+    nothing, which is exactly the dropped arm the checker requires."""
+    boot_deps = {"BDEPEND": "usefoo? ( dev-libs/w753otherpkg[useblah] )"}
+    full_deps = {"BDEPEND": "useboh? ( dev-libs/w753pkgnew[use3] )"}
+    boot = dict(bootstrap=True, reduced_use=["-useboh"],
+                deps=full_deps, use=["useblah"], iuse=["useboh", "useblah"])
+    boot.update(tweaks.pop("boot", {}))
+    final = dict(deps=full_deps, use=["useblah", "useboh"],
+                 iuse=["useboh", "useblah"])
+    final.update(tweaks.pop("final", {}))
+    assert not tweaks, tweaks
+    return plan([entry("dev-libs/w753otherpkg-1", 0, **boot),
+                 entry("dev-libs/w753pkgnew-1", 1, deps=boot_deps,
+                       use=["usefoo", "use3"], iuse=["usefoo", "use3"]),
+                 entry("dev-libs/w753otherpkg-1", 2, **final)])
+
+
+def test_bootstrap_pair_passes():
+    """Backlog #753: the complete boot-plus-definitive pair is the one
+    rebuild the charter 2a bootstrap recognises — every need is met when
+    each row starts, so `check_order` passes unmodified and the `slot`
+    exemption accepts the pair."""
+    assert hc.check_plan(_bootstrap_plan()) == []
+
+
+def test_bootstrap_without_declared_rebuild_fails():
+    """A marked boot row that is last for its slot is a failure naming the
+    slot and the missing rebuild — it must not excuse anything."""
+    doc = _bootstrap_plan()
+    doc["entries"] = [e for e in doc["entries"] if e["merge_order"] != 2]
+    [finding] = [f for f in hc.check_plan(doc) if f.is_failure]
+    assert (finding.property, finding.package) == ("slot", "dev-libs/w753otherpkg")
+    assert "no declared rebuild" in finding.reason
+
+
+def test_unmarked_duplicate_still_fails():
+    """The #749 un-collapse, unchanged: two identical rows with no marker
+    still fail as `slot`."""
+    doc = plan([entry("dev-libs/w753otherpkg-1", 0),
+                entry("dev-libs/w753otherpkg-1", 1)])
+    assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
+
+
+def test_bootstrap_empty_reduced_use_fails():
+    """A marked row with an empty USE delta fails: the delta must be
+    non-empty, or there is no reduction to recognise."""
+    doc = _bootstrap_plan(boot={"reduced_use": []})
+    assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
+
+
+def test_bootstrap_two_marked_rows_fail():
+    """Two marked rows for one slot fail: the pair is boot plus one
+    definitive rebuild, never two boots."""
+    doc = _bootstrap_plan(final={"bootstrap": True, "reduced_use": ["-useboh"]})
+    assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
+
+
+def test_bootstrap_final_row_use_mismatch_fails():
+    """A final row missing the restored flag fails: the survivor must
+    equal the declared build."""
+    doc = _bootstrap_plan(final={"use": ["useblah"]})
+    assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
+
+
+def test_bootstrap_unreduced_boot_deps_fail():
+    """Backlog #753 (I1): a marked row whose evaluated build-time atoms
+    are not a strict subset of the final row's is no reduction — the
+    `keeper` need survives the reduced USE, so the pair fails as `slot`
+    even though the USE delta is non-empty. `keeper` is kept installed,
+    so `check_order` stays silent and the pin names only the pair."""
+    doc = _bootstrap_plan(boot={"deps": {"BDEPEND": "useboh? ( dev-libs/w753pkgnew[use3] ) dev-libs/keeper"}})
+    doc["kept"] = [kept("dev-libs/keeper-1")]
+    assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
 
 
 def test_build_dep_never_provided_is_flagged():

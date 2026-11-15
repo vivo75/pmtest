@@ -195,6 +195,19 @@ def _cyclic_edges(edges: set[tuple[int, int]], n: int) -> set[tuple[int, int]]:
     return {(a, b) for a, b in edges if comp[a] == comp[b]}
 
 
+def _is_bootstrap_pair(rows: list) -> bool:
+    """Whether `rows` — the merge-bound entries of one slot, in plan order —
+    are the charter 2a bootstrap pair (backlog #753): exactly one marked
+    boot row with a non-empty USE delta that is not last, the rest
+    unmarked. Structural shape only; the health checker validates the
+    USE/version/binding equality of the pair itself."""
+    if len(rows) != 2:
+        return False
+    boot, final = rows
+    return (bool(boot.get("bootstrap")) and bool(boot.get("reduced_use"))
+            and not final.get("bootstrap"))
+
+
 def check_json(doc: dict, root: Path | None = None,
                repo_roots: list[Path] | None = None,
                args: list[str] | None = None,
@@ -252,15 +265,22 @@ def check_json(doc: dict, root: Path | None = None,
         if i not in reached:
             problems.append(f"{e['category']}/{e['package']}: unreachable from the seeds")
 
-    # No duplicate cat/pkg:slot unless a slot conflict is reported for it.
+    # No duplicate cat/pkg:slot unless a slot conflict is reported for it,
+    # or the rows are the charter 2a bootstrap pair (backlog #753): exactly
+    # one marked boot row (non-empty `reduced_use`) that is not last, the
+    # rest unmarked. The marker distinguishes the rows by construction; the
+    # health checker validates the pair itself (USE, version, bindings).
     conflicted = {(c["category"], c["package"]) for c in doc["slot_conflicts"]}
-    slots = Counter(
-        (e["category"], e["package"], e["slot"], e.get("builds_against_running_root"))
-        for e in entries if e["outcome"] in MERGE_BOUND
-    )
-    for (cat, pkg, slot, _running_root), n in slots.items():
-        if n > 1 and (cat, pkg) not in conflicted:
-            problems.append(f"{cat}/{pkg}:{slot} appears {n} times with no slot conflict reported")
+    slots: dict = {}
+    for e in entries:
+        if e["outcome"] in MERGE_BOUND:
+            slots.setdefault(
+                (e["category"], e["package"], e["slot"],
+                 e.get("builds_against_running_root")), []).append(e)
+    for (cat, pkg, slot, _running_root), rows in slots.items():
+        if len(rows) > 1 and (cat, pkg) not in conflicted \
+                and not _is_bootstrap_pair(rows):
+            problems.append(f"{cat}/{pkg}:{slot} appears {len(rows)} times with no slot conflict reported")
 
     # Merge order respects required_by edges, except cycles, PDEPEND and
     # dependencies an installed instance satisfies.
