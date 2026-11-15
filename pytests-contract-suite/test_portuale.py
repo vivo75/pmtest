@@ -265,10 +265,10 @@ def test_mrg_forwards_rebuild_and_usepkg_exclude(mrg_binary, emerge_binary, fixt
 
 def test_mrg_solver_selects_the_resolution_backend(mrg_binary, emerge_binary, fixture_env):
     """`--solver=` is portuale-only (Portage emerge has none): `mrg` parses
-    exactly portage/pubgrub/resolvo and forwards `--solver=<value>` to the
-    emerge codepath, which resolves with that backend. All three agree on
+    exactly portage/pubgrub and forwards `--solver=<value>` to the
+    emerge codepath, which resolves with that backend. Both agree on
     the trivial fixture; anything else is a clap usage error (exit 2)."""
-    for solver in ("portage", "pubgrub", "resolvo"):
+    for solver in ("portage", "pubgrub"):
         args = ["--pretend", f"--solver={solver}", "dev-libs/newpkg"]
         mrg = subprocess.run(
             [str(mrg_binary), *args],
@@ -298,12 +298,12 @@ def test_mrg_solver_selects_the_resolution_backend(mrg_binary, emerge_binary, fi
 
 
 def test_solver_backends_share_the_visibility_filter(emerge_binary, fixture_env):
-    """The PubGrub/resolvo bridges resolve from the same visibility-filtered
+    """The PubGrub bridge resolves from the same visibility-filtered
     pool as the backtracking walk: `dev-libs/maskedpkg` is `~amd64`-only
     (invisible under the fixture's `ACCEPT_KEYWORDS=amd64`), so every
     backend refuses it with no `[ebuild` line, while a visible package
     still resolves everywhere."""
-    for solver in ("portage", "pubgrub", "resolvo"):
+    for solver in ("portage", "pubgrub"):
         masked = subprocess.run(
             [str(emerge_binary), "--pretend", f"--solver={solver}", "dev-libs/maskedpkg"],
             capture_output=True,
@@ -326,26 +326,12 @@ def test_solver_backends_share_the_visibility_filter(emerge_binary, fixture_env)
 
 def test_solver_backends_report_engine_native_conflicts(emerge_binary, fixture_env):
     """H.15a (engine-native failure text): an unsatisfiable target under
-    `--solver=resolvo` renders resolvo's own conflict explanation
-    (`Conflict::display_user_friendly` -- "The following packages are
-    incompatible" plus the conflict chains) instead of the raw
-    `Unsolvable(Conflict { clauses: ... })` debug dump, and pubgrub
-    keeps rendering its own `Because ... are incompatible` derivation
-    tree (until #434: now the walk's own slot-conflict report). Both name the
-    conflicted packages and exit 1."""
-    resolvo = subprocess.run(
-        [str(emerge_binary), "--pretend", "--solver=resolvo", "dev-libs/slotconfgroup"],
-        capture_output=True,
-        text=True,
-        check=False,
-        env=fixture_env,
-    )
-    assert resolvo.returncode == 1
-    assert "The following packages are incompatible" in resolvo.stderr
-    assert "dev-libs/slotconflicttarget" in resolvo.stderr
-    assert "ClauseId(" not in resolvo.stderr
-    assert "Unsolvable(" not in resolvo.stderr
-
+    `--solver=pubgrub` renders the walk's own slot-conflict report --
+    backlog #434: when the walk fails too, its report stands in for the
+    engine text, so pubgrub prints Portage's slot-conflict block and merge
+    rows byte-identically to the default path. The removed resolvo backend
+    had its own conflict text; it died with the engine. Both remaining
+    paths name the conflicted packages and exit 1."""
     pubgrub = subprocess.run(
         [str(emerge_binary), "--pretend", "--solver=pubgrub", "dev-libs/slotconfgroup"],
         capture_output=True,
@@ -375,9 +361,7 @@ def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
     byte-identically to the walk. A weak merge-vs-merge block (`B`, rc 1
     since #68 S2) and a strong block against installed `samepkg` that no
     walked node pulls in (`b`, rc 0 since #68 S3; Portage 3.0.82.2 oracle
-    2026-09-16). Resolvo reads weak blockers as hard conflicts and
-    refuses `graphblockerparent` outright -- an engine-model divergence,
-    out of scope (its H.15a text already renders the refusal readably)."""
+    2026-09-16)."""
     portage_graph = subprocess.run(
         [str(emerge_binary), "--pretend", "--solver=portage", "dev-libs/graphblockerparent"],
         capture_output=True,
@@ -400,7 +384,7 @@ def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
         " is soft blocking dev-libs/weakblockerpkg-1.0)" in pubgrub_graph.stdout
     )
 
-    for solver in ("portage", "pubgrub", "resolvo"):
+    for solver in ("portage", "pubgrub"):
         result = subprocess.run(
             [str(emerge_binary), "--pretend", f"--solver={solver}", "dev-libs/blockerpkg"],
             capture_output=True,
@@ -409,7 +393,7 @@ def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
             env=fixture_env,
         )
         # Satisfied (no walked graph node pulls samepkg in, so Portage
-        # uninstalls it): the walk and both engines print the satisfied
+        # uninstalls it): the walk and the engine print the satisfied
         # `b` line and exit 0 -- #68 S2/S3, Portage 3.0.82.2 oracle.
         assert result.returncode == 0, solver
         assert (
@@ -424,16 +408,15 @@ def test_solver_backends_report_matched_blockers(emerge_binary, fixture_env):
         check=False,
         env=fixture_env,
     )
-    for solver in ("pubgrub", "resolvo"):
-        result = subprocess.run(
-            [str(emerge_binary), "--pretend", f"--solver={solver}", "dev-libs/blockerpkg"],
-            capture_output=True,
-            text=True,
-            check=False,
-            env=fixture_env,
-        )
-        assert result.stdout == portage_err.stdout, solver
-        assert result.stderr == portage_err.stderr, solver
+    result = subprocess.run(
+        [str(emerge_binary), "--pretend", "--solver=pubgrub", "dev-libs/blockerpkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=fixture_env,
+    )
+    assert result.stdout == portage_err.stdout
+    assert result.stderr == portage_err.stderr
 
 
 def _slotbind_root(tmp_path):
@@ -476,10 +459,7 @@ def test_solver_backends_schedule_stale_equals_consumer_reinstalls(
     its sub-slot (2 -> 2/9) reschedules the stale := consumer for
     reinstall (`[ebuild rR]`) plus the "causing rebuilds" block, via the
     walk's own fixpoint -- byte-identical between the walk and pubgrub.
-    The fresh (`:2/9=`) consumer is never rebuilt. Resolvo favors the
-    installed 1.0 here and reports an empty plan (a pre-existing
-    engine-policy divergence, verified on the pristine tree) -- out of
-    scope, noted, not pinned beyond a clean exit."""
+    The fresh (`:2/9=`) consumer is never rebuilt."""
     env = dict(fixture_env)
     env["ROOT"] = str(_slotbind_root(tmp_path))
     # Same record state for every compared solver: the first run on this
@@ -509,24 +489,15 @@ def test_solver_backends_schedule_stale_equals_consumer_reinstalls(
     assert "slotbindfresh" not in pubgrub.stdout
     assert "The following packages are causing rebuilds:" in pubgrub.stdout
 
-    resolvo = subprocess.run(
-        [str(emerge_binary), "--pretend", "--solver=resolvo", "dev-libs/slotbindtarget"],
-        capture_output=True,
-        text=True,
-        check=False,
-        env=env,
-    )
-    assert resolvo.returncode == 0
-
 
 def test_solver_backends_share_the_walk_merge_order(emerge_binary, fixture_env):
     """H.15b (merge-order fidelity): bridge plans used to display in raw
     engine install order (pubgrub printed shared-b before shared-a for
     `dev-libs/diamond`). Bridge entries now carry Portage `deps` edges and
-    run through the same `serialize_merge_order` sort as the walk, so all
-    three backends print one identical dependency-first merge list."""
+    run through the same `serialize_merge_order` sort as the walk, so both
+    backends print one identical dependency-first merge list."""
     outputs = []
-    for solver in ("portage", "pubgrub", "resolvo"):
+    for solver in ("portage", "pubgrub"):
         result = subprocess.run(
             [str(emerge_binary), "--pretend", f"--solver={solver}", "dev-libs/diamond"],
             capture_output=True,
@@ -536,7 +507,7 @@ def test_solver_backends_share_the_walk_merge_order(emerge_binary, fixture_env):
         )
         assert result.returncode == 0, solver
         outputs.append(result.stdout)
-    assert outputs[0] == outputs[1] == outputs[2]
+    assert outputs[0] == outputs[1]
     assert [line.rstrip() for line in strip_pretend_preamble(outputs[0]).splitlines()] == [
         f'[ebuild  N     ] dev-libs/common-1.0 to {fixture_env["ROOT"]}',
         f'[ebuild  N     ] dev-libs/shared-a-1.0 to {fixture_env["ROOT"]}',
@@ -549,14 +520,14 @@ def test_solver_backends_render_forced_flag_markers(emerge_binary, fixture_env):
     """`--solver=` forced-flag markers (backlog Tier 1): bridge entries
     used to build their USE display with an empty forced set, dropping
     Portage `pkg_use_display`'s `( )` wraps for profile-forced/masked
-    flags. Both bridges now call the walk's own `forced_or_masked_flags`,
+    flags. The bridge now calls the walk's own `forced_or_masked_flags`,
     so `-pv` of `dev-libs/pkgusemaskforcepkg` matches the walk-path
     contract byte for byte (`USE="(forceflag) (-maskflag) -specflag"`)."""
     expected = (
         f'[ebuild  N     ] dev-libs/pkgusemaskforcepkg-1.0::testrepo to {fixture_env["ROOT"]} USE="(forceflag) (-maskflag) -specflag" \n'
         "\nTotal: 1 package (1 new), Size of downloads: 0 KiB\n"
     )
-    for solver in ("portage", "pubgrub", "resolvo"):
+    for solver in ("portage", "pubgrub"):
         result = subprocess.run(
             [str(emerge_binary), "--pretend", "-v", f"--solver={solver}", "dev-libs/pkgusemaskforcepkg"],
             capture_output=True,
@@ -574,8 +545,7 @@ def test_solver_pubgrub_reports_the_unbreakable_build_time_cycle(emerge_binary, 
     and reports the shortest unbreakable build-time cycle, so pubgrub on
     `dev-libs/hardcyclea` prints the merge list plus the fatal
     `* Error: circular dependencies:` block (exit 1) as the walk-path
-    contract pins. Resolvo is excluded: its `install_order` still cannot
-    linearise any cyclic closure (Tier-4 `--solver=resolvo` item). Since
+    contract pins. Since
     Slice 4 the `--solver=portage` path renders the stuck remainder only
     (no separate re-display); the pubgrub bridge result stays `Complete`
     by construction (no walk/backtrack to abandon -- Slice 2), so it
