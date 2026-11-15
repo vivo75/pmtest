@@ -43,6 +43,45 @@ for arg in "$@"; do
         --basetemp) prev="yes" ;;
     esac
 done
+# Backlog #756: the basetemp needs ~1.8 M inodes for a complete run (measured
+# 2026-11-15: 1 804 465 for 4967 tests). A 1 M-inode tmpfs such as /tmp dies
+# with ENOSPC while gigabytes are free, which reads as a product regression.
+# This check must stay after the basetemp is resolved above (argv wins over
+# PMTEST_BASETEMP) and before the rm -rf below, so a refusal neither deletes
+# the tree it protects nor creates anything. PMTEST_MIN_BASETEMP_INODES lowers
+# the floor for a deliberate small run, like PMTEST_MIN_FREE_PERCENT does for
+# space. (Not PMTEST_MIN_FREE_INODES: conftest owns that name for its own
+# per-tmp-dir guard, with a different default -- two knobs, two names, and a
+# value that is not a positive integer is refused rather than silently ignored.)
+min_inodes=${PMTEST_MIN_BASETEMP_INODES:-2500000}
+case "$min_inodes" in
+    ''|*[!0-9]*)
+        echo "pytest-parallel: PMTEST_MIN_BASETEMP_INODES must be a positive integer (got '$min_inodes')" >&2
+        exit 2
+        ;;
+esac
+if [ "$min_inodes" -le 0 ]; then
+    echo "pytest-parallel: PMTEST_MIN_BASETEMP_INODES must be greater than 0 (got $min_inodes)" >&2
+    exit 2
+fi
+anchor=$basetemp
+while [ -n "$anchor" ] && [ "$anchor" != "/" ] && [ ! -e "$anchor" ]; do
+    anchor=$(dirname "$anchor")
+done
+inode_stats=$(df -Pi "$anchor" 2>/dev/null | awk 'NR==2 {print $2" "$4}')
+i_total=${inode_stats%% *}
+i_free=${inode_stats##* }
+if [ -z "${i_total:-}" ] || [ "${i_total:-0}" -eq 0 ]; then
+    echo "pytest-parallel: cannot read inode counts for '$anchor' (0 or unknown); refusing to guess" >&2
+    exit 2
+fi
+if [ "${i_free}" -lt "${min_inodes}" ]; then
+    echo "pytest-parallel: basetemp '$basetemp' is on a filesystem with only ${i_free} free inodes (need ${min_inodes})" >&2
+    echo "  a complete run needs ~1.8 M inodes (backlog #756); a 1 M-inode tmpfs like /tmp cannot hold one" >&2
+    echo "  point it elsewhere: PMTEST_BASETEMP=/var/tmp/pytest-parallel or --basetemp=<dir>" >&2
+    echo "  deliberate small run? PMTEST_MIN_BASETEMP_INODES=<n> lowers the floor" >&2
+    exit 2
+fi
 if [ -n "$basetemp" ] && [ "$basetemp" != "/" ] && [ -e "$basetemp" ]; then
     if ! rm -rf "$basetemp" 2>/dev/null && [ -e "$basetemp" ]; then
         echo "pytest-parallel: cannot reclaim basetemp '$basetemp' (root-owned residue from an earlier run as root?)" >&2
