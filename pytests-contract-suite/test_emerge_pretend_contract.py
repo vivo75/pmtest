@@ -16970,7 +16970,7 @@ def test_solver_portage_matches_the_default_resolution(
     )
     assert bad_rust.returncode == 2
     assert bad_rust.stdout == ''
-    assert bad_rust.stderr == 'emerge: --solver: "sat" is not "portage", "pubgrub" or "resolvo"\n'
+    assert bad_rust.stderr == 'emerge: --solver: "sat" is not "portage" or "pubgrub"\n'
 
 
 def test_columns_columnwidth_falls_back_to_default_on_an_unparsable_value(
@@ -18269,7 +18269,7 @@ Output:
 Portuale extensions (not Portage emerge options):
       --json                dump the resolved graph as one JSON line instead of the display
       --shell <bash|brush>  which real shell runs a merge / unmerge / --config phase chain (default bash)
-      --solver <solver>     which dependency solver resolves the graph: portage (default), pubgrub or resolvo
+      --solver <solver>     which dependency solver resolves the graph: portage (default) or pubgrub
 
 emerge --sync is a permanent non-goal: it prints
 "Functionality has moved to `emaint sync`." and exits 1.
@@ -26744,10 +26744,8 @@ def test_oracle_slotop_bridge_pubgrub_agrees_on_mismatched_upgrade(
     entry, and the bridge schedules no consumer rebuild, like the
     default path after the #252 probe (Portage 3.0.82.2 merges only
     `mmprov-3`; see the entry pin above for the probe citation).
-    (`resolvo` does not resolve the direct upgrade arg at all here --
-    an engine-side gap below this layer, reported for filing; the
-    conflict-mass shape likewise resolves walked `:=` deps to installed
-    inside both engines, so scan-level agreement cannot reach it without
+    (The conflict-mass shape likewise resolves walked `:=` deps to installed
+    inside the engine, so scan-level agreement cannot reach it without
     engine-side probe scheduling.)"""
     installed = [
         ("app-misc", "mmprov", "1", "0/1", {"EAPI": "8"}),
@@ -39990,30 +39988,6 @@ def test_703_the_route_less_note_is_quiet_under_quiet(emerge_binary, fixture_env
     ok = _run([str(emerge_binary)], ["--pretend", "--quiet", "--solver=pubgrub", "dev-libs/p569prov"], env)
     assert ok.returncode == 0, (ok.stdout, ok.stderr)
     assert "cannot follow them" not in ok.stdout, ok.stdout
-
-
-def test_702_resolvo_does_not_upgrade_installed_packages_so_there_is_no_co_upgrade(
-    emerge_binary, fixture_env, tmp_path
-):
-    """Backlog #702, a documented cut (CUT-12): `--solver=resolvo` keeps every installed package as
-    it is. On the #698 ROOT (`p569prov-5.42` installed, 5.44 in the tree) it plans nothing, with
-    or without `--update --deep`, and the same holds for the lone `p698upg` 1 -> 2 upgrade; a
-    package that is not installed still resolves. So no installed holder is left unsatisfied
-    (charter property 1 holds) and the co-upgrade has no upgrade to follow; property 3 (as new
-    as possible) is the part resolvo does not serve. Source: the capture of 2026-11-11 (the three
-    commands below), not Portage. If resolvo learns to upgrade installed packages this pin goes
-    red and #702 must be wired then."""
-    env = _698_root(
-        fixture_env, tmp_path, ["dev-libs/p698rebuild", "dev-libs/p698reinst", "dev-libs/p698upg"]
-    )
-    for args in (
-        ["dev-libs/p569prov"],
-        ["--update", "--deep", "dev-libs/p569prov"],
-        ["--update", "--deep", "dev-libs/p698upg"],
-    ):
-        out = _run([str(emerge_binary)], ["--pretend", "--solver=resolvo", *args], env)
-        assert out.returncode == 0, (args, out.stdout, out.stderr)
-        assert not any(l.startswith("[ebuild") for l in out.stdout.splitlines()), (args, out.stdout)
 
 
 def test_713_co_upgraded_holders_name_the_provider_as_parent(
