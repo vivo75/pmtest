@@ -3205,6 +3205,7 @@ CASES = [
     ("#613: the same with --backtrack=1 (Portage 3.0.83 rc 1, 0/1)", ["--pretend", "--backtrack=1", "dev-libs/abk0d"], 1),
     ("#727: a new package whose || group lists the new p569prov first, in the shared ROOT where p569prov is not installed (the withheld-provider shape needs its own ROOT: test_727_*)", ["--pretend", "dev-libs/p727top"], 0),
     ("#753: the owner's USE-conditional build-time pair bootstraps to three rows (boot with USE=-useboh, the middle, the definitive rebuild; charter 2a, rc 0)", ["--pretend", "dev-libs/w753pkgnew", "dev-libs/w753otherpkg"], 0),
+    ("#761: an upgrade leaves an installed consumer whose recorded =pin forbids it stale, and says so (charter property 5, rc 0)", ["--pretend", "--update", "dev-libs/p569prov"], 0),
 ]
 
 
@@ -40383,3 +40384,36 @@ def test_716_pubgrub_json_carries_what_a_plan_checker_needs(emerge_binary, fixtu
     assert all(k in docs["pubgrub"] for k in keys), docs["pubgrub"]
     assert {k: docs["pubgrub"][k] for k in keys} == {k: docs["portage"][k] for k in keys}
     assert docs["pubgrub"]["use"] == ["added", "keep"], docs["pubgrub"]
+
+
+def test_761_a_stale_binding_the_plan_cannot_repair_is_named(emerge_binary, fixture_env):
+    """Backlog #761, charter property 5 ("every error names the cause and says at least one
+    thing the user can do"). The plan upgrades `dev-libs/p569prov` to 5.44 while the installed,
+    unreached `dev-libs/p569virt-1` records `=dev-libs/p569prov-5.42*` next to its built
+    `:0/5.42=`: the rebuild that would repair the binding is refused, and the run used to say
+    nothing. Expected: a NOTE naming the consumer, the recorded atom, the provider version and
+    what to do (the fast `--plan-world` already names the same refusal). rc stays 0, `--quiet`
+    hides it, and `--json` carries it as `stale-bindings` only when there is one."""
+    got = _run([str(emerge_binary)], ["--pretend", "--update", "dev-libs/p569prov"], fixture_env)
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    assert got.stdout.splitlines()[-5:] == [
+        "NOTE: One or more installed packages keep a stale slot-operator binding that was not rebuilt:",
+        "",
+        "  dev-libs/p569virt-1: its dependency =dev-libs/p569prov-5.42* is not satisfied by dev-libs/p569prov-5.44",
+        "",
+        "  Rebuild them once a visible version accepts the new provider, or unmerge them if they are unused.",
+    ], got.stdout
+    quiet = _run([str(emerge_binary)], ["--pretend", "--quiet", "--update", "dev-libs/p569prov"], fixture_env)
+    assert "stale slot-operator binding" not in quiet.stdout, quiet.stdout
+    doc = json.loads(
+        _run([str(emerge_binary)], ["--pretend", "--json", "--update", "dev-libs/p569prov"], fixture_env).stdout
+    )
+    assert doc["stale-bindings"] == [
+        {
+            "consumer": "dev-libs/p569virt-1",
+            "atom": "=dev-libs/p569prov-5.42*",
+            "provider": "dev-libs/p569prov-5.44",
+        }
+    ], doc
+    plain = json.loads(_run([str(emerge_binary)], ["--pretend", "--json", "dev-libs/newpkg"], fixture_env).stdout)
+    assert "stale-bindings" not in plain, plain
