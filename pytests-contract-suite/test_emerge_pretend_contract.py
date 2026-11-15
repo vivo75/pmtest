@@ -39045,7 +39045,8 @@ def test_skipped_update_block_names_every_installed_consumer(
     four rows; Portage writes the block to stderr, portuale to stdout).
     """
     root = tmp_path / "root"
-    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True)
+    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True,
+                    ignore=fixtures_copytree_ignore())
     world = root / "var/lib/portage/world"
     world.write_text(
         world.read_text() + "dev-libs/p573world\ndev-libs/p573virt\n"
@@ -39883,7 +39884,8 @@ def _698_root(fixture_env, tmp_path, world_extra, installed_extra=()):
     """A scratch ROOT: the shared vdb plus installed #698 holders that recorded
     the pins the provider's old sub-slot (`p569prov-5.42`) left in them."""
     root = tmp_path / "root"
-    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True)
+    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True,
+                    ignore=fixtures_copytree_ignore())
     world = root / "var/lib/portage/world"
     world.write_text(world.read_text() + "".join(f"{w}\n" for w in world_extra))
     seed_updates_record(root)
@@ -40038,7 +40040,8 @@ def test_715_the_provider_is_merged_before_the_holders_rebuilt_for_it(
     as a build-time (DEPEND) dependency is available". Order wanted:
     `p715lib`, `p715prov-2`, then the holders, with both solvers."""
     root = tmp_path / "root"
-    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True)
+    shutil.copytree(Path(fixture_env["ROOT"]) / "var", root / "var", symlinks=True,
+                    ignore=fixtures_copytree_ignore())
     world = root / "var/lib/portage/world"
     world.write_text(
         world.read_text() + "dev-libs/p715h1\ndev-libs/p715h2\ndev-libs/p715prov\n"

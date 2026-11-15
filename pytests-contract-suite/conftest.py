@@ -580,16 +580,27 @@ def _require_fixture_tree():
 def fixtures_copytree_ignore(*extra) -> "callable":
     """`ignore=` for copies of the fixture tree (or its `var` subtree):
     skip runtime state that concurrent suite runs create and delete --
-    the vdb lockfile (every fixtures-root run takes the vdb lock while
-    checking for global updates, so a parallel copy can list it just as
-    its owner deletes it and fail with ENOENT) and the updates-record
-    seeder's lock and temp files. All live under gitignored paths; none
-    is fixture state a copy must carry (a copied lock in particular must
-    never travel: lock state is not transferable). `extra` appends
-    site-specific names (for example `mtimedb`, where the copy must
-    start record-free)."""
+    the vdb lockfile and its hardlink/inode-probe siblings, the
+    updates-record seeder's lock and temp files. A copy that lists such a
+    name just as its owner deletes it dies with ENOENT, and a lock that is
+    copied anyway is not transferable state (backlog #754, #757). The
+    shape mirrors portuale's own volatile-name list
+    (`crates/portuale/src/vdb_rw.rs`) and the bed's
+    `is_volatile_name` (`differential-test-bed/compare/check-world-mutants.py`),
+    so the three stay in step. All live under gitignored paths; none is
+    fixture state a copy must carry. `extra` appends site-specific names
+    (for example `mtimedb`, where the copy must start record-free)."""
     return shutil.ignore_patterns(
-        ".pkg.portage_lockfile", ".mtimedb.seed.lock", ".mtimedb.tmp.*", *extra
+        # The lock's basename when it guards the vdb is `.pkg.portage_lockfile`,
+        # but the two implementations this mirrors (`vdb_rw.rs`,
+        # `check-world-mutants.py`) cover any `*.portage_lockfile` -- a test
+        # root may lock with another prefix, and a copy must never carry one.
+        "*.portage_lockfile",
+        "*.portage_lockfile.hardlock-*",
+        "*-inode-test",
+        ".mtimedb.seed.lock",
+        ".mtimedb.tmp.*",
+        *extra,
     )
 
 
