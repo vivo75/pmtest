@@ -698,6 +698,11 @@ CASES = [
         0,
     ),
     (
+        "#753: the DEPEND-gated sibling cycle bootstraps the same way (was: circular dep USE-flag suggestion; charter 2a, rc 0)",
+        ["--pretend", "dev-libs/fucyclea"],
+        0,
+    ),
+    (
         "invalid: conditional USE-dep on a flag outside the owner's own IUSE masks the package",
         ["--pretend", "dev-libs/fucyclec"],
         1,
@@ -4510,6 +4515,31 @@ def test_circular_dep_use_flag_gated_cycle_bootstraps(
     assert rc.returncode == 0, (rc.stdout, rc.stderr)
     assert "USE=\"\x1b[34;01m-x\x1b[39;49;00m\"" in rc.stdout
     assert "(bootstrap: USE=\"-x\" temporary" in rc.stdout
+
+
+def test_circular_dep_depend_gated_cycle_bootstraps(
+    emerge_binary, fixture_env
+):
+    """Backlog #753 (charter 2a) m1: `dev-libs/fucyclea` (IUSE +x) gates
+    `dev-libs/fucycleb` behind `x?` in DEPEND (not BDEPEND like
+    `usecyclea`); `fucycleb` unconditionally build-depends back. The same
+    single-flag reduction serializes it: `USE="-x" fucyclea` (temporary),
+    then `fucycleb`, then `fucyclea` with the declared USE (definitive),
+    rc 0, no `* Error: circular dependencies`. The `fucycleb` target entry
+    point bootstraps identically (same boot/middle/definitive rows; see
+    the reviewed corpus pairing, 9 flag variants each). (Was: the
+    find-suggestions USE-flag suggestion with rc 1; Portage implements no
+    bootstrap, so no Portage capture is owed here.)"""
+    root = fixture_env["ROOT"]
+    for target in ("dev-libs/fucyclea", "dev-libs/fucycleb"):
+        rust = _run([str(emerge_binary)], ["--pretend", target], fixture_env)
+        assert rust.returncode == 0, (target, rust.stdout, rust.stderr)
+        assert "circular dependencies" not in rust.stderr
+        assert rust.stdout.splitlines() == [
+            f"[ebuild  N     ] dev-libs/fucyclea-1.0 to {root} USE=\"-x\"  (bootstrap: USE=\"-x\" temporary — will be rebuilt with the declared USE)",
+            f"[ebuild  N     ] dev-libs/fucycleb-1.0 to {root}",
+            f"[ebuild  N     ] dev-libs/fucyclea-1.0 to {root} USE=\"x\" ",
+        ], target
 
 
 def test_circular_dep_grandparent_gated_cycle_bootstraps(

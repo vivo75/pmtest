@@ -233,11 +233,14 @@ def test_genuine_build_time_cycle_fails():
 
 def _bootstrap_plan(**tweaks):
     """The owner's #753 pair as the resolver now plans it: the reduced-USE
-    boot build, the middle, the definitive rebuild with the declared USE."""
+    boot build, the middle, the definitive rebuild with the declared USE.
+    The boot row carries its own `BDEPEND` string (grounded in
+    `--pretend --verbose --json`): under the reduced USE it evaluates to
+    nothing, which is exactly the dropped arm the checker requires."""
     boot_deps = {"BDEPEND": "usefoo? ( dev-libs/w753otherpkg[useblah] )"}
     full_deps = {"BDEPEND": "useboh? ( dev-libs/w753pkgnew[use3] )"}
     boot = dict(bootstrap=True, reduced_use=["-useboh"],
-                deps=boot_deps, use=["useblah"], iuse=["useboh", "useblah"])
+                deps=full_deps, use=["useblah"], iuse=["useboh", "useblah"])
     boot.update(tweaks.pop("boot", {}))
     final = dict(deps=full_deps, use=["useblah", "useboh"],
                  iuse=["useboh", "useblah"])
@@ -293,6 +296,17 @@ def test_bootstrap_final_row_use_mismatch_fails():
     """A final row missing the restored flag fails: the survivor must
     equal the declared build."""
     doc = _bootstrap_plan(final={"use": ["useblah"]})
+    assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
+
+
+def test_bootstrap_unreduced_boot_deps_fail():
+    """Backlog #753 (I1): a marked row whose evaluated build-time atoms
+    are not a strict subset of the final row's is no reduction — the
+    `keeper` need survives the reduced USE, so the pair fails as `slot`
+    even though the USE delta is non-empty. `keeper` is kept installed,
+    so `check_order` stays silent and the pin names only the pair."""
+    doc = _bootstrap_plan(boot={"deps": {"BDEPEND": "useboh? ( dev-libs/w753pkgnew[use3] ) dev-libs/keeper"}})
+    doc["kept"] = [kept("dev-libs/keeper-1")]
     assert failures(doc) == [("slot", "dev-libs/w753otherpkg", "dev-libs/w753otherpkg:0")]
 
 

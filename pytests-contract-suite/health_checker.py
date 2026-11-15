@@ -580,6 +580,14 @@ def _bootstrap_pair_violation(rows: list) -> str | None:
             or final.use != boot.use | boot.reduced_use):
         return (f"bootstrap pair for {boot.cpv}: the final build is not the "
                 "declared build")
+    # The reduction must drop a real build-time need: the boot row's
+    # evaluated build-time atoms are a strict subset of the final row's.
+    # A marked row with an unreduced `BDEPEND` is no reduction at all.
+    boot_atoms = {a.text for _, n in _build_atoms(boot) for a in _plain_atoms([n])}
+    final_atoms = {a.text for _, n in _build_atoms(final) for a in _plain_atoms([n])}
+    if not boot_atoms < final_atoms:
+        return (f"bootstrap build {boot.cpv}: the reduced USE drops no "
+                "build-time need")
     return None
 
 
