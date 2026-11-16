@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: one-level build-time closure (backlog #764), shape V2
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/w764am
+SLOT=0
+_md5_=6fbe1855d213e357f8b8a162a6c2a16c

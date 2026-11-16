@@ -332,3 +332,73 @@ def test_766_the_agreement_check_can_fail():
     assert _differences_766((set(), set()), ({row}, {"x/y"})) == {
         "consumers only the resolver names": ["a/b"],
         "stale reinstalls only the resolver lists": ["x/y"]}
+
+
+# --- backlog #764: the fast plan's build-time closure is one level deep ----------------------------
+#
+# `build_time_used` protects only the DIRECT targets of a package's build-kind edges, so the runtime
+# edges of a build tool are cut one level down (`crates/portage-world/src/order.rs`). PMS 8.1
+# (`dependencies.tex`, "installed and usable") would want the tool's whole runtime closure present
+# first; charter 2/2a, as the owner ruled it in #749 and on 2026-11-15, is literal and does not. These
+# three shapes (`LLM/02.764-build-closure.opus.md` sec. 1, orders derived by hand from the cut rule)
+# pin what that costs. Expected rows come from the rule, "literal clean/failure" from the literal
+# checker (`hc`), the late package from the PMS over the fixture's declared deps.
+
+def _plan_764(mrg_binary, fixture_env, tmp_path, atom):
+    """The w764 rows and stderr of `--plan-world --json --sort depend` for a world holding `atom`
+    on an empty VDB (like `test_740`), and the literal checker's failures on that plan."""
+    root = tmp_path / "root"
+    (root / "var/lib/portage").mkdir(parents=True)
+    (root / "var/lib/portage/world").write_text(atom + "\n")
+    (root / "var/db/pkg").mkdir(parents=True)
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    run = subprocess.run(
+        [str(mrg_binary), "--plan-world", "--json", "--sort", "depend"],
+        capture_output=True, text=True, env=env, check=False,
+    )
+    assert run.returncode == 0, run.stderr
+    doc = hc.parse_json_output(run.stdout)
+    rows = [e["package"] for e in doc["entries"] if e["package"].startswith("w764")]
+    assert rows, "no w764 rows: the fixtures are missing"
+    found = [f for f in hc.check_document(doc, root / "var/db/pkg") if f.is_failure and not f.pre_existing]
+    return rows, run.stderr, found
+
+
+def test_764_a_tool_runtime_dependency_on_a_cut_cycle_lands_after_its_consumer(
+    mrg_binary, fixture_env, tmp_path
+):
+    """Shape V2 (`w764a*`): `ab` builds with `at`, `at` runs with `am`, `am -> au -> ax -> am` is a
+    runtime cycle. Only `at` is protected, so the cycle is cut at `(am,au)` and `au`, the runtime
+    dependency of `am` (depth 2 of the tool `at`), merges AFTER `ab`: PMS 8.1 would call `at`
+    unusable at `ab`. The literal checker (charter 2/2a, #749) is clean; that is the documented
+    limitation, owner ruling 2026-11-15."""
+    rows, _, found = _plan_764(mrg_binary, fixture_env, tmp_path, "dev-libs/w764ab")
+    assert rows == ["w764am", "w764at", "w764ab", "w764ax", "w764au"], rows
+    assert found == [], found
+    assert rows.index("w764au") > rows.index("w764ab")  # the late package
+
+
+def test_764_an_unavoidable_late_tool_dependency_is_literal_legal(mrg_binary, fixture_env, tmp_path):
+    """Shape V1 (`w764c*`): as V2 but the runtime dependency `cu` of the tool's `cm` builds with the
+    consumer `cb` (`cu -B-> cb`), so `cu` after `cb` is the only legal order (PMS-genuine). The cut
+    `(cm,cu)` gives it; propagating the build-used status down the runtime closure would leave the
+    cycle uncuttable and the walk would put `cu` first, a literal `build-order` failure."""
+    rows, _, found = _plan_764(mrg_binary, fixture_env, tmp_path, "dev-libs/w764cb")
+    assert rows == ["w764cm", "w764ct", "w764cb", "w764cu"], rows
+    assert found == [], found
+
+
+def test_764_an_uncuttable_runtime_cycle_is_left_to_the_walk(mrg_binary, fixture_env, tmp_path):
+    """Shape V3 (`w764d*`): `db -B-> dt`, `dt -R-> du`, `du -B-> db`. `dt` is build-used so its
+    runtime edge is not cuttable, `build_time_cycles` sees build edges only, so the cycle is neither
+    cut by the rule nor reported (no `build cycle` line); the name-ordered walk puts `du` before
+    `db` and the literal checker fails `du` (BDEPEND `db` merged later) although `dt, db, du` is
+    legal. OBSERVED DEFECT, pinned exactly: the owner decided on 2026-11-16 not to fix it in #764;
+    residue #771 (fallback to the first runtime-only edge). A change here has to be judged."""
+    rows, err, found = _plan_764(mrg_binary, fixture_env, tmp_path, "dev-libs/w764db")
+    assert rows == ["w764du", "w764dt", "w764db"], rows
+    assert "build cycle" not in err, err
+    assert [(f.property, f.package) for f in found] == [("build-order", "dev-libs/w764du-1")], found
+    assert "merged later" in found[0].reason and "merge it first" in found[0].reason

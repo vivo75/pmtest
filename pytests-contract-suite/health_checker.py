@@ -14,11 +14,11 @@ Properties, from portuale's charter (PMS-based, no Portage involved):
    slot holds two packages.
 2. Order is legal: every DEPEND/BDEPEND/IDEPEND atom of a merged package is
    matched by a package present when it is merged (installed, or merged
-   earlier), and that package is usable (PMS 8.1): its RDEPEND closure is
-   met by then too, and no DEPEND/BDEPEND blocker matches a package present
-   at that moment. A need only a later package of the same cycle can meet
-   (build-time and runtime edges between merges) is noted as an
-   unserializable cycle, not reported as a failure.
+   earlier), and no DEPEND/BDEPEND blocker matches a package present at that
+   moment. Charter-literal since backlog #749: whether the matched package
+   is usable (its RDEPEND closure met, PMS 8.1) is not checked, and a need
+   only a later package can meet is a `build-order` failure, also inside a
+   genuine build cycle.
 4. A removal (the `{"removal": ...}` document of `-C`, `--depclean`,
    `--prune` with `--pretend --json`) keeps every shared library that an
    ELF file staying installed still links against: the dynamic linker
