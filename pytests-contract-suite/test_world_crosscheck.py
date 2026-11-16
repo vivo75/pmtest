@@ -83,10 +83,41 @@ def test_a_fast_plan_stale_binding_the_plan_does_not_repair_is_noted():
              "provider": "c/d-2", "reason": "not satisfied by c/d-2"}
     fast = {"entries": [], "kept": [], "stale-bindings": [stale], "aborted": None}
     got = load().crosscheck({"entries": []}, fast, [])
-    assert kinds(got) == [("note", "fast-stale-binding-unrepaired")]
-    assert "a/b (c/d:0/1=: not satisfied by c/d-2)" in got[0].text
+    assert kinds(got) == [("judge", "stale-binding-fast-only"), ("note", "fast-stale-binding-unrepaired")]
+    assert "a/b (c/d:0/1=: not satisfied by c/d-2)" in got[1].text
     bare = {"entries": [], "kept": [], "aborted": None}
     assert load().crosscheck({"entries": []}, bare, []) == []
+
+
+def stale_fast(consumer, atom="c/d:0/1=", provider="c/d-2"):
+    row = {"consumer": consumer, "atom": atom, "provider": provider, "reason": "not satisfied by " + str(provider)}
+    return {"entries": [], "kept": [], "stale-bindings": [row], "aborted": None}
+
+
+def test_a_stale_binding_only_the_fast_plan_names_is_judged():
+    """Backlog #766: the two plans apply one PMS rule; a consumer only the fast plan names is a
+    judge line. The key is the consumer `cat/pkg` (the resolver prints `cat/pkg-ver`)."""
+    got = load().crosscheck({"entries": []}, stale_fast("a/b"), [])
+    assert ("judge", "stale-binding-fast-only") in kinds(got)
+    assert "a/b" in next(l.text for l in got if l.kind == "stale-binding-fast-only")
+
+
+def test_a_stale_binding_only_the_resolver_names_is_judged():
+    resolver = {"entries": [], "stale-bindings": [
+        {"consumer": "a/b-1", "atom": "=c/d-1*", "provider": "c/d-2"}]}
+    bare = {"entries": [], "kept": [], "aborted": None}
+    got = load().crosscheck(resolver, bare, [])
+    assert kinds(got) == [("judge", "stale-binding-resolver-only")]
+    assert "a/b" in got[0].text
+
+
+def test_a_stale_binding_both_name_gives_no_line_to_judge():
+    """The same consumer on both sides is agreement at the key, even when the row text differs (the
+    fast plan's null provider for a consumer outside its walk, #768): only the note remains."""
+    resolver = {"entries": [], "stale-bindings": [
+        {"consumer": "a/b-1", "atom": "=c/d-1*", "provider": "c/d-2"}]}
+    got = load().crosscheck(resolver, stale_fast("a/b", provider=None), [])
+    assert kinds(got) == [("note", "fast-stale-binding-unrepaired")]
 
 
 def test_the_command_line_prints_the_lines_and_exits_zero(tmp_path):

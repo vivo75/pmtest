@@ -80,7 +80,9 @@ changes the result. Unit test: `pytests-contract-suite/test_check_world_mutants.
 sets the resolver's `@world` plan, `mrg --plan-world --json` and
 `mrg --check-world --json` side by side and labels each line `[judge]`
 (version differs, a world atom the check calls unsatisfiable that a plan
-holds, a resolver that refused a world the check finds clean) or `[note]`
+holds, a resolver that refused a world the check finds clean, a consumer whose
+stale slot-operator binding only one plan names: `stale-binding-fast-only` /
+`stale-binding-resolver-only`, keyed by the consumer `cat/pkg`) or `[note]`
 (a slot only one plan lists; the resolver's reinstalls counted apart). It
 never fails by itself. `run/l0-health.sh` runs it for the default resolver
 plan and for `--getbinpkg=n`, prints it as the report section "world

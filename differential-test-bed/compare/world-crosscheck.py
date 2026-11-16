@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Set three views of one @world side by side: the resolver's plan
-(`emerge -pv --json --update --deep --newuse @world`), the fast plan
+(`emerge -pv --json --update --deep --newuse @world`; the `default` pair
+of `run/l0-health.sh` is `-puvD`, the `nobin` pair `-puvDN --getbinpkg=n`), the fast plan
 (`mrg --plan-world --json`) and, when given, the check
 (`mrg --check-world --json`, one JSON object per line).
 
@@ -17,6 +18,10 @@ by itself. Each output line says which class it is:
                                      resolver's reinstalls are counted
                                      apart: the fast plan rebuilds only for
                                      a slot operator)
+  [judge] stale-binding-fast-only / stale-binding-resolver-only
+                                     a consumer whose recorded slot-operator
+                                     binding only one plan names as unrepaired
+                                     (key: the consumer cat/pkg; backlog #766)
   [note]  fast-stale-binding-unrepaired
                                      a kept package whose recorded slot-
                                      operator binding the fast plan does
@@ -142,7 +147,24 @@ def crosscheck(resolver: dict, fast: dict, findings: list[dict] | None = None) -
         notes.append(Line("note", "fast-stale-binding-unrepaired",
                            f"{stale['consumer']} ({stale['atom']}: "
                            f"{stale.get('reason', 'not rebuilt')})"))
+    judge += stale_binding_lines(resolver, fast)
     return judge + notes
+
+
+def stale_binding_lines(resolver: dict, fast: dict) -> list[Line]:
+    """One PMS rule (`:=` bound to a sub-slot the plan leaves behind), two implementations: a
+    consumer only one plan names as unrepaired is a line to judge. The key is the consumer
+    `cat/pkg` (the resolver prints `cat/pkg-ver`); the atom and provider text are not compared,
+    because the fast plan prints a null provider for a consumer outside its walk (backlog #768)."""
+    ours = {s["consumer"]: s for s in fast.get("stale-bindings", [])}
+    theirs = {"/".join(hc.split_cpv(s["consumer"])[:2]): s for s in resolver.get("stale-bindings", [])}
+    lines = [Line("judge", "stale-binding-fast-only",
+                  f"{who}: the fast plan leaves its binding {ours[who]['atom']} unrepaired, the resolver does not name it")
+             for who in sorted(ours.keys() - theirs.keys())]
+    lines += [Line("judge", "stale-binding-resolver-only",
+                   f"{who}: the resolver leaves its dependency {theirs[who]['atom']} unrepaired, the fast plan does not name it")
+              for who in sorted(theirs.keys() - ours.keys())]
+    return lines
 
 
 def summary(lines: list[Line]) -> str:
