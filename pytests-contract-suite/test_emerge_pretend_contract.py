@@ -3206,6 +3206,7 @@ CASES = [
     ("#727: a new package whose || group lists the new p569prov first, in the shared ROOT where p569prov is not installed (the withheld-provider shape needs its own ROOT: test_727_*)", ["--pretend", "dev-libs/p727top"], 0),
     ("#753: the owner's USE-conditional build-time pair bootstraps to three rows (boot with USE=-useboh, the middle, the definitive rebuild; charter 2a, rc 0)", ["--pretend", "dev-libs/w753pkgnew", "dev-libs/w753otherpkg"], 0),
     ("#761: an upgrade leaves an installed consumer whose recorded =pin forbids it stale, and says so (charter property 5, rc 0)", ["--pretend", "--update", "dev-libs/p569prov"], 0),
+    ("#765: --solver=pubgrub names the same stale binding as the default solver (#761; charter property 5, rc 0)", ["--solver=pubgrub", "--pretend", "--update", "dev-libs/p569prov"], 0),
 ]
 
 
@@ -40416,4 +40417,47 @@ def test_761_a_stale_binding_the_plan_cannot_repair_is_named(emerge_binary, fixt
         }
     ], doc
     plain = json.loads(_run([str(emerge_binary)], ["--pretend", "--json", "dev-libs/newpkg"], fixture_env).stdout)
+    assert "stale-bindings" not in plain, plain
+
+
+_STALE_NOTE_765 = [
+    "NOTE: One or more installed packages keep a stale slot-operator binding that was not rebuilt:",
+    "",
+    "  dev-libs/p569virt-1: its dependency =dev-libs/p569prov-5.42* is not satisfied by dev-libs/p569prov-5.44",
+    "",
+    "  Rebuild them once a visible version accepts the new provider, or unmerge them if they are unused.",
+]
+
+
+@pytest.mark.parametrize("solver", ["", "--solver=pubgrub"])
+def test_765_both_solvers_name_a_stale_binding_the_plan_cannot_repair(
+    emerge_binary, fixture_env, solver
+):
+    """Backlog #765, charter property 5 ("every error names the cause and says at least one
+    thing the user can do"). The #761 shape (`dev-libs/p569prov` moves to 5.44 while the installed
+    `dev-libs/p569virt-1` records `=dev-libs/p569prov-5.42*`) printed the NOTE only with the
+    default solver: the `--solver=pubgrub` bridge ran the same scan and dropped its refusals.
+    Expected text: the #761 pin (`test_761_*`), identical for both solvers. rc stays 0,
+    `--quiet` hides it, `--json` carries `stale-bindings` only when there is one. The pubgrub
+    parameter proves it reached the bridge (`PORTUALE_PG_TRACE=1` writes `pg-*` trace lines
+    there and none with the default solver)."""
+    args = [a for a in (solver, "--pretend") if a]
+    env = dict(fixture_env, PORTUALE_PG_TRACE="1")
+    got = _run([str(emerge_binary)], [*args, "--update", "dev-libs/p569prov"], env)
+    assert got.returncode == 0, (got.stdout, got.stderr)
+    assert bool(got.stderr.count("pg-")) == bool(solver), got.stderr[:300]
+    assert got.stdout.splitlines()[-5:] == _STALE_NOTE_765, got.stdout
+    quiet = _run([str(emerge_binary)], [*args, "--quiet", "--update", "dev-libs/p569prov"], fixture_env)
+    assert "stale slot-operator binding" not in quiet.stdout, quiet.stdout
+    doc = json.loads(
+        _run([str(emerge_binary)], [*args, "--json", "--update", "dev-libs/p569prov"], fixture_env).stdout
+    )
+    assert doc["stale-bindings"] == [
+        {
+            "consumer": "dev-libs/p569virt-1",
+            "atom": "=dev-libs/p569prov-5.42*",
+            "provider": "dev-libs/p569prov-5.44",
+        }
+    ], doc
+    plain = json.loads(_run([str(emerge_binary)], [*args, "--json", "dev-libs/newpkg"], fixture_env).stdout)
     assert "stale-bindings" not in plain, plain
