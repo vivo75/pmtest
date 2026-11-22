@@ -271,6 +271,8 @@ _VIRT_DIFF_768 = {"consumers only the resolver names": [_VIRT_766],
     pytest.param("outpin", {_REINST_PIN_766}, set(), True, False, id="outpin-pin-outside"),
     # p569virt is walked here and both rebuild it; pubgrub does not yet (#770).
     pytest.param("pull", {_PULL_766}, {_VIRT_766}, False, True, id="pull-walked-consumer"),
+    # A consumer with no ebuild left: both name it (owner Q2(b)); the rows differ by contract.
+    pytest.param("gone", None, set(), True, False, id="gone-no-ebuild"),
 ])
 def test_766_the_two_plans_agree_on_the_stale_consumers(
     mrg_binary, emerge_binary, fixture_env, tmp_path, solver, name, rows, reinstalls, virt, default_only
@@ -290,8 +292,14 @@ def test_766_the_two_plans_agree_on_the_stale_consumers(
     bound = _bound_766(root)
     fast, res = _view_766(fast_doc, bound, False), _view_766(res_doc, bound, True)
     assert _differences_766(fast, res) == (_VIRT_DIFF_768 if virt else {})
-    assert fast == (rows, reinstalls | ({_VIRT_766} if virt else set())), fast
-    assert res == (rows | ({_VIRT_RES_766} if virt else set()), reinstalls), res
+    extra_fast = {_VIRT_766} if virt else set()
+    extra_res = {_VIRT_RES_766} if virt else set()
+    if rows is None:  # `gone`: the fast plan says "no visible ebuild" (null provider), the resolver names the provider
+        assert fast == ({("dev-libs/p766gone", _BIND_766, None)}, reinstalls | extra_fast), fast
+        assert res == ({("dev-libs/p766gone", _BIND_766, _NEW_766)} | extra_res, reinstalls), res
+    else:
+        assert fast == (rows, reinstalls | extra_fast), fast
+        assert res == (rows | extra_res, reinstalls), res
     if virt:  # the fast plan's rebuild can be built: the arm package is in the plan
         assert any(e["category"] + "/" + e["package"] == "dev-libs/p569core" and e.get("outcome") == "new"
                    for e in fast_doc["entries"]), fast_doc["entries"]
@@ -299,7 +307,6 @@ def test_766_the_two_plans_agree_on_the_stale_consumers(
 
 # (fast refusals, fast reinstalls, resolver refusals, resolver reinstalls) per root and solver.
 _PINS_766 = {
-    "gone": ({("dev-libs/p766gone", _BIND_766, None)}, {_VIRT_766}, {_VIRT_RES_766}, set()),
     "pull": ({_PULL_766}, {_VIRT_766}, {_PULL_766}, {_VIRT_766}),
     "bdw": (set(), {"dev-libs/p698rebuild", _VIRT_766}, {_VIRT_RES_766}, set()),
 }
@@ -307,11 +314,10 @@ _PINS_766 = {
 
 @pytest.mark.parametrize("solver", _SOLVERS_766)
 @pytest.mark.parametrize("name, extra, klass", [
-    # A1: the fast plan names a consumer that has no ebuild; the resolver is silent (#768).
-    pytest.param("gone", (), "A1", id="gone-A1"),
     # S: the default solver files the `rR` of a walked stale consumer, pubgrub does not (#770).
     pytest.param("pull", (), "S", id="pull-S"),
-    # A4: under --usepkg bdeps are off, so the resolver does not read DEPEND (#769).
+    # A4: under --usepkg bdeps are off, so the resolver does not read DEPEND (#769). Kept on purpose (owner Q5(c)):
+    # --usepkg can mix prebuilt and to-be-built packages, a clean rule would hold only for --usepkgonly.
     pytest.param("bdw", ("--usepkg",), "A4", id="bdw-usepkg-A4"),
 ])
 def test_766_the_known_differences_are_pinned_exactly(
@@ -331,6 +337,27 @@ def test_766_the_known_differences_are_pinned_exactly(
         rreinst = set()
     assert fast == (frows, freinst), fast
     assert res == (rrows, rreinst), res
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_768_a_stale_consumer_with_no_ebuild_is_named(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #768, owner decision Q2(b) of 2026-11-16, charter property 5 (the cause is named):
+    an installed package whose `:=` binding the plan breaks and that has no ebuild left cannot be
+    rebuilt, so `emerge -puDN @world` names it in the stale-binding NOTE and in `--json`, on both
+    solvers. The expected text is the owner's wording, not Portage's (Portage prints nothing)."""
+    env = _root_766(fixture_env, tmp_path, "gone")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--update",
+            "--deep", "--newuse", "--getbinpkg=n"]
+    text = subprocess.run([*argv, "@world"], capture_output=True, text=True, env=env, check=False)
+    assert text.returncode == 0, text.stderr
+    assert ("  dev-libs/p766gone-1: its dependency dev-libs/p569prov:0/5.42= was built against a sub-slot "
+            "dev-libs/p569prov-5.44 does not have, and no ebuild of it is left to rebuild it from"
+            ) in text.stdout.splitlines(), text.stdout
+    doc = hc.parse_json_output(
+        subprocess.run([*argv, "--json", "@world"], capture_output=True, text=True, env=env, check=False).stdout)
+    rows = [r for r in doc["stale-bindings"] if r["consumer"] == "dev-libs/p766gone-1"]
+    assert rows == [{"consumer": "dev-libs/p766gone-1", "atom": _BIND_766, "provider": _NEW_766,
+                     "reason": "no ebuild"}], rows
 
 
 def test_766_the_agreement_check_can_fail():

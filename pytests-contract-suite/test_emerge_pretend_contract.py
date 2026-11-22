@@ -3178,7 +3178,7 @@ CASES = [
     ("#647: a co-scheduled upgrade kills the installed virtual's =prov arm, so the plain consumer's seed feed surfaces the ~ arm while the virtual stays kept (M5: p647enclocale + =p647prov-5.44.0, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p647enclocale", "=dev-libs/p647prov-5.44.0"], 0),
     ("#650/#657: the bare provider request merges the transient with no fresh puller outside it, so the replacing parent keeps both installed arms and neither fall-through arm merges (bare p650prov: U prov only, virtuals kept; bed libreoffice/gimp hold Test-Harness the same way; Portage N1 holds via the skip this leg does not render, rc 0)", ["--pretend", "--verbose", "dev-libs/p650prov"], 0),
     ("#650: with the transient skipped under the referenced holder pin both seeds are withheld, so only the provider and the holder reinstall (H1: p650prov + p650holder, R + R with the skip WARNING, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p650prov", "dev-perl/p650holder"], 0),
-    ("#656 leg (a): the bare provider request with installed+tree holders skips the transient, so only the provider reinstalls (bare p651prov: R prov with the skip WARNING, virtuals kept; supersedes the #651 guard description -- same argv, the world changed under it when enforcement-open landed; Portage H0/P2 reinstall with no fall-through, the skip block itself bed-oracled -- enforcement-open gate, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov"], 0),
+    ("#656 leg (a): the bare provider request with installed+tree holders skips the transient, so only the provider reinstalls (bare p651prov: U p651prov-5.44.0 plus two U virtuals; supersedes the #651 guard description -- same argv, the world changed under it when enforcement-open landed; Portage H0/P2 reinstall with no fall-through, the skip block itself bed-oracled -- enforcement-open gate, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov"], 0),
     ("#651: with the transient skipped under the chained holder pin both commit-before-conflict seeds are voided, so only the provider and the top reinstall (C1: p651prov + p651top, R + R with the skip WARNING, Portage 3.0.83, rc 0)", ["--pretend", "--verbose", "dev-libs/p651prov", "dev-perl/p651top"], 0),
     ("#652: the N-form consumer request holds the dead virtual after post-skip re-resolution, so no Sub-Name fall-through merges (N p652foo + N p652try, R top under the holder pin with the skip WARNING, virtuals kept; Portage NF oracle + texlive bed cell, rc 0)", ["--pretend", "--verbose", "dev-perl/p651top", "dev-perl/p652try"], 0),
     ("#652: under the live merging transient the Encode fall-through merges while TH stays held with the early consumer in the request (N enccore + U prov + N early, no TH pin, virtuals kept; libreoffice/gimp bed cells, rc 0)", ["--pretend", "--verbose", "dev-perl/p652early", "dev-libs/p651prov"], 0),
@@ -38061,8 +38061,8 @@ def test_651_bare_request_with_transient_merging_seeds_the_fall_through(
     dev-libs/p651prov` (no `--update`). The enforcement-open gate files the
     kept virtuals' `||` conflict when installed, tree-present
     `=p651prov-5.42*` requirers carry the pin (the three `p656hold` twins
-    plus the background holders; the treeless `p651pin` stays inert per the
-    N2 carve-in), so the bare transient no longer merges: one row (`R`
+    plus the background holders; the treeless `p651pin` is now named in the
+    stale-binding NOTE, owner decision Q2(b), #768), so the bare transient no longer merges: one row (`R`
     prov 5.42.2), both virtuals kept-silent, no fall-through, the skip
     WARNING block, `Total: 1 package (1 reinstall)`, rc 0. The old
     U-posture pin (N enccore + N thcore + U prov, no skip) died with the
@@ -38107,6 +38107,12 @@ def test_651_bare_request_with_transient_merging_seeds_the_fall_through(
         f"[ebuild     U  ] virtual/p651th-3.520.0::testrepo [3.500.0-r1::testrepo] to {root}",
         "",
         "Total: 3 packages (3 upgrades), Size of downloads: 0 KiB",
+        "",
+        "NOTE: One or more installed packages keep a stale slot-operator binding that was not rebuilt:",
+        "",
+        "  dev-perl/p651pin-1: its dependency dev-libs/p651prov:0/5.42= was built against a sub-slot dev-libs/p651prov-5.44.0 does not have, and no ebuild of it is left to rebuild it from",
+        "",
+        "  Rebuild them once a visible version accepts the new provider, or unmerge them if they are unused.",
     ], got.stdout
 
 
