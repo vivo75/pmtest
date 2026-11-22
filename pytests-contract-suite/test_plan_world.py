@@ -381,7 +381,7 @@ _A10_PIN_773 = ("dev-libs/p573virt", "=dev-libs/p569prov-5.42*", _NEW_766)
 # (resolver refusal rows, resolver stale reinstalls) per solver on root `a10`.
 _A10_773 = {
     "": (set(), {"dev-libs/p573virt"}),
-    "pubgrub": ({_VIRT_RES_766}, {"dev-libs/p573virt"}),
+    "pubgrub": ({_VIRT_RES_766, _A10_PIN_773}, set()),
 }
 
 
@@ -392,9 +392,10 @@ def test_773_a_consumer_whose_tree_pins_the_old_provider(mrg_binary, emerge_bina
     plan may not rebuild it against `p569prov-5.44`. The fast plan and the default solver keep the
     provider and rebuild the consumer; the fast plan also rebuilds the shared VDB's `p569virt-1`
     through its recorded `||` (owner decision 2026-11-22), needlessly once the provider stays
-    (residue #777). OBSERVED DEFECT on pubgrub, pinned exactly until the fix (plan
-    `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`): it upgrades the provider AND
-    rebuilds the consumer."""
+    (residue #777). pubgrub keeps the upgrade, does not rebuild the consumer and names it in
+    the stale-binding NOTE (owner decision Q1 (A), 2026-11-22; plan
+    `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`); the default solver and the fast
+    plan hold the provider back instead."""
     env = _root_766(fixture_env, tmp_path, "a10")
     fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
     bound = _bound_766(tmp_path / "root")
