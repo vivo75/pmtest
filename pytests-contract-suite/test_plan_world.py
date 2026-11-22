@@ -255,6 +255,8 @@ _VIRT_DIFF_768 = {"consumers only the resolver names": [_VIRT_766],
 @pytest.mark.parametrize("name, rows, reinstalls, virt, default_only", [
     pytest.param("ctl", set(), set(), False, False, id="ctl-nothing-stale"),
     pytest.param("r703", set(), set(), False, False, id="r703-provider-held-back"),
+    # A recorded pin the tree ebuild lets go: both reinstall it (owner Q4(a), #769).
+    pytest.param("r698", set(), {"dev-libs/p698rebuild", "dev-libs/p698reinst"}, True, False, id="r698-holder-route"),
     # Only the p569virt difference (owner decision 2026-11-22).
     pytest.param("prov", set(), set(), True, False, id="prov-consumer-outside-the-walk"),
     # A consumer inside the walk with the binding in DEPEND: both rebuild it.
@@ -297,10 +299,6 @@ def test_766_the_two_plans_agree_on_the_stale_consumers(
 
 # (fast refusals, fast reinstalls, resolver refusals, resolver reinstalls) per root and solver.
 _PINS_766 = {
-    "r698": (
-        {_REINST_PIN_766}, {"dev-libs/p698rebuild", _VIRT_766},
-        {_VIRT_RES_766}, {"dev-libs/p698rebuild", "dev-libs/p698reinst"},
-    ),
     "gone": ({("dev-libs/p766gone", _BIND_766, None)}, {_VIRT_766}, {_VIRT_RES_766}, set()),
     "pull": ({_PULL_766}, {_VIRT_766}, {_PULL_766}, {_VIRT_766}),
     "bdw": (set(), {"dev-libs/p698rebuild", _VIRT_766}, {_VIRT_RES_766}, set()),
@@ -309,8 +307,6 @@ _PINS_766 = {
 
 @pytest.mark.parametrize("solver", _SOLVERS_766)
 @pytest.mark.parametrize("name, extra, klass", [
-    # D-698: the fast plan refuses what the resolver's holder route reinstalls (#769).
-    pytest.param("r698", (), "D-698", id="r698-D-698"),
     # A1: the fast plan names a consumer that has no ebuild; the resolver is silent (#768).
     pytest.param("gone", (), "A1", id="gone-A1"),
     # S: the default solver files the `rR` of a walked stale consumer, pubgrub does not (#770).
