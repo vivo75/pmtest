@@ -253,29 +253,29 @@ _VIRT_DIFF_768 = {"consumers only the resolver names": [_VIRT_766],
 
 
 @pytest.mark.parametrize("solver", _SOLVERS_766)
-@pytest.mark.parametrize("name, rows, reinstalls, virt, default_only", [
-    pytest.param("ctl", set(), set(), False, False, id="ctl-nothing-stale"),
-    pytest.param("r703", set(), set(), False, False, id="r703-provider-held-back"),
+@pytest.mark.parametrize("name, rows, reinstalls, virt", [
+    pytest.param("ctl", set(), set(), False, id="ctl-nothing-stale"),
+    pytest.param("r703", set(), set(), False, id="r703-provider-held-back"),
     # A recorded pin the tree ebuild lets go: both reinstall it (owner Q4(a), #769).
-    pytest.param("r698", set(), {"dev-libs/p698rebuild", "dev-libs/p698reinst"}, True, False, id="r698-holder-route"),
+    pytest.param("r698", set(), {"dev-libs/p698rebuild", "dev-libs/p698reinst"}, True, id="r698-holder-route"),
     # Only the p569virt difference (owner decision 2026-11-22).
-    pytest.param("prov", set(), set(), True, False, id="prov-consumer-outside-the-walk"),
+    pytest.param("prov", set(), set(), True, id="prov-consumer-outside-the-walk"),
     # A consumer inside the walk with the binding in DEPEND: both rebuild it.
-    pytest.param("bdw", set(), {"dev-libs/p698rebuild"}, True, False, id="bdw-consumer-inside-the-walk"),
+    pytest.param("bdw", set(), {"dev-libs/p698rebuild"}, True, id="bdw-consumer-inside-the-walk"),
     # A recorded text that does not reduce: the tree decides on both sides (owner Q3(a)).
-    pytest.param("unred", set(), {"dev-libs/p698rebuild"}, True, False, id="unred-tree-decides"),
+    pytest.param("unred", set(), {"dev-libs/p698rebuild"}, True, id="unred-tree-decides"),
     # Outside the walk, nothing holds it back: both rebuild it (owner Q1(a)).
-    pytest.param("outr", set(), {"dev-libs/p698rebuild"}, True, False, id="outr-rebuilt-outside-the-walk"),
+    pytest.param("outr", set(), {"dev-libs/p698rebuild"}, True, id="outr-rebuilt-outside-the-walk"),
     # Outside the walk, binding only in DEPEND: silent on both sides (Q-A (i)).
-    pytest.param("bdout", set(), set(), True, False, id="bdout-depend-only-outside"),
+    pytest.param("bdout", set(), set(), True, id="bdout-depend-only-outside"),
     # Outside the walk with a recorded pin and no `||`: refused on both sides, the tree is not asked.
-    pytest.param("outpin", {_REINST_PIN_766}, set(), True, False, id="outpin-pin-outside"),
-    pytest.param("pull", {_PULL_766}, {_VIRT_766}, False, False, id="pull-walked-consumer"),
+    pytest.param("outpin", {_REINST_PIN_766}, set(), True, id="outpin-pin-outside"),
+    pytest.param("pull", {_PULL_766}, {_VIRT_766}, False, id="pull-walked-consumer"),
     # A consumer with no ebuild left: both name it (owner Q2(b)); the rows differ by contract.
-    pytest.param("gone", None, set(), True, False, id="gone-no-ebuild"),
+    pytest.param("gone", None, set(), True, id="gone-no-ebuild"),
 ])
 def test_766_the_two_plans_agree_on_the_stale_consumers(
-    mrg_binary, emerge_binary, fixture_env, tmp_path, solver, name, rows, reinstalls, virt, default_only
+    mrg_binary, emerge_binary, fixture_env, tmp_path, solver, name, rows, reinstalls, virt
 ):
     """Backlog #766, #768: charter property 1 (a `:=` binding the plan breaks is repaired or
     said) and property 5 (named). On these roots `mrg --plan-world` and `emerge -puDN @world`
@@ -284,8 +284,6 @@ def test_766_the_two_plans_agree_on_the_stale_consumers(
     plan rebuilds it and the resolver refuses it (owner decision 2026-11-22, residue #793).
     Expected sets come from how each root is built (PMS `sec:slot-dep`) and from the owner's
     decisions of 2026-11-16 (Q1(a), Q3(a), Q-A (i)) and 2026-11-22, not from either program."""
-    if default_only and solver:
-        pytest.skip("pubgrub schedules no rebuild of a walked stale consumer: backlog #770")
     env = _root_766(fixture_env, tmp_path, name)
     root = tmp_path / "root"
     fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
