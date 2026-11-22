@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/w772eprov:=
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape E, build slot operator in a cycle
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=dd4023d46941ae868a0470f2d5b2c42a

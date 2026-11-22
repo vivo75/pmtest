@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/w772btwo
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape B, two-package build cycle
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=8d14e87b4a5e04faf6088fa887926dd4

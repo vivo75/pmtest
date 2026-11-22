@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/w772cuser
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape C, cycle through another slot
+EAPI=8
+KEYWORDS=amd64
+SLOT=2
+_md5_=272f9f591e5aac061fa49b6a0983b474

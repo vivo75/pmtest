@@ -1,0 +1,8 @@
+DEFINED_PHASES=-
+DEPEND=dev-libs/w772dprov:=
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape D, slot operator moved by the plan
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=dev-libs/w772dprov:=
+SLOT=0
+_md5_=9b8f2304f7f819393291d43a9744d7bb

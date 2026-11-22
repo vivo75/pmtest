@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape C, cycle through another slot
+EAPI=8
+KEYWORDS=amd64
+SLOT=1
+_md5_=7bf4438bb8ec983cb0a3f3b34c987893

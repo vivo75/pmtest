@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/w772duser
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape D, slot operator moved by the plan
+EAPI=8
+KEYWORDS=amd64
+SLOT=0/2
+_md5_=6aae16927e0585f824bd1ebddb58a380

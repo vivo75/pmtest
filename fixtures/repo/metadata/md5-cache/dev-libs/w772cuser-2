@@ -1,0 +1,7 @@
+BDEPEND=dev-libs/w772cslot
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: build cycle against installed versions (backlog #772), shape C, cycle through another slot
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=1f6d6167861e509857301f1bb96248dc
