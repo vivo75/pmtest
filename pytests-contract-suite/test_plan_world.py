@@ -269,8 +269,7 @@ _VIRT_DIFF_768 = {"consumers only the resolver names": [_VIRT_766],
     pytest.param("bdout", set(), set(), True, False, id="bdout-depend-only-outside"),
     # Outside the walk with a recorded pin and no `||`: refused on both sides, the tree is not asked.
     pytest.param("outpin", {_REINST_PIN_766}, set(), True, False, id="outpin-pin-outside"),
-    # p569virt is walked here and both rebuild it; pubgrub does not yet (#770).
-    pytest.param("pull", {_PULL_766}, {_VIRT_766}, False, True, id="pull-walked-consumer"),
+    pytest.param("pull", {_PULL_766}, {_VIRT_766}, False, False, id="pull-walked-consumer"),
     # A consumer with no ebuild left: both name it (owner Q2(b)); the rows differ by contract.
     pytest.param("gone", None, set(), True, False, id="gone-no-ebuild"),
 ])
@@ -307,15 +306,12 @@ def test_766_the_two_plans_agree_on_the_stale_consumers(
 
 # (fast refusals, fast reinstalls, resolver refusals, resolver reinstalls) per root and solver.
 _PINS_766 = {
-    "pull": ({_PULL_766}, {_VIRT_766}, {_PULL_766}, {_VIRT_766}),
     "bdw": (set(), {"dev-libs/p698rebuild", _VIRT_766}, {_VIRT_RES_766}, set()),
 }
 
 
 @pytest.mark.parametrize("solver", _SOLVERS_766)
 @pytest.mark.parametrize("name, extra, klass", [
-    # S: the default solver files the `rR` of a walked stale consumer, pubgrub does not (#770).
-    pytest.param("pull", (), "S", id="pull-S"),
     # A4: under --usepkg bdeps are off, so the resolver does not read DEPEND (#769). Kept on purpose (owner Q5(c)):
     # --usepkg can mix prebuilt and to-be-built packages, a clean rule would hold only for --usepkgonly.
     pytest.param("bdw", ("--usepkg",), "A4", id="bdw-usepkg-A4"),
@@ -326,15 +322,12 @@ def test_766_the_known_differences_are_pinned_exactly(
     """Backlog #766: the differences between the fast plan and the resolver that probes found
     (`LLM/evidence/02.766/before/classes.txt`), each as the exact fast set and the exact resolver
     set. These pins record CURRENT behaviour, not what is right: a change to either side moves a
-    pin and has to be judged, not absorbed. Class S differs only on pubgrub: there the resolver set has no reinstall (the two plans agree
-    on the default solver)."""
+    pin and has to be judged, not absorbed."""
     env = _root_766(fixture_env, tmp_path, name)
     fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver, extra)
     bound = _bound_766(tmp_path / "root")
     fast, res = _view_766(fast_doc, bound, False), _view_766(res_doc, bound, True)
     frows, freinst, rrows, rreinst = _PINS_766[name]
-    if klass == "S" and solver:  # pubgrub schedules no rebuild of the walked consumer
-        rreinst = set()
     assert fast == (frows, freinst), fast
     assert res == (rrows, rreinst), res
 
@@ -358,6 +351,29 @@ def test_768_a_stale_consumer_with_no_ebuild_is_named(emerge_binary, fixture_env
     rows = [r for r in doc["stale-bindings"] if r["consumer"] == "dev-libs/p766gone-1"]
     assert rows == [{"consumer": "dev-libs/p766gone-1", "atom": _BIND_766, "provider": _NEW_766,
                      "reason": "no ebuild"}], rows
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+@pytest.mark.parametrize("flags", [("--update", "--deep", "--newuse"), ("--update", "--deep")], ids=["uDN", "uD"])
+def test_770_both_solvers_rebuild_the_walked_installed_virtual(emerge_binary, fixture_env, tmp_path, solver, flags):
+    """Backlog #770, PMS `dependencies.tex` `sec:slot-dep` and charter property 1 (a `:=` binding
+    the plan breaks is repaired or said): `p569pull-2` moves `p569prov` to 5.44, so the installed
+    `p569virt-1`, recorded on `p569prov:0/5.42=` and walked below `p569pull`, is rebuilt, on both
+    solvers. The expected rows are derived from the root (the binding and the move), and equal the
+    default solver's output; nothing comes from Portage. The provider row's `r` tag is not compared
+    (pubgrub does not print it, backlog #780)."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", *flags, "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False,
+                         env={**env, "PORTUALE_PG_TRACE": "1"} if solver else env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    assert bool(re.search(r"^pg-", run.stderr, re.M)) == bool(solver), run.stderr[:300]
+    rows = [line for line in run.stdout.splitlines() if line.startswith("[ebuild")]
+    assert any(re.match(r"\[ebuild  rR    \] dev-libs/p569virt-1\b", line) for line in rows), rows
+    out = run.stdout
+    assert "causes rebuilds for:" in out, out
+    block = out.split("causes rebuilds for:")[0].splitlines()[-1] + out.split("causes rebuilds for:")[1].split("\n\n")[0]
+    assert "dev-libs/p569prov-5.44" in block and "dev-libs/p569virt-1" in block, block
 
 
 def test_766_the_agreement_check_can_fail():
