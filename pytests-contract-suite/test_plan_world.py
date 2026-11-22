@@ -157,6 +157,7 @@ _ROOTS_766 = {
         ["dev-libs/p569prov", "dev-libs/p698rebuild"],
         [("dev-libs/p698rebuild-1", "|| ( " + _BIND_766, "")],
     ),
+    "a10": (["dev-libs/p569prov"], [("dev-libs/p573virt-1", _BIND_766, "")]),
 }
 _VIRT_RES_766 = ("dev-libs/p569virt", "=dev-libs/p569prov-5.42*", _NEW_766)
 
@@ -374,6 +375,34 @@ def test_770_both_solvers_rebuild_the_walked_installed_virtual(emerge_binary, fi
     assert "causes rebuilds for:" in out, out
     block = out.split("causes rebuilds for:")[0].splitlines()[-1] + out.split("causes rebuilds for:")[1].split("\n\n")[0]
     assert "dev-libs/p569prov-5.44" in block and "dev-libs/p569virt-1" in block, block
+
+
+_A10_PIN_773 = ("dev-libs/p573virt", "=dev-libs/p569prov-5.42*", _NEW_766)
+# (resolver refusal rows, resolver stale reinstalls) per solver on root `a10`.
+_A10_773 = {
+    "": (set(), {"dev-libs/p573virt"}),
+    "pubgrub": ({_VIRT_RES_766}, {"dev-libs/p573virt"}),
+}
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_773_a_consumer_whose_tree_pins_the_old_provider(mrg_binary, emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #773. Root `a10`: the installed `p573virt-1` recorded `p569prov:0/5.42=`, and its
+    tree ebuild needs `=dev-libs/p569prov-5.42*`. PMS `sec:slot-dep` and charter property 1: a
+    plan may not rebuild it against `p569prov-5.44`. The fast plan and the default solver keep the
+    provider and rebuild the consumer; the fast plan also rebuilds the shared VDB's `p569virt-1`
+    through its recorded `||` (owner decision 2026-11-22), needlessly once the provider stays
+    (residue #777). OBSERVED DEFECT on pubgrub, pinned exactly until the fix (plan
+    `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`): it upgrades the provider AND
+    rebuilds the consumer."""
+    env = _root_766(fixture_env, tmp_path, "a10")
+    fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
+    bound = _bound_766(tmp_path / "root")
+    fast, res = _view_766(fast_doc, bound, False), _view_766(res_doc, bound, True)
+    assert fast == (set(), {"dev-libs/p573virt", "dev-libs/p569virt"}), fast
+    assert res == _A10_773[solver], res
+    moved = {e["package"] for e in res_doc["entries"] if e.get("outcome") == "upgrade"}
+    assert ("p569prov" in moved) == bool(solver), moved
 
 
 def test_766_the_agreement_check_can_fail():
