@@ -474,15 +474,93 @@ def test_764_an_unavoidable_late_tool_dependency_is_literal_legal(mrg_binary, fi
     assert found == [], found
 
 
-def test_764_an_uncuttable_runtime_cycle_is_left_to_the_walk(mrg_binary, fixture_env, tmp_path):
+def test_772_a_late_need_without_a_cycle_is_reported(mrg_binary, fixture_env, tmp_path):
     """Shape V3 (`w764d*`): `db -B-> dt`, `dt -R-> du`, `du -B-> db`. `dt` is build-used so its
-    runtime edge is not cuttable, `build_time_cycles` sees build edges only, so the cycle is neither
-    cut by the rule nor reported (no `build cycle` line); the name-ordered walk puts `du` before
-    `db` and the literal checker fails `du` (BDEPEND `db` merged later) although `dt, db, du` is
-    legal. OBSERVED DEFECT, pinned exactly: the owner decided on 2026-11-16 not to fix it in #764;
-    residue #771 (fallback to the first runtime-only edge). A change here has to be judged."""
+    runtime edge is not cuttable and the name-ordered walk puts `du` before `db`; the literal
+    checker fails `du` (BDEPEND `db` merged later) although `dt, db, du` is legal. The order is
+    still the walk's, so the plan says so, truthfully: no build path joins `du` and `db` (the
+    edge `dt -> du` is runtime), hence "no build cycle joins them". Charter 2a (literal) and 5;
+    the wording is the owner's decision Q2/Q3 of 2026-11-16, not Portage's."""
     rows, err, found = _plan_764(mrg_binary, fixture_env, tmp_path, "dev-libs/w764db")
     assert rows == ["w764du", "w764dt", "w764db"], rows
-    assert "build cycle" not in err, err
+    assert (
+        'plan-world: this order builds dev-libs/w764du:0 before its build dependency '
+        '"dev-libs/w764db", merged later; no build cycle joins them, so the order itself is wrong\n'
+    ) in err, err
     assert [(f.property, f.package) for f in found] == [("build-order", "dev-libs/w764du-1")], found
     assert "merged later" in found[0].reason and "merge it first" in found[0].reason
+
+
+# --- backlog #772: a cycle line only for a build need the produced order really breaks ------------
+#
+# The line used to list every build-time strongly connected component, whether or not the order it
+# came with built anything early. Now it is a check of the final rows: a build atom whose target is
+# merged later, that nothing installed (and still present) or earlier meets. Expected text from the
+# owner's decision Q2/Q3 of 2026-11-16; charter 2/2a/5 and PMS `dependencies.tex:340`, `:348-350`
+# (the `=` operator binds a `DEPEND` dependency only).
+
+def _plan_772(mrg_binary, fixture_env, tmp_path, world, installed):
+    """stderr lines about cycles and the literal failures of `--plan-world --json --sort depend`
+    on a scratch ROOT whose world holds `world` and whose VDB holds `installed` (cpv -> SLOT)."""
+    root = tmp_path / "root"
+    (root / "var/lib/portage").mkdir(parents=True)
+    (root / "var/lib/portage/world").write_text("".join(f"{w}\n" for w in world))
+    (root / "var/db/pkg").mkdir(parents=True)
+    for cpv, slot in installed.items():
+        entry = root / "var/db/pkg" / cpv
+        entry.mkdir(parents=True)
+        for key, text in (("CATEGORY", cpv.split("/")[0]), ("EAPI", "8"), ("SLOT", slot), ("repository", "testrepo")):
+            (entry / key).write_text(text + "\n")
+    env = dict(fixture_env)
+    env["ROOT"] = str(root)
+    env["PORTAGE_RUNNING_ROOT"] = str(root)
+    run = subprocess.run([str(mrg_binary), "--plan-world", "--json", "--sort", "depend"],
+                         capture_output=True, text=True, env=env, check=False)
+    assert run.returncode == 0, run.stderr
+    doc = hc.parse_json_output(run.stdout)
+    assert any(e["package"].startswith("w772") for e in doc["entries"]), "no w772 rows: the fixtures are missing"
+    found = [f for f in hc.check_document(doc, root / "var/db/pkg") if f.is_failure and not f.pre_existing]
+    lines = [line for line in run.stderr.splitlines() if "build cycle" in line or "before its build dependency" in line]
+    return lines, found
+
+
+@pytest.mark.parametrize("world, installed", [
+    pytest.param(["dev-libs/w772aone", "dev-libs/w772atwo"],
+                 {"dev-libs/w772aone-1": "0", "dev-libs/w772atwo-1": "0"}, id="w772a-both-installed"),
+    pytest.param(["dev-libs/w772cuser", "dev-libs/w772cslot"],
+                 {"dev-libs/w772cuser-1": "0", "dev-libs/w772cslot-1": "1"}, id="w772c-older-slot-installed"),
+    pytest.param(["dev-libs/w772euser", "dev-libs/w772eprov"],
+                 {"dev-libs/w772euser-1": "0", "dev-libs/w772eprov-1": "0/1"}, id="w772e-bdepend-slot-operator"),
+])
+def test_772_a_cycle_the_installed_versions_satisfy_is_not_reported(mrg_binary, fixture_env, tmp_path, world, installed):
+    """A build cycle whose late edge the installed version meets (any slot the atom allows; a
+    `:=` only in `BDEPEND` is no binding) breaks nothing: charter 2a asks that a build
+    dependency be installed before, not that it be in this plan earlier."""
+    lines, found = _plan_772(mrg_binary, fixture_env, tmp_path, world, installed)
+    assert lines == [], lines
+    assert found == [], found
+
+
+def test_772_an_unmet_build_cycle_names_its_real_path(mrg_binary, fixture_env, tmp_path):
+    """Control, charter 2a: the same cycle with nothing installed has no legal order, and the
+    line names the real build path, once."""
+    lines, _ = _plan_772(mrg_binary, fixture_env, tmp_path, ["dev-libs/w772bone", "dev-libs/w772btwo"], {})
+    assert lines == [
+        'plan-world: build cycle: dev-libs/w772btwo:0 -> dev-libs/w772bone:0 -> dev-libs/w772btwo:0; '
+        'this order builds dev-libs/w772btwo:0 before its build dependency "dev-libs/w772bone", merged later '
+        '(disable a USE flag on one of these packages to break the cycle)'], lines
+
+
+def test_772_a_moved_binding_is_still_a_need(mrg_binary, fixture_env, tmp_path):
+    """PMS `dependencies.tex:348-350`: the `=` binding of a `DEPEND` dependency is to the installed
+    sub-slot; a plan that replaces the provider with another sub-slot later leaves the binding
+    stale, although an installed version "meets" the atom."""
+    lines, found = _plan_772(mrg_binary, fixture_env, tmp_path, ["dev-libs/w772duser", "dev-libs/w772dprov"],
+                             {"dev-libs/w772duser-1": "0", "dev-libs/w772dprov-1": "0/1"})
+    assert lines == [
+        'plan-world: build cycle: dev-libs/w772duser:0 -> dev-libs/w772dprov:0 -> dev-libs/w772duser:0; '
+        'this order builds dev-libs/w772duser:0 before its build dependency "dev-libs/w772dprov:=", merged later; '
+        'the installed dev-libs/w772dprov-1 meets it, but this plan replaces it with sub-slot 2, so '
+        "dev-libs/w772duser:0's binding would go stale "
+        '(disable a USE flag on one of these packages to break the cycle)'], lines
+    assert found == [], found  # the literal checker cannot see a moved `:=` binding
