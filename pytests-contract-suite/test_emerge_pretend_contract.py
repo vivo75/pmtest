@@ -40467,3 +40467,48 @@ def test_765_both_solvers_name_a_stale_binding_the_plan_cannot_repair(
     ], doc
     plain = json.loads(_run([str(emerge_binary)], [*args, "--json", "dev-libs/newpkg"], fixture_env).stdout)
     assert "stale-bindings" not in plain, plain
+
+
+def test_794_depclean_keeps_what_only_the_profile_set_reaches(
+    emerge_binary, tmp_path, fixtures_root
+):
+    """Backlog #794: `emerge --pretend --depclean` requires `@profile` (the
+    profile's unstarred `packages` lines) next to `@selected` and `@system`.
+
+    Charter property 1: a depclean must not remove what the system still
+    names. Seen on 2026-11-22 on a real desktop container: Portage 3.0.82.2
+    kept 2231 of 2231 packages, every one `pulled in by: @profile requires
+    ...`, while portuale listed 286 for removal. Here the user profile names
+    `dev-libs/dcorphan`: it and its private dependency `dcorphandep` are
+    kept, and the statistics gain Portage's `Packages in profile:` line."""
+    env, _ = _t346_user_profile_root(
+        tmp_path / "cfg-root", fixtures_root, {"packages": "dev-libs/dcorphan\n"}
+    )
+    env["ROOT"] = str(_depclean_root(tmp_path))
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean"], env)
+    assert result.returncode == 0, result.stderr
+    out = result.stdout.splitlines()
+    assert [ln for ln in out if ln.startswith(" dev-libs/")] == []
+    stats = [ln for ln in out if ln.startswith("Packages ") or ln.startswith("Required")]
+    assert "Packages in profile:  1" in stats
+    assert stats[-1].startswith("Required packages:    9")
+
+
+def test_794_depclean_refuses_when_a_kept_packages_dependencies_cannot_be_read(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #794: a world package whose stored RDEPEND does not parse makes
+    `--depclean` stop (rc 1, nothing listed) instead of treating it as having
+    no dependencies and listing everything it keeps.
+
+    Charter property 1. Not a Portage message: Portage's parser raises on the
+    same string and aborts; the wording is portuale's own."""
+    env = _depclean_env(fixture_env, tmp_path)
+    root = Path(env["ROOT"])
+    (root / "var/db/pkg/dev-libs/dcworld-1.0/RDEPEND").write_text(
+        "|| ( dev-libs/dcdep dev-libs/dcsub\n"
+    )
+    result = _run([str(emerge_binary)], ["--pretend", "--depclean"], env)
+    assert result.returncode == 1
+    assert "dev-libs/dcworld-1.0 (RDEPEND)" in result.stderr
+    assert " dev-libs/" not in result.stdout
