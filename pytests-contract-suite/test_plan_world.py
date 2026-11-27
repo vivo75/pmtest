@@ -499,6 +499,26 @@ def test_809_an_arm_that_cannot_be_merged_is_a_pin_not_an_abort(emerge_binary, f
     assert "p809virt-1" in run.stdout, run.stdout
 
 
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_780_a_holder_rebuild_is_tagged_and_named_without_a_deep_walk(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #780, charter property 5 (the plan says what causes a rebuild). Root `pull`,
+    `emerge -pv --update @world` (no `--deep`): `p569pull-2` moves `p569prov` to 5.44, so the
+    installed `p569virt-1` (recorded `:0/5.42=`) is rebuilt. The default solver's rows are the
+    comparison: the rebuild row carries the red `r` (`rR`) and the NOTE's "causes rebuilds for"
+    block lists the consumer. pubgrub printed a bare `R` and no pair. The provider row's own `r`
+    is not compared: the default solver tags it only when a slot conflict files it (#810)."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = {m.group(2): m.group(1).replace(" ", "")
+            for m in (re.match(r"^\[ebuild([^\]]*)\] (\S+?)(?::\S+)?(?: \[.*?\])?(?: to .*)?$", l)
+                      for l in run.stdout.splitlines()) if m}
+    assert rows["dev-libs/p569virt-1"] == "rR", rows
+    assert "causes rebuilds for:\n    (dev-libs/p569virt-1:0/0" in run.stdout, run.stdout
+
+
 def test_766_the_agreement_check_can_fail():
     """A self-test of the comparison: documents that differ are reported, so a green agreement
     test is not vacuous. Hand-made views, no program run."""
