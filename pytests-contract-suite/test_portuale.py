@@ -3947,6 +3947,40 @@ def test_emerge_atom_without_pretend_really_builds_and_merges_from_source(
     assert world_lines == sorted(world_lines)
 
 
+def test_emerge_bare_name_target_is_recorded_in_world_with_its_category(
+    emerge_binary, tmp_path
+):
+    """`emerge packagepkg` (no category) merges `dev-libs/packagepkg` and
+    records `dev-libs/packagepkg` in `world`: the favorites record must see
+    the package the resolver expanded the bare name to, not the raw word
+    (PR #1). Source: Portage `depgraph.saveNomergeFavorites` records the
+    expanded atom; the health property is that the user's request is not
+    silently dropped from `world`, which `emerge --depclean` relies on."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(Path(FIXTURES_ROOT) / "var", root / "var", ignore=fixtures_copytree_ignore())
+    env = dict(os.environ)
+    env["PORTAGE_CONFIGROOT"] = FIXTURES_ROOT
+    env["ROOT"] = str(root)
+    env["DISTDIR"] = str(Path(FIXTURES_ROOT) / "distfiles")
+    env["PORTAGE_TMPDIR"] = str(tmp_path / "portage-tmpdir")
+
+    result = subprocess.run(
+        [str(emerge_binary), "packagepkg"],
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    assert (root / "var/db/pkg/dev-libs/packagepkg-1.0").is_dir()
+    assert '>>> Recording dev-libs/packagepkg in "world" favorites file...' in result.stdout
+    world_lines = (root / "var/lib/portage/world").read_text().split()
+    assert "dev-libs/packagepkg" in world_lines
+    assert "dev-libs/samepkg" not in world_lines
+
+
 def test_emerge_failed_build_prints_emerging_but_no_installing_line(
     emerge_binary, tmp_path
 ):
