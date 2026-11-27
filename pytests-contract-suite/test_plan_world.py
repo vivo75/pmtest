@@ -158,6 +158,9 @@ _ROOTS_766 = {
         [("dev-libs/p698rebuild-1", "|| ( " + _BIND_766, "")],
     ),
     "a10": (["dev-libs/p569prov"], [("dev-libs/p573virt-1", _BIND_766, "")]),
+    # #808: the consumer's tree accepts the new provider through a `||` arm naming a package the plan
+    # does not merge on its own.
+    "a808": (["dev-libs/p569prov"], [("dev-libs/p808virt-1", _BIND_766, "")]),
     # #774: the only version of the holder that accepts the new provider is keyword-masked.
     "w774": (["dev-libs/p569prov", "dev-libs/p774mask"], [("dev-libs/p774mask-1", _PIN_766, "")]),
     # #775: installed 1 accepts the new provider; the newest visible version, 2, still pins the old one.
@@ -410,7 +413,7 @@ _A10_PIN_773 = ("dev-libs/p573virt", "=dev-libs/p569prov-5.42*", _NEW_766)
 # (resolver refusal rows, resolver stale reinstalls) per solver on root `a10`.
 _A10_773 = {
     "": (set(), {"dev-libs/p573virt"}),
-    "pubgrub": ({_VIRT_RES_766, _A10_PIN_773}, set()),
+    "pubgrub": (set(), set()),
 }
 
 
@@ -421,10 +424,10 @@ def test_773_a_consumer_whose_tree_pins_the_old_provider(mrg_binary, emerge_bina
     plan may not rebuild it against `p569prov-5.44`. The fast plan and the default solver keep the
     provider and rebuild the consumer; the fast plan also rebuilds the shared VDB's `p569virt-1`
     through its recorded `||` (owner decision 2026-11-22), needlessly once the provider stays
-    (residue #777). pubgrub keeps the upgrade, does not rebuild the consumer and names it in
-    the stale-binding NOTE (owner decision Q1 (A), 2026-11-22; plan
-    `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`); the default solver and the fast
-    plan hold the provider back instead."""
+    (residue #777). pubgrub first kept the upgrade and named the consumer in the stale-binding
+    NOTE (owner decision Q1 (A), 2026-11-22; plan `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`);
+    since #791 (option B) it holds the provider back like the other two and says why
+    (`test_791_*`)."""
     env = _root_766(fixture_env, tmp_path, "a10")
     fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
     bound = _bound_766(tmp_path / "root")
@@ -432,7 +435,50 @@ def test_773_a_consumer_whose_tree_pins_the_old_provider(mrg_binary, emerge_bina
     assert fast == (set(), {"dev-libs/p573virt", "dev-libs/p569virt"}), fast
     assert res == _A10_773[solver], res
     moved = {e["package"] for e in res_doc["entries"] if e.get("outcome") == "upgrade"}
-    assert ("p569prov" in moved) == bool(solver), moved
+    assert "p569prov" not in moved, moved
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_791_pubgrub_holds_the_provider_a_pinned_consumer_cannot_follow(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #791 (option B of #773's Q1), PMS `sec:slot-dep` and charter properties 1 and 5.
+    Root `a10`, `emerge -pv --update --deep @world`: the installed `p573virt-1` recorded
+    `p569prov:0/5.42=` and its tree ebuild needs `=p569prov-5.42*`, and nothing else requires
+    `p569prov-5.44`. Upgrading the provider would leave the consumer's binding stale with no rebuild
+    able to repair it, so every solver keeps `p569prov` at 5.42. The default solver says so with its
+    skip WARNING; pubgrub names the cause in the "cannot follow" NOTE. Expected: no `p569prov` row."""
+    env = _root_766(fixture_env, tmp_path, "a10")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    assert "dev-libs/p569prov-5.44" not in "".join(l for l in run.stdout.splitlines() if l.startswith("[ebuild")), run.stdout
+    if solver:
+        assert "dev-libs/p573virt-1 needs =dev-libs/p569prov-5.42*" in run.stdout, run.stdout
+        assert "No visible version of dev-libs/p573virt accepts dev-libs/p569prov-5.44." in run.stdout, run.stdout
+        assert "keep a stale slot-operator binding" not in run.stdout, run.stdout
+    else:
+        assert "=dev-libs/p569prov-5.42* required by" in run.stdout, run.stdout
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_808_pubgrub_asks_for_the_arm_that_accepts_the_new_provider(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #808, PMS `sec:slot-dep` and charter properties 1 and 3. Root `a808`,
+    `emerge -pv --update --deep @world`: the installed `p808virt-1` recorded `p569prov:0/5.42=`;
+    its tree ebuild offers `|| ( =p569prov-5.42* p808other ) p569prov:=`, so it can follow the
+    upgrade to 5.44 through `p808other`, which nothing in the plan pulls in. Both solvers merge
+    `p808other` (new) and rebuild `p808virt` (the default solver's rows are the comparison)."""
+    env = _root_766(fixture_env, tmp_path, "a808")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = {m.group(2): m.group(1).replace(" ", "")
+            for m in (re.match(r"^\[ebuild([^\]]*)\] (\S+?)(?::\S+)?(?: \[.*?\])?(?: to .*)?$", l)
+                      for l in run.stdout.splitlines()) if m}
+    assert rows["dev-libs/p569prov-5.44"].endswith("U"), rows
+    assert rows["dev-libs/p808other-1"] == "N", rows
+    assert rows["dev-libs/p808virt-1"].endswith("R"), rows
+    assert "p808virt-1: its dependency" not in run.stdout, run.stdout
 
 
 def test_766_the_agreement_check_can_fail():
