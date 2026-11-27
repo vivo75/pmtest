@@ -161,6 +161,8 @@ _ROOTS_766 = {
     # #808: the consumer's tree accepts the new provider through a `||` arm naming a package the plan
     # does not merge on its own.
     "a808": (["dev-libs/p569prov"], [("dev-libs/p808virt-1", _BIND_766, "")]),
+    # #809: the accepting `||` arm names a package that does not exist.
+    "a809": (["dev-libs/p569prov"], [("dev-libs/p809virt-1", _BIND_766, "")]),
     # #774: the only version of the holder that accepts the new provider is keyword-masked.
     "w774": (["dev-libs/p569prov", "dev-libs/p774mask"], [("dev-libs/p774mask-1", _PIN_766, "")]),
     # #775: installed 1 accepts the new provider; the newest visible version, 2, still pins the old one.
@@ -479,6 +481,22 @@ def test_808_pubgrub_asks_for_the_arm_that_accepts_the_new_provider(emerge_binar
     assert rows["dev-libs/p808other-1"] == "N", rows
     assert rows["dev-libs/p808virt-1"].endswith("R"), rows
     assert "p808virt-1: its dependency" not in run.stdout, run.stdout
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_809_an_arm_that_cannot_be_merged_is_a_pin_not_an_abort(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #809, charter properties 1 and 5. Root `a809`, `emerge -pv --update --deep @world`:
+    the tree of the installed `p809virt-1` accepts the new provider only through
+    `|| ( ... dev-libs/p809missing )`, a package that does not exist. Both solvers keep
+    `p569prov` at 5.42 and finish with exit code 0; pubgrub used to stop with
+    "the requested targets depends on dev-libs/p809missing"."""
+    env = _root_766(fixture_env, tmp_path, "a809")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    assert "p569prov-5.44" not in "".join(l for l in run.stdout.splitlines() if l.startswith("[ebuild")), run.stdout
+    assert "p809virt-1" in run.stdout, run.stdout
 
 
 def test_766_the_agreement_check_can_fail():
