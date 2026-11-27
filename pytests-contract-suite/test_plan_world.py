@@ -379,6 +379,33 @@ def test_770_both_solvers_rebuild_the_walked_installed_virtual(emerge_binary, fi
     assert "dev-libs/p569prov-5.44" in block and "dev-libs/p569virt-1" in block, block
 
 
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_781_a_plain_update_follows_a_provider_move_the_plan_requires(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #781, PMS `sec:slot-dep` and charter properties 1 and 5. Root `pull`,
+    `emerge -pv --update @world` (no `--deep`): world `p569pull` becomes `-2`, whose tree ebuild
+    needs `p569prov-5.44`, so the move is required, not optional. The installed `p569virt-1`
+    recorded `p569prov:0/5.42=`; its tree ebuild offers `|| ( =p569prov-5.42* ... ~p569core-1.0 )`,
+    so it can follow through the `p569core` arm and is rebuilt. pubgrub used to hold the provider
+    back, plan `p569pull-1` and print a false "No visible version of p569virt accepts" note. Expected
+    rows are derived from the root and equal the default solver's (the `r` tag and the cause pair
+    are not compared: backlog #780)."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = [re.sub(r"^\[ebuild([^\]]*)\] (\S+?)(:\S+)?( \[.*?\])?( to .*)?$",
+                   lambda m: m.group(1).replace(" ", "") + " " + m.group(2), line)
+            for line in run.stdout.splitlines() if line.startswith("[ebuild")]
+    kinds = {r.split(" ")[-1].rsplit("-", 1)[0]: r.split(" ")[0] for r in rows}
+    assert kinds["dev-libs/p569prov"].endswith("U"), rows
+    assert kinds["dev-libs/p569core"] == "N", rows
+    assert kinds["dev-libs/p569pull"] == "N" and any(r.endswith("p569pull-2") for r in rows), rows
+    assert any(r.endswith("p569virt-1") and r.split(" ")[0].endswith("R") for r in rows), rows
+    assert "No visible version" not in run.stdout, run.stdout
+    assert "dev-libs/p573virt-1: its dependency =dev-libs/p569prov-5.42* is not satisfied" in run.stdout, run.stdout
+
+
 _A10_PIN_773 = ("dev-libs/p573virt", "=dev-libs/p569prov-5.42*", _NEW_766)
 # (resolver refusal rows, resolver stale reinstalls) per solver on root `a10`.
 _A10_773 = {
