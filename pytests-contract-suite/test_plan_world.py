@@ -158,6 +158,10 @@ _ROOTS_766 = {
         [("dev-libs/p698rebuild-1", "|| ( " + _BIND_766, "")],
     ),
     "a10": (["dev-libs/p569prov"], [("dev-libs/p573virt-1", _BIND_766, "")]),
+    # #774: the only version of the holder that accepts the new provider is keyword-masked.
+    "w774": (["dev-libs/p569prov", "dev-libs/p774mask"], [("dev-libs/p774mask-1", _PIN_766, "")]),
+    # #775: installed 1 accepts the new provider; the newest visible version, 2, still pins the old one.
+    "w775": (["dev-libs/p569prov", "dev-libs/p775pick"], [("dev-libs/p775pick-1", _PIN_766, "")]),
 }
 _VIRT_RES_766 = ("dev-libs/p569virt", "=dev-libs/p569prov-5.42*", _NEW_766)
 
@@ -562,3 +566,36 @@ def test_772_a_moved_binding_is_still_a_need(mrg_binary, fixture_env, tmp_path):
         "dev-libs/w772duser:0's binding would go stale "
         '(disable a USE flag on one of these packages to break the cycle)'], lines
     assert found == [], found  # the literal checker cannot see a moved `:=` binding
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_774_a_masked_only_version_is_not_a_route(mrg_binary, emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #774, charter property 1 (a kept package keeps its dependencies; the user can only
+    install a visible version): `p774mask-2` accepts `p569prov-5.44` but is keyword-masked, so the
+    installed `p774mask-1` (pinned to 5.42) has no route. Both plans keep the provider and the
+    holder where they are and neither plans the masked version. Before the fix the resolver took
+    the masked version as the route and the whole `-puDN @world` failed. Expected set: the root is
+    built so (PMS `sec:slot-dep`, `KEYWORDS`), not taken from either program."""
+    env = _root_766(fixture_env, tmp_path, "w774")
+    fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
+    for label, doc in (("fast", fast_doc), ("resolver", res_doc)):
+        moved = {e["category"] + "/" + e["package"] for e in doc["entries"]
+                 if e.get("outcome") in ("new", "upgrade", "reinstall", "downgrade")}
+        assert not moved & {"dev-libs/p569prov", "dev-libs/p774mask"}, (label, moved)
+        assert not any(e.get("version") == "2" and e["package"] == "p774mask" for e in doc["entries"]), label
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_775_the_two_plans_agree_when_the_newest_holder_pins_the_old_provider(
+    mrg_binary, emerge_binary, fixture_env, tmp_path, solver
+):
+    """Backlog #775 (S0 result), charter property 1: `p775pick-1` is installed and accepts the new
+    provider, the newest visible `p775pick-2` pins the old one. The two plans do not differ on
+    the stale-binding verdict: neither refuses, both take the holder to 2, and the provider stays
+    at 5.42 in the resolver. The refusal the entry predicted ("the fast plan tests 2 and refuses
+    by name") does not appear."""
+    env = _root_766(fixture_env, tmp_path, "w775")
+    fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
+    for label, doc in (("fast", fast_doc), ("resolver", res_doc)):
+        assert not doc.get("stale-bindings"), (label, doc.get("stale-bindings"))
+        assert [e["version"] for e in doc["entries"] if e["package"] == "p775pick"] == ["2"], label

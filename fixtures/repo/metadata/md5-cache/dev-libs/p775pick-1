@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #775 holder (v1 accepts the new provider; v2 pins the old one)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND==dev-libs/p569prov-5.44* dev-libs/p569prov:=
+SLOT=0
+_md5_=3459b9b8ea8af9d01f5b5862d398d036
