@@ -39852,6 +39852,58 @@ def test_696_binary_mask_hides_one_build_not_every_build_of_the_version(
     ]
 
 
+def test_805_builds_that_fail_the_same_way_are_masked_in_one_restart(
+    emerge_binary, fixture_env, tmp_path, fixtures_root
+):
+    """#805: the probe masks the build the graph holds; the next build of the
+    same version then fails on the same atom and cost one more restart each.
+    Four local builds of `app-misc/u257par-1`: BUILD_ID 6, 5 and 4 record the
+    stale `u257prov:0/1=`, BUILD_ID 3 records `u257prov:2/2=`, which the
+    provider's current slot satisfies. The plan is the one test 696 pins (the
+    binary build 3, after compiling the provider) and the three stale builds
+    cost one restart together, not three. Portage peels one build per restart
+    (`depgraph.py:2896-2903`, one package object), so its counter would read
+    `3/20`; portuale deliberately leaves that count: same plan, fewer passes
+    (charter: the waiting time)."""
+    env = _world_extra_env(fixture_env, tmp_path, fixtures_root)
+    pkgdir = tmp_path / "fixtures" / "pkgdir"
+    packages = (pkgdir / "Packages").read_text()
+    count = int(re.search(r"^PACKAGES: (\d+)", packages, re.M).group(1))
+    packages = re.sub(r"^PACKAGES: \d+", f"PACKAGES: {count + 4}", packages, count=1, flags=re.M)
+
+    def entry(build_id, build_time, dep):
+        return (
+            f"\n\nCPV: app-misc/u257par-1\nBUILD_ID: {build_id}\nBUILD_TIME: {build_time}\n"
+            "DEFINED_PHASES: -\nEAPI: 8\nIUSE:\nKEYWORDS: amd64\n"
+            f"PATH: app-misc/u257par-1-{build_id}.gpkg.tar\nRDEPEND: {dep}\n"
+            "REPO: testrepo\nSIZE: 4096\nSLOT: 0\nUSE:\n"
+        )
+
+    packages = (
+        packages.rstrip("\n")
+        + entry(3, 1000, "app-misc/u257prov:2/2=")
+        + entry(4, 2000, "app-misc/u257prov:0/1=")
+        + entry(5, 3000, "app-misc/u257prov:0/1=")
+        + entry(6, 4000, "app-misc/u257prov:0/1=")
+    )
+    (pkgdir / "Packages").write_text(packages)
+    # Raw output, not `_run`'s rows view: the counter is in the footer.
+    r = subprocess.run(
+        [str(emerge_binary), "--pretend", "--verbose", "--usepkg", "app-misc/u257par"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    rows = [l for l in r.stdout.splitlines() if l.startswith("[")]
+    assert [re.sub(r" +", " ", l) for l in rows] == [
+        f'[ebuild N ] app-misc/u257prov-2:2::testrepo to {env["ROOT"]} 0 KiB',
+        f'[binary N ] app-misc/u257par-1-3::testrepo to {env["ROOT"]} 0 KiB',
+    ], r.stdout
+    assert "Dependency resolution took (backtrack: 1/20)." in r.stdout, r.stdout
+
+
 def test_697_binary_with_a_missing_dependency_falls_back_to_the_ebuild(
     emerge_binary, fixture_env, tmp_path, fixtures_root
 ):
