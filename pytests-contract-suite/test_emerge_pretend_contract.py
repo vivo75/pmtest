@@ -35043,33 +35043,35 @@ def test_built_parent_update_masks_the_binary_and_upgrades_the_child_like_portag
     the installed mbabilib-1.0 sits in 0/1, while the tree has mbabilib-2.0 in 0/2
     that the ebuild's `dev-libs/mbabilib:=` accepts. Portage masks the binary and
     upgrades the child; portuale must do the same in one restart, not keep the
-    binary. Portage also renders the upgraded child with an `r` marker (the
-    replace-set argument), pinned by the next test (#481)."""
+    binary. Portage also renders the upgraded child with an `r` marker; portuale
+    does not (#819), pinned by the next test."""
     out = _mbabi_rows(emerge_binary, fixture_env)
     rows = [l for l in out.splitlines() if l.startswith("[")]
     assert not any(l.startswith("[binary") for l in rows), rows
     assert "(backtrack: 1/20)" in out, out
     upgrade = [l for l in rows if "dev-libs/mbabilib-2.0:0/2" in l]
     new = [l for l in rows if "dev-libs/mbabicons-1.0" in l]
-    assert len(upgrade) == 1 and upgrade[0].startswith("[ebuild  r  U  ]"), rows
+    assert len(upgrade) == 1 and upgrade[0].startswith("[ebuild     U  ]"), rows
     assert upgrade[0].endswith(f"[1.0:0/1::testrepo] to {fixture_env['ROOT']} 0 KiB"), upgrade
     assert len(new) == 1 and new[0].startswith("[ebuild  N     ]"), rows
 
 
-def test_built_parent_update_renders_the_replaced_child_with_r_like_portage(
+def test_built_parent_update_renders_the_upgraded_child_without_r(
     emerge_binary, fixture_env
 ):
     """Backlog #477 S2 residue. Oracle: host `emerge` 3.0.82.2 `--pretend --verbose
     --update --deep --usepkg dev-libs/mbabicons` on the same fixture tree prints exactly
     `[ebuild  r  U  ] dev-libs/mbabilib-2.0:0/2::testrepo [1.0:0/1::testrepo] to <ROOT>`
-    and `[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo to <ROOT>`. Portage marks the
+    and `[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo to <ROOT>`. Backlog #819
+    (owner decision, #810): portuale prints a plain `U` -- `r` marks a reinstall of the
+    same version, never an upgrade, however the search reached the plan. Portage marks the
     child `r` because `_slot_operator_update_backtrack` adds it to
     `slot_operator_replace_installed`, which becomes the `__auto_slot_operator_replace_installed__`
     force-reinstall argument (depgraph.py `_iter_atoms_for_pkg`; resolver/output.py `force_reinstall`)."""
     out = _mbabi_rows(emerge_binary, fixture_env)
     root = fixture_env["ROOT"]
     assert [l for l in out.splitlines() if l.startswith("[")] == [
-        f"[ebuild  r  U  ] dev-libs/mbabilib-2.0:0/2::testrepo [1.0:0/1::testrepo] to {root} 0 KiB",
+        f"[ebuild     U  ] dev-libs/mbabilib-2.0:0/2::testrepo [1.0:0/1::testrepo] to {root} 0 KiB",
         f"[ebuild  N     ] dev-libs/mbabicons-1.0::testrepo to {root} 0 KiB",
     ]
 
@@ -37749,7 +37751,7 @@ def test_580_t2_built_atom_conflicts_with_the_update(emerge_binary, fixture_env)
 def _598_expect(fixture_env, prefix, pull_slot_ver="2"):
     root = fixture_env["ROOT"]
     return [
-        f"[ebuild  r  U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild     U  ] dev-libs/{prefix}prov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
         f"[ebuild  N     ] dev-libs/{prefix}core-1.0::testrepo to {root}",
         f"[ebuild  rR    ] dev-libs/{prefix}virt-1::testrepo to {root}",
         f"[ebuild  N     ] dev-libs/{prefix}pull-{pull_slot_ver}::testrepo to {root}",
@@ -38694,7 +38696,7 @@ def test_601_masked_installed_provider_keeps_the_rebuild_display(
         if ln.startswith("[ebuild")
     ]
     assert rows == [
-        f"[ebuild  r  U  ] dev-libs/p589dprov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
+        f"[ebuild     U  ] dev-libs/p589dprov-5.44:0/5.44::testrepo [5.42:0/5.42::testrepo] to {root}",
         f"[ebuild  rR    ] dev-libs/p589dvirt-1::testrepo to {root}",
         f"[ebuild  N     ] dev-libs/p589dpull-1::testrepo to {root}",
     ], got.stdout
@@ -39351,7 +39353,7 @@ _602_REBUILD = (
             ["app-misc/w602cons"],
             [*_603_SWITCHES_OFF, *_602_ARGS],
             [
-                "[ebuild  r  U  ] dev-libs/w602prov-2 [1] to {root}",
+                "[ebuild     U  ] dev-libs/w602prov-2 [1] to {root}",
                 "[ebuild  N     ] dev-libs/w602s-1 to {root}",
                 "[ebuild  N     ] app-misc/w602a-1 to {root}",
                 "[ebuild  rR    ] app-misc/w602cons-1 to {root}",
