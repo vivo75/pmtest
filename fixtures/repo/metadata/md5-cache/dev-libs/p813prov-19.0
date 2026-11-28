@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #813 multi-slot provider, slot 19, the highest visible (mirrors dev-db/postgresql:19)
+EAPI=8
+KEYWORDS=amd64
+SLOT=19
+_md5_=26e38319b395d774c36f90283d42afb4
