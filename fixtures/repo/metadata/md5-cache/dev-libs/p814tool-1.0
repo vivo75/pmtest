@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #814 the tree and the installed copy have IUSE p814old; the binhost binary was built without it (mirrors sci-libs/gdal and its mongodb flag)
+EAPI=8
+IUSE=p814old
+KEYWORDS=amd64
+SLOT=0
+_md5_=31d9ca82dd91395d61ddf45b4521389b

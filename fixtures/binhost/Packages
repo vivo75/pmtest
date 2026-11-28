@@ -190,3 +190,29 @@ SIZE: 4096
 SLOT: 0
 USE:
 
+
+BUILD_ID: 1
+BUILD_TIME: 100
+CPV: dev-libs/p812orphan-1.0-r1
+DEFINED_PHASES: -
+DESCRIPTION: fixture package: #812 remote binhost binary whose ebuild is gone from the tree (installed copy is the same version)
+EAPI: 8
+IUSE:
+KEYWORDS: amd64
+REPO: testrepo
+SIZE: 4096
+SLOT: 0
+USE:
+
+BUILD_ID: 2
+BUILD_TIME: 200
+CPV: dev-libs/p814tool-1.0
+DEFINED_PHASES: -
+DESCRIPTION: fixture package: #814 remote binhost binary built from an ebuild without the p814old flag; the tree ebuild and the installed copy have it
+EAPI: 8
+IUSE:
+KEYWORDS: amd64
+REPO: testrepo
+SIZE: 4096
+SLOT: 0
+USE:

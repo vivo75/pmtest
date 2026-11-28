@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #813 holder of the provider's `:=` operator; installed copy was built against slot 18 (mirrors dev-python/psycopg)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=>=dev-libs/p813prov-1:=
+SLOT=0
+_md5_=54e4d7bfcd9664b08e70804dfce4d4af
