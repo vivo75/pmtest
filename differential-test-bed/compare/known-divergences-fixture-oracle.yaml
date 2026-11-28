@@ -133,6 +133,39 @@
     #71's. See `differential-test-bed/findings/l0.md` "#71 S1".
   owner: portuale
 
+# -- #817 (DECIDED 2026-11-28, #698): the pin holder follows the update. The
+#    whpin cell (`FX_WORLD_EXTRA=dev-libs/whtarget`, atomlist
+#    l0-fixture-oracle-whpin.txt, #91 S2): `whtarget-1.0` pins
+#    `~dev-libs/whblocker-1.0`. Portage keeps `whblocker-2.0` back and
+#    merges `whpuller-2.0` only; portuale updates `whtarget` to 2.0 (a
+#    visible same-slot version whose dependencies accept `whblocker-2.0`)
+#    and `whblocker` with it, so the pin is not left stale.
+
+- id: whpin-pin-holder-follows-update-698
+  categories: [skipped-updates, extra]
+  slugs: ["--update_--deep_--newuse_--oneshot_dev-libs_whpuller"]
+  match:
+    - "skipped-update block present for real, absent for portuale: dev-libs/whblocker:0"
+    - "ebuild dev-libs/whtarget-2.0 present for portuale, absent for real"
+    - "blocks <dev-libs/whtarget-2.0 present for portuale, absent for real"
+    - "ebuild dev-libs/whblocker-2.0 present for portuale, absent for real"
+  reason: >
+    Decided difference (#817, from the 2026-11-28 bed run; #698 owner
+    decision: the complete plan and charter before Portage parity). A
+    holder of a pin that blocks an update gets a route to the new provider
+    when the tree has a same-slot, not-older version whose dependencies
+    accept it; then the holder and the provider are one plan. Here
+    `whtarget-2.0` routes to `whblocker-2.0`, so portuale upgrades
+    `whblocker`, `whpuller` and `whtarget` together, and the skipped-update
+    block Portage prints has nothing to skip. Charter property 3 (as new
+    as possible) is met and property 1 holds: no installed package is left
+    with an unsatisfied pin. The `blocks` row is the soft (`b`) blocker of
+    `whtarget-2.0` on `whblocker-2.0`, both planned by the same merge.
+    Portage withholds the update, which leaves `whblocker` at 1.0 under a
+    holder that still needs it to stay old. Oracle: charter properties 1
+    and 3; #698 and Portage 3.0.83 as a comparison.
+  owner: portuale
+
 # -- #79 D1 (DONE 2026-09-18): the reverse-dependency pin fixture
 #    (FX_WORLD_EXTRA=dev-libs/rdctarget,
 #    differential-test-bed/atomlists/l0-fixture-oracle-rdcpin.txt).
