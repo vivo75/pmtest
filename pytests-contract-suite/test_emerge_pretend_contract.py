@@ -40593,11 +40593,15 @@ def test_716_pubgrub_json_carries_what_a_plan_checker_needs(emerge_binary, fixtu
 def test_761_a_stale_binding_the_plan_cannot_repair_is_named(emerge_binary, fixture_env):
     """Backlog #761, charter property 5 ("every error names the cause and says at least one
     thing the user can do"). The plan upgrades `dev-libs/p569prov` to 5.44 while the installed,
-    unreached `dev-libs/p569virt-1` records `=dev-libs/p569prov-5.42*` next to its built
-    `:0/5.42=`: the rebuild that would repair the binding is refused, and the run used to say
-    nothing. Expected: a NOTE naming the consumer, the recorded atom, the provider version and
-    what to do (the fast `--plan-world` already names the same refusal). rc stays 0, `--quiet`
-    hides it, and `--json` carries it as `stale-bindings` only when there is one."""
+    unreached `dev-libs/p569virt-1` records `|| ( =dev-libs/p569prov-5.42* =...5.40* =...5.38*
+    ~dev-libs/p569core-1.0 )` next to its built `:0/5.42=`: the resolver reads that `||`
+    installed-first, so the rebuild that would repair the binding is refused, and the run used
+    to say nothing. Expected: a NOTE naming the consumer, the first recorded atom, the provider
+    version and what to do. The fast `--plan-world` does not refuse this consumer: it reads the
+    `||` best-visible first and rebuilds it (pinned difference, residue #793, see
+    `_VIRT_DIFF_768` in `test_plan_world.py`); for a consumer without a `||` it names the same
+    refusal (#778 pins a masked-only one). rc stays 0, `--quiet` hides it, and `--json` carries
+    it as `stale-bindings` only when there is one."""
     got = _run([str(emerge_binary)], ["--pretend", "--update", "dev-libs/p569prov"], fixture_env)
     assert got.returncode == 0, (got.stdout, got.stderr)
     assert got.stdout.splitlines()[-5:] == [
@@ -40638,7 +40642,7 @@ def test_765_both_solvers_name_a_stale_binding_the_plan_cannot_repair(
 ):
     """Backlog #765, charter property 5 ("every error names the cause and says at least one
     thing the user can do"). The #761 shape (`dev-libs/p569prov` moves to 5.44 while the installed
-    `dev-libs/p569virt-1` records `=dev-libs/p569prov-5.42*`) printed the NOTE only with the
+    `dev-libs/p569virt-1` records `|| ( =dev-libs/p569prov-5.42* ... )`) printed the NOTE only with the
     default solver: the `--solver=pubgrub` bridge ran the same scan and dropped its refusals.
     Expected text: the #761 pin (`test_761_*`), identical for both solvers. rc stays 0,
     `--quiet` hides it, `--json` carries `stale-bindings` only when there is one. The pubgrub
