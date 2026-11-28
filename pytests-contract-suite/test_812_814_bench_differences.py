@@ -6,9 +6,8 @@ that machine is needed to work on them. Backlog entries #812, #813 and #814 in
 Expected behaviour comes from the charter, not from Portage; Portage's answer is recorded as the
 comparison. Where the reduction stands:
 
-* #813 reproduces. Owner decision pending, so it has two tests: the `portage_` one states what
-  Portage prints (strict xfail on portuale), the `today_` one pins what portuale prints now.
-  When the owner decides, keep the matching one and delete the other.
+* #813 reproduces and is decided (owner 2026-11-28): portuale keeps the installed binding, so the
+  one test pins that answer; Portage's `[ebuild rR]` is a difference accepted on purpose.
 * #812: the rule the owner ruled right (2026-11-28: Portage's, an installed version with no ebuild
   is not a candidate) already holds for portuale on the fixtures, so the test passes and guards it.
   What failed on the real machine (portuale saw no ebuild of the overlay at all) is NOT reproduced
@@ -86,7 +85,7 @@ def test_812_an_installed_version_without_an_ebuild_is_not_a_candidate(
 # 19.0 both installed and 19 the highest visible slot. The ebuild's `>=postgresql-8.1:=` now
 # resolves to slot 19. Portage rebuilds psycopg (`[ebuild rR]`) so the binding follows; portuale
 # keeps it, slot 18 being installed and satisfying the atom. The installed system is consistent
-# either way. Owner: undecided. Related: the stale-binding family of #766 and upstream bug 439694.
+# either way. Owner 2026-11-28: keep portuale's behaviour. Related: the stale-binding family of #766 and upstream bug 439694.
 
 def _root_813(tmp_path):
     return _root(tmp_path, ["dev-libs/p813user"], [
@@ -100,20 +99,11 @@ def _root_813(tmp_path):
 _OPTS_813 = ["--update", "--deep", "--getbinpkg=n", "--usepkg=n", "@world"]
 
 
-@pytest.mark.xfail(
-    IS_PORTUALE, strict=True,
-    reason="#813 (owner decision pending): Portage rebuilds the holder of a `:=` built against "
-    "slot 18 when slot 19 is the highest installed slot; portuale keeps it",
-)
-def test_813_portage_rebuilds_the_holder_when_the_best_slot_moved(emerge_binary, fixture_env, tmp_path):
-    """Comparison: Portage's answer. Delete if the owner decides to keep the installed binding."""
-    rows = _plan(emerge_binary, fixture_env, _root_813(tmp_path), *_OPTS_813)
-    assert rows == [("ebuild", "rR", "dev-libs/p813user-1.0", None)], rows
-
-
 @pytest.mark.skipif(not IS_PORTUALE, reason="pins portuale's current answer")
 def test_813_today_portuale_keeps_the_holder_built_against_the_older_slot(emerge_binary, fixture_env, tmp_path):
-    """Current behaviour. Delete if the owner decides Portage's answer is the right one."""
+    """Owner decision 2026-11-28: keep the installed binding. The system is consistent either way
+    (slot 18 is installed and satisfies the atom), so no rebuild is planned; Portage plans
+    `[ebuild rR]` here, a difference accepted on purpose."""
     assert _plan(emerge_binary, fixture_env, _root_813(tmp_path), *_OPTS_813) == []
 
 
@@ -123,7 +113,8 @@ def test_813_today_portuale_keeps_the_holder_built_against_the_older_slot(emerge
 # binhost builds 5 to 13 were made without it. With `--newuse --getbinpkg`, portuale compares the
 # binary with the installed copy, sees a flag removed from IUSE, and plans `[binary Rg]`. Portage
 # plans nothing: it ends up on the tree ebuild, which matches what is installed. The enabled USE is
-# identical in both, so nothing the user gets would change. Owner: undecided. NOT reproduced here:
+# identical in both, so nothing the user gets would change. NOT reproduced here (backlog #814 closed
+# as not reproducible):
 # the fixture below is what was tried, and portuale plans nothing on it (backlog #814).
 
 def _root_814(tmp_path):
@@ -138,8 +129,8 @@ _OPTS_814 = ["--update", "--deep", "--newuse", "--getbinpkg", "--usepkg", "dev-l
 @pytest.mark.xfail(
     IS_PORTUALE, strict=False,
     reason="#814 is not reproduced: the real machine shows `[binary Rg]` for sci-libs/gdal, these "
-    "fixtures plan nothing, so this passes today. Find the missing ingredient (backlog #814), then "
-    "make it strict",
+    "fixtures plan nothing, so this passes today. Backlog #814 is closed as not reproducible; "
+    "reopen it only with a real case",
 )
 def test_814_portage_ignores_a_binary_whose_iuse_differs_from_the_tree(emerge_binary, fixture_env, tmp_path):
     """Comparison: Portage's answer. Delete if the owner decides `--newuse` should act on the binary."""
