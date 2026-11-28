@@ -38255,7 +38255,7 @@ def test_651_bare_request_with_transient_merging_seeds_the_fall_through(
         "",
         "NOTE: One or more installed packages keep a stale slot-operator binding that was not rebuilt:",
         "",
-        "  dev-perl/p651pin-1: its dependency dev-libs/p651prov:0/5.42= was built against a sub-slot dev-libs/p651prov-5.44.0 does not have, and no ebuild of it is left to rebuild it from",
+        "  dev-perl/p651pin-1: its dependency dev-libs/p651prov:0/5.42= was built against a sub-slot dev-libs/p651prov-5.44.0 does not have, and no visible ebuild of it is left to rebuild it from",
         "",
         "  Rebuild them once a visible version accepts the new provider, or unmerge them if they are unused.",
     ], got.stdout
