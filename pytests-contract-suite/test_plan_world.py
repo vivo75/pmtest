@@ -150,6 +150,8 @@ _ROOTS_766 = {
     "bdw": (["dev-libs/p569prov", "dev-libs/p698rebuild"], [("dev-libs/p698rebuild-1", "", _BIND_766)]),
     "pull": (["dev-libs/p569pull"], [("dev-libs/p573virt-1", _PIN_766, "")]),
     "gone": (["dev-libs/p569prov"], [("dev-libs/p766gone-1", _BIND_766, "")]),
+    # #778: the consumer's only ebuild is package.mask'd, so it cannot be rebuilt either.
+    "a2": (["dev-libs/p569prov"], [("dev-libs/hardmaskedpkg-1.0", _BIND_766, "")]),
     "outr": (["dev-libs/p569prov"], [("dev-libs/p698rebuild-1", _BIND_766, "")]),
     "outpin": (["dev-libs/p569prov"], [("dev-libs/p698reinst-1", _PIN_766, "")]),
     "bdout": (["dev-libs/p569prov"], [("dev-libs/p698rebuild-1", "", _BIND_766)]),
@@ -281,7 +283,9 @@ _VIRT_DIFF_768 = {"consumers only the resolver names": [_VIRT_766],
     pytest.param("outpin", {_REINST_PIN_766}, set(), True, id="outpin-pin-outside"),
     pytest.param("pull", {_PULL_766}, {_VIRT_766}, False, id="pull-walked-consumer"),
     # A consumer with no ebuild left: both name it (owner Q2(b)); the rows differ by contract.
-    pytest.param("gone", None, set(), True, id="gone-no-ebuild"),
+    pytest.param("gone", "dev-libs/p766gone", set(), True, id="gone-no-ebuild"),
+    # #778: only a masked ebuild is left: named on both sides, like a missing one.
+    pytest.param("a2", "dev-libs/hardmaskedpkg", set(), True, id="a2-masked-only-consumer"),
 ])
 def test_766_the_two_plans_agree_on_the_stale_consumers(
     mrg_binary, emerge_binary, fixture_env, tmp_path, solver, name, rows, reinstalls, virt
@@ -301,9 +305,9 @@ def test_766_the_two_plans_agree_on_the_stale_consumers(
     assert _differences_766(fast, res) == (_VIRT_DIFF_768 if virt else {})
     extra_fast = {_VIRT_766} if virt else set()
     extra_res = {_VIRT_RES_766} if virt else set()
-    if rows is None:  # `gone`: the fast plan says "no visible ebuild" (null provider), the resolver names the provider
-        assert fast == ({("dev-libs/p766gone", _BIND_766, None)}, reinstalls | extra_fast), fast
-        assert res == ({("dev-libs/p766gone", _BIND_766, _NEW_766)} | extra_res, reinstalls), res
+    if isinstance(rows, str):  # no visible ebuild: the fast plan says so (null provider), the resolver names the provider
+        assert fast == ({(rows, _BIND_766, None)}, reinstalls | extra_fast), fast
+        assert res == ({(rows, _BIND_766, _NEW_766)} | extra_res, reinstalls), res
     else:
         assert fast == (rows, reinstalls | extra_fast), fast
         assert res == (rows | extra_res, reinstalls), res
@@ -352,7 +356,7 @@ def test_768_a_stale_consumer_with_no_ebuild_is_named(emerge_binary, fixture_env
     text = subprocess.run([*argv, "@world"], capture_output=True, text=True, env=env, check=False)
     assert text.returncode == 0, text.stderr
     assert ("  dev-libs/p766gone-1: its dependency dev-libs/p569prov:0/5.42= was built against a sub-slot "
-            "dev-libs/p569prov-5.44 does not have, and no ebuild of it is left to rebuild it from"
+            "dev-libs/p569prov-5.44 does not have, and no visible ebuild of it is left to rebuild it from"
             ) in text.stdout.splitlines(), text.stdout
     doc = hc.parse_json_output(
         subprocess.run([*argv, "--json", "@world"], capture_output=True, text=True, env=env, check=False).stdout)
