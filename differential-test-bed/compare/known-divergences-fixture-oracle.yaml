@@ -98,6 +98,23 @@
 # USE_EXPAND on both sides. Entry removed; if the bed ever flags the
 # missed-line USE again, re-add it with fresh bytes rather than this text.)
 
+- id: slotop-provider-r-on-upgrade
+  category: flags
+  slugs: ["*"]
+  match: "real flags [r U] vs portuale [U]"
+  reason: >
+    Decided difference (#810, #819, owner 2026-11-28): Portage's backtrack
+    files the installed provider into `slot_operator_replace_installed`
+    after a slot conflict (provpkg-2.0 from the world atom against the
+    installed consumers' `>=provpkg-1.0:0/1=` pin, `_slot_operator_update_backtrack`,
+    depgraph.py:2459), which its display turns into `r  U`; the same upgrade
+    without that conflict prints a plain `U`. portuale prints `r` only for a
+    reinstall of the same version, never for an upgrade, so the mark means
+    the same in every plan. The plan is the same: the provider upgrade and
+    the five rebuilds, with `r` on the consumers. The consumers' "causes
+    rebuilds" block names why they rebuild.
+  owner: portuale
+
 - id: slotop-world-complete-graph-order
   category: order
   slugs:
