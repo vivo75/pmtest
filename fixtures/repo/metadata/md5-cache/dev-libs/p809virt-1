@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #809 consumer whose accepting || arm names a package that does not exist (the arm cannot be merged)
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p569prov-5.42* dev-libs/p809missing ) dev-libs/p569prov:=
+SLOT=0
+_md5_=10c592e960235bd10bb73974dc1221a6

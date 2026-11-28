@@ -1,0 +1,6 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #808 the package a consumer's || arm names instead of the old provider pin
+EAPI=8
+KEYWORDS=amd64
+SLOT=0
+_md5_=f23e27548d6116350eddf60b97e1a14a

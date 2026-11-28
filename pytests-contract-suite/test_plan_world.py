@@ -158,6 +158,11 @@ _ROOTS_766 = {
         [("dev-libs/p698rebuild-1", "|| ( " + _BIND_766, "")],
     ),
     "a10": (["dev-libs/p569prov"], [("dev-libs/p573virt-1", _BIND_766, "")]),
+    # #808: the consumer's tree accepts the new provider through a `||` arm naming a package the plan
+    # does not merge on its own.
+    "a808": (["dev-libs/p569prov"], [("dev-libs/p808virt-1", _BIND_766, "")]),
+    # #809: the accepting `||` arm names a package that does not exist.
+    "a809": (["dev-libs/p569prov"], [("dev-libs/p809virt-1", _BIND_766, "")]),
     # #774: the only version of the holder that accepts the new provider is keyword-masked.
     "w774": (["dev-libs/p569prov", "dev-libs/p774mask"], [("dev-libs/p774mask-1", _PIN_766, "")]),
     # #775: installed 1 accepts the new provider; the newest visible version, 2, still pins the old one.
@@ -379,11 +384,38 @@ def test_770_both_solvers_rebuild_the_walked_installed_virtual(emerge_binary, fi
     assert "dev-libs/p569prov-5.44" in block and "dev-libs/p569virt-1" in block, block
 
 
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_781_a_plain_update_follows_a_provider_move_the_plan_requires(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #781, PMS `sec:slot-dep` and charter properties 1 and 5. Root `pull`,
+    `emerge -pv --update @world` (no `--deep`): world `p569pull` becomes `-2`, whose tree ebuild
+    needs `p569prov-5.44`, so the move is required, not optional. The installed `p569virt-1`
+    recorded `p569prov:0/5.42=`; its tree ebuild offers `|| ( =p569prov-5.42* ... ~p569core-1.0 )`,
+    so it can follow through the `p569core` arm and is rebuilt. pubgrub used to hold the provider
+    back, plan `p569pull-1` and print a false "No visible version of p569virt accepts" note. Expected
+    rows are derived from the root and equal the default solver's (the `r` tag and the cause pair
+    are not compared: backlog #780)."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = [re.sub(r"^\[ebuild([^\]]*)\] (\S+?)(:\S+)?( \[.*?\])?( to .*)?$",
+                   lambda m: m.group(1).replace(" ", "") + " " + m.group(2), line)
+            for line in run.stdout.splitlines() if line.startswith("[ebuild")]
+    kinds = {r.split(" ")[-1].rsplit("-", 1)[0]: r.split(" ")[0] for r in rows}
+    assert kinds["dev-libs/p569prov"].endswith("U"), rows
+    assert kinds["dev-libs/p569core"] == "N", rows
+    assert kinds["dev-libs/p569pull"] == "N" and any(r.endswith("p569pull-2") for r in rows), rows
+    assert any(r.endswith("p569virt-1") and r.split(" ")[0].endswith("R") for r in rows), rows
+    assert "No visible version" not in run.stdout, run.stdout
+    assert "dev-libs/p573virt-1: its dependency =dev-libs/p569prov-5.42* is not satisfied" in run.stdout, run.stdout
+
+
 _A10_PIN_773 = ("dev-libs/p573virt", "=dev-libs/p569prov-5.42*", _NEW_766)
 # (resolver refusal rows, resolver stale reinstalls) per solver on root `a10`.
 _A10_773 = {
     "": (set(), {"dev-libs/p573virt"}),
-    "pubgrub": ({_VIRT_RES_766, _A10_PIN_773}, set()),
+    "pubgrub": (set(), set()),
 }
 
 
@@ -394,10 +426,10 @@ def test_773_a_consumer_whose_tree_pins_the_old_provider(mrg_binary, emerge_bina
     plan may not rebuild it against `p569prov-5.44`. The fast plan and the default solver keep the
     provider and rebuild the consumer; the fast plan also rebuilds the shared VDB's `p569virt-1`
     through its recorded `||` (owner decision 2026-11-22), needlessly once the provider stays
-    (residue #777). pubgrub keeps the upgrade, does not rebuild the consumer and names it in
-    the stale-binding NOTE (owner decision Q1 (A), 2026-11-22; plan
-    `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`); the default solver and the fast
-    plan hold the provider back instead."""
+    (residue #777). pubgrub first kept the upgrade and named the consumer in the stale-binding
+    NOTE (owner decision Q1 (A), 2026-11-22; plan `LLM/02.773-pubgrub-rebuild-against-tree-pin.opus.md`);
+    since #791 (option B) it holds the provider back like the other two and says why
+    (`test_791_*`)."""
     env = _root_766(fixture_env, tmp_path, "a10")
     fast_doc, res_doc = _both_766(mrg_binary, emerge_binary, env, solver)
     bound = _bound_766(tmp_path / "root")
@@ -405,7 +437,105 @@ def test_773_a_consumer_whose_tree_pins_the_old_provider(mrg_binary, emerge_bina
     assert fast == (set(), {"dev-libs/p573virt", "dev-libs/p569virt"}), fast
     assert res == _A10_773[solver], res
     moved = {e["package"] for e in res_doc["entries"] if e.get("outcome") == "upgrade"}
-    assert ("p569prov" in moved) == bool(solver), moved
+    assert "p569prov" not in moved, moved
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_791_pubgrub_holds_the_provider_a_pinned_consumer_cannot_follow(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #791 (option B of #773's Q1), PMS `sec:slot-dep` and charter properties 1 and 5.
+    Root `a10`, `emerge -pv --update --deep @world`: the installed `p573virt-1` recorded
+    `p569prov:0/5.42=` and its tree ebuild needs `=p569prov-5.42*`, and nothing else requires
+    `p569prov-5.44`. Upgrading the provider would leave the consumer's binding stale with no rebuild
+    able to repair it, so every solver keeps `p569prov` at 5.42. The default solver says so with its
+    skip WARNING; pubgrub names the cause in the "cannot follow" NOTE. Expected: no `p569prov` row."""
+    env = _root_766(fixture_env, tmp_path, "a10")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    assert "dev-libs/p569prov-5.44" not in "".join(l for l in run.stdout.splitlines() if l.startswith("[ebuild")), run.stdout
+    if solver:
+        assert "dev-libs/p573virt-1 needs =dev-libs/p569prov-5.42*" in run.stdout, run.stdout
+        assert "No visible version of dev-libs/p573virt accepts dev-libs/p569prov-5.44." in run.stdout, run.stdout
+        assert "keep a stale slot-operator binding" not in run.stdout, run.stdout
+    else:
+        assert "=dev-libs/p569prov-5.42* required by" in run.stdout, run.stdout
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_808_pubgrub_asks_for_the_arm_that_accepts_the_new_provider(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #808, PMS `sec:slot-dep` and charter properties 1 and 3. Root `a808`,
+    `emerge -pv --update --deep @world`: the installed `p808virt-1` recorded `p569prov:0/5.42=`;
+    its tree ebuild offers `|| ( =p569prov-5.42* p808other ) p569prov:=`, so it can follow the
+    upgrade to 5.44 through `p808other`, which nothing in the plan pulls in. Both solvers merge
+    `p808other` (new) and rebuild `p808virt` (the default solver's rows are the comparison)."""
+    env = _root_766(fixture_env, tmp_path, "a808")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = {m.group(2): m.group(1).replace(" ", "")
+            for m in (re.match(r"^\[ebuild([^\]]*)\] (\S+?)(?::\S+)?(?: \[.*?\])?(?: to .*)?$", l)
+                      for l in run.stdout.splitlines()) if m}
+    assert rows["dev-libs/p569prov-5.44"].endswith("U"), rows
+    assert rows["dev-libs/p808other-1"] == "N", rows
+    assert rows["dev-libs/p808virt-1"].endswith("R"), rows
+    assert "p808virt-1: its dependency" not in run.stdout, run.stdout
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_809_an_arm_that_cannot_be_merged_is_a_pin_not_an_abort(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #809, charter properties 1 and 5. Root `a809`, `emerge -pv --update --deep @world`:
+    the tree of the installed `p809virt-1` accepts the new provider only through
+    `|| ( ... dev-libs/p809missing )`, a package that does not exist. Both solvers keep
+    `p569prov` at 5.42 and finish with exit code 0; pubgrub used to stop with
+    "the requested targets depends on dev-libs/p809missing"."""
+    env = _root_766(fixture_env, tmp_path, "a809")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    assert "p569prov-5.44" not in "".join(l for l in run.stdout.splitlines() if l.startswith("[ebuild")), run.stdout
+    assert "p809virt-1" in run.stdout, run.stdout
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_780_a_holder_rebuild_is_tagged_and_named_without_a_deep_walk(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #780, charter property 5 (the plan says what causes a rebuild). Root `pull`,
+    `emerge -pv --update @world` (no `--deep`): `p569pull-2` moves `p569prov` to 5.44, so the
+    installed `p569virt-1` (recorded `:0/5.42=`) is rebuilt. The default solver's rows are the
+    comparison: the rebuild row carries the red `r` (`rR`) and the NOTE's "causes rebuilds for"
+    block lists the consumer. pubgrub printed a bare `R` and no pair. The provider row's own `r`
+    is not compared: the default solver tags it only when a slot conflict files it (#810)."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = {m.group(2): m.group(1).replace(" ", "")
+            for m in (re.match(r"^\[ebuild([^\]]*)\] (\S+?)(?::\S+)?(?: \[.*?\])?(?: to .*)?$", l)
+                      for l in run.stdout.splitlines()) if m}
+    assert rows["dev-libs/p569virt-1"] == "rR", rows
+    assert "causes rebuilds for:\n    (dev-libs/p569virt-1:0/0" in run.stdout, run.stdout
+
+
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_811_a_scanned_rebuild_under_a_deep_bound_gets_its_dependencies(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #811, charter property 1 (a rebuilt package's dependencies hold). Root `pull`,
+    `emerge -pv --update --deep=1 @world`: the installed `p569virt-1` is rebuilt for the new
+    `p569prov` 5.44, and once the provider is 5.44 its tree `||` leaves only `~p569core-1.0`. The
+    default solver's rows are the comparison: `N p569core-1.0` and `rR p569virt-1`. pubgrub
+    printed the rebuild without `p569core`."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep=1", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = {m.group(2): m.group(1).replace(" ", "")
+            for m in (re.match(r"^\[ebuild([^\]]*)\] (\S+?)(?::\S+)?(?: \[.*?\])?(?: to .*)?$", l)
+                      for l in run.stdout.splitlines()) if m}
+    assert rows["dev-libs/p569core-1.0"] == "N", rows
+    assert rows["dev-libs/p569virt-1"] == "rR", rows
 
 
 def test_766_the_agreement_check_can_fail():

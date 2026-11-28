@@ -1,0 +1,7 @@
+DEFINED_PHASES=-
+DESCRIPTION=fixture package: #808 consumer whose || group has an arm off the provider (mirrors virtual/perl-*), bound to the provider
+EAPI=8
+KEYWORDS=amd64
+RDEPEND=|| ( =dev-libs/p569prov-5.42* dev-libs/p808other ) dev-libs/p569prov:=
+SLOT=0
+_md5_=4395d98d9e90f2e2fc6cd627a45d5622
