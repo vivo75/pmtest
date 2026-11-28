@@ -519,6 +519,25 @@ def test_780_a_holder_rebuild_is_tagged_and_named_without_a_deep_walk(emerge_bin
     assert "causes rebuilds for:\n    (dev-libs/p569virt-1:0/0" in run.stdout, run.stdout
 
 
+@pytest.mark.parametrize("solver", _SOLVERS_766)
+def test_811_a_scanned_rebuild_under_a_deep_bound_gets_its_dependencies(emerge_binary, fixture_env, tmp_path, solver):
+    """Backlog #811, charter property 1 (a rebuilt package's dependencies hold). Root `pull`,
+    `emerge -pv --update --deep=1 @world`: the installed `p569virt-1` is rebuilt for the new
+    `p569prov` 5.44, and once the provider is 5.44 its tree `||` leaves only `~p569core-1.0`. The
+    default solver's rows are the comparison: `N p569core-1.0` and `rR p569virt-1`. pubgrub
+    printed the rebuild without `p569core`."""
+    env = _root_766(fixture_env, tmp_path, "pull")
+    argv = [str(emerge_binary), *(["--solver=pubgrub"] if solver else []), "--pretend", "--verbose",
+            "--update", "--deep=1", "--getbinpkg=n", "@world"]
+    run = subprocess.run(argv, capture_output=True, text=True, check=False, env=env)
+    assert run.returncode == 0, (run.stdout, run.stderr)
+    rows = {m.group(2): m.group(1).replace(" ", "")
+            for m in (re.match(r"^\[ebuild([^\]]*)\] (\S+?)(?::\S+)?(?: \[.*?\])?(?: to .*)?$", l)
+                      for l in run.stdout.splitlines()) if m}
+    assert rows["dev-libs/p569core-1.0"] == "N", rows
+    assert rows["dev-libs/p569virt-1"] == "rR", rows
+
+
 def test_766_the_agreement_check_can_fail():
     """A self-test of the comparison: documents that differ are reported, so a green agreement
     test is not vacuous. Hand-made views, no program run."""
