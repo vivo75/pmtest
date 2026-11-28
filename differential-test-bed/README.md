@@ -279,7 +279,7 @@ findings are filed there and adjudicated temporarily via
 Host-only self-tests (no container): `compare/test-gpkg-structure.sh`,
 `compare/test-gpkg-diff.sh`, `compare/test-diff-tolerance.py`.
 
-### L3+ (not yet implemented)
+### L3 — source-build parity
 
 L3 source-build comparison (`run/l3-source-parity.sh` + `layers/l3/build-and-merge.sh`)
 builds one atom list from source under both PMs and diffs the snapshots.

@@ -6487,6 +6487,51 @@ def test_self_referential_bootstrap_branch_merges_before_its_consumers(
     assert ok_order.index("mogook") < ok_order.index("momd2manok")
 
 
+def test_two_root_bootstrap_chain_keeps_its_build_order(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Same fixture as the #53 test above, but with a running root apart from
+    ROOT (the bed's `FX_HOST_RUNNING_ROOT=1` shape; Portage resolves BDEPEND
+    in `/`). `dev-go/momd2man` builds in the running root and its own
+    `BDEPEND` names `>=dev-lang/mogo-1.24:=` and `app-misc/mounzip`, both
+    already visited through `mopodman`'s own BDEPEND. The running-root edge
+    cut used to drop every `BDEPEND` edge to an already-visited package, so
+    `momd2man` lost both edges and merged first, before `mogo`: a build
+    dependency not yet installed (charter property 2). Only an edge that
+    closes a cycle is cut now. Portage (3.0.83, bed `l0-fx-20261128T0210`)
+    plans `mounzip, mogoboot, mogo, momd2man, ...`, the single-root order."""
+    running = tmp_path / "running-root"
+    (running / "var/db").mkdir(parents=True)
+    shutil.copytree(
+        Path(fixture_env["ROOT"]) / "var/db/pkg",
+        running / "var/db/pkg",
+        symlinks=True,
+        ignore=fixtures_copytree_ignore(),
+    )
+    seed_updates_record(running)
+    env = dict(fixture_env, PORTAGE_RUNNING_ROOT=str(running))
+    rows = json.loads(
+        _run([str(emerge_binary)], ["--pretend", "--json", "app-misc/mopodman"], env).stdout
+    )["entries"]
+    order = [e["package"] for e in rows]
+    assert order == [
+        "mounzip",
+        "mogoboot",
+        "mogo",
+        "momd2man",
+        "moconmon",
+        "mocommon",
+        "mopodman",
+    ]
+    assert order.index("mogo") < order.index("momd2man")
+    assert order.index("mounzip") < order.index("momd2man")
+    ok_rows = json.loads(
+        _run([str(emerge_binary)], ["--pretend", "--json", "app-misc/mopodmanok"], env).stdout
+    )["entries"]
+    ok_order = [e["package"] for e in ok_rows]
+    assert ok_order.index("mogook") < ok_order.index("momd2manok")
+
+
 def test_ignore_built_slot_operator_deps_suppresses_the_rebuild(
     emerge_binary, fixture_env, tmp_path
 ):
