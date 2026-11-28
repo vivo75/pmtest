@@ -382,6 +382,34 @@
     sibling: re-tighten when the gap closes.
   owner: portuale-bug
 
+- id: l3-glibc-self-libc-dep
+  layer: l3
+  category: VDB
+  path_glob: "sys-libs/glibc-*/RDEPEND"
+  match: ">=sys-libs/glibc-"
+  reason: >
+    Portage bug, not copied (portage-quirks Q32). `_inject_libc_dep`
+    (doebuild.py:3060) means to skip the libc package itself, but
+    passes strings to `pkgcmp`, which wants pkgsplit tuples, so the
+    guard never fires and Portage records `>=sys-libs/glibc-<installed
+    libc>` in glibc's own RDEPEND. Portuale skips libc providers as
+    the comment intends. Verified 2026-11-28 on l3-smoke: RDEPEND is
+    the only content difference of the glibc VDB entry.
+  owner: portage-bug
+
+- id: l3-glibc-self-libc-dep-metadata
+  layer: l3
+  category: VDB
+  path_glob: "sys-libs/glibc-*/metadata"
+  reason: >
+    The `metadata` file echoes the same RDEPEND line (see
+    l3-glibc-self-libc-dep). The finding detail is cut at 200
+    characters, so `match` cannot see the atom here and this entry
+    matches the file name. Masking tradeoff: another difference in
+    glibc's `metadata` would hide too; the RDEPEND entry above stays
+    exact. Re-tighten if diff.py stops truncating.
+  owner: portage-bug
+
 - id: perl-cluster-hash-order-601
   layer: l0
   categories: [order]
