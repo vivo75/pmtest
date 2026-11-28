@@ -30107,6 +30107,38 @@ def test_or_pick_backtrack0_reports_the_self_cycle(
     assert total == ["Total: 4 packages (4 new), Size of downloads: 0 KiB"]
 
 
+def test_g216_backtrack0_dual_root_remainder_lists_four_flat_rows(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #818: with a running root apart from `ROOT`, `--backtrack=0
+    app-misc/g216top` re-displays the stuck remainder like Portage 3.0.83
+    (bed log `l0-fx-20261128T021225Z`): four flat rows, `g216top`,
+    `g216mid`, `g216comp` for `ROOT`, `g216comp` for the running root, with
+    no `[nomerge]` ancestors. Portuale printed two extra `[nomerge]` rows
+    and a different order: the cycle's fallback pick put the running-root
+    instance last and the cross-root display reversed the list once more,
+    both leftovers from before #517 (b) made the single-root remainder
+    flat."""
+    running = tmp_path / "running"
+    running.mkdir()
+    env = dict(fixture_env)
+    env["PORTAGE_RUNNING_ROOT"] = str(running)
+    rust = _run(
+        [str(emerge_binary)],
+        ["--pretend", "--color=n", "--backtrack=0", "app-misc/g216top"],
+        env,
+    )
+    assert rust.returncode == 1
+    root = env["ROOT"]
+    assert "[nomerge" not in rust.stdout
+    assert [ln for ln in rust.stdout.splitlines() if ln.startswith("[ebuild")] == [
+        f"[ebuild  N     ] app-misc/g216top-1.0::testrepo to {root} 0 KiB",
+        f"[ebuild  N     ]  dev-libs/g216mid-1.0::testrepo to {root} 0 KiB",
+        f"[ebuild  N     ]   dev-lang/g216comp-1.0::testrepo to {root} 0 KiB",
+        f"[ebuild  N     ]    dev-lang/g216comp-1.0::testrepo to {running} 0 KiB",
+    ]
+
+
 def test_or_pick_direct_target_resolves_to_bootstrap(
     emerge_binary, fixture_env, tmp_path
 ):
