@@ -9,5 +9,10 @@
 #
 # Portage withholds `whblocker-2.0` (slot-conflict keep-installed over the
 # installed `whtarget-1.0`'s `RDEPEND="~dev-libs/whblocker-1.0"` pin)
-# and merges only `whpuller-2.0`, rc 0; portuale matches since #91 S1.
+# and merges only `whpuller-2.0`, rc 0. Portuale deliberately updates the
+# pin holder (`whtarget-2.0`) and `whblocker-2.0` with it (#698: pin
+# holders follow the update when the tree gives them a route), so the
+# plan differs from Portage's. The difference is allowlisted as
+# `whpin-pin-holder-follows-update-698` in
+# `compare/known-divergences-fixture-oracle.yaml` (#817).
 --update --deep --newuse --oneshot dev-libs/whpuller
