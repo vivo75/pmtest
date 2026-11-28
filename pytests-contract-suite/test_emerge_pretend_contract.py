@@ -27773,6 +27773,72 @@ def test_oracle_slotop_world_upgrade_with_eapi_installed_bindings(
     assert "have been skipped" not in out
 
 
+def test_oracle_slotop_argument_upgrade_is_not_held_back_by_a_build_only_consumer(
+    emerge_binary, fixture_env, tmp_path
+):
+    """Backlog #816: the slotop matrix with a consumer as the argument and
+    bed-faithful installed metadata (vdb `EAPI=8` on every row).
+
+    Same installed set as
+    `test_oracle_slotop_world_upgrade_with_eapi_installed_bindings`. With
+    `--update --deep --oneshot dev-libs/consdep` the first walk plans
+    `provpkg-2.0` and the four consumers it reaches (Total 5), as Portage
+    3.0.83 does (bed log `l0-fx-20261128T021155Z`). The second walk, run
+    with the world fed in, meets the installed `consbdep`'s
+    `BDEPEND >=dev-libs/provpkg-1.0:0/1=` as a pin, masks `provpkg-2.0` and
+    plans `consdep` alone with a skipped-update block. That plan holds an
+    update back that the first walk had, so the first walk stays (charter
+    property 3). Introduced by bbcf5e7d, which made a masked forced-upgrade
+    seed skip instead of ending the search."""
+    installed = [
+        ("dev-libs", "provpkg", "1.0", "0/1", {"EAPI": "8"}),
+    ] + [
+        (
+            "dev-libs",
+            name,
+            "1.0",
+            "0",
+            {"EAPI": "8", key: ">=dev-libs/provpkg-1.0:0/1="},
+        )
+        for name, key in (
+            ("consrdep", "RDEPEND"),
+            ("consdep", "DEPEND"),
+            ("consbdep", "BDEPEND"),
+            ("conspdep", "PDEPEND"),
+            ("considep", "IDEPEND"),
+        )
+    ]
+    world = [
+        "dev-libs/provpkg",
+        "dev-libs/consrdep",
+        "dev-libs/consdep",
+        "dev-libs/consbdep",
+        "dev-libs/conspdep",
+        "dev-libs/considep",
+    ]
+    root = _b1_root(tmp_path, world, installed)
+    env = _b1_env(fixture_env, root)
+    r = _b1_run(
+        ["--pretend", "--update", "--deep", "--newuse", "--oneshot", "dev-libs/consdep"],
+        env,
+        emerge_binary,
+    )
+    out = r.stdout + r.stderr
+    assert r.returncode == 0
+    assert [
+        ln.split("] ", 1)[1].split(" ")[0]
+        for ln in _b1_merges(out)
+        if "dev-libs/" in ln
+    ] == [
+        "dev-libs/provpkg-2.0",
+        "dev-libs/consdep-1.0",
+        "dev-libs/considep-1.0",
+        "dev-libs/conspdep-1.0",
+        "dev-libs/consrdep-1.0",
+    ]
+    assert "have been skipped" not in out
+
+
 def test_use_expand_prefix_wildcard_cancels_the_iuse_default(
     emerge_binary, tmp_path
 ):
